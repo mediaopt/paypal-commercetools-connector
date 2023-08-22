@@ -1,0 +1,1 @@
+This connector has a sample `service` application.
