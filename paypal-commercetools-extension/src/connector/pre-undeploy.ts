@@ -3,11 +3,11 @@ dotenv.config();
 
 import { createApiRoot } from '../client/create.client';
 import { assertError } from '../utils/assert.utils';
-import { deleteCartUpdateExtension } from './actions';
+import { deletePaymentUpdateExtension } from './actions';
 
 async function preUndeploy(): Promise<void> {
   const apiRoot = createApiRoot();
-  await deleteCartUpdateExtension(apiRoot);
+  await deletePaymentUpdateExtension(apiRoot);
 }
 
 async function run(): Promise<void> {
