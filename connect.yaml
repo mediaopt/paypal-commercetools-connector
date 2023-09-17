@@ -9,6 +9,8 @@ deployAs:
       standardConfiguration:
         - key: CTP_REGION
           description: commercetools Composable Commerce API region
+        - key: PAYPAL_CLIENT_ID
+          description: PayPal Client Id
       securedConfiguration:
         - key: CTP_PROJECT_KEY
           description: commercetools Composable Commerce project key
@@ -18,3 +20,5 @@ deployAs:
           description: commercetools Composable Commerce client secret
         - key: CTP_SCOPE
           description: commercetools Composable Commerce client scope
+        - key: PAYPAL_CLIENT_SECRET
+          description: PayPal Client Secret

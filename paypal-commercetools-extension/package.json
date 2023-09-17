@@ -33,6 +33,7 @@
     "prettier": "^2.7.1",
     "rimraf": "^3.0.2",
     "ts-jest": "^29.0.5",
+    "ngrok": "^4.3.3",
     "typescript": "^4.8.3"
   },
   "dependencies": {
