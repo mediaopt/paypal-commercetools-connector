@@ -8,7 +8,8 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { createPayPalOrder } from './paypal.service';
+import {capturePayPalOrder, createPayPalOrder} from './paypal.service';
+import {OrderCaptureRequest} from "../paypal/model/orderCaptureRequest";
 
 export const handleCreateOrderRequest = async (
   payment: Payment
@@ -29,14 +30,40 @@ export const handleCreateOrderRequest = async (
     ],
     ...request,
   } as OrderRequest;
-  const updateActions = handleRequest('createPayPalOrder', request);
+  let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(request);
-    return updateActions.concat(
+    updateActions = updateActions.concat(
       handlePaymentResponse('createPayPalOrder', response)
     );
+    if (!payment?.interfaceId) {
+      updateActions.push({
+        action: 'setInterfaceId',
+        interfaceId: response.id,
+      });
+    }
+    return updateActions;
   } catch (e) {
     logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('createPayPalOrder', e);
+  }
+};
+
+export const handleCaptureOrderRequest = async (
+    payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment.custom?.fields.capturePayPalOrderRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment.custom.fields.capturePayPalOrderRequest);
+  const updateActions = handleRequest('capturePayPalOrder', request);
+  try {
+    const response = await capturePayPalOrder(request.orderId, request as OrderCaptureRequest);
+    return updateActions.concat(
+        handlePaymentResponse('capturePayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to createPayPalOrder resulted in an error', e);
+    return handleError('capturePayPalOrder', e);
   }
 };
