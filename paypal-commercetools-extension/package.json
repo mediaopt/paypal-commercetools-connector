@@ -23,17 +23,19 @@
     "@types/express": "^4.17.14",
     "@types/jest": "^29.0.3",
     "@types/node": "^18.7.18",
+    "@types/request": "^2.48.8",
     "@types/validator": "^13.7.10",
     "@typescript-eslint/eslint-plugin": "^5.46.0",
     "@typescript-eslint/parser": "^5.46.0",
     "concurrently": "^7.4.0",
     "eslint": "^8.24.0",
     "jest": "^29.5.0",
+    "ngrok": "^4.3.3",
     "nodemon": "^3.0.0",
     "prettier": "^2.7.1",
+    "prettier-plugin-organize-imports": "^3.2.3",
     "rimraf": "^3.0.2",
     "ts-jest": "^29.0.5",
-    "ngrok": "^4.3.3",
     "typescript": "^4.8.3"
   },
   "dependencies": {
@@ -43,6 +45,7 @@
     "body-parser": "^1.20.0",
     "dotenv": "^16.0.3",
     "express": "4.18.2",
+    "request": "^2.81.0",
     "validator": "^13.7.0"
   }
 }

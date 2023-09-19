@@ -1,10 +1,10 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 
+import { PaymentReference } from '@commercetools/platform-sdk';
 import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
-import { PaymentReference } from '@commercetools/platform-sdk';
-import { logger } from '../utils/logger.utils';
 import { handleCreateOrderRequest } from '../service/payments.service';
+import { logger } from '../utils/logger.utils';
 
 /**
  * Handle the update action
@@ -19,7 +19,7 @@ const update = async (resource: Resource) => {
       return;
     }
     logger.info(`Update payment with id ${payment.obj.id}`);
-    const updateActions: Array<UpdateAction> = handleCreateOrderRequest(
+    const updateActions: Array<UpdateAction> = await handleCreateOrderRequest(
       payment.obj
     );
     return { statusCode: 200, actions: updateActions };

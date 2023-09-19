@@ -4,6 +4,7 @@ dotenv.config();
 import { createApiRoot } from '../client/create.client';
 import { assertError, assertString } from '../utils/assert.utils';
 import {
+  createCustomPaymentInteractionType,
   createCustomPaymentType,
   createPaymentUpdateExtension,
 } from './actions';
@@ -18,6 +19,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const apiRoot = createApiRoot();
   await createPaymentUpdateExtension(apiRoot, applicationUrl);
   await createCustomPaymentType(apiRoot);
+  await createCustomPaymentInteractionType(apiRoot);
 }
 
 async function run(): Promise<void> {

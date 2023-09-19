@@ -1,8 +1,8 @@
 import {
   optional,
-  standardString,
-  standardKey,
   region,
+  standardKey,
+  standardString,
 } from './helpers.validators';
 
 /**
