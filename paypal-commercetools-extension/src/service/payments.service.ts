@@ -9,6 +9,7 @@ import {
   handleRequest,
 } from '../utils/response.utils';
 import { createPayPalOrder } from './paypal.service';
+import {mapCommercetoolsMoneyToPayPalMoney} from "../utils/map.utils";
 
 export const handleCreateOrderRequest = async (
   payment: Payment
@@ -23,7 +24,7 @@ export const handleCreateOrderRequest = async (
       {
         amount: {
           currencyCode: payment.amountPlanned.currencyCode,
-          value: payment.amountPlanned.centAmount,
+          value: mapCommercetoolsMoneyToPayPalMoney(payment.amountPlanned),
         },
       },
     ],
