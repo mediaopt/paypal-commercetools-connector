@@ -7,7 +7,10 @@ import {
 
 const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 const PAYPAL_PAYMENT_TYPE_KEY = 'paypal-payment-type';
-export const PAYPAL_API_PAYMENT_ENDPOINTS = ['createPayPalOrder'];
+export const PAYPAL_API_PAYMENT_ENDPOINTS = [
+  'createPayPalOrder',
+  'getClientToken',
+];
 
 export async function createPaymentUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
