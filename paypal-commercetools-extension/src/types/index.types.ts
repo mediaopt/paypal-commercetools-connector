@@ -19,3 +19,5 @@ export type Wrapper = (
 ) => (value: object) => boolean;
 
 export type UpdateActions = Array<UpdateAction>;
+
+export type StringOrObject = string | object;

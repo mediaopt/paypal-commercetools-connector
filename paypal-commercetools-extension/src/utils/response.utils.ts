@@ -1,10 +1,12 @@
-import { getCurrentTimestamp } from './data.utils';
+import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
+import { HttpError } from '../paypal/api/apis';
+import {StringOrObject, UpdateActions} from '../types/index.types';
+import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
-import { UpdateActions } from '../types/index.types';
 
 export const handleRequest = (
   requestName: string,
-  request: string | object
+  request: StringOrObject
 ): UpdateActions => {
   const updateActions: UpdateActions = [];
   if (typeof request === 'object') {
@@ -14,25 +16,21 @@ export const handleRequest = (
     action: 'addInterfaceInteraction',
     type: {
       typeId: 'type',
-      key: 'BRAINTREE_PAYMENT_INTERACTION_TYPE_KEY',
+      key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
     },
     fields: {
-      type: requestName + 'Request',
+      type: `${requestName}Request`,
       data: stringifyData(request),
       timestamp: getCurrentTimestamp(),
     },
   });
-  logger.info(`${requestName} request: ${JSON.stringify(request)}`);
+  logger.info(`${requestName} request: ${stringifyData(request)}`);
   return updateActions;
 };
 
-function stringifyData(data: string | object) {
-  return typeof data === 'string' ? data : JSON.stringify(data);
-}
-
 export const handlePaymentResponse = (
   requestName: string,
-  response: string | object,
+  response: StringOrObject,
   transactionId?: string
 ): UpdateActions => {
   const updateActions: UpdateActions = [];
@@ -42,17 +40,17 @@ export const handlePaymentResponse = (
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
     transactionId: transactionId,
-    name: requestName + 'Response',
+    name: `${requestName}Response`,
     value: stringifyData(response),
   });
   updateActions.push({
     action: 'addInterfaceInteraction',
     type: {
       typeId: 'type',
-      key: 'BRAINTREE_PAYMENT_INTERACTION_TYPE_KEY',
+      key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
     },
     fields: {
-      type: requestName + 'Response',
+      type: `${requestName}Response`,
       data: stringifyData(response),
       timestamp: getCurrentTimestamp(),
     },
@@ -60,7 +58,7 @@ export const handlePaymentResponse = (
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
     transactionId: transactionId,
-    name: requestName + 'Request',
+    name: `${requestName}Request`,
     value: null,
   });
   return updateActions;
@@ -86,7 +84,9 @@ export const handleError = (
   transactionId?: string
 ): UpdateActions => {
   const errorMessage =
-    error instanceof Error && 'message' in error
+    error instanceof HttpError
+      ? `${error.body.message}: ${error.body.details[0].description ?? ''}`
+      : error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
   const updateActions: UpdateActions = [];

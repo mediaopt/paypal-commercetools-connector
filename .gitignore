@@ -3,6 +3,7 @@ coverage
 .terraform
 *.tfstate*
 *.tfvars
+.idea
 
 .DS_Store
 .vscode
