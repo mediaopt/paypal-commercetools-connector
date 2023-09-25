@@ -36,25 +36,30 @@ export const createPayPalOrder = async (request: OrderRequest) => {
 };
 
 export async function getClientToken() {
-  const accessToken = await generateAccessToken();
-
-  const response = await fetch(`${getAPIEndpoint()}/v1/identity/generate-token`, {
-    method: 'post',
-
+  const token = await generateAccessToken();
+  const options = {
+    method: 'POST',
+    url: `${getAPIEndpoint()}/v1/identity/generate-token`,
     headers: {
-      Authorization: `Bearer ${accessToken}`,
-
-      'Accept-Language': 'en_US',
-
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    },
+    }
+  };
+  return new Promise<string>((resolve, reject) => {
+    request(options, function (error: Error, response: request.Response) {
+      if (error) reject(error);
+      if (
+          response.statusCode &&
+          response.statusCode >= 200 &&
+          response.statusCode <= 299
+      ) {
+        const body = JSON.parse(response.body);
+        resolve(body['client_token']);
+      } else {
+        reject(new CustomError(response.statusCode, response.statusMessage));
+      }
+    });
   });
-
-  console.log('response', response.status);
-
-  const jsonData = await handleResponse(response);
-
-  return jsonData.client_token;
 }
 
 const generateAccessToken = async (): Promise<string> => {
@@ -98,13 +103,3 @@ const getAPIEndpoint = () => {
     ? PAYPAL_API_LIVE
     : PAYPAL_API_SANDBOX;
 };
-
-async function handleResponse(response: Response) {
-  if (response.status === 200 || response.status === 201) {
-    return response.json();
-  }
-
-  const errorMessage = await response.text();
-
-  throw new Error(errorMessage);
-}
