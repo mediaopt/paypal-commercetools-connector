@@ -1,16 +1,16 @@
 import { Payment } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
+import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
 import { logger } from '../utils/logger.utils';
+import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
   handleError,
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import {capturePayPalOrder, createPayPalOrder} from './paypal.service';
-import {OrderCaptureRequest} from "../paypal/model/orderCaptureRequest";
-import {mapCommercetoolsMoneyToPayPalMoney} from "../utils/map.utils";
+import { capturePayPalOrder, createPayPalOrder } from './paypal.service';
 
 export const handleCreateOrderRequest = async (
   payment: Payment
@@ -51,7 +51,7 @@ export const handleCreateOrderRequest = async (
 };
 
 export const handleCaptureOrderRequest = async (
-    payment: Payment
+  payment: Payment
 ): Promise<UpdateAction[]> => {
   if (!payment.custom?.fields.capturePayPalOrderRequest) {
     return [];
@@ -59,9 +59,12 @@ export const handleCaptureOrderRequest = async (
   const request = JSON.parse(payment.custom.fields.capturePayPalOrderRequest);
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
-    const response = await capturePayPalOrder(request.orderId, request as OrderCaptureRequest);
+    const response = await capturePayPalOrder(
+      request.orderId,
+      request as OrderCaptureRequest
+    );
     return updateActions.concat(
-        handlePaymentResponse('capturePayPalOrder', response)
+      handlePaymentResponse('capturePayPalOrder', response)
     );
   } catch (e) {
     logger.error('Call to createPayPalOrder resulted in an error', e);

@@ -1,9 +1,12 @@
 import { PaymentReference } from '@commercetools/platform-sdk';
 import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
-import {handleCaptureOrderRequest, handleCreateOrderRequest} from '../service/payments.service';
+import {
+  handleCaptureOrderRequest,
+  handleCreateOrderRequest,
+} from '../service/payments.service';
+import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
-import {UpdateActions} from "../types/index.types";
 
 /**
  * Handle the update action
@@ -20,8 +23,8 @@ const update = async (resource: Resource) => {
     }
     logger.info(`Update payment with id ${payment.obj.id}`);
     updateActions = updateActions.concat(
-        await handleCreateOrderRequest(payment.obj),
-        await handleCaptureOrderRequest(payment.obj),
+      await handleCreateOrderRequest(payment.obj),
+      await handleCaptureOrderRequest(payment.obj)
     );
     return { statusCode: 200, actions: updateActions };
   } catch (error) {
