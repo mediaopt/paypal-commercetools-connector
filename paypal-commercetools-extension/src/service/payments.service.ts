@@ -3,6 +3,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
 import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
+import { UpdatePayPalOrderRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
@@ -10,7 +11,11 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { capturePayPalOrder, createPayPalOrder } from './paypal.service';
+import {
+  capturePayPalOrder,
+  createPayPalOrder,
+  updatePayPalOrder,
+} from './paypal.service';
 
 export const handleCreateOrderRequest = async (
   payment: Payment
@@ -69,5 +74,26 @@ export const handleCaptureOrderRequest = async (
   } catch (e) {
     logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('capturePayPalOrder', e);
+  }
+};
+
+export const handleUpdateOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment.custom?.fields.updatePayPalOrderRequest) {
+    return [];
+  }
+  const request = JSON.parse(
+    payment.custom.fields.updatePayPalOrderRequest
+  ) as UpdatePayPalOrderRequest;
+  const updateActions = handleRequest('updatePayPalOrder', request);
+  try {
+    const response = await updatePayPalOrder(request.orderId, request.patch);
+    return updateActions.concat(
+      handlePaymentResponse('updatePayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to updatePayPalOrder resulted in an error', e);
+    return handleError('updatePayPalOrder', e);
   }
 };
