@@ -22,7 +22,9 @@ const getPayPalGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   const token = await generateAccessToken();
   logger.info(JSON.stringify(token));
   gateway.accessToken = token;
-  gateway.addInterceptor(function (options) {options.timeout = timeout;});
+  gateway.addInterceptor(function (options) {
+    options.timeout = timeout;
+  });
   return gateway;
 };
 

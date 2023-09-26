@@ -1,12 +1,12 @@
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
 import { HttpError } from '../paypal/api/apis';
-import { UpdateActions } from '../types/index.types';
+import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
 
 export const handleRequest = (
   requestName: string,
-  request: string | object
+  request: StringOrObject
 ): UpdateActions => {
   const updateActions: UpdateActions = [];
   if (typeof request === 'object') {
@@ -19,18 +19,18 @@ export const handleRequest = (
       key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
     },
     fields: {
-      type: requestName + 'Request',
+      type: `${requestName}Request`,
       data: stringifyData(request),
       timestamp: getCurrentTimestamp(),
     },
   });
-  logger.info(`${requestName} request: ${JSON.stringify(request)}`);
+  logger.info(`${requestName} request: ${stringifyData(request)}`);
   return updateActions;
 };
 
 export const handlePaymentResponse = (
   requestName: string,
-  response: string | object,
+  response: StringOrObject,
   transactionId?: string
 ): UpdateActions => {
   const updateActions: UpdateActions = [];
@@ -40,7 +40,7 @@ export const handlePaymentResponse = (
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
     transactionId: transactionId,
-    name: requestName + 'Response',
+    name: `${requestName}Response`,
     value: stringifyData(response),
   });
   updateActions.push({
@@ -50,7 +50,7 @@ export const handlePaymentResponse = (
       key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
     },
     fields: {
-      type: requestName + 'Response',
+      type: `${requestName}Response`,
       data: stringifyData(response),
       timestamp: getCurrentTimestamp(),
     },
@@ -58,7 +58,7 @@ export const handlePaymentResponse = (
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
     transactionId: transactionId,
-    name: requestName + 'Request',
+    name: `${requestName}Request`,
     value: null,
   });
   return updateActions;
@@ -85,7 +85,7 @@ export const handleError = (
 ): UpdateActions => {
   const errorMessage =
     error instanceof HttpError
-      ? error.body.message + ': ' + (error.body.details[0].description ?? '')
+      ? `${error.body.message}: ${error.body.details[0].description ?? ''}`
       : error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
