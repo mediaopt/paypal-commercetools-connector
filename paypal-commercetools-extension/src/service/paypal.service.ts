@@ -3,8 +3,8 @@ import { OrdersApi } from '../paypal/api/ordersApi';
 
 import { randomUUID } from 'crypto';
 import request from 'request';
+import { OrderRequest } from '../paypal/model/orderRequest';
 import { logger } from '../utils/logger.utils';
-import {OrderRequest} from "../paypal/model/orderRequest";
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -21,7 +21,9 @@ const getPayPalGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   const token = await generateAccessToken();
   logger.info(JSON.stringify(token));
   gateway.accessToken = token;
-  gateway.addInterceptor(function (options) {options.timeout = timeout;});
+  gateway.addInterceptor(function (options) {
+    options.timeout = timeout;
+  });
   return gateway;
 };
 

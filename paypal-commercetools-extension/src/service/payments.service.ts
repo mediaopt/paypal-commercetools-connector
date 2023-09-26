@@ -3,13 +3,13 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
 import { OrderRequest } from '../paypal/model/orderRequest';
 import { logger } from '../utils/logger.utils';
+import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
   handleError,
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
 import { createPayPalOrder } from './paypal.service';
-import {mapCommercetoolsMoneyToPayPalMoney} from "../utils/map.utils";
 
 export const handleCreateOrderRequest = async (
   payment: Payment
