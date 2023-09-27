@@ -1,8 +1,8 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import express, { Express } from 'express';
 import bodyParser from 'body-parser';
+import express, { Express } from 'express';
 
 // Import routes
 import ServiceRoutes from './routes/service.route';
@@ -10,8 +10,8 @@ import ServiceRoutes from './routes/service.route';
 // Import logger
 import { logger } from './utils/logger.utils';
 
-import { readConfiguration } from './utils/config.utils';
 import { errorMiddleware } from './middleware/error.middleware';
+import { readConfiguration } from './utils/config.utils';
 
 // Read env variables
 readConfiguration();

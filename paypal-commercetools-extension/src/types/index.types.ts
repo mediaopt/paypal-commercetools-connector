@@ -1,3 +1,5 @@
+import { UpdateAction } from '@commercetools/sdk-client-v2';
+
 export type Message = {
   code: string;
   message: string;
@@ -15,3 +17,7 @@ export type ValidatorFunction = (o: object) => boolean;
 export type Wrapper = (
   validator: ValidatorFunction
 ) => (value: object) => boolean;
+
+export type UpdateActions = Array<UpdateAction>;
+
+export type StringOrObject = string | object;

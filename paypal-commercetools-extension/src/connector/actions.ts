@@ -1,12 +1,14 @@
-import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import {
   FieldDefinition,
   TypeAddFieldDefinitionAction,
   TypeDraft,
 } from '@commercetools/platform-sdk';
+import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 
 const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 const PAYPAL_PAYMENT_TYPE_KEY = 'paypal-payment-type';
+export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
+  'paypal-payment-interaction-type';
 export const PAYPAL_API_PAYMENT_ENDPOINTS = ['createPayPalOrder'];
 
 export async function createPaymentUpdateExtension(
@@ -43,6 +45,7 @@ export async function createPaymentUpdateExtension(
     .post({
       body: {
         key: PAYPAL_PAYMENT_EXTENSION_KEY,
+        timeoutInMs: 10000,
         destination: {
           type: 'HTTP',
           url: applicationUrl,
@@ -190,4 +193,52 @@ function mapEndpointsToCondition(endpoints: string[]) {
       .join(' or ') +
     ')'
   );
+}
+
+export async function createCustomPaymentInteractionType(
+  apiRoot: ByProjectKeyRequestBuilder
+): Promise<void> {
+  const fieldDefinitions: FieldDefinition[] = [
+    {
+      name: 'type',
+      label: {
+        en: 'type',
+      },
+      type: {
+        name: 'String',
+      },
+      inputHint: 'SingleLine',
+      required: false,
+    },
+    {
+      name: 'data',
+      label: {
+        en: 'data',
+      },
+      type: {
+        name: 'String',
+      },
+      inputHint: 'MultiLine',
+      required: false,
+    },
+    {
+      name: 'timestamp',
+      label: {
+        en: 'timestamp',
+      },
+      type: {
+        name: 'DateTime',
+      },
+      required: false,
+    },
+  ];
+  const customType = {
+    key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+    name: {
+      en: 'Custom payment interaction type to PayPal fields',
+    },
+    resourceTypeIds: ['payment-interface-interaction'],
+    fieldDefinitions: fieldDefinitions,
+  };
+  await addOrUpdateCustomType(apiRoot, customType);
 }
