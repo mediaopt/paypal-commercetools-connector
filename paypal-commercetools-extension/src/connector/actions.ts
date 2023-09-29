@@ -9,7 +9,10 @@ const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 const PAYPAL_PAYMENT_TYPE_KEY = 'paypal-payment-type';
 export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
   'paypal-payment-interaction-type';
-export const PAYPAL_API_PAYMENT_ENDPOINTS = ['createPayPalOrder'];
+export const PAYPAL_API_PAYMENT_ENDPOINTS = [
+  'createPayPalOrder',
+  'capturePayPalOrder',
+];
 
 export async function createPaymentUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
@@ -187,7 +190,7 @@ async function addOrUpdateCustomType(
 
 function mapEndpointsToCondition(endpoints: string[]) {
   return (
-    'custom(fields is defined) AND (' +
+    'custom is defined AND custom(fields is defined) AND (' +
     endpoints
       .map((endpoint) => `custom(fields(${endpoint}Request is defined))`)
       .join(' or ') +

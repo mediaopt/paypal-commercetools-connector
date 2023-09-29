@@ -3,6 +3,7 @@ import { OrdersApi } from '../paypal/api/ordersApi';
 
 import { randomUUID } from 'crypto';
 import request from 'request';
+import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
 import { logger } from '../utils/logger.utils';
 
@@ -32,6 +33,23 @@ export const createPayPalOrder = async (request: OrderRequest) => {
   const response = await gateway.ordersCreate(
     randomUUID(),
     'application/json',
+    request
+  );
+  return response.body;
+};
+
+export const capturePayPalOrder = async (
+  orderId: string,
+  request: OrderCaptureRequest
+) => {
+  const gateway = await getPayPalGateway();
+  const response = await gateway.ordersCapture(
+    randomUUID(),
+    orderId,
+    'application/json',
+    undefined,
+    undefined,
+    undefined,
     request
   );
   return response.body;
