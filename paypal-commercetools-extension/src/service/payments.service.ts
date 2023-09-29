@@ -3,7 +3,6 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
 import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
-import { UpdatePayPalOrderRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
@@ -80,15 +79,15 @@ export const handleCaptureOrderRequest = async (
 export const handleUpdateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.updatePayPalOrderRequest) {
+  const updateRequest = payment.custom?.fields.updatePayPalOrderRequest;
+  if (!updateRequest) {
     return [];
   }
-  const request = JSON.parse(
-    payment.custom.fields.updatePayPalOrderRequest
-  ) as UpdatePayPalOrderRequest;
+  const request = JSON.parse(updateRequest);
+  const { orderId, patch } = request;
   const updateActions = handleRequest('updatePayPalOrder', request);
   try {
-    const response = await updatePayPalOrder(request.orderId, request.patch);
+    const response = await updatePayPalOrder(orderId, patch);
     return updateActions.concat(
       handlePaymentResponse('updatePayPalOrder', response)
     );
