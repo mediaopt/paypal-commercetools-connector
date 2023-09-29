@@ -63,15 +63,15 @@ export async function getClientToken() {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   };
   return new Promise<string>((resolve, reject) => {
     request(options, function (error: Error, response: request.Response) {
       if (error) reject(error);
       if (
-          response.statusCode &&
-          response.statusCode >= 200 &&
-          response.statusCode <= 299
+        response.statusCode &&
+        response.statusCode >= 200 &&
+        response.statusCode <= 299
       ) {
         const body = JSON.parse(response.body);
         resolve(body['client_token']);

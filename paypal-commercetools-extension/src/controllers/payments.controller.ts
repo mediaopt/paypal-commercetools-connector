@@ -26,7 +26,7 @@ const update = async (resource: Resource) => {
     updateActions = updateActions.concat(
       await handleCreateOrderRequest(payment.obj),
       await handleCaptureOrderRequest(payment.obj),
-     await handleGetClientTokenRequest(payment.obj),
+      await handleGetClientTokenRequest(payment.obj)
     );
     return { statusCode: 200, actions: updateActions };
   } catch (error) {

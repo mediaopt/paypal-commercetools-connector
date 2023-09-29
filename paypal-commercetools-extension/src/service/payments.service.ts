@@ -3,6 +3,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
 import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
+import { ClientTokenRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
@@ -10,20 +11,11 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { capturePayPalOrder, createPayPalOrder, getClientToken } from './paypal.service';
-
-export interface ClientTokenRequest {
-  customerId?: string | undefined;
-  merchantAccountId?: string | undefined;
-  options?:
-      | {
-    failOnDuplicatePaymentMethod?: boolean | undefined;
-    makeDefault?: boolean | undefined;
-    verifyCard?: boolean | undefined;
-  }
-      | undefined;
-  version?: string | undefined;
-}
+import {
+  capturePayPalOrder,
+  createPayPalOrder,
+  getClientToken,
+} from './paypal.service';
 
 export const handleCreateOrderRequest = async (
   payment: Payment
@@ -86,12 +78,11 @@ export const handleCaptureOrderRequest = async (
 };
 
 export async function handleGetClientTokenRequest(payment?: Payment) {
-  if (!payment?.custom?.fields?.getClientTokenRequest) {
+  const clientTokenRequest = payment?.custom?.fields?.getClientTokenRequest;
+  if (!clientTokenRequest) {
     return [];
   }
-  let request: ClientTokenRequest = JSON.parse(
-      payment.custom.fields.getClientTokenRequest
-  );
+  let request: ClientTokenRequest = JSON.parse(clientTokenRequest);
   request = {
     merchantAccountId: process.env.BRAINTREE_MERCHANT_ACCOUNT || undefined,
     ...request,
@@ -100,7 +91,7 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
   try {
     const response = await getClientToken();
     return updateActions.concat(
-        handlePaymentResponse('getClientToken', response)
+      handlePaymentResponse('getClientToken', response)
     );
   } catch (e) {
     logger.error('Call to getClientToken resulted in an error', e);
