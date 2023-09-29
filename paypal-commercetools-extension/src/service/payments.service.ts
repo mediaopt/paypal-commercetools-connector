@@ -1,15 +1,16 @@
 import { Payment } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
+import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
 import { logger } from '../utils/logger.utils';
+import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
   handleError,
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { createPayPalOrder, getClientToken } from './paypal.service';
-import {mapCommercetoolsMoneyToPayPalMoney} from "../utils/map.utils";
+import { capturePayPalOrder, createPayPalOrder, getClientToken } from './paypal.service';
 
 export interface ClientTokenRequest {
   customerId?: string | undefined;
@@ -43,15 +44,44 @@ export const handleCreateOrderRequest = async (
     ],
     ...request,
   } as OrderRequest;
-  const updateActions = handleRequest('createPayPalOrder', request);
+  let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(request);
-    return updateActions.concat(
+    updateActions = updateActions.concat(
       handlePaymentResponse('createPayPalOrder', response)
     );
+    if (!payment?.interfaceId) {
+      updateActions.push({
+        action: 'setInterfaceId',
+        interfaceId: response.id,
+      });
+    }
+    return updateActions;
   } catch (e) {
     logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('createPayPalOrder', e);
+  }
+};
+
+export const handleCaptureOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment.custom?.fields.capturePayPalOrderRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment.custom.fields.capturePayPalOrderRequest);
+  const updateActions = handleRequest('capturePayPalOrder', request);
+  try {
+    const response = await capturePayPalOrder(
+      request.orderId,
+      request as OrderCaptureRequest
+    );
+    return updateActions.concat(
+      handlePaymentResponse('capturePayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to createPayPalOrder resulted in an error', e);
+    return handleError('capturePayPalOrder', e);
   }
 };
 

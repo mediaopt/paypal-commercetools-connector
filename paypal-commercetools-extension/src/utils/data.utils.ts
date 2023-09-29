@@ -1,4 +1,4 @@
-import {StringOrObject} from "../types/index.types";
+import { StringOrObject } from '../types/index.types';
 
 export const getCurrentTimestamp = (): string => {
   return new Date().toISOString();

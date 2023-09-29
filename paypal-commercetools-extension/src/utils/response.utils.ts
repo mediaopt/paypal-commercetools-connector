@@ -1,6 +1,6 @@
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
 import { HttpError } from '../paypal/api/apis';
-import {StringOrObject, UpdateActions} from '../types/index.types';
+import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
 
