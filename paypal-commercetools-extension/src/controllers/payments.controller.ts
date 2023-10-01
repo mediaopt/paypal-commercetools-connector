@@ -4,6 +4,7 @@ import { Resource } from '../interfaces/resource.interface';
 import {
   handleCaptureOrderRequest,
   handleCreateOrderRequest,
+  handleUpdateOrderRequest,
 } from '../service/payments.service';
 import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
@@ -24,7 +25,8 @@ const update = async (resource: Resource) => {
     logger.info(`Update payment with id ${payment.obj.id}`);
     updateActions = updateActions.concat(
       await handleCreateOrderRequest(payment.obj),
-      await handleCaptureOrderRequest(payment.obj)
+      await handleCaptureOrderRequest(payment.obj),
+      await handleUpdateOrderRequest(payment.obj)
     );
     return { statusCode: 200, actions: updateActions };
   } catch (error) {
