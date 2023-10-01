@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import request from 'request';
 import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
+import { Patch } from '../paypal/model/patch';
 import { logger } from '../utils/logger.utils';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
@@ -36,6 +37,24 @@ export const createPayPalOrder = async (request: OrderRequest) => {
     request
   );
   return response.body;
+};
+
+export const updatePayPalOrder = async (
+  orderId: string,
+  request: Array<Patch>
+) => {
+  const gateway = await getPayPalGateway();
+  const response = await gateway.ordersPatch(
+    orderId,
+    'application/json',
+    request
+  );
+  if (response.response.statusCode === 204) {
+    return {
+      status: 'success',
+    };
+  }
+  return response.response;
 };
 
 export const capturePayPalOrder = async (

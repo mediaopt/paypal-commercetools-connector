@@ -1,4 +1,5 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { Patch } from '../paypal/model/patch';
 
 export type Message = {
   code: string;
@@ -31,4 +32,9 @@ export type ClientTokenRequest = {
     verifyCard?: boolean;
   };
   version?: string;
+};
+
+export type UpdatePayPalOrderRequest = {
+  orderId: string;
+  patch: Array<Patch>;
 };
