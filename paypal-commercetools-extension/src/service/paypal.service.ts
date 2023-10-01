@@ -74,6 +74,33 @@ export const capturePayPalOrder = async (
   return response.body;
 };
 
+export async function getClientToken() {
+  const token = await generateAccessToken();
+  const options = {
+    method: 'POST',
+    url: `${getAPIEndpoint()}/v1/identity/generate-token`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  };
+  return new Promise<string>((resolve, reject) => {
+    request(options, function (error: Error, response: request.Response) {
+      if (error) reject(error);
+      if (
+        response.statusCode &&
+        response.statusCode >= 200 &&
+        response.statusCode <= 299
+      ) {
+        const body = JSON.parse(response.body);
+        resolve(body['client_token']);
+      } else {
+        reject(new CustomError(response.statusCode, response.statusMessage));
+      }
+    });
+  });
+}
+
 const generateAccessToken = async (): Promise<string> => {
   const credentials = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`

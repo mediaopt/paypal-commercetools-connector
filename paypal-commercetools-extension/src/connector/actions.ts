@@ -11,6 +11,7 @@ export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
   'paypal-payment-interaction-type';
 export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'createPayPalOrder',
+  'getClientToken',
   'capturePayPalOrder',
   'updatePayPalOrder',
 ];

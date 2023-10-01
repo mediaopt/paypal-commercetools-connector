@@ -3,6 +3,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
 import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
+import { ClientTokenRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
 import {
@@ -13,6 +14,7 @@ import {
 import {
   capturePayPalOrder,
   createPayPalOrder,
+  getClientToken,
   updatePayPalOrder,
 } from './paypal.service';
 
@@ -75,6 +77,28 @@ export const handleCaptureOrderRequest = async (
     return handleError('capturePayPalOrder', e);
   }
 };
+
+export async function handleGetClientTokenRequest(payment?: Payment) {
+  const clientTokenRequest = payment?.custom?.fields?.getClientTokenRequest;
+  if (!clientTokenRequest) {
+    return [];
+  }
+  let request: ClientTokenRequest = JSON.parse(clientTokenRequest);
+  request = {
+    merchantAccountId: process.env.BRAINTREE_MERCHANT_ACCOUNT || undefined,
+    ...request,
+  };
+  const updateActions = handleRequest('getClientToken', request);
+  try {
+    const response = await getClientToken();
+    return updateActions.concat(
+      handlePaymentResponse('getClientToken', response)
+    );
+  } catch (e) {
+    logger.error('Call to getClientToken resulted in an error', e);
+    return handleError('getClientToken', e);
+  }
+}
 
 export const handleUpdateOrderRequest = async (
   payment: Payment

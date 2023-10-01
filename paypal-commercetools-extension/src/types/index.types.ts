@@ -23,6 +23,17 @@ export type UpdateActions = Array<UpdateAction>;
 
 export type StringOrObject = string | object;
 
+export type ClientTokenRequest = {
+  customerId?: string;
+  merchantAccountId?: string;
+  options?: {
+    failOnDuplicatePaymentMethod?: boolean;
+    makeDefault?: boolean;
+    verifyCard?: boolean;
+  };
+  version?: string;
+};
+
 export type UpdatePayPalOrderRequest = {
   orderId: string;
   patch: Array<Patch>;
