@@ -7,6 +7,7 @@ import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model/orderRequest';
 import { Patch } from '../paypal/model/patch';
 import { logger } from '../utils/logger.utils';
+import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -104,6 +105,14 @@ export async function getClientToken() {
 }
 
 const generateAccessToken = async (): Promise<string> => {
+  const cachedToken = await getCachedAccessToken();
+  if (
+    cachedToken?.value &&
+    cachedToken.value.validUntil > new Date().toISOString()
+  ) {
+    logger.debug('Using cached token');
+    return cachedToken.value.accessToken;
+  }
   const credentials = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
   ).toString('base64');
@@ -131,6 +140,15 @@ const generateAccessToken = async (): Promise<string> => {
         response.statusCode <= 299
       ) {
         const body = JSON.parse(response.body);
+        cacheAccessToken(
+          {
+            accessToken: body['access_token'],
+            validUntil: new Date(
+              new Date().getTime() + body['expires_in'] * 1000
+            ),
+          },
+          cachedToken?.version ?? 0
+        );
         resolve(body['access_token']);
       } else {
         reject(new CustomError(response.statusCode, response.statusMessage));
