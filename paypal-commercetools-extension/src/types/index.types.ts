@@ -38,3 +38,8 @@ export type UpdatePayPalOrderRequest = {
   orderId: string;
   patch: Array<Patch>;
 };
+
+export type AccessTokenObject = {
+  accessToken: string;
+  validUntil: Date;
+};
