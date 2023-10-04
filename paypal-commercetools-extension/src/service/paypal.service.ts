@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.utils';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
+const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
 
 const TIMEOUT_PAYMENT = 9500;
 const getPayPalGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
@@ -34,7 +35,8 @@ export const createPayPalOrder = async (request: OrderRequest) => {
   const response = await gateway.ordersCreate(
     randomUUID(),
     'application/json',
-    request
+    request,
+    PAYPAL_PARTNER_ATTRIBUTION_ID
   );
   return response.body;
 };
