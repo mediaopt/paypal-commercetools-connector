@@ -60,6 +60,12 @@ export const updatePayPalOrder = async (
   return response.response;
 };
 
+export const getPayPalOrder = async (orderId: string) => {
+  const gateway = await getPayPalGateway();
+  const response = await gateway.ordersGet(orderId, 'application/json');
+  return response.body;
+};
+
 export const capturePayPalOrder = async (
   orderId: string,
   request: OrderCaptureRequest
