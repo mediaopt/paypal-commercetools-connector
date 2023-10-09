@@ -15,21 +15,29 @@ const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
 const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
 
 const TIMEOUT_PAYMENT = 9500;
-const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+
+async function initializeGateway(gateway: OrdersApi, timeout: number) {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
       'Internal Server Error - braintree config is missing'
     );
   }
-  const gateway = new OrdersApi(getAPIEndpoint());
   const token = await generateAccessToken();
   logger.info(JSON.stringify(token));
   gateway.accessToken = token;
   gateway.addInterceptor(function (options) {
     options.timeout = timeout;
+    if (options.headers) {
+      options.headers['PayPal-Partner-Attribution-Id'] =
+        PAYPAL_PARTNER_ATTRIBUTION_ID;
+    }
   });
   return gateway;
+}
+
+const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+  return await initializeGateway(new OrdersApi(getAPIEndpoint()), timeout);
 };
 
 export const createPayPalOrder = async (request: OrderRequest) => {
@@ -37,8 +45,7 @@ export const createPayPalOrder = async (request: OrderRequest) => {
   const response = await gateway.ordersCreate(
     randomUUID(),
     'application/json',
-    request,
-    PAYPAL_PARTNER_ATTRIBUTION_ID
+    request
   );
   return response.body;
 };
@@ -109,6 +116,7 @@ export async function getClientToken() {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
     },
   };
   return new Promise<string>((resolve, reject) => {
@@ -146,6 +154,7 @@ const generateAccessToken = async (): Promise<string> => {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${credentials}`,
+      'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
     },
     form: {
       grant_type: 'client_credentials',
