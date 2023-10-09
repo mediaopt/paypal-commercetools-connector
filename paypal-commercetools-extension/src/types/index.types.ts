@@ -43,3 +43,35 @@ export type AccessTokenObject = {
   accessToken: string;
   validUntil: Date;
 };
+
+export type PayPalSettings = {
+  acceptPayPal: boolean;
+  acceptPayLater: boolean;
+  acceptVenmo: boolean;
+  acceptLocal: boolean;
+  acceptCredit: boolean;
+  buttonPaymentPage: boolean;
+  buttonCartPage: boolean;
+  buttonDetailPage: boolean;
+  buttonShippingPage: boolean;
+  buttonLayout: string;
+  buttonShape: string;
+  buttonTagline: boolean;
+  buttonColor: string;
+  buttonLabel: string;
+  payLaterMessagingType: string;
+  payLaterMessageCartPage: boolean;
+  payLaterMessagePaymentPage: boolean;
+  payLaterMessageCategoryPage: boolean;
+  payLaterMessageDetailsPage: boolean;
+  payLaterMessageHomePage: boolean;
+  payLaterMessageTextLogoType: string;
+  payLaterMessageTextLogoPosition: string;
+  payLaterMessageTextColor: string;
+  payLaterMessageTextSize: string;
+  payLaterMessageTextAlign: string;
+  payLaterMessageFlexColor: string;
+  payLaterMessageFlexRatio: string;
+  threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
+  payPalIntent: 'capture' | 'authorize';
+};

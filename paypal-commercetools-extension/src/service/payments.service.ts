@@ -11,6 +11,7 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
+import { getSettings } from './config.service';
 import {
   capturePayPalOrder,
   createPayPalOrder,
@@ -26,8 +27,10 @@ export const handleCreateOrderRequest = async (
     return [];
   }
   let request = JSON.parse(payment.custom.fields.createPayPalOrderRequest);
+  const settings = await getSettings();
   request = {
-    intent: CheckoutPaymentIntent.Capture,
+    intent:
+      settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
     purchaseUnits: [
       {
         amount: {
