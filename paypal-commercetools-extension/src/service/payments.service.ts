@@ -15,6 +15,7 @@ import {
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
+  getPayPalOrder,
   updatePayPalOrder,
 } from './paypal.service';
 
@@ -118,5 +119,26 @@ export const handleUpdateOrderRequest = async (
   } catch (e) {
     logger.error('Call to updatePayPalOrder resulted in an error', e);
     return handleError('updatePayPalOrder', e);
+  }
+};
+
+export const handleGetOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  const getRequest = payment.custom?.fields.getPayPalOrderRequest;
+  if (!getRequest) {
+    return [];
+  }
+  const request = JSON.parse(getRequest);
+  const { orderId } = request;
+  const updateActions = handleRequest('getPayPalOrder', request);
+  try {
+    const response = await getPayPalOrder(orderId);
+    return updateActions.concat(
+      handlePaymentResponse('getPayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to getPayPalOrder resulted in an error', e);
+    return handleError('getPayPalOrder', e);
   }
 };
