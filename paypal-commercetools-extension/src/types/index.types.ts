@@ -1,5 +1,5 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { Patch } from '../paypal/model/patch';
+import { Patch } from '../paypal/model-checkout-orders/patch';
 
 export type Message = {
   code: string;

@@ -1,8 +1,9 @@
 import { Payment } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
-import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
-import { OrderRequest } from '../paypal/model/orderRequest';
+import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
+import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
+import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
+import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
 import { ClientTokenRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
@@ -13,6 +14,7 @@ import {
 } from '../utils/response.utils';
 import { getSettings } from './config.service';
 import {
+  authorizePayPalOrder,
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
@@ -77,8 +79,30 @@ export const handleCaptureOrderRequest = async (
       handlePaymentResponse('capturePayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to createPayPalOrder resulted in an error', e);
+    logger.error('Call to capturePayPalOrder resulted in an error', e);
     return handleError('capturePayPalOrder', e);
+  }
+};
+
+export const handleAuthorizeOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment.custom?.fields.authorizePayPalOrderRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment.custom.fields.authorizePayPalOrderRequest);
+  const updateActions = handleRequest('authorizePayPalOrder', request);
+  try {
+    const response = await authorizePayPalOrder(
+      request.orderId,
+      request as OrderAuthorizeRequest
+    );
+    return updateActions.concat(
+      handlePaymentResponse('authorizePayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to authorizePayPalOrder resulted in an error', e);
+    return handleError('authorizePayPalOrder', e);
   }
 };
 

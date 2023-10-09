@@ -3,9 +3,10 @@ import { OrdersApi } from '../paypal/api/ordersApi';
 
 import { randomUUID } from 'crypto';
 import request from 'request';
-import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
-import { OrderRequest } from '../paypal/model/orderRequest';
-import { Patch } from '../paypal/model/patch';
+import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
+import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
+import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
+import { Patch } from '../paypal/model-checkout-orders/patch';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
@@ -14,7 +15,7 @@ const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
 const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
 
 const TIMEOUT_PAYMENT = 9500;
-const getPayPalGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
@@ -32,7 +33,7 @@ const getPayPalGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
 };
 
 export const createPayPalOrder = async (request: OrderRequest) => {
-  const gateway = await getPayPalGateway();
+  const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersCreate(
     randomUUID(),
     'application/json',
@@ -42,11 +43,28 @@ export const createPayPalOrder = async (request: OrderRequest) => {
   return response.body;
 };
 
+export const authorizePayPalOrder = async (
+  orderId: string,
+  request: OrderAuthorizeRequest
+) => {
+  const gateway = await getPayPalOrdersGateway();
+  const response = await gateway.ordersCapture(
+    randomUUID(),
+    orderId,
+    'application/json',
+    undefined,
+    undefined,
+    undefined,
+    request
+  );
+  return response.body;
+};
+
 export const updatePayPalOrder = async (
   orderId: string,
   request: Array<Patch>
 ) => {
-  const gateway = await getPayPalGateway();
+  const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersPatch(
     orderId,
     'application/json',
@@ -61,7 +79,7 @@ export const updatePayPalOrder = async (
 };
 
 export const getPayPalOrder = async (orderId: string) => {
-  const gateway = await getPayPalGateway();
+  const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersGet(orderId, 'application/json');
   return response.body;
 };
@@ -70,7 +88,7 @@ export const capturePayPalOrder = async (
   orderId: string,
   request: OrderCaptureRequest
 ) => {
-  const gateway = await getPayPalGateway();
+  const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersCapture(
     randomUUID(),
     orderId,
