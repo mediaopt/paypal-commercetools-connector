@@ -73,5 +73,5 @@ export type PayPalSettings = {
   payLaterMessageFlexColor: string;
   payLaterMessageFlexRatio: string;
   threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
-  payPalIntent: 'capture' | 'authorize';
+  payPalIntent: 'Capture' | 'Authorize';
 };

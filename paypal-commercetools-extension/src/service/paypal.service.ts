@@ -18,6 +18,12 @@ const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
 
 const TIMEOUT_PAYMENT = 9500;
 
+function getPayPalPartnerAttributionHeader() {
+  return {
+    'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
+  };
+}
+
 async function initializeGateway(
   gateway: OrdersApi | AuthorizationsApi,
   timeout: number
@@ -34,8 +40,10 @@ async function initializeGateway(
   gateway.addInterceptor(function (options) {
     options.timeout = timeout;
     if (options.headers) {
-      options.headers['PayPal-Partner-Attribution-Id'] =
-        PAYPAL_PARTNER_ATTRIBUTION_ID;
+      options.headers = {
+        ...options.headers,
+        ...getPayPalPartnerAttributionHeader(),
+      };
     }
   });
   return gateway;
@@ -148,7 +156,7 @@ export async function getClientToken() {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
+      ...getPayPalPartnerAttributionHeader(),
     },
   };
   return new Promise<string>((resolve, reject) => {
@@ -186,7 +194,7 @@ const generateAccessToken = async (): Promise<string> => {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${credentials}`,
-      'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
+      ...getPayPalPartnerAttributionHeader(),
     },
     form: {
       grant_type: 'client_credentials',

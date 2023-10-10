@@ -27,10 +27,10 @@ import {
 export const handleCreateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.createPayPalOrderRequest) {
+  let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  let request = JSON.parse(payment.custom.fields.createPayPalOrderRequest);
   const settings = await getSettings();
   request = {
     intent:
@@ -67,10 +67,12 @@ export const handleCreateOrderRequest = async (
 export const handleCaptureOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.capturePayPalOrderRequest) {
+  const request = JSON.parse(
+    payment?.custom?.fields?.capturePayPalOrderRequest
+  );
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(payment.custom.fields.capturePayPalOrderRequest);
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
     const response = await capturePayPalOrder(
@@ -89,12 +91,12 @@ export const handleCaptureOrderRequest = async (
 export const handleCaptureAuthorizationRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.capturePayPalAuthorizationRequest) {
+  const request = JSON.parse(
+    payment?.custom?.fields?.capturePayPalAuthorizationRequest
+  );
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(
-    payment.custom.fields.capturePayPalAuthorizationRequest
-  );
   const updateActions = handleRequest('capturePayPalAuthorization', request);
   try {
     const response = await capturePayPalAuthorization(
@@ -113,10 +115,12 @@ export const handleCaptureAuthorizationRequest = async (
 export const handleAuthorizeOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.authorizePayPalOrderRequest) {
+  const request = JSON.parse(
+    payment?.custom?.fields?.authorizePayPalOrderRequest
+  );
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(payment.custom.fields.authorizePayPalOrderRequest);
   const updateActions = handleRequest('authorizePayPalOrder', request);
   try {
     const response = await authorizePayPalOrder(
@@ -157,11 +161,10 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
 export const handleUpdateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const updateRequest = payment.custom?.fields.updatePayPalOrderRequest;
-  if (!updateRequest) {
+  const request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(updateRequest);
   const { orderId, patch } = request;
   const updateActions = handleRequest('updatePayPalOrder', request);
   try {
@@ -178,11 +181,10 @@ export const handleUpdateOrderRequest = async (
 export const handleGetOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const getRequest = payment.custom?.fields.getPayPalOrderRequest;
-  if (!getRequest) {
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(getRequest);
   const { orderId } = request;
   const updateActions = handleRequest('getPayPalOrder', request);
   try {
