@@ -55,7 +55,7 @@ export const authorizePayPalOrder = async (
   request: OrderAuthorizeRequest
 ) => {
   const gateway = await getPayPalOrdersGateway();
-  const response = await gateway.ordersCapture(
+  const response = await gateway.ordersAuthorize(
     randomUUID(),
     orderId,
     'application/json',
