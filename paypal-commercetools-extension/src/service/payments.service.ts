@@ -4,6 +4,7 @@ import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutP
 import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
 import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
+import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
 import { ClientTokenRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
@@ -15,6 +16,7 @@ import {
 import { getSettings } from './config.service';
 import {
   authorizePayPalOrder,
+  capturePayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
@@ -81,6 +83,30 @@ export const handleCaptureOrderRequest = async (
   } catch (e) {
     logger.error('Call to capturePayPalOrder resulted in an error', e);
     return handleError('capturePayPalOrder', e);
+  }
+};
+
+export const handleCaptureAuthorizationRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment.custom?.fields.capturePayPalAuthorizationRequest) {
+    return [];
+  }
+  const request = JSON.parse(
+    payment.custom.fields.capturePayPalAuthorizationRequest
+  );
+  const updateActions = handleRequest('capturePayPalAuthorization', request);
+  try {
+    const response = await capturePayPalAuthorization(
+      request.authorizationId,
+      request as CaptureRequest
+    );
+    return updateActions.concat(
+      handlePaymentResponse('capturePayPalAuthorization', response)
+    );
+  } catch (e) {
+    logger.error('Call to capturePayPalAuthorization resulted in an error', e);
+    return handleError('capturePayPalAuthorization', e);
   }
 };
 
