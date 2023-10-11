@@ -14,7 +14,7 @@ import http from 'http';
 import localVarRequest from 'request';
 
 /* tslint:disable:no-unused-locals */
-import { Patch } from '../model/patch';
+import { Patch } from '../model-checkout-orders/patch';
 
 import {
   Authentication,
@@ -22,7 +22,7 @@ import {
   OAuth,
   ObjectSerializer,
   VoidAuth,
-} from '../model/models';
+} from '../model-checkout-orders/models';
 
 import { HttpError } from './apis';
 

@@ -1,8 +1,10 @@
 import { Payment } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { CheckoutPaymentIntent } from '../paypal/model/checkoutPaymentIntent';
-import { OrderCaptureRequest } from '../paypal/model/orderCaptureRequest';
-import { OrderRequest } from '../paypal/model/orderRequest';
+import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
+import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
+import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
+import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
+import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
 import { ClientTokenRequest } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { mapCommercetoolsMoneyToPayPalMoney } from '../utils/map.utils';
@@ -11,7 +13,10 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
+import { getSettings } from './config.service';
 import {
+  authorizePayPalOrder,
+  capturePayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
@@ -22,12 +27,14 @@ import {
 export const handleCreateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.createPayPalOrderRequest) {
+  let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  let request = JSON.parse(payment.custom.fields.createPayPalOrderRequest);
+  const settings = await getSettings();
   request = {
-    intent: CheckoutPaymentIntent.Capture,
+    intent:
+      settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
     purchaseUnits: [
       {
         amount: {
@@ -60,10 +67,12 @@ export const handleCreateOrderRequest = async (
 export const handleCaptureOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  if (!payment.custom?.fields.capturePayPalOrderRequest) {
+  const request = JSON.parse(
+    payment?.custom?.fields?.capturePayPalOrderRequest
+  );
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(payment.custom.fields.capturePayPalOrderRequest);
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
     const response = await capturePayPalOrder(
@@ -74,8 +83,56 @@ export const handleCaptureOrderRequest = async (
       handlePaymentResponse('capturePayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to createPayPalOrder resulted in an error', e);
+    logger.error('Call to capturePayPalOrder resulted in an error', e);
     return handleError('capturePayPalOrder', e);
+  }
+};
+
+export const handleCaptureAuthorizationRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  const request = JSON.parse(
+    payment?.custom?.fields?.capturePayPalAuthorizationRequest
+  );
+  if (!request) {
+    return [];
+  }
+  const updateActions = handleRequest('capturePayPalAuthorization', request);
+  try {
+    const response = await capturePayPalAuthorization(
+      request.authorizationId,
+      request as CaptureRequest
+    );
+    return updateActions.concat(
+      handlePaymentResponse('capturePayPalAuthorization', response)
+    );
+  } catch (e) {
+    logger.error('Call to capturePayPalAuthorization resulted in an error', e);
+    return handleError('capturePayPalAuthorization', e);
+  }
+};
+
+export const handleAuthorizeOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  const request = JSON.parse(
+    payment?.custom?.fields?.authorizePayPalOrderRequest
+  );
+  if (!request) {
+    return [];
+  }
+  const updateActions = handleRequest('authorizePayPalOrder', request);
+  try {
+    const response = await authorizePayPalOrder(
+      request.orderId,
+      request as OrderAuthorizeRequest
+    );
+    return updateActions.concat(
+      handlePaymentResponse('authorizePayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to authorizePayPalOrder resulted in an error', e);
+    return handleError('authorizePayPalOrder', e);
   }
 };
 
@@ -104,11 +161,10 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
 export const handleUpdateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const updateRequest = payment.custom?.fields.updatePayPalOrderRequest;
-  if (!updateRequest) {
+  const request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(updateRequest);
   const { orderId, patch } = request;
   const updateActions = handleRequest('updatePayPalOrder', request);
   try {
@@ -125,11 +181,10 @@ export const handleUpdateOrderRequest = async (
 export const handleGetOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const getRequest = payment.custom?.fields.getPayPalOrderRequest;
-  if (!getRequest) {
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalOrderRequest);
+  if (!request) {
     return [];
   }
-  const request = JSON.parse(getRequest);
   const { orderId } = request;
   const updateActions = handleRequest('getPayPalOrder', request);
   try {

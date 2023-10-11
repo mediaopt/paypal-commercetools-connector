@@ -14,14 +14,14 @@ import http from 'http';
 import localVarRequest from 'request';
 
 /* tslint:disable:no-unused-locals */
-import { ConfirmOrderRequest } from '../model/confirmOrderRequest';
-import { Order } from '../model/order';
-import { OrderAuthorizeRequest } from '../model/orderAuthorizeRequest';
-import { OrderAuthorizeResponse } from '../model/orderAuthorizeResponse';
-import { OrderCaptureRequest } from '../model/orderCaptureRequest';
-import { OrderRequest } from '../model/orderRequest';
-import { OrderTrackerRequest } from '../model/orderTrackerRequest';
-import { Patch } from '../model/patch';
+import { ConfirmOrderRequest } from '../model-checkout-orders/confirmOrderRequest';
+import { Order } from '../model-checkout-orders/order';
+import { OrderAuthorizeRequest } from '../model-checkout-orders/orderAuthorizeRequest';
+import { OrderAuthorizeResponse } from '../model-checkout-orders/orderAuthorizeResponse';
+import { OrderCaptureRequest } from '../model-checkout-orders/orderCaptureRequest';
+import { OrderRequest } from '../model-checkout-orders/orderRequest';
+import { OrderTrackerRequest } from '../model-checkout-orders/orderTrackerRequest';
+import { Patch } from '../model-checkout-orders/patch';
 
 import {
   Authentication,
@@ -29,7 +29,7 @@ import {
   OAuth,
   ObjectSerializer,
   VoidAuth,
-} from '../model/models';
+} from '../model-checkout-orders/models';
 
 import { HttpError } from './apis';
 

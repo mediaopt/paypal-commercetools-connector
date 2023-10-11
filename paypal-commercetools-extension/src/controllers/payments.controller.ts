@@ -2,6 +2,8 @@ import { PaymentReference } from '@commercetools/platform-sdk';
 import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
 import {
+  handleAuthorizeOrderRequest,
+  handleCaptureAuthorizationRequest,
   handleCaptureOrderRequest,
   handleCreateOrderRequest,
   handleGetClientTokenRequest,
@@ -28,6 +30,8 @@ const update = async (resource: Resource) => {
     updateActions = updateActions.concat(
       await handleCreateOrderRequest(payment.obj),
       await handleCaptureOrderRequest(payment.obj),
+      await handleCaptureAuthorizationRequest(payment.obj),
+      await handleAuthorizeOrderRequest(payment.obj),
       await handleGetClientTokenRequest(payment.obj),
       await handleGetOrderRequest(payment.obj),
       await handleUpdateOrderRequest(payment.obj)

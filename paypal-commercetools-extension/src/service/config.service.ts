@@ -1,6 +1,24 @@
 import { createApiRoot } from '../client/create.client';
-import { AccessTokenObject } from '../types/index.types';
+import { AccessTokenObject, PayPalSettings } from '../types/index.types';
 
+export const getSettings = async () => {
+  try {
+    const apiRoot = createApiRoot();
+    const customObject = (
+      await apiRoot
+        .customObjects()
+        .withContainerAndKey({
+          container: 'paypal-commercetools-connector',
+          key: 'settings',
+        })
+        .get()
+        .execute()
+    ).body;
+    return customObject.value as PayPalSettings;
+  } catch (e) {
+    return undefined;
+  }
+};
 export const getCachedAccessToken = async () => {
   try {
     const apiRoot = createApiRoot();
