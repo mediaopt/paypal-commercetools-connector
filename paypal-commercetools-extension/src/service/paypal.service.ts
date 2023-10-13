@@ -4,11 +4,13 @@ import { OrdersApi } from '../paypal/api/ordersApi';
 import { randomUUID } from 'crypto';
 import request from 'request';
 import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
+import { CapturesApi } from '../paypal/api/capturesApi';
 import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
 import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
 import { Patch } from '../paypal/model-checkout-orders/patch';
 import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
+import { RefundRequest } from '../paypal/model-payments-payment/refundRequest';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
@@ -24,10 +26,9 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function initializeGateway(
-  gateway: OrdersApi | AuthorizationsApi,
-  timeout: number
-) {
+async function initializeGateway<
+  PayPalApi extends OrdersApi | AuthorizationsApi | CapturesApi
+>(gateway: PayPalApi, timeout: number): Promise<PayPalApi> {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
@@ -50,19 +51,20 @@ async function initializeGateway(
 }
 
 const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return (await initializeGateway(
-    new OrdersApi(getAPIEndpoint()),
-    timeout
-  )) as OrdersApi;
+  return await initializeGateway(new OrdersApi(getAPIEndpoint()), timeout);
 };
 
 const getPayPalAuhorizationsGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
-  return (await initializeGateway(
+  return await initializeGateway(
     new AuthorizationsApi(getAPIEndpoint()),
     timeout
-  )) as AuthorizationsApi;
+  );
+};
+
+const getPayPalCapturesGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+  return await initializeGateway(new CapturesApi(getAPIEndpoint()), timeout);
 };
 
 export const createPayPalOrder = async (request: OrderRequest) => {
@@ -141,6 +143,22 @@ export const capturePayPalOrder = async (
     orderId,
     'application/json',
     undefined,
+    undefined,
+    undefined,
+    request
+  );
+  return response.body;
+};
+
+export const refundPayPalOrder = async (
+  captureId: string,
+  request?: RefundRequest
+) => {
+  const gateway = await getPayPalCapturesGateway();
+  const response = await gateway.capturesRefund(
+    captureId,
+    randomUUID(),
+    'application/json',
     undefined,
     undefined,
     request
