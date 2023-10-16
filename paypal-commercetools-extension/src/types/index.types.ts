@@ -1,8 +1,8 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
+import { CapturesApi } from '../paypal/api/capturesApi';
+import { OrdersApi } from '../paypal/api/ordersApi';
 import { Patch } from '../paypal/model-checkout-orders/patch';
-import {OrdersApi} from "../paypal/api/ordersApi";
-import {AuthorizationsApi} from "../paypal/api/authorizationsApi";
-import {CapturesApi} from "../paypal/api/capturesApi";
 
 export type Message = {
   code: string;

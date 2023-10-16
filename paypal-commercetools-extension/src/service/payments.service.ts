@@ -121,15 +121,16 @@ export const handleRefundPayPalOrderRequest = async (
   }
   const request = JSON.parse(payment?.custom?.fields?.refundPayPalOrderRequest);
   const updateActions = handleRequest('refundPayPalOrder', request);
+  const { amount, captureId } = request;
   try {
-    const response = request?.amount
-      ? await refundPayPalOrder(request.captureId, {
+    const response = amount
+      ? await refundPayPalOrder(captureId, {
           amount: {
-            value: request.amount,
+            value: amount,
             currencyCode: payment.amountPlanned.currencyCode,
           },
         } as CaptureRequest)
-      : await refundPayPalOrder(request.captureId);
+      : await refundPayPalOrder(captureId);
     return updateActions.concat(
       handlePaymentResponse('refundPayPalOrder', response)
     );

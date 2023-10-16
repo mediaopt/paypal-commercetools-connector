@@ -11,9 +11,9 @@ import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
 import { Patch } from '../paypal/model-checkout-orders/patch';
 import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
 import { RefundRequest } from '../paypal/model-payments-payment/refundRequest';
+import { PayPalApi } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
-import {PayPalApi} from "../types/index.types";
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -27,7 +27,10 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function initializeGateway<T extends PayPalApi>(gateway: T, timeout: number): Promise<T> {
+async function initializeGateway<T extends PayPalApi>(
+  gateway: T,
+  timeout: number
+): Promise<T> {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
