@@ -13,6 +13,7 @@ import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest'
 import { RefundRequest } from '../paypal/model-payments-payment/refundRequest';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
+import {PayPalApi} from "../types/index.types";
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -26,9 +27,7 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function initializeGateway<
-  PayPalApi extends OrdersApi | AuthorizationsApi | CapturesApi
->(gateway: PayPalApi, timeout: number): Promise<PayPalApi> {
+async function initializeGateway<T extends PayPalApi>(gateway: T, timeout: number): Promise<T> {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
