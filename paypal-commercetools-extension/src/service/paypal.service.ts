@@ -129,7 +129,7 @@ export const capturePayPalAuthorization = async (
     authorizationId,
     randomUUID(),
     'application/json',
-    undefined,
+    'return=representation',
     request
   );
   return response.body;
@@ -144,7 +144,7 @@ export const capturePayPalOrder = async (
     randomUUID(),
     orderId,
     'application/json',
-    undefined,
+    'return=representation',
     undefined,
     undefined,
     request
@@ -161,7 +161,7 @@ export const refundPayPalOrder = async (
     captureId,
     randomUUID(),
     'application/json',
-    undefined,
+    'return=representation',
     undefined,
     request
   );
