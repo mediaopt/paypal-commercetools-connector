@@ -17,6 +17,7 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'capturePayPalAuthorization',
   'updatePayPalOrder',
   'getPayPalOrder',
+  'refundPayPalOrder',
 ];
 
 export async function createPaymentUpdateExtension(

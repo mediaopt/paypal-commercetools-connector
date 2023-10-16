@@ -21,16 +21,17 @@ import {
   createPayPalOrder,
   getClientToken,
   getPayPalOrder,
+  refundPayPalOrder,
   updatePayPalOrder,
 } from './paypal.service';
 
 export const handleCreateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
-  if (!request) {
+  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
     return [];
   }
+  let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   const settings = await getSettings();
   request = {
     intent:
@@ -67,12 +68,12 @@ export const handleCreateOrderRequest = async (
 export const handleCaptureOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.capturePayPalOrderRequest) {
+    return [];
+  }
   const request = JSON.parse(
     payment?.custom?.fields?.capturePayPalOrderRequest
   );
-  if (!request) {
-    return [];
-  }
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
     const response = await capturePayPalOrder(
@@ -91,12 +92,12 @@ export const handleCaptureOrderRequest = async (
 export const handleCaptureAuthorizationRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.capturePayPalAuthorizationRequest) {
+    return [];
+  }
   const request = JSON.parse(
     payment?.custom?.fields?.capturePayPalAuthorizationRequest
   );
-  if (!request) {
-    return [];
-  }
   const updateActions = handleRequest('capturePayPalAuthorization', request);
   try {
     const response = await capturePayPalAuthorization(
@@ -112,15 +113,42 @@ export const handleCaptureAuthorizationRequest = async (
   }
 };
 
+export const handleRefundPayPalOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.refundPayPalOrderRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment?.custom?.fields?.refundPayPalOrderRequest);
+  const updateActions = handleRequest('refundPayPalOrder', request);
+  const { amount, captureId } = request;
+  try {
+    const response = amount
+      ? await refundPayPalOrder(captureId, {
+          amount: {
+            value: amount,
+            currencyCode: payment.amountPlanned.currencyCode,
+          },
+        } as CaptureRequest)
+      : await refundPayPalOrder(captureId);
+    return updateActions.concat(
+      handlePaymentResponse('refundPayPalOrder', response)
+    );
+  } catch (e) {
+    logger.error('Call to refundPayPalOrder resulted in an error', e);
+    return handleError('refundPayPalOrder', e);
+  }
+};
+
 export const handleAuthorizeOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.authorizePayPalOrderRequest) {
+    return [];
+  }
   const request = JSON.parse(
     payment?.custom?.fields?.authorizePayPalOrderRequest
   );
-  if (!request) {
-    return [];
-  }
   const updateActions = handleRequest('authorizePayPalOrder', request);
   try {
     const response = await authorizePayPalOrder(
@@ -161,10 +189,10 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
 export const handleUpdateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
-  if (!request) {
+  if (!payment?.custom?.fields?.updatePayPalOrderRequest) {
     return [];
   }
+  const request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
   const { orderId, patch } = request;
   const updateActions = handleRequest('updatePayPalOrder', request);
   try {
@@ -181,10 +209,10 @@ export const handleUpdateOrderRequest = async (
 export const handleGetOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
-  const request = JSON.parse(payment?.custom?.fields?.getPayPalOrderRequest);
-  if (!request) {
+  if (!payment?.custom?.fields?.getPayPalOrderRequest) {
     return [];
   }
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalOrderRequest);
   const { orderId } = request;
   const updateActions = handleRequest('getPayPalOrder', request);
   try {

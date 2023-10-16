@@ -1,4 +1,7 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
+import { CapturesApi } from '../paypal/api/capturesApi';
+import { OrdersApi } from '../paypal/api/ordersApi';
 import { Patch } from '../paypal/model-checkout-orders/patch';
 
 export type Message = {
@@ -75,3 +78,5 @@ export type PayPalSettings = {
   threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
   payPalIntent: 'Capture' | 'Authorize';
 };
+
+export type PayPalApi = OrdersApi | AuthorizationsApi | CapturesApi;
