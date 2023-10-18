@@ -2,6 +2,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
 import { CapturesApi } from '../paypal/api/capturesApi';
 import { OrdersApi } from '../paypal/api/ordersApi';
+import { VerifyWebhookSignatureApi } from '../paypal/api/verifyWebhookSignatureApi';
 import { Patch } from '../paypal/model-checkout-orders/patch';
 
 export type Message = {
@@ -79,4 +80,8 @@ export type PayPalSettings = {
   payPalIntent: 'Capture' | 'Authorize';
 };
 
-export type PayPalApi = OrdersApi | AuthorizationsApi | CapturesApi;
+export type PayPalApi =
+  | OrdersApi
+  | AuthorizationsApi
+  | CapturesApi
+  | VerifyWebhookSignatureApi;

@@ -73,6 +73,11 @@ export const handleCreateOrderRequest = async (
     }
     const requestAmount = request?.amount;
     updateActions.push({
+      action: 'setCustomField',
+      name: 'PayPalOrderId',
+      value: response.id,
+    });
+    updateActions.push({
       action: 'addTransaction',
       transaction: {
         type:

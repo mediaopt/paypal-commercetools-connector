@@ -6,6 +6,7 @@ import express, { Express } from 'express';
 
 // Import routes
 import ServiceRoutes from './routes/service.route';
+import PayPalWebhookRouter from './routes/webhook.route';
 
 // Import logger
 import { logger } from './utils/logger.utils';
@@ -27,6 +28,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Define routes
 app.use('/paypal-commercetools-extension', ServiceRoutes);
+app.use('/paypal-webhooks', PayPalWebhookRouter);
 
 // Global error handler
 app.use(errorMiddleware);
