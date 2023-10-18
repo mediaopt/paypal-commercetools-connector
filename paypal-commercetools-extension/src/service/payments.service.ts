@@ -4,6 +4,7 @@ import {
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
+import { Order } from '../paypal/model-checkout-orders/order';
 import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
 import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
@@ -16,6 +17,7 @@ import {
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalOrderStatusToCommercetoolsTransactionState,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
 } from '../utils/map.utils';
 import {
@@ -93,7 +95,7 @@ export const handleCreateOrderRequest = async (
         ),
       },
     } as PaymentAddTransactionAction);
-    return updateActions;
+    return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
     logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('createPayPalOrder', e);
@@ -132,6 +134,7 @@ export const handleCaptureOrderRequest = async (
       },
     } as PaymentAddTransactionAction);
     return updateActions.concat(
+      updatePaymentFields(response),
       handlePaymentResponse('capturePayPalOrder', response)
     );
   } catch (e) {
@@ -260,6 +263,7 @@ export const handleAuthorizeOrderRequest = async (
       },
     } as PaymentAddTransactionAction);
     return updateActions.concat(
+      updatePaymentFields(response),
       handlePaymentResponse('authorizePayPalOrder', response)
     );
   } catch (e) {
@@ -322,6 +326,7 @@ export const handleGetOrderRequest = async (
   try {
     const response = await getPayPalOrder(orderId);
     return updateActions.concat(
+      updatePaymentFields(response),
       handlePaymentResponse('getPayPalOrder', response)
     );
   } catch (e) {
@@ -329,3 +334,25 @@ export const handleGetOrderRequest = async (
     return handleError('getPayPalOrder', e);
   }
 };
+
+function updatePaymentFields(response: Order): UpdateActions {
+  const updateActions: UpdateActions = [
+    {
+      action: 'setStatusInterfaceCode',
+      interfaceCode: response.status,
+    },
+    {
+      action: 'setStatusInterfaceText',
+      interfaceText: response.status,
+    },
+  ];
+  if (response.paymentSource) {
+    updateActions.push({
+      action: 'setMethodInfoMethod',
+      method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(
+        response.paymentSource
+      ),
+    });
+  }
+  return updateActions;
+}

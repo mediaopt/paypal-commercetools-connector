@@ -1,5 +1,6 @@
 import { TransactionState, TypedMoney } from '@commercetools/platform-sdk';
 import { OrderStatus } from '../paypal/model-checkout-orders/orderStatus';
+import { PaymentSourceResponse } from '../paypal/model-checkout-orders/paymentSourceResponse';
 import { Capture2 } from '../paypal/model-payments-payment/capture2';
 import { Refund } from '../paypal/model-payments-payment/refund';
 import StatusEnum = Refund.StatusEnum;
@@ -68,4 +69,46 @@ export const mapPayPalOrderStatusToCommercetoolsTransactionState = (
     default:
       return 'Pending';
   }
+};
+
+export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
+  source: PaymentSourceResponse
+): string => {
+  if (source.card) {
+    return `Card (${source.card.name})`;
+  }
+  if (source.eps) {
+    return `eps (${source.eps.name})`;
+  }
+  if (source.bancontact) {
+    return `Bancontact (${source.bancontact.cardLastDigits})`;
+  }
+  if (source.blik) {
+    return `BLIK (${source.blik.name})`;
+  }
+  if (source.p24) {
+    return `p24 (${source.p24.email})`;
+  }
+  if (source.giropay) {
+    return `giropay (${source.giropay.name})`;
+  }
+  if (source.ideal) {
+    return `iDEAL (${source.ideal.ibanLastChars})`;
+  }
+  if (source.mybank) {
+    return `MyBank (${source.mybank.ibanLastChars})`;
+  }
+  if (source.paypal) {
+    return `PayPal (${source.paypal.emailAddress})`;
+  }
+  if (source.sofort) {
+    return `SOFORT (${source.sofort.ibanLastChars})`;
+  }
+  if (source.trustly) {
+    return `trustly (${source.trustly.ibanLastChars})`;
+  }
+  if (source.venmo) {
+    return `Venmo (${source.venmo.emailAddress})`;
+  }
+  return '';
 };
