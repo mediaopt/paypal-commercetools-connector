@@ -336,22 +336,21 @@ export const handleGetOrderRequest = async (
 };
 
 function updatePaymentFields(response: Order): UpdateActions {
+  const { paymentSource, status } = response;
   const updateActions: UpdateActions = [
     {
       action: 'setStatusInterfaceCode',
-      interfaceCode: response.status,
+      interfaceCode: status,
     },
     {
       action: 'setStatusInterfaceText',
-      interfaceText: response.status,
+      interfaceText: status,
     },
   ];
-  if (response.paymentSource) {
+  if (paymentSource) {
     updateActions.push({
       action: 'setMethodInfoMethod',
-      method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(
-        response.paymentSource
-      ),
+      method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(paymentSource),
     });
   }
   return updateActions;
