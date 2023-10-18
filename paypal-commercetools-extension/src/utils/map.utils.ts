@@ -14,7 +14,7 @@ export const mapCommercetoolsMoneyToPayPalMoney = (
 
 export const mapPayPalMoneyToCommercetoolsMoney = (
   amount: string,
-  fractionDigits: number | undefined
+  fractionDigits?: number
 ): number => {
   return parseFloat(amount) * Math.pow(10, fractionDigits ?? 0);
 };

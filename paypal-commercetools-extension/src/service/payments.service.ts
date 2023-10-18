@@ -43,14 +43,15 @@ export const handleCreateOrderRequest = async (
   }
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   const settings = await getSettings();
+  const amountPlanned = payment.amountPlanned;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
     purchaseUnits: [
       {
         amount: {
-          currencyCode: payment.amountPlanned.currencyCode,
-          value: mapCommercetoolsMoneyToPayPalMoney(payment.amountPlanned),
+          currencyCode: amountPlanned.currencyCode,
+          value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
         },
       },
     ],
@@ -68,6 +69,7 @@ export const handleCreateOrderRequest = async (
         interfaceId: response.id,
       });
     }
+    const requestAmount = request?.amount;
     updateActions.push({
       action: 'addTransaction',
       transaction: {
@@ -75,15 +77,15 @@ export const handleCreateOrderRequest = async (
           settings?.payPalIntent.toUpperCase() === 'CAPTURE'
             ? 'Charge'
             : 'Authorization',
-        amount: request?.amount
+        amount: requestAmount
           ? {
               centAmount: mapPayPalMoneyToCommercetoolsMoney(
-                request?.amount,
-                payment?.amountPlanned?.fractionDigits
+                requestAmount,
+                amountPlanned.fractionDigits
               ),
-              currencyCode: payment?.amountPlanned?.currencyCode,
+              currencyCode: amountPlanned.currencyCode,
             }
-          : payment.amountPlanned,
+          : amountPlanned,
         interactionId: response.id,
         timestamp: getCurrentTimestamp(),
         state: mapPayPalOrderStatusToCommercetoolsTransactionState(
@@ -187,11 +189,12 @@ export const handleRefundPayPalOrderRequest = async (
   );
   const { amount, captureId } = request;
   try {
+    const amountPlanned = payment.amountPlanned;
     const response = amount
       ? await refundPayPalOrder(captureId, {
           amount: {
             value: amount,
-            currencyCode: payment.amountPlanned.currencyCode,
+            currencyCode: amountPlanned.currencyCode,
           },
         } as CaptureRequest)
       : await refundPayPalOrder(captureId);
@@ -204,11 +207,11 @@ export const handleRefundPayPalOrderRequest = async (
           ? {
               centAmount: mapPayPalMoneyToCommercetoolsMoney(
                 refundedAmount,
-                payment?.amountPlanned?.fractionDigits
+                amountPlanned.fractionDigits
               ),
-              currencyCode: payment?.amountPlanned?.currencyCode,
+              currencyCode: amountPlanned.currencyCode,
             }
-          : payment.amountPlanned,
+          : amountPlanned,
         interactionId: response.id,
         timestamp: response.updateTime,
         state: mapPayPalRefundStatusToCommercetoolsTransactionState(
