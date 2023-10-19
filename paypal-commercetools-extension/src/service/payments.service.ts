@@ -198,19 +198,18 @@ export const handleRefundPayPalOrderRequest = async (
   const { amount, captureId } = request;
   try {
     const amountPlanned = payment.amountPlanned;
-    const response = amount
-      ? await refundPayPalOrder(
-          captureId ?? findSuitableTransactionId(payment, 'Charge', 'Success'),
-          {
-            amount: {
-              value: amount,
-              currencyCode: amountPlanned.currencyCode,
-            },
-          } as CaptureRequest
-        )
-      : await refundPayPalOrder(
-          captureId ?? findSuitableTransactionId(payment, 'Charge', 'Success')
-        );
+    const request: CaptureRequest | undefined = amount
+      ? {
+          amount: {
+            value: amount,
+            currencyCode: amountPlanned.currencyCode,
+          },
+        }
+      : undefined;
+    const response = await refundPayPalOrder(
+      captureId ?? findSuitableTransactionId(payment, 'Charge', 'Success'),
+      request
+    );
     const refundedAmount = response?.amount?.value ?? amount ?? 0;
     updateActions.push({
       action: 'addTransaction',
