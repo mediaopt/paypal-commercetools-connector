@@ -5,10 +5,12 @@ import { randomUUID } from 'crypto';
 import request from 'request';
 import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
 import { CapturesApi } from '../paypal/api/capturesApi';
+import { VerifyWebhookSignatureApi } from '../paypal/api/verifyWebhookSignatureApi';
 import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
 import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
 import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
 import { Patch } from '../paypal/model-checkout-orders/patch';
+import { VerifyWebhookSignature } from '../paypal/model-notifications-webhooks/verifyWebhookSignature';
 import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
 import { RefundRequest } from '../paypal/model-payments-payment/refundRequest';
 import { PayPalApi } from '../types/index.types';
@@ -37,9 +39,7 @@ async function initializeGateway<T extends PayPalApi>(
       'Internal Server Error - braintree config is missing'
     );
   }
-  const token = await generateAccessToken();
-  logger.info(JSON.stringify(token));
-  gateway.accessToken = token;
+  gateway.accessToken = await generateAccessToken();
   gateway.addInterceptor(function (options) {
     options.timeout = timeout;
     if (options.headers) {
@@ -54,6 +54,15 @@ async function initializeGateway<T extends PayPalApi>(
 
 const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   return await initializeGateway(new OrdersApi(getAPIEndpoint()), timeout);
+};
+
+const getPayPalVerifyWebhookSignatureGateway = async (
+  timeout: number = TIMEOUT_PAYMENT
+) => {
+  return await initializeGateway(
+    new VerifyWebhookSignatureApi(getAPIEndpoint()),
+    timeout
+  );
 };
 
 const getPayPalAuhorizationsGateway = async (
@@ -202,7 +211,7 @@ const generateAccessToken = async (): Promise<string> => {
     cachedToken?.value &&
     cachedToken.value.validUntil > new Date().toISOString()
   ) {
-    logger.debug('Using cached token');
+    logger.info('Using cached token');
     return cachedToken.value.accessToken;
   }
   const credentials = Buffer.from(
@@ -248,6 +257,12 @@ const generateAccessToken = async (): Promise<string> => {
       }
     });
   });
+};
+
+export const validateSignature = async (signature: VerifyWebhookSignature) => {
+  const gateway = await getPayPalVerifyWebhookSignatureGateway(0);
+  const response = await gateway.verifyWebhookSignaturePost(signature);
+  return response.body;
 };
 
 const getAPIEndpoint = () => {

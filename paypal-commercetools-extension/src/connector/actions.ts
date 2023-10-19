@@ -103,7 +103,19 @@ export async function deletePaymentUpdateExtension(
 export async function createCustomPaymentType(
   apiRoot: ByProjectKeyRequestBuilder
 ): Promise<void> {
-  const fieldDefinitions: FieldDefinition[] = [];
+  const fieldDefinitions: FieldDefinition[] = [
+    {
+      name: `PayPalOrderId`,
+      label: {
+        en: `PayPal Order Id`,
+        de: 'PayPal Bestellnummer',
+      },
+      type: {
+        name: 'String',
+      },
+      required: false,
+    },
+  ];
   PAYPAL_API_PAYMENT_ENDPOINTS.forEach((element) =>
     fieldDefinitions.push(
       {
