@@ -1,8 +1,12 @@
 import {
   Payment,
   PaymentAddTransactionAction,
+  Transaction,
+  TransactionState,
+  TransactionType,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import CustomError from '../errors/custom.error';
 import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
 import { Order } from '../paypal/model-checkout-orders/order';
 import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
@@ -114,7 +118,7 @@ export const handleCaptureOrderRequest = async (
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
     const response = await capturePayPalOrder(
-      request.orderId,
+      request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderCaptureRequest
     );
     updateActions.push({
@@ -155,7 +159,8 @@ export const handleCaptureAuthorizationRequest = async (
   const updateActions = handleRequest('capturePayPalAuthorization', request);
   try {
     const response = await capturePayPalAuthorization(
-      request.authorizationId,
+      request.authorizationId ??
+        findSuitableTransactionId(payment, 'Authorization', 'Success'),
       request as CaptureRequest
     );
     updateActions.push({
@@ -193,14 +198,18 @@ export const handleRefundPayPalOrderRequest = async (
   const { amount, captureId } = request;
   try {
     const amountPlanned = payment.amountPlanned;
-    const response = amount
-      ? await refundPayPalOrder(captureId, {
+    const request: CaptureRequest | undefined = amount
+      ? {
           amount: {
             value: amount,
             currencyCode: amountPlanned.currencyCode,
           },
-        } as CaptureRequest)
-      : await refundPayPalOrder(captureId);
+        }
+      : undefined;
+    const response = await refundPayPalOrder(
+      captureId ?? findSuitableTransactionId(payment, 'Charge', 'Success'),
+      request
+    );
     const refundedAmount = response?.amount?.value ?? amount ?? 0;
     updateActions.push({
       action: 'addTransaction',
@@ -243,7 +252,7 @@ export const handleAuthorizeOrderRequest = async (
   const updateActions = handleRequest('authorizePayPalOrder', request);
   try {
     const response = await authorizePayPalOrder(
-      request.orderId,
+      request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderAuthorizeRequest
     );
     updateActions.push({
@@ -354,4 +363,19 @@ function updatePaymentFields(response: Order): UpdateActions {
     });
   }
   return updateActions;
+}
+
+function findSuitableTransactionId(
+  payment: Payment,
+  type: TransactionType,
+  status?: TransactionState
+) {
+  const transactions = payment?.transactions.filter(
+    (transaction: Transaction): boolean =>
+      transaction.type === type && (!status || status === transaction.state)
+  );
+  if (!transactions || transactions.length === 0) {
+    throw new CustomError(500, 'The payment has no suitable transaction');
+  }
+  return transactions[transactions.length - 1].interactionId;
 }
