@@ -10,9 +10,11 @@ import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
 import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
 import { Order } from '../paypal/model-checkout-orders/order';
+import { Authorization2 } from '../paypal/model-payments-payment/authorization2';
 import { Capture2 } from '../paypal/model-payments-payment/capture2';
 import { logger } from '../utils/logger.utils';
 import {
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalOrderStatusToCommercetoolsTransactionState,
@@ -121,6 +123,31 @@ export const handleCaptureWebhook = async (resource: Capture2) => {
       resource.status
     ),
   };
+  const updateActions = prepareCreateOrUpdateTransactionAction(
+    payment,
+    transaction
+  );
+  await handleUpdatePayment(payment.id, payment.version, updateActions);
+};
+
+export const handleAuthorizeWebhook = async (resource: Authorization2) => {
+  const orderId = resource.supplementaryData?.relatedIds?.orderId ?? '';
+  const payment = await getPaymentByPayPalOrderId(orderId);
+  const transaction = {
+    type: 'Authorization',
+    amount: {
+      centAmount: mapPayPalMoneyToCommercetoolsMoney(
+        resource?.amount?.value ?? '0',
+        payment?.amountPlanned?.fractionDigits
+      ),
+      currencyCode: payment?.amountPlanned?.currencyCode,
+    },
+    interactionId: resource.id,
+    timestamp: resource.updateTime,
+    state: mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+      resource.status
+    ),
+  } as TransactionDraft;
   const updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction

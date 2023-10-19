@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
 import { VerifyWebhookSignature } from '../paypal/model-notifications-webhooks/verifyWebhookSignature';
 import {
+  handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
 } from '../service/commercetools.service';
@@ -15,15 +16,15 @@ async function verifyWebhookSignature(request: Request) {
     authAlgo: request.header('paypal-auth-algo') ?? '',
     transmissionId: request.header('paypal-transmission-id') ?? '',
     transmissionSig: request.header('paypal-transmission-sig') ?? '',
-    transmissionTime: new Date(request.header('paypal-transmission-time') ?? ''),
+    transmissionTime: new Date(
+      request.header('paypal-transmission-time') ?? ''
+    ),
     webhookEvent: request.body,
     webhookId: '3C785155UA8032035',
   };
   logger.info(
     JSON.stringify(
-      await validateSignature(
-        verificationRequest as VerifyWebhookSignature
-      )
+      await validateSignature(verificationRequest as VerifyWebhookSignature)
     )
   );
   // @TODO validate verifyWebhookSignature response
@@ -60,6 +61,14 @@ export const post = async (
     switch (resource_type) {
       case 'capture':
         await handleCaptureWebhook(data);
+        response.status(200).json({});
+        return;
+      case 'refund':
+        // @TODO handle refund
+        response.status(200).json({});
+        return;
+      case 'authorization':
+        await handleAuthorizeWebhook(data);
         response.status(200).json({});
         return;
       case 'checkout-order':

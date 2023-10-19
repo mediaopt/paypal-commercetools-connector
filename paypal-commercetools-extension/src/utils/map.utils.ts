@@ -1,6 +1,7 @@
 import { TransactionState, TypedMoney } from '@commercetools/platform-sdk';
 import { OrderStatus } from '../paypal/model-checkout-orders/orderStatus';
 import { PaymentSourceResponse } from '../paypal/model-checkout-orders/paymentSourceResponse';
+import { Authorization2 } from '../paypal/model-payments-payment/authorization2';
 import { Capture2 } from '../paypal/model-payments-payment/capture2';
 import { Refund } from '../paypal/model-payments-payment/refund';
 import StatusEnum = Refund.StatusEnum;
@@ -48,6 +49,24 @@ export const mapPayPalCaptureStatusToCommercetoolsTransactionState = (
     case undefined:
       return 'Failure';
     case Capture2.StatusEnum.Pending:
+    default:
+      return 'Pending';
+  }
+};
+
+export const mapPayPalAuthorizationStatusToCommercetoolsTransactionState = (
+  status?: Authorization2.StatusEnum
+): TransactionState => {
+  switch (status) {
+    case Authorization2.StatusEnum.Voided:
+    case Authorization2.StatusEnum.Captured:
+    case Authorization2.StatusEnum.PartiallyCaptured:
+    case Authorization2.StatusEnum.Created:
+      return 'Success';
+    case Authorization2.StatusEnum.Denied:
+    case undefined:
+      return 'Failure';
+    case Authorization2.StatusEnum.Pending:
     default:
       return 'Pending';
   }

@@ -18,9 +18,7 @@ function singleSnakeToCamel(string: string): string {
   return (start + rest.map(capitalize).join('')) as never;
 }
 
-export function snakeToCamel<T extends object>(
-  object: T
-): T {
+export function snakeToCamel<T extends object>(object: T): T {
   return Object.entries(object).reduce(
     (result, [key, value]) => ({
       ...result,
