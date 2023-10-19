@@ -7,15 +7,15 @@ export const getCurrentTimestamp = (): string => {
 export function stringifyData(data: StringOrObject) {
   return typeof data === 'string' ? data : JSON.stringify(data);
 }
-function capitalize<S extends string>(string: S): Capitalize<S> {
-  if (string.length === 0) return '' as never;
+function capitalize(s: string): Capitalize<string> {
+  if (s.length === 0) return '';
 
-  return (string[0].toUpperCase() + string.slice(1)) as never;
+  return (s[0].toUpperCase() + s.slice(1)) as Capitalize<string>;
 }
 function singleSnakeToCamel(string: string): string {
   const [start, ...rest] = string.split('_');
 
-  return (start + rest.map(capitalize).join('')) as never;
+  return start + rest.map(capitalize).join('');
 }
 
 export function snakeToCamel<T extends object>(object: T): T {
@@ -26,5 +26,5 @@ export function snakeToCamel<T extends object>(object: T): T {
         typeof value === 'object' ? snakeToCamel(value) : value,
     }),
     {}
-  ) as never;
+  ) as T;
 }
