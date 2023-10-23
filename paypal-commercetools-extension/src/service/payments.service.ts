@@ -7,12 +7,14 @@ import {
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import CustomError from '../errors/custom.error';
-import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
-import { Order } from '../paypal/model-checkout-orders/order';
-import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
-import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
-import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
-import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
+import {
+  CheckoutPaymentIntent,
+  Order,
+  OrderAuthorizeRequest,
+  OrderCaptureRequest,
+  OrderRequest,
+} from '../paypal/checkout_api';
+import { CaptureRequest } from '../paypal/payments_api';
 import { ClientTokenRequest, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
@@ -53,10 +55,10 @@ export const handleCreateOrderRequest = async (
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
-    purchaseUnits: [
+    purchase_units: [
       {
         amount: {
-          currencyCode: amountPlanned.currencyCode,
+          currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
         },
       },
@@ -132,11 +134,11 @@ export const handleCaptureOrderRequest = async (
         type: 'Charge',
         amount: payment.amountPlanned,
         interactionId:
-          response?.purchaseUnits &&
-          response.purchaseUnits[0].payments?.captures
-            ? response.purchaseUnits[0].payments.captures[0].id
+          response?.purchase_units &&
+          response.purchase_units[0].payments?.captures
+            ? response.purchase_units[0].payments.captures[0].id
             : response.id,
-        timestamp: response.updateTime,
+        timestamp: response.update_time,
         state: mapPayPalOrderStatusToCommercetoolsTransactionState(
           response.status
         ),
@@ -174,7 +176,7 @@ export const handleCaptureAuthorizationRequest = async (
         type: 'Charge',
         amount: payment.amountPlanned,
         interactionId: response?.id,
-        timestamp: response.updateTime,
+        timestamp: response.update_time,
         state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
           response.status
         ),
@@ -207,7 +209,7 @@ export const handleRefundPayPalOrderRequest = async (
       ? {
           amount: {
             value: amount,
-            currencyCode: amountPlanned.currencyCode,
+            currency_code: amountPlanned.currencyCode,
           },
         }
       : undefined;
@@ -230,7 +232,7 @@ export const handleRefundPayPalOrderRequest = async (
             }
           : amountPlanned,
         interactionId: response.id,
-        timestamp: response.updateTime,
+        timestamp: response.update_time,
         state: mapPayPalRefundStatusToCommercetoolsTransactionState(
           response.status
         ),
@@ -266,9 +268,9 @@ export const handleAuthorizeOrderRequest = async (
         type: 'Authorization',
         amount: payment.amountPlanned,
         interactionId:
-          response?.purchaseUnits &&
-          response.purchaseUnits[0].payments?.authorizations
-            ? response.purchaseUnits[0].payments.authorizations[0].id
+          response?.purchase_units &&
+          response.purchase_units[0].payments?.authorizations
+            ? response.purchase_units[0].payments.authorizations[0].id
             : response.id,
         timestamp: getCurrentTimestamp(),
         state: mapPayPalOrderStatusToCommercetoolsTransactionState(
@@ -320,7 +322,7 @@ export const handleUpdateOrderRequest = async (
   try {
     const response = await updatePayPalOrder(orderId, patch);
     return updateActions.concat(
-      handlePaymentResponse('updatePayPalOrder', response)
+      handlePaymentResponse('updatePayPalOrder', response ?? '')
     );
   } catch (e) {
     logger.error('Call to updatePayPalOrder resulted in an error', e);
@@ -338,7 +340,9 @@ export const handleGetOrderRequest = async (
   const { orderId } = request;
   const updateActions = handleRequest('getPayPalOrder', request);
   try {
-    const response = await getPayPalOrder(orderId);
+    const response = await getPayPalOrder(
+      orderId ?? payment.custom.fields?.PayPalOrderId
+    );
     return updateActions.concat(
       updatePaymentFields(response),
       handlePaymentResponse('getPayPalOrder', response)
@@ -350,7 +354,7 @@ export const handleGetOrderRequest = async (
 };
 
 function updatePaymentFields(response: Order): UpdateActions {
-  const { paymentSource, status } = response;
+  const { payment_source, status } = response;
   const updateActions: UpdateActions = [
     {
       action: 'setStatusInterfaceCode',
@@ -361,10 +365,10 @@ function updatePaymentFields(response: Order): UpdateActions {
       interfaceText: status,
     },
   ];
-  if (paymentSource) {
+  if (payment_source) {
     updateActions.push({
       action: 'setMethodInfoMethod',
-      method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(paymentSource),
+      method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(payment_source),
     });
   }
   return updateActions;

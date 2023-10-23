@@ -8,10 +8,8 @@ import {
 } from '@commercetools/platform-sdk';
 import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
-import { CheckoutPaymentIntent } from '../paypal/model-checkout-orders/checkoutPaymentIntent';
-import { Order } from '../paypal/model-checkout-orders/order';
-import { Authorization2 } from '../paypal/model-payments-payment/authorization2';
-import { Capture2 } from '../paypal/model-payments-payment/capture2';
+import { CheckoutPaymentIntent, Order } from '../paypal/checkout_api';
+import { Authorization2, Capture2 } from '../paypal/payments_api';
 import { logger } from '../utils/logger.utils';
 import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
@@ -85,17 +83,17 @@ export const handleOrderWebhook = async (resource: Order) => {
         ? 'Charge'
         : 'Authorization',
     amount:
-      resource?.purchaseUnits && resource.purchaseUnits[0]?.amount?.value
+      resource?.purchase_units && resource.purchase_units[0]?.amount?.value
         ? {
             centAmount: mapPayPalMoneyToCommercetoolsMoney(
-              resource?.purchaseUnits[0].amount.value,
+              resource?.purchase_units[0].amount.value,
               payment?.amountPlanned?.fractionDigits
             ),
             currencyCode: payment?.amountPlanned?.currencyCode,
           }
         : payment.amountPlanned,
     interactionId: resource.id,
-    timestamp: resource.updateTime ?? resource.createTime,
+    timestamp: resource.update_time ?? resource.create_time,
     state: mapPayPalOrderStatusToCommercetoolsTransactionState(resource.status),
   };
   const updateActions = prepareCreateOrUpdateTransactionAction(
@@ -106,7 +104,7 @@ export const handleOrderWebhook = async (resource: Order) => {
 };
 
 export const handleCaptureWebhook = async (resource: Capture2) => {
-  const orderId = resource.supplementaryData?.relatedIds?.orderId ?? '';
+  const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payment = await getPaymentByPayPalOrderId(orderId);
   const transaction = {
     type: 'Charge',
@@ -118,7 +116,7 @@ export const handleCaptureWebhook = async (resource: Capture2) => {
       currencyCode: payment?.amountPlanned?.currencyCode,
     },
     interactionId: resource.id,
-    timestamp: resource.updateTime,
+    timestamp: resource.update_time,
     state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
       resource.status
     ),
@@ -131,7 +129,7 @@ export const handleCaptureWebhook = async (resource: Capture2) => {
 };
 
 export const handleAuthorizeWebhook = async (resource: Authorization2) => {
-  const orderId = resource.supplementaryData?.relatedIds?.orderId ?? '';
+  const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payment = await getPaymentByPayPalOrderId(orderId);
   const transaction = {
     type: 'Authorization',
@@ -143,7 +141,7 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
       currencyCode: payment?.amountPlanned?.currencyCode,
     },
     interactionId: resource.id,
-    timestamp: resource.updateTime,
+    timestamp: resource.update_time,
     state: mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
       resource.status
     ),

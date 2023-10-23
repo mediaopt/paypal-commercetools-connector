@@ -1,9 +1,5 @@
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
-import { CapturesApi } from '../paypal/api/capturesApi';
-import { OrdersApi } from '../paypal/api/ordersApi';
-import { VerifyWebhookSignatureApi } from '../paypal/api/verifyWebhookSignatureApi';
-import { Patch } from '../paypal/model-checkout-orders/patch';
+import { Patch } from '../paypal/checkout_api';
 
 export type Message = {
   code: string;
@@ -79,9 +75,3 @@ export type PayPalSettings = {
   threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
   payPalIntent: 'Capture' | 'Authorize';
 };
-
-export type PayPalApi =
-  | OrdersApi
-  | AuthorizationsApi
-  | CapturesApi
-  | VerifyWebhookSignatureApi;
