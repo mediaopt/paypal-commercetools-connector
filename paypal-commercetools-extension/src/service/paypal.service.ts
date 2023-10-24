@@ -36,7 +36,6 @@ function getPayPalPartnerAttributionHeader() {
 }
 
 async function buildConfiguration(timeout: number) {
-  console.log(getPayPalPartnerAttributionHeader());
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
