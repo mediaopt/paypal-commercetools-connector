@@ -1,10 +1,10 @@
 import { TransactionState, TypedMoney } from '@commercetools/platform-sdk';
-import { OrderStatus } from '../paypal/model-checkout-orders/orderStatus';
-import { PaymentSourceResponse } from '../paypal/model-checkout-orders/paymentSourceResponse';
-import { Authorization2 } from '../paypal/model-payments-payment/authorization2';
-import { Capture2 } from '../paypal/model-payments-payment/capture2';
-import { Refund } from '../paypal/model-payments-payment/refund';
-import StatusEnum = Refund.StatusEnum;
+import { OrderStatus, PaymentSourceResponse } from '../paypal/checkout_api';
+import {
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
+  RefundStatusEnum,
+} from '../paypal/payments_api';
 
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
@@ -22,55 +22,57 @@ export const mapPayPalMoneyToCommercetoolsMoney = (
 };
 
 export const mapPayPalRefundStatusToCommercetoolsTransactionState = (
-  status?: StatusEnum
+  status?: RefundStatusEnum
 ): TransactionState => {
   switch (status) {
-    case StatusEnum.Completed:
+    case RefundStatusEnum.Completed:
       return 'Success';
-    case StatusEnum.Cancelled:
-    case StatusEnum.Failed:
+    case RefundStatusEnum.Cancelled:
+    case RefundStatusEnum.Failed:
     case undefined:
       return 'Failure';
+    case RefundStatusEnum.Pending:
     default:
       return 'Pending';
   }
 };
 
 export const mapPayPalCaptureStatusToCommercetoolsTransactionState = (
-  status?: Capture2.StatusEnum
+  status?: Capture2StatusEnum
 ): TransactionState => {
   switch (status) {
-    case Capture2.StatusEnum.Completed:
-    case Capture2.StatusEnum.Refunded:
-    case Capture2.StatusEnum.PartiallyRefunded:
+    case Capture2StatusEnum.Completed:
+    case Capture2StatusEnum.Refunded:
+    case Capture2StatusEnum.PartiallyRefunded:
       return 'Success';
-    case Capture2.StatusEnum.Declined:
-    case Capture2.StatusEnum.Failed:
+    case Capture2StatusEnum.Declined:
+    case Capture2StatusEnum.Failed:
     case undefined:
       return 'Failure';
-    case Capture2.StatusEnum.Pending:
+    case Capture2StatusEnum.Pending:
     default:
       return 'Pending';
   }
 };
 
 export const mapPayPalAuthorizationStatusToCommercetoolsTransactionState = (
-  status?: Authorization2.StatusEnum
+  status?: Authorization2StatusEnum
 ): TransactionState => {
   switch (status) {
-    case Authorization2.StatusEnum.Voided:
-    case Authorization2.StatusEnum.Captured:
-    case Authorization2.StatusEnum.PartiallyCaptured:
-    case Authorization2.StatusEnum.Created:
+    case Authorization2StatusEnum.Voided:
+    case Authorization2StatusEnum.Captured:
+    case Authorization2StatusEnum.PartiallyCaptured:
+    case Authorization2StatusEnum.Created:
       return 'Success';
-    case Authorization2.StatusEnum.Denied:
+    case Authorization2StatusEnum.Denied:
     case undefined:
       return 'Failure';
-    case Authorization2.StatusEnum.Pending:
+    case Authorization2StatusEnum.Pending:
     default:
       return 'Pending';
   }
 };
+
 export const mapPayPalOrderStatusToCommercetoolsTransactionState = (
   status?: OrderStatus
 ): TransactionState => {
@@ -100,7 +102,7 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
     return `eps (${source.eps.name})`;
   }
   if (source.bancontact) {
-    return `Bancontact (${source.bancontact.cardLastDigits})`;
+    return `Bancontact (${source.bancontact.card_last_digits})`;
   }
   if (source.blik) {
     return `BLIK (${source.blik.name})`;
@@ -112,22 +114,22 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
     return `giropay (${source.giropay.name})`;
   }
   if (source.ideal) {
-    return `iDEAL (${source.ideal.ibanLastChars})`;
+    return `iDEAL (${source.ideal.iban_last_chars})`;
   }
   if (source.mybank) {
-    return `MyBank (${source.mybank.ibanLastChars})`;
+    return `MyBank (${source.mybank.iban_last_chars})`;
   }
   if (source.paypal) {
-    return `PayPal (${source.paypal.emailAddress})`;
+    return `PayPal (${source.paypal.email_address})`;
   }
   if (source.sofort) {
-    return `SOFORT (${source.sofort.ibanLastChars})`;
+    return `SOFORT (${source.sofort.iban_last_chars})`;
   }
   if (source.trustly) {
-    return `trustly (${source.trustly.ibanLastChars})`;
+    return `trustly (${source.trustly.iban_last_chars})`;
   }
   if (source.venmo) {
-    return `Venmo (${source.venmo.emailAddress})`;
+    return `Venmo (${source.venmo.email_address})`;
   }
   return '';
 };

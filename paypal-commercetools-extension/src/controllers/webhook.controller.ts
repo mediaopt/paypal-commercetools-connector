@@ -1,33 +1,29 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
-import { VerifyWebhookSignature } from '../paypal/model-notifications-webhooks/verifyWebhookSignature';
+import { VerifyWebhookSignature } from '../paypal/webhooks_api';
 import {
   handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
 } from '../service/commercetools.service';
 import { validateSignature } from '../service/paypal.service';
-import { snakeToCamel } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 
 async function verifyWebhookSignature(request: Request) {
-  const verificationRequest = {
-    certUrl: request.header('paypal-cert-url') ?? '',
-    authAlgo: request.header('paypal-auth-algo') ?? '',
-    transmissionId: request.header('paypal-transmission-id') ?? '',
-    transmissionSig: request.header('paypal-transmission-sig') ?? '',
-    transmissionTime: new Date(
-      request.header('paypal-transmission-time') ?? ''
-    ),
-    webhookEvent: request.body,
-    webhookId: '3C785155UA8032035',
+  const verificationRequest: VerifyWebhookSignature = {
+    cert_url: request.header('paypal-cert-url') ?? '',
+    auth_algo: request.header('paypal-auth-algo') ?? '',
+    transmission_id: request.header('paypal-transmission-id') ?? '',
+    transmission_sig: request.header('paypal-transmission-sig') ?? '',
+    transmission_time: request.header('paypal-transmission-time') ?? '',
+    webhook_event: request.body,
+    webhook_id: '3C785155UA8032035',
   };
-  logger.info(
-    JSON.stringify(
-      await validateSignature(verificationRequest as VerifyWebhookSignature)
-    )
-  );
-  // @TODO validate verifyWebhookSignature response
+  const response = await validateSignature(verificationRequest);
+  logger.info(JSON.stringify(response));
+  if (response.verification_status !== 'SUCCESS') {
+    throw new CustomError(400, 'Verification failed');
+  }
 }
 
 /**
@@ -37,13 +33,11 @@ async function verifyWebhookSignature(request: Request) {
  *
  * @param {Request} request The express request
  * @param {Response} response The express response
- * @param {NextFunction} next
  * @returns
  */
 export const post = async (
   request: Request,
-  response: Response,
-  next: NextFunction
+  response: Response
 ) => {
   logger.info('Webhook called');
   await verifyWebhookSignature(request);
@@ -53,14 +47,13 @@ export const post = async (
       `Got ${event_type} for ${resource_type} with id ${resource.id}`
     );
     logger.info(summary);
-    const data = snakeToCamel(resource);
-    logger.info(JSON.stringify(data));
+    logger.info(JSON.stringify(resource));
     if (!resource_type) {
       throw new CustomError(400, 'Bad request - Missing body parameters.');
     }
     switch (resource_type) {
       case 'capture':
-        await handleCaptureWebhook(data);
+        await handleCaptureWebhook(resource);
         response.status(200).json({});
         return;
       case 'refund':
@@ -68,11 +61,11 @@ export const post = async (
         response.status(200).json({});
         return;
       case 'authorization':
-        await handleAuthorizeWebhook(data);
+        await handleAuthorizeWebhook(resource);
         response.status(200).json({});
         return;
       case 'checkout-order':
-        await handleOrderWebhook(data);
+        await handleOrderWebhook(resource);
         response.status(200).json({});
         return;
       default:
@@ -83,10 +76,8 @@ export const post = async (
     }
   } catch (error) {
     logger.info('Error occured', error);
-    if (error instanceof Error) {
-      next(new CustomError(500, error.message));
-    } else {
-      next(error);
-    }
+
+    response.status(200).json({});
+    return;
   }
 };

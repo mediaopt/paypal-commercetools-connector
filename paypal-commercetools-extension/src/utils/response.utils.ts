@@ -1,5 +1,4 @@
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
-import { HttpError } from '../paypal/api/apis';
 import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
@@ -84,9 +83,7 @@ export const handleError = (
   transactionId?: string
 ): UpdateActions => {
   const errorMessage =
-    error instanceof HttpError
-      ? `${error.body.message}: ${error.body.details[0].description ?? ''}`
-      : error instanceof Error && 'message' in error
+    error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
   const updateActions: UpdateActions = [];

@@ -1,19 +1,25 @@
-import CustomError from '../errors/custom.error';
-import { OrdersApi } from '../paypal/api/ordersApi';
-
+import axios from 'axios';
 import { randomUUID } from 'crypto';
-import request from 'request';
-import { AuthorizationsApi } from '../paypal/api/authorizationsApi';
-import { CapturesApi } from '../paypal/api/capturesApi';
-import { VerifyWebhookSignatureApi } from '../paypal/api/verifyWebhookSignatureApi';
-import { OrderAuthorizeRequest } from '../paypal/model-checkout-orders/orderAuthorizeRequest';
-import { OrderCaptureRequest } from '../paypal/model-checkout-orders/orderCaptureRequest';
-import { OrderRequest } from '../paypal/model-checkout-orders/orderRequest';
-import { Patch } from '../paypal/model-checkout-orders/patch';
-import { VerifyWebhookSignature } from '../paypal/model-notifications-webhooks/verifyWebhookSignature';
-import { CaptureRequest } from '../paypal/model-payments-payment/captureRequest';
-import { RefundRequest } from '../paypal/model-payments-payment/refundRequest';
-import { PayPalApi } from '../types/index.types';
+import qs from 'qs';
+import CustomError from '../errors/custom.error';
+import {
+  OrderAuthorizeRequest,
+  OrderCaptureRequest,
+  OrderRequest,
+  OrdersApi,
+  Patch,
+} from '../paypal/checkout_api';
+import { Configuration } from '../paypal/configuration';
+import {
+  AuthorizationsApi,
+  CaptureRequest,
+  CapturesApi,
+  RefundRequest,
+} from '../paypal/payments_api';
+import {
+  VerifyWebhookSignature,
+  VerifyWebhookSignatureApi,
+} from '../paypal/webhooks_api';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
@@ -29,53 +35,35 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function initializeGateway<T extends PayPalApi>(
-  gateway: T,
-  timeout: number
-): Promise<T> {
-  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
-    throw new CustomError(
-      500,
-      'Internal Server Error - braintree config is missing'
-    );
-  }
-  gateway.accessToken = await generateAccessToken();
-  gateway.addInterceptor(function (options) {
-    options.timeout = timeout;
-    if (options.headers) {
-      options.headers = {
-        ...options.headers,
-        ...getPayPalPartnerAttributionHeader(),
-      };
-    }
+async function buildConfiguration(timeout: number) {
+  return new Configuration({
+    basePath: getAPIEndpoint(),
+    baseOptions: {
+      timeout: timeout,
+      headers: getPayPalPartnerAttributionHeader(),
+    },
+    accessToken: await generateAccessToken(),
   });
-  return gateway;
 }
 
 const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return await initializeGateway(new OrdersApi(getAPIEndpoint()), timeout);
+  return new OrdersApi(await buildConfiguration(timeout));
 };
 
 const getPayPalVerifyWebhookSignatureGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
-  return await initializeGateway(
-    new VerifyWebhookSignatureApi(getAPIEndpoint()),
-    timeout
-  );
+  return new VerifyWebhookSignatureApi(await buildConfiguration(timeout));
 };
 
 const getPayPalAuhorizationsGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
-  return await initializeGateway(
-    new AuthorizationsApi(getAPIEndpoint()),
-    timeout
-  );
+  return new AuthorizationsApi(await buildConfiguration(timeout));
 };
 
 const getPayPalCapturesGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return await initializeGateway(new CapturesApi(getAPIEndpoint()), timeout);
+  return new CapturesApi(await buildConfiguration(timeout));
 };
 
 export const createPayPalOrder = async (request: OrderRequest) => {
@@ -85,7 +73,7 @@ export const createPayPalOrder = async (request: OrderRequest) => {
     'application/json',
     request
   );
-  return response.body;
+  return response.data;
 };
 
 export const authorizePayPalOrder = async (
@@ -102,7 +90,7 @@ export const authorizePayPalOrder = async (
     undefined,
     request
   );
-  return response.body;
+  return response.data;
 };
 
 export const updatePayPalOrder = async (
@@ -115,18 +103,18 @@ export const updatePayPalOrder = async (
     'application/json',
     request
   );
-  if (response.response.statusCode === 204) {
+  if (response.status === 204) {
     return {
       status: 'success',
     };
   }
-  return response.response;
+  return response.data;
 };
 
 export const getPayPalOrder = async (orderId: string) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersGet(orderId, 'application/json');
-  return response.body;
+  return response.data;
 };
 
 export const capturePayPalAuthorization = async (
@@ -141,7 +129,7 @@ export const capturePayPalAuthorization = async (
     'return=representation',
     request
   );
-  return response.body;
+  return response.data;
 };
 
 export const capturePayPalOrder = async (
@@ -158,7 +146,7 @@ export const capturePayPalOrder = async (
     undefined,
     request
   );
-  return response.body;
+  return response.data;
 };
 
 export const refundPayPalOrder = async (
@@ -174,7 +162,7 @@ export const refundPayPalOrder = async (
     undefined,
     request
   );
-  return response.body;
+  return response.data;
 };
 
 export async function getClientToken() {
@@ -188,24 +176,21 @@ export async function getClientToken() {
       ...getPayPalPartnerAttributionHeader(),
     },
   };
-  return new Promise<string>((resolve, reject) => {
-    request(options, function (error: Error, response: request.Response) {
-      if (error) reject(error);
-      if (
-        response.statusCode &&
-        response.statusCode >= 200 &&
-        response.statusCode <= 299
-      ) {
-        const body = JSON.parse(response.body);
-        resolve(body['client_token']);
-      } else {
-        reject(new CustomError(response.statusCode, response.statusMessage));
-      }
-    });
-  });
+  const response = await axios.request(options);
+  if (response.status && response.status >= 200 && response.status <= 299) {
+    return response.data.client_token;
+  } else {
+    throw new CustomError(response.status, response.statusText);
+  }
 }
 
 const generateAccessToken = async (): Promise<string> => {
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+    throw new CustomError(
+      500,
+      'Internal Server Error - PayPal config is missing'
+    );
+  }
   const cachedToken = await getCachedAccessToken();
   if (
     cachedToken?.value &&
@@ -225,44 +210,36 @@ const generateAccessToken = async (): Promise<string> => {
       Authorization: `Basic ${credentials}`,
       ...getPayPalPartnerAttributionHeader(),
     },
-    form: {
+    data: qs.stringify({
       grant_type: 'client_credentials',
       ignoreCache: 'true',
       return_authn_schemes: 'true',
       return_client_metadata: 'true',
       return_unconsented_scopes: 'true',
-    },
+    }),
   };
-  return new Promise<string>((resolve, reject) => {
-    request(options, function (error: Error, response: request.Response) {
-      if (error) reject(error);
-      if (
-        response.statusCode &&
-        response.statusCode >= 200 &&
-        response.statusCode <= 299
-      ) {
-        const body = JSON.parse(response.body);
-        cacheAccessToken(
-          {
-            accessToken: body['access_token'],
-            validUntil: new Date(
-              new Date().getTime() + body['expires_in'] * 1000
-            ),
-          },
-          cachedToken?.version ?? 0
-        );
-        resolve(body['access_token']);
-      } else {
-        reject(new CustomError(response.statusCode, response.statusMessage));
-      }
-    });
-  });
+  const response = await axios.request(options);
+
+  if (response.status && response.status >= 200 && response.status <= 299) {
+    const body = response.data;
+    await cacheAccessToken(
+      {
+        accessToken: body.access_token,
+        validUntil: new Date(new Date().getTime() + body.expires_in * 1000),
+      },
+      cachedToken?.version ?? 0
+    );
+    logger.info(body.access_token);
+    return body.access_token;
+  } else {
+    throw new CustomError(response.status, response.statusText);
+  }
 };
 
 export const validateSignature = async (signature: VerifyWebhookSignature) => {
   const gateway = await getPayPalVerifyWebhookSignatureGateway(0);
   const response = await gateway.verifyWebhookSignaturePost(signature);
-  return response.body;
+  return response.data;
 };
 
 const getAPIEndpoint = () => {
