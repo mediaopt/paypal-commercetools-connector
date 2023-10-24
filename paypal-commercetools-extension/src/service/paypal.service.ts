@@ -36,6 +36,7 @@ function getPayPalPartnerAttributionHeader() {
 }
 
 async function buildConfiguration(timeout: number) {
+  console.log(getPayPalPartnerAttributionHeader());
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
@@ -219,8 +220,9 @@ const generateAccessToken = async (): Promise<string> => {
     }),
   };
   const response = await axios.request(options);
+
   if (response.status && response.status >= 200 && response.status <= 299) {
-    const body = JSON.parse(response.data);
+    const body = response.data;
     await cacheAccessToken(
       {
         accessToken: body.access_token,
