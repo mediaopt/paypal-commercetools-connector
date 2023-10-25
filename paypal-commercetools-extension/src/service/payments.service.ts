@@ -37,6 +37,7 @@ import {
   capturePayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
+  generateUserIdToken,
   getClientToken,
   getPayPalOrder,
   refundPayPalOrder,
@@ -307,6 +308,24 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
   } catch (e) {
     logger.error('Call to getClientToken resulted in an error', e);
     return handleError('getClientToken', e);
+  }
+}
+
+export async function handleGetUserIDTokenRequest(payment?: Payment) {
+  const request = payment?.custom?.fields?.getUserIDTokenRequest;
+  if (!request) {
+    return [];
+  }
+  const { customerId } = JSON.parse(request);
+  const updateActions = handleRequest('getUserIDToken', { customerId });
+  try {
+    const response = await generateUserIdToken(customerId);
+    return updateActions.concat(
+      handlePaymentResponse('getUserIDToken', response)
+    );
+  } catch (e) {
+    logger.error('Call to getUserIDToken resulted in an error', e);
+    return handleError('getUserIDToken', e);
   }
 }
 

@@ -213,9 +213,6 @@ const generateAccessToken = async (): Promise<string> => {
     data: qs.stringify({
       grant_type: 'client_credentials',
       ignoreCache: 'true',
-      return_authn_schemes: 'true',
-      return_client_metadata: 'true',
-      return_unconsented_scopes: 'true',
     }),
   };
   const response = await axios.request(options);
@@ -231,6 +228,41 @@ const generateAccessToken = async (): Promise<string> => {
     );
     logger.info(body.access_token);
     return body.access_token;
+  } else {
+    throw new CustomError(response.status, response.statusText);
+  }
+};
+
+export const generateUserIdToken = async (
+  customerId?: string
+): Promise<string> => {
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+    throw new CustomError(
+      500,
+      'Internal Server Error - PayPal config is missing'
+    );
+  }
+  const credentials = Buffer.from(
+    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+  ).toString('base64');
+  const options = {
+    method: 'POST',
+    url: `${getAPIEndpoint()}/v1/oauth2/token`,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${credentials}`,
+      ...getPayPalPartnerAttributionHeader(),
+    },
+    data: qs.stringify({
+      grant_type: 'client_credentials',
+      ignoreCache: 'true',
+      response_type: 'id_token',
+      target_customer_id: customerId,
+    }),
+  };
+  const response = await axios.request(options);
+  if (response.status && response.status >= 200 && response.status <= 299) {
+    return response.data.id_token;
   } else {
     throw new CustomError(response.status, response.statusText);
   }
