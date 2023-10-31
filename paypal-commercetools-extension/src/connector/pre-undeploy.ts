@@ -3,11 +3,16 @@ dotenv.config();
 
 import { createApiRoot } from '../client/create.client';
 import { assertError } from '../utils/assert.utils';
-import { deletePaymentUpdateExtension } from './actions';
+import {
+  deleteExtension,
+  PAYPAL_CUSTOMER_EXTENSION_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+} from './actions';
 
 async function preUndeploy(): Promise<void> {
   const apiRoot = createApiRoot();
-  await deletePaymentUpdateExtension(apiRoot);
+  await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY);
+  await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY);
 }
 
 async function run(): Promise<void> {
