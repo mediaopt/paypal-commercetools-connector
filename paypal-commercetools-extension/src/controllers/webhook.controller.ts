@@ -35,10 +35,7 @@ async function verifyWebhookSignature(request: Request) {
  * @param {Response} response The express response
  * @returns
  */
-export const post = async (
-  request: Request,
-  response: Response
-) => {
+export const post = async (request: Request, response: Response) => {
   logger.info('Webhook called');
   await verifyWebhookSignature(request);
   const { resource_type, event_type, resource, summary } = request.body;
