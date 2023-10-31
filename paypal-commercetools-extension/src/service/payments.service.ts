@@ -37,7 +37,6 @@ import {
   capturePayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
-  generateUserIdToken,
   getClientToken,
   getPayPalOrder,
   refundPayPalOrder,
@@ -109,7 +108,6 @@ export const handleCreateOrderRequest = async (
     } as PaymentAddTransactionAction);
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
-    logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('createPayPalOrder', e);
   }
 };
@@ -311,24 +309,6 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
   }
 }
 
-export async function handleGetUserIDTokenRequest(payment?: Payment) {
-  const request = payment?.custom?.fields?.getUserIDTokenRequest;
-  if (!request) {
-    return [];
-  }
-  const { customerId } = JSON.parse(request);
-  const updateActions = handleRequest('getUserIDToken', { customerId });
-  try {
-    const response = await generateUserIdToken(customerId);
-    return updateActions.concat(
-      handlePaymentResponse('getUserIDToken', response)
-    );
-  } catch (e) {
-    logger.error('Call to getUserIDToken resulted in an error', e);
-    return handleError('getUserIDToken', e);
-  }
-}
-
 export const handleUpdateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
@@ -367,7 +347,6 @@ export const handleGetOrderRequest = async (
       handlePaymentResponse('getPayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to getPayPalOrder resulted in an error', e);
     return handleError('getPayPalOrder', e);
   }
 };

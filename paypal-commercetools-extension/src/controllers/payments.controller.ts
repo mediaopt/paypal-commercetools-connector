@@ -8,7 +8,6 @@ import {
   handleCreateOrderRequest,
   handleGetClientTokenRequest,
   handleGetOrderRequest,
-  handleGetUserIDTokenRequest,
   handleRefundPayPalOrderRequest,
   handleUpdateOrderRequest,
 } from '../service/payments.service';
@@ -36,7 +35,6 @@ const update = async (resource: Resource) => {
       await handleAuthorizeOrderRequest(payment.obj),
       await handleGetClientTokenRequest(payment.obj),
       await handleGetOrderRequest(payment.obj),
-      await handleGetUserIDTokenRequest(payment.obj),
       await handleRefundPayPalOrderRequest(payment.obj),
       await handleUpdateOrderRequest(payment.obj)
     );
