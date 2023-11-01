@@ -123,6 +123,38 @@ async function prepareCreateOrderRequest(
     ],
     ...request,
   } as OrderRequest;
+  if (request?.payment_source?.paypal && settings?.storeInVaultOnSuccess) {
+    request.payment_source.paypal = {
+      attributes: {
+              vault: {
+                store_in_vault: 'ON_SUCCESS',
+                usage_type: 'MERCHANT',
+              },
+            },
+      ...request.payment_source.paypal
+    }
+  }
+  if (request?.payment_source?.venmo && settings?.storeInVaultOnSuccess) {
+    request.payment_source.venmo = {
+      attributes: {
+        vault: {
+          store_in_vault: 'ON_SUCCESS',
+          usage_type: 'MERCHANT',
+        },
+      },
+      ...request.payment_source.venmo
+    }
+  }
+  if (request?.payment_source?.card && settings?.storeInVaultOnSuccess) {
+    request.payment_source.card = {
+      attributes: {
+        vault: {
+          store_in_vault: 'ON_SUCCESS',
+        },
+      },
+      ...request.payment_source.card
+    }
+  }
   return request;
 }
 
