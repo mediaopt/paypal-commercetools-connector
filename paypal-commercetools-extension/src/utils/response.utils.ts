@@ -1,3 +1,4 @@
+import { AxiosError } from 'axios';
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
 import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
@@ -5,24 +6,28 @@ import { logger } from './logger.utils';
 
 export const handleRequest = (
   requestName: string,
-  request: StringOrObject
+  request: StringOrObject,
+  skipRemoveEmptyProperties = false,
+  isPayment = true
 ): UpdateActions => {
   const updateActions: UpdateActions = [];
-  if (typeof request === 'object') {
+  if (typeof request === 'object' && !skipRemoveEmptyProperties) {
     removeEmptyProperties(request);
   }
-  updateActions.push({
-    action: 'addInterfaceInteraction',
-    type: {
-      typeId: 'type',
-      key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
-    },
-    fields: {
-      type: `${requestName}Request`,
-      data: stringifyData(request),
-      timestamp: getCurrentTimestamp(),
-    },
-  });
+  if (isPayment) {
+    updateActions.push({
+      action: 'addInterfaceInteraction',
+      type: {
+        typeId: 'type',
+        key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+      },
+      fields: {
+        type: `${requestName}Request`,
+        data: stringifyData(request),
+        timestamp: getCurrentTimestamp(),
+      },
+    });
+  }
   logger.info(`${requestName} request: ${stringifyData(request)}`);
   return updateActions;
 };
@@ -63,6 +68,27 @@ export const handlePaymentResponse = (
   return updateActions;
 };
 
+export const handleCustomerResponse = (
+  requestName: string,
+  response: StringOrObject
+): UpdateActions => {
+  const updateActions: UpdateActions = [];
+  if (typeof response === 'object') {
+    removeEmptyProperties(response);
+  }
+  updateActions.push({
+    action: 'setCustomField',
+    name: `${requestName}Response`,
+    value: stringifyData(response),
+  });
+  updateActions.push({
+    action: 'setCustomField',
+    name: `${requestName}Request`,
+    value: null,
+  });
+  return updateActions;
+};
+
 export const removeEmptyProperties = (response: any) => {
   for (const prop in response) {
     if (response[prop] === null) {
@@ -79,11 +105,17 @@ export const removeEmptyProperties = (response: any) => {
 
 export const handleError = (
   requestName: string,
-  error: unknown,
+  error: any,
   transactionId?: string
 ): UpdateActions => {
+  logger.error(
+    `Call to ${requestName} resulted in an error`,
+    error?.response?.data ?? error
+  );
   const errorMessage =
-    error instanceof Error && 'message' in error
+    error instanceof AxiosError
+      ? `${error.message} (${error?.response?.data?.message})`
+      : error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
   const updateActions: UpdateActions = [];

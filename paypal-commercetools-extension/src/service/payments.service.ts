@@ -108,7 +108,6 @@ export const handleCreateOrderRequest = async (
     } as PaymentAddTransactionAction);
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
-    logger.error('Call to createPayPalOrder resulted in an error', e);
     return handleError('createPayPalOrder', e);
   }
 };
@@ -348,7 +347,6 @@ export const handleGetOrderRequest = async (
       handlePaymentResponse('getPayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to getPayPalOrder resulted in an error', e);
     return handleError('getPayPalOrder', e);
   }
 };

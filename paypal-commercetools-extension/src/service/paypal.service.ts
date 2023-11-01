@@ -16,6 +16,7 @@ import {
   CapturesApi,
   RefundRequest,
 } from '../paypal/payments_api';
+import { SetupTokenRequest, SetupTokensApi } from '../paypal/vault_api';
 import {
   VerifyWebhookSignature,
   VerifyWebhookSignatureApi,
@@ -66,12 +67,23 @@ const getPayPalCapturesGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   return new CapturesApi(await buildConfiguration(timeout));
 };
 
-export const createPayPalOrder = async (request: OrderRequest) => {
+const getPayPalSetupTokenGateway = async (
+  timeout: number = TIMEOUT_PAYMENT
+) => {
+  return new SetupTokensApi(await buildConfiguration(timeout));
+};
+
+export const createPayPalOrder = async (
+  request: OrderRequest,
+  clientMetadataId?: string
+) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersCreate(
     randomUUID(),
     'application/json',
-    request
+    request,
+    undefined,
+    clientMetadataId
   );
   return response.data;
 };
@@ -213,9 +225,6 @@ const generateAccessToken = async (): Promise<string> => {
     data: qs.stringify({
       grant_type: 'client_credentials',
       ignoreCache: 'true',
-      return_authn_schemes: 'true',
-      return_client_metadata: 'true',
-      return_unconsented_scopes: 'true',
     }),
   };
   const response = await axios.request(options);
@@ -234,6 +243,51 @@ const generateAccessToken = async (): Promise<string> => {
   } else {
     throw new CustomError(response.status, response.statusText);
   }
+};
+
+export const generateUserIdToken = async (
+  customerId?: string
+): Promise<string> => {
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+    throw new CustomError(
+      500,
+      'Internal Server Error - PayPal config is missing'
+    );
+  }
+  const credentials = Buffer.from(
+    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+  ).toString('base64');
+  const options = {
+    method: 'POST',
+    url: `${getAPIEndpoint()}/v1/oauth2/token`,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${credentials}`,
+      ...getPayPalPartnerAttributionHeader(),
+    },
+    data: qs.stringify({
+      grant_type: 'client_credentials',
+      ignoreCache: 'true',
+      response_type: 'id_token',
+      target_customer_id: customerId,
+    }),
+  };
+  const response = await axios.request(options);
+  if (response.status && response.status >= 200 && response.status <= 299) {
+    return response.data.id_token;
+  } else {
+    throw new CustomError(response.status, response.statusText);
+  }
+};
+
+export const createVaultSetupToken = async (request: SetupTokenRequest) => {
+  const gateway = await getPayPalSetupTokenGateway(2000);
+  const response = await gateway.setupTokensCreate(
+    'application/json',
+    randomUUID(),
+    request
+  );
+  return response.data;
 };
 
 export const validateSignature = async (signature: VerifyWebhookSignature) => {
