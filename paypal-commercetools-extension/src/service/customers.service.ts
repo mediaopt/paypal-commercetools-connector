@@ -15,7 +15,7 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
   if (!request) {
     return [];
   }
-  const { customerId } = JSON.parse(request);
+  const customerId = customer?.custom?.fields?.PayPalUserId;
   const updateActions = handleRequest(
     'getUserIDToken',
     { customerId },
@@ -32,13 +32,13 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
     return handleError('getUserIDToken', e);
   }
 }
+
 export const handleCreateVaultSetupTokenRequest = async (
   customer: Customer
 ): Promise<UpdateAction[]> => {
   if (!customer?.custom?.fields?.createVaultSetupTokenRequest) {
     return [];
   }
-  logger.info(customer?.custom?.fields?.createVaultSetupTokenRequest);
   let request: SetupTokenRequest = JSON.parse(
     customer?.custom?.fields?.createVaultSetupTokenRequest
   );
@@ -61,6 +61,13 @@ export const handleCreateVaultSetupTokenRequest = async (
   try {
     const response = await createVaultSetupToken(request);
     logger.info(JSON.stringify(response));
+    if (response.customer?.id) {
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'PayPalUserId',
+        value: response.customer?.id,
+      })
+    }
     return updateActions.concat(
       handleCustomerResponse('createVaultSetupToken', response)
     );
