@@ -70,7 +70,9 @@ export const handleCreateOrderRequest = async (
         locale: 'de-DE',
         brand_name: settings?.ratePayBrandName?.de,
         logo_url: settings?.ratePayLogoUrl?.de,
-        customer_service_instructions: [settings?.ratePayCustomerServiceInstructions?.de  ?? 'Instructions'],
+        customer_service_instructions: [
+          settings?.ratePayCustomerServiceInstructions?.de ?? 'Instructions',
+        ],
       },
       ...request.payment_source.pay_upon_invoice,
     };

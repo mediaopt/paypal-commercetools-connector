@@ -1,6 +1,6 @@
+import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { Patch } from '../paypal/checkout_api';
-import {LocalizedString} from "@commercetools/platform-sdk/dist/declarations/src/generated/models/common";
 
 export type Message = {
   code: string;
