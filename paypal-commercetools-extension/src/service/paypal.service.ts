@@ -311,6 +311,14 @@ export const createPaymentToken = async (request: PaymentTokenRequest) => {
   return response.data;
 };
 
+export const getPaymentTokens = async (customerId: string) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.customerPaymentTokensGet(
+    'application/json',
+    customerId
+  );
+  return response.data;
+};
 export const validateSignature = async (signature: VerifyWebhookSignature) => {
   const gateway = await getPayPalVerifyWebhookSignatureGateway(0);
   const response = await gateway.verifyWebhookSignaturePost(signature);
