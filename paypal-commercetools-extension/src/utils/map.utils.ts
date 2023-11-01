@@ -1,5 +1,13 @@
-import { TransactionState, TypedMoney } from '@commercetools/platform-sdk';
-import { OrderStatus, PaymentSourceResponse } from '../paypal/checkout_api';
+import {
+  LineItem,
+  TransactionState,
+  TypedMoney,
+} from '@commercetools/platform-sdk';
+import {
+  Item,
+  OrderStatus,
+  PaymentSourceResponse,
+} from '../paypal/checkout_api';
 import {
   Authorization2StatusEnum,
   Capture2StatusEnum,
@@ -132,4 +140,21 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
     return `Venmo (${source.venmo.email_address})`;
   }
   return '';
+};
+
+export const mapCommercetoolsLineItemsToPayPalItems = (
+  lineItem: LineItem,
+  locale?: string
+): Item => {
+  const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
+  return {
+    unit_amount: {
+      value: mapCommercetoolsMoneyToPayPalMoney(lineItem.price.value),
+      currency_code: lineItem.price.value.currencyCode,
+    },
+    name: name,
+    sku: lineItem.variant.sku,
+    quantity: `${lineItem.quantity}`,
+    description: name,
+  };
 };

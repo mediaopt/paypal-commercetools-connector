@@ -4,6 +4,7 @@ import {
   Transaction,
   TransactionState,
   TransactionType,
+  TypedMoney,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { createApiRoot } from '../client/create.client';
@@ -24,6 +25,7 @@ import {
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  mapCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -56,8 +58,9 @@ async function prepareCreateOrderRequest(
   const cart = await getCart(payment.id);
   const amountPlanned = payment.amountPlanned;
   const paymentDescription = settings?.paymentDescription
-    ? settings?.paymentDescription[cart.locale ?? 'en'] ??
-      Object.values(settings?.paymentDescription)[0]
+    ? settings?.paymentDescription[
+        cart.locale ?? Object.keys(settings?.paymentDescription)[0]
+      ]
     : undefined;
   request = {
     intent:
@@ -67,9 +70,28 @@ async function prepareCreateOrderRequest(
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
+          breakdown: {
+            item_total: {
+              currency_code: amountPlanned.currencyCode,
+              value: mapCommercetoolsMoneyToPayPalMoney({
+                centAmount: cart.lineItems
+                  .map(
+                    (lineItem) =>
+                      lineItem.price.value.centAmount * lineItem.quantity
+                  )
+                  .reduce((x, y) => x + y),
+                fractionDigits: cart.lineItems[0].price.value.fractionDigits,
+                currencyCode: cart.lineItems[0].price.value.currencyCode,
+                type: cart.lineItems[0].price.value.type,
+              } as TypedMoney),
+            },
+          },
         },
         invoice_id: payment.id,
         description: paymentDescription,
+        items: cart.lineItems.map((lineItem) =>
+          mapCommercetoolsLineItemsToPayPalItems(lineItem, cart.locale)
+        ),
       },
     ],
     ...request,
