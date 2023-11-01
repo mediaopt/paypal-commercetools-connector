@@ -56,6 +56,33 @@ async function prepareCreateOrderRequest(
 ) {
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   const cart = await getCart(payment.id);
+  if (request?.payment_source?.pay_upon_invoice) {
+    const cart = await getCart(payment.id);
+    request.payment_source.pay_upon_invoice = {
+      email: cart.customerEmail,
+      name: {
+        given_name: cart.billingAddress?.firstName,
+        surname: cart.billingAddress?.lastName,
+      },
+      billing_address: {
+        address_line_1: `${cart.billingAddress?.streetName} ${cart.billingAddress?.streetNumber}`,
+        admin_area_2: cart.billingAddress?.city,
+        postal_code: cart.billingAddress?.postalCode,
+        country_code: cart.billingAddress?.country,
+      },
+      experience_context: {
+        locale: 'de-DE',
+        brand_name: settings?.ratePayBrandName?.de,
+        logo_url: settings?.ratePayLogoUrl?.de,
+        customer_service_instructions: [
+          settings?.ratePayCustomerServiceInstructions?.de ?? 'Instructions',
+        ],
+      },
+      ...request.payment_source.pay_upon_invoice,
+    };
+    request.intent = 'CAPTURE';
+    request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
+  }
   const amountPlanned = payment.amountPlanned;
   const paymentDescription = settings?.paymentDescription
     ? settings?.paymentDescription[
@@ -110,7 +137,10 @@ export const handleCreateOrderRequest = async (
   const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
-    const response = await createPayPalOrder(request);
+    const response = await createPayPalOrder(
+      request,
+      request?.clientMetadataId
+    );
     updateActions = updateActions.concat(
       handlePaymentResponse('createPayPalOrder', response)
     );

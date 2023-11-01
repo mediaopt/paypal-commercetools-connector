@@ -75,5 +75,8 @@ export type PayPalSettings = {
   payLaterMessageFlexRatio: string;
   threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
   payPalIntent: 'Capture' | 'Authorize';
+  ratePayCustomerServiceInstructions: LocalizedString;
+  ratePayBrandName: LocalizedString;
+  ratePayLogoUrl: LocalizedString;
   paymentDescription: LocalizedString;
 };
