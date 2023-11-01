@@ -6,6 +6,7 @@ import {
   TransactionType,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
@@ -51,6 +52,33 @@ export const handleCreateOrderRequest = async (
   }
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   const settings = await getSettings();
+  if (request?.payment_source?.pay_upon_invoice) {
+    const cart = await getCart(payment.id);
+    request.payment_source.pay_upon_invoice = {
+      email: cart.customerEmail,
+      name: {
+        given_name: cart.billingAddress?.firstName,
+        surname: cart.billingAddress?.lastName,
+      },
+      billing_address: {
+        address_line_1: `${cart.billingAddress?.streetName} ${cart.billingAddress?.streetNumber}`,
+        admin_area_2: cart.billingAddress?.city,
+        postal_code: cart.billingAddress?.postalCode,
+        country_code: cart.billingAddress?.country,
+      },
+      experience_context: {
+        locale: 'de-DE',
+        brand_name: settings?.ratePayBrandName?.de,
+        logo_url: settings?.ratePayLogoUrl?.de,
+        customer_service_instructions: [
+          settings?.ratePayCustomerServiceInstructions?.de ?? 'Instructions',
+        ],
+      },
+      ...request.payment_source.pay_upon_invoice,
+    };
+    request.intent = 'CAPTURE';
+    request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
+  }
   const amountPlanned = payment.amountPlanned;
   request = {
     intent:
@@ -67,7 +95,10 @@ export const handleCreateOrderRequest = async (
   } as OrderRequest;
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
-    const response = await createPayPalOrder(request);
+    const response = await createPayPalOrder(
+      request,
+      request?.clientMetadataId
+    );
     updateActions = updateActions.concat(
       handlePaymentResponse('createPayPalOrder', response)
     );
@@ -386,3 +417,19 @@ function findSuitableTransactionId(
   }
   return transactions[transactions.length - 1].interactionId;
 }
+
+const getCart = async (paymentId: string) => {
+  const apiRoot = createApiRoot();
+  const cart = await apiRoot
+    .carts()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
+  if (cart.body.total !== 1) {
+    throw new CustomError(500, 'payment is not associated with a cart.');
+  }
+  return cart.body.results[0];
+};

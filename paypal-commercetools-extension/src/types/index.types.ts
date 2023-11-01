@@ -1,3 +1,4 @@
+import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { Patch } from '../paypal/checkout_api';
 
@@ -74,4 +75,7 @@ export type PayPalSettings = {
   payLaterMessageFlexRatio: string;
   threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
   payPalIntent: 'Capture' | 'Authorize';
+  ratePayCustomerServiceInstructions: LocalizedString;
+  ratePayBrandName: LocalizedString;
+  ratePayLogoUrl: LocalizedString;
 };
