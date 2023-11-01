@@ -6,6 +6,7 @@ import {
   TransactionType,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
@@ -15,7 +16,11 @@ import {
   OrderRequest,
 } from '../paypal/checkout_api';
 import { CaptureRequest } from '../paypal/payments_api';
-import { ClientTokenRequest, UpdateActions } from '../types/index.types';
+import {
+  ClientTokenRequest,
+  PayPalSettings,
+  UpdateActions,
+} from '../types/index.types';
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
@@ -43,15 +48,17 @@ import {
   updatePayPalOrder,
 } from './paypal.service';
 
-export const handleCreateOrderRequest = async (
-  payment: Payment
-): Promise<UpdateAction[]> => {
-  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
-    return [];
-  }
+async function prepareCreateOrderRequest(
+  payment: Payment,
+  settings?: PayPalSettings
+) {
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
-  const settings = await getSettings();
+  const cart = await getCart(payment.id);
   const amountPlanned = payment.amountPlanned;
+  const paymentDescription = settings?.paymentDescription
+    ? settings?.paymentDescription[cart.locale ?? 'en'] ??
+      Object.values(settings?.paymentDescription)[0]
+    : undefined;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -61,10 +68,24 @@ export const handleCreateOrderRequest = async (
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
         },
+        invoice_id: payment.id,
+        description: paymentDescription,
       },
     ],
     ...request,
   } as OrderRequest;
+  return request;
+}
+
+export const handleCreateOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
+    return [];
+  }
+  const amountPlanned = payment.amountPlanned;
+  const settings = await getSettings();
+  const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(request);
@@ -386,3 +407,19 @@ function findSuitableTransactionId(
   }
   return transactions[transactions.length - 1].interactionId;
 }
+
+const getCart = async (paymentId: string) => {
+  const apiRoot = createApiRoot();
+  const cart = await apiRoot
+    .carts()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
+  if (cart.body.total !== 1) {
+    throw new CustomError(500, 'payment is not associated with a cart.');
+  }
+  return cart.body.results[0];
+};
