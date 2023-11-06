@@ -78,4 +78,5 @@ export type PayPalSettings = {
   ratePayCustomerServiceInstructions: LocalizedString;
   ratePayBrandName: LocalizedString;
   ratePayLogoUrl: LocalizedString;
+  paymentDescription: LocalizedString;
 };

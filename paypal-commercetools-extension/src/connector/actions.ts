@@ -26,6 +26,7 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
 export const PAYPAL_API_CUSTOMER_ENDPOINTS = [
   'createVaultSetupToken',
   'getUserIDToken',
+  'createPaymentToken',
 ];
 
 export async function createPaymentUpdateExtension(

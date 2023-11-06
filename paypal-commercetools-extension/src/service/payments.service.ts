@@ -4,6 +4,7 @@ import {
   Transaction,
   TransactionState,
   TransactionType,
+  TypedMoney,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { createApiRoot } from '../client/create.client';
@@ -16,10 +17,15 @@ import {
   OrderRequest,
 } from '../paypal/checkout_api';
 import { CaptureRequest } from '../paypal/payments_api';
-import { ClientTokenRequest, UpdateActions } from '../types/index.types';
+import {
+  ClientTokenRequest,
+  PayPalSettings,
+  UpdateActions,
+} from '../types/index.types';
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  mapCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -44,14 +50,12 @@ import {
   updatePayPalOrder,
 } from './paypal.service';
 
-export const handleCreateOrderRequest = async (
-  payment: Payment
-): Promise<UpdateAction[]> => {
-  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
-    return [];
-  }
+async function prepareCreateOrderRequest(
+  payment: Payment,
+  settings?: PayPalSettings
+) {
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
-  const settings = await getSettings();
+  const cart = await getCart(payment.id);
   if (request?.payment_source?.pay_upon_invoice) {
     const cart = await getCart(payment.id);
     request.payment_source.pay_upon_invoice = {
@@ -80,6 +84,11 @@ export const handleCreateOrderRequest = async (
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
   }
   const amountPlanned = payment.amountPlanned;
+  const paymentDescription = settings?.paymentDescription
+    ? settings?.paymentDescription[
+        cart.locale ?? Object.keys(settings?.paymentDescription)[0]
+      ]
+    : undefined;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -88,11 +97,44 @@ export const handleCreateOrderRequest = async (
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
+          breakdown: {
+            item_total: {
+              currency_code: amountPlanned.currencyCode,
+              value: mapCommercetoolsMoneyToPayPalMoney({
+                centAmount: cart.lineItems
+                  .map(
+                    (lineItem) =>
+                      lineItem.price.value.centAmount * lineItem.quantity
+                  )
+                  .reduce((x, y) => x + y),
+                fractionDigits: cart.lineItems[0].price.value.fractionDigits,
+                currencyCode: cart.lineItems[0].price.value.currencyCode,
+                type: cart.lineItems[0].price.value.type,
+              } as TypedMoney),
+            },
+          },
         },
+        invoice_id: payment.id,
+        description: paymentDescription,
+        items: cart.lineItems.map((lineItem) =>
+          mapCommercetoolsLineItemsToPayPalItems(lineItem, cart.locale)
+        ),
       },
     ],
     ...request,
   } as OrderRequest;
+  return request;
+}
+
+export const handleCreateOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
+    return [];
+  }
+  const amountPlanned = payment.amountPlanned;
+  const settings = await getSettings();
+  const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(

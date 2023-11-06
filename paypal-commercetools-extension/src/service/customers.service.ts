@@ -1,6 +1,10 @@
 import { Customer } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { SetupTokenRequest } from '../paypal/vault_api';
+import {
+  PaymentTokenRequest,
+  SetupTokenRequest,
+  TokenIdRequestTypeEnum,
+} from '../paypal/vault_api';
 import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
@@ -8,14 +12,18 @@ import {
   handleError,
   handleRequest,
 } from '../utils/response.utils';
-import { createVaultSetupToken, generateUserIdToken } from './paypal.service';
+import {
+  createPaymentToken,
+  createVaultSetupToken,
+  generateUserIdToken,
+} from './paypal.service';
 
 export async function handleGetUserIDTokenRequest(customer: Customer) {
   const request = customer?.custom?.fields?.getUserIDTokenRequest;
   if (!request) {
     return [];
   }
-  const { customerId } = JSON.parse(request);
+  const customerId = customer?.custom?.fields?.PayPalUserId;
   const updateActions = handleRequest(
     'getUserIDToken',
     { customerId },
@@ -32,13 +40,13 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
     return handleError('getUserIDToken', e);
   }
 }
+
 export const handleCreateVaultSetupTokenRequest = async (
   customer: Customer
 ): Promise<UpdateAction[]> => {
   if (!customer?.custom?.fields?.createVaultSetupTokenRequest) {
     return [];
   }
-  logger.info(customer?.custom?.fields?.createVaultSetupTokenRequest);
   let request: SetupTokenRequest = JSON.parse(
     customer?.custom?.fields?.createVaultSetupTokenRequest
   );
@@ -61,10 +69,61 @@ export const handleCreateVaultSetupTokenRequest = async (
   try {
     const response = await createVaultSetupToken(request);
     logger.info(JSON.stringify(response));
+    if (response.customer?.id) {
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'PayPalUserId',
+        value: response.customer?.id,
+      });
+    }
     return updateActions.concat(
       handleCustomerResponse('createVaultSetupToken', response)
     );
   } catch (e) {
     return handleError('createVaultSetupToken', e);
+  }
+};
+
+export const handleCreatePaymentTokenRequest = async (
+  customer: Customer
+): Promise<UpdateAction[]> => {
+  if (!customer?.custom?.fields?.createPaymentTokenRequest) {
+    return [];
+  }
+  const request: PaymentTokenRequest = {
+    customer: customer?.custom?.fields?.PayPalUserId
+      ? {
+          id: customer?.custom?.fields?.PayPalUserId,
+        }
+      : undefined,
+    payment_source: {
+      token: {
+        type: TokenIdRequestTypeEnum.SetupToken,
+        id: customer?.custom?.fields?.createPaymentTokenRequest,
+      },
+    },
+  };
+  logger.info(JSON.stringify(request));
+  const updateActions: UpdateActions = handleRequest(
+    'createPaymentToken',
+    request,
+    true,
+    false
+  );
+  try {
+    const response = await createPaymentToken(request);
+    logger.info(JSON.stringify(response));
+    if (response.customer?.id) {
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'PayPalUserId',
+        value: response.customer?.id,
+      });
+    }
+    return updateActions.concat(
+      handleCustomerResponse('createPaymentToken', response)
+    );
+  } catch (e) {
+    return handleError('createPaymentToken', e);
   }
 };
