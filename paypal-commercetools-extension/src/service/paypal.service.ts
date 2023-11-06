@@ -16,7 +16,12 @@ import {
   CapturesApi,
   RefundRequest,
 } from '../paypal/payments_api';
-import { SetupTokenRequest, SetupTokensApi } from '../paypal/vault_api';
+import {
+  PaymentTokenRequest,
+  PaymentTokensApi,
+  SetupTokenRequest,
+  SetupTokensApi,
+} from '../paypal/vault_api';
 import {
   VerifyWebhookSignature,
   VerifyWebhookSignatureApi,
@@ -71,6 +76,12 @@ const getPayPalSetupTokenGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
   return new SetupTokensApi(await buildConfiguration(timeout));
+};
+
+const getPayPalPaymentTokenGateway = async (
+  timeout: number = TIMEOUT_PAYMENT
+) => {
+  return new PaymentTokensApi(await buildConfiguration(timeout));
 };
 
 export const createPayPalOrder = async (
@@ -283,6 +294,16 @@ export const generateUserIdToken = async (
 export const createVaultSetupToken = async (request: SetupTokenRequest) => {
   const gateway = await getPayPalSetupTokenGateway(2000);
   const response = await gateway.setupTokensCreate(
+    'application/json',
+    randomUUID(),
+    request
+  );
+  return response.data;
+};
+
+export const createPaymentToken = async (request: PaymentTokenRequest) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.paymentTokensCreate(
     'application/json',
     randomUUID(),
     request

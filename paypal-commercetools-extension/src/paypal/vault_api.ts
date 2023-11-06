@@ -2285,6 +2285,9 @@ export interface TokenIdRequest {
 
 export const TokenIdRequestTypeEnum = {
   BillingAgreement: 'BILLING_AGREEMENT',
+  //MEDIAOPT ADJUSTMENT START
+  SetupToken: 'SETUP_TOKEN',
+  //MEDIAOPT ADJUSTMENT END
 } as const;
 
 export type TokenIdRequestTypeEnum =
