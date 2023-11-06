@@ -79,4 +79,5 @@ export type PayPalSettings = {
   ratePayBrandName: LocalizedString;
   ratePayLogoUrl: LocalizedString;
   paymentDescription: LocalizedString;
+  storeInVaultOnSuccess: boolean;
 };

@@ -4,6 +4,7 @@ import { Resource } from '../interfaces/resource.interface';
 import {
   handleCreatePaymentTokenRequest,
   handleCreateVaultSetupTokenRequest,
+  handleGetPaymentTokensRequest,
   handleGetUserIDTokenRequest,
 } from '../service/customers.service';
 import { UpdateActions } from '../types/index.types';
@@ -26,6 +27,7 @@ const update = async (resource: Resource) => {
     updateActions = updateActions.concat(
       await handleGetUserIDTokenRequest(customer.obj),
       await handleCreatePaymentTokenRequest(customer.obj),
+      await handleGetPaymentTokensRequest(customer.obj),
       await handleCreateVaultSetupTokenRequest(customer.obj)
     );
     return { statusCode: 200, actions: updateActions };

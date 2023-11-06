@@ -16,6 +16,7 @@ import {
   createPaymentToken,
   createVaultSetupToken,
   generateUserIdToken,
+  getPaymentTokens,
 } from './paypal.service';
 
 export async function handleGetUserIDTokenRequest(customer: Customer) {
@@ -125,5 +126,29 @@ export const handleCreatePaymentTokenRequest = async (
     );
   } catch (e) {
     return handleError('createPaymentToken', e);
+  }
+};
+
+export const handleGetPaymentTokensRequest = async (
+  customer: Customer
+): Promise<UpdateAction[]> => {
+  if (!customer?.custom?.fields?.getPaymentTokensRequest) {
+    return [];
+  }
+  const customerId = customer?.custom?.fields?.PayPalUserId;
+  const updateActions: UpdateActions = handleRequest(
+    'getPaymentTokens',
+    { customerId },
+    true,
+    false
+  );
+  try {
+    const response = await getPaymentTokens(customerId);
+    logger.info(JSON.stringify(response));
+    return updateActions.concat(
+      handleCustomerResponse('getPaymentTokens', response)
+    );
+  } catch (e) {
+    return handleError('getPaymentTokens', e);
   }
 };
