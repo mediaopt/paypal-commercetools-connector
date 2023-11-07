@@ -10,11 +10,11 @@ const config = {
   cloudIdentifier: '${env:CLOUD_IDENTIFIER}',
   env: {
     development: {
-      initialProjectKey: '${env:CTP_INITIAL_PROJECT_KEY}',
+      initialProjectKey: 'paypal-dev',
     },
     production: {
       applicationId: '${env:APPLICATION_ID}',
-      url: 'https://your_app_hostname.com',
+      url: '${env:APPLICATION_URL}',
     },
   },
   oAuthScopes: {
