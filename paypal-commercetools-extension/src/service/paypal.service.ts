@@ -23,9 +23,12 @@ import {
   SetupTokensApi,
 } from '../paypal/vault_api';
 import {
+  EventType,
   VerifyWebhookSignature,
   VerifyWebhookSignatureApi,
+  WebhooksApi,
 } from '../paypal/webhooks_api';
+import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
@@ -60,6 +63,9 @@ const getPayPalVerifyWebhookSignatureGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
   return new VerifyWebhookSignatureApi(await buildConfiguration(timeout));
+};
+const getPayPalWebhooksGateway = async (timeout = 0) => {
+  return new WebhooksApi(await buildConfiguration(timeout));
 };
 
 const getPayPalAuhorizationsGateway = async (
@@ -343,4 +349,37 @@ const getAPIEndpoint = () => {
   return process.env.PAYPAL_ENVIRONMENT === 'Production'
     ? PAYPAL_API_LIVE
     : PAYPAL_API_SANDBOX;
+};
+
+export const createOrUpdateWebhook = async (url: string) => {
+  const gateway = await getPayPalWebhooksGateway();
+  const webhooks = await gateway.webhooksList('APPLICATION');
+  logger.info(JSON.stringify(webhooks.data.webhooks));
+  const oldWebhook = webhooks.data.webhooks?.find((webhook) =>
+    webhook.url.endsWith(PAYPAL_WEBHOOKS_PATH)
+  );
+  if (oldWebhook && oldWebhook?.id) {
+    if (oldWebhook?.url === url) {
+      logger.info('Webhook URL did not change');
+      return oldWebhook;
+    }
+    const response = await gateway.webhooksUpdate(oldWebhook.id, [
+      {
+        op: 'replace',
+        path: '/url',
+        value: url,
+      },
+    ]);
+    logger.info(`Webhook url updated from ${oldWebhook.url} to ${url}`);
+    return response.data;
+  }
+  const response = await gateway.webhooksPost({
+    url: url,
+    event_types: [
+      {
+        name: '*',
+      } as EventType,
+    ],
+  });
+  return response.data;
 };
