@@ -311,6 +311,20 @@ export const createPaymentToken = async (request: PaymentTokenRequest) => {
   return response.data;
 };
 
+export const deletePaymentToken = async (paymentTokenId: string) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.paymentTokensDelete(
+    paymentTokenId,
+    'application/json'
+  );
+  if (response.status === 204) {
+    return {
+      status: 'success',
+    };
+  }
+  return response.data;
+};
+
 export const getPaymentTokens = async (customerId: string) => {
   const gateway = await getPayPalPaymentTokenGateway(2000);
   const response = await gateway.customerPaymentTokensGet(

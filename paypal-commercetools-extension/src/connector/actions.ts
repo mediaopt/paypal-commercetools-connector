@@ -28,6 +28,7 @@ export const PAYPAL_API_CUSTOMER_ENDPOINTS = [
   'getUserIDToken',
   'createPaymentToken',
   'getPaymentTokens',
+  'deletePaymentToken',
 ];
 
 export async function createPaymentUpdateExtension(
