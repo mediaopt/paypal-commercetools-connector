@@ -1,10 +1,10 @@
 import {
+  Cart,
   Payment,
   PaymentAddTransactionAction,
   Transaction,
   TransactionState,
   TransactionType,
-  TypedMoney,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import { createApiRoot } from '../client/create.client';
@@ -26,6 +26,7 @@ import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
   mapCommercetoolsLineItemsToPayPalItems,
+  mapCommercetoolsLineItemsToPayPalPriceBreakdown,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -55,6 +56,9 @@ async function prepareCreateOrderRequest(
   settings?: PayPalSettings
 ) {
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
+  if (!request?.payment_source && request.paymentSource) {
+    request.payment_source = request.paymentSource;
+  }
   const cart = await getCart(payment.id);
   if (request?.payment_source?.pay_upon_invoice) {
     const cart = await getCart(payment.id);
@@ -97,62 +101,80 @@ async function prepareCreateOrderRequest(
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-          breakdown: {
-            item_total: {
-              currency_code: amountPlanned.currencyCode,
-              value: mapCommercetoolsMoneyToPayPalMoney({
-                centAmount: cart.lineItems
-                  .map(
-                    (lineItem) =>
-                      lineItem.price.value.centAmount * lineItem.quantity
-                  )
-                  .reduce((x, y) => x + y),
-                fractionDigits: cart.lineItems[0].price.value.fractionDigits,
-                currencyCode: cart.lineItems[0].price.value.currencyCode,
-                type: cart.lineItems[0].price.value.type,
-              } as TypedMoney),
-            },
-          },
+          breakdown: mapCommercetoolsLineItemsToPayPalPriceBreakdown(
+            cart.lineItems
+          ),
         },
+        shipping: !cart.shippingAddress
+          ? undefined
+          : {
+              type: 'SHIPPING',
+              name: {
+                full_name: `${cart.shippingAddress.firstName} ${cart.shippingAddress.lastName}`,
+              },
+              address: {
+                address_line_1: `${cart.shippingAddress.streetName} ${cart.shippingAddress.streetNumber}`,
+                admin_area_2: cart.shippingAddress.city,
+                postal_code: cart.shippingAddress.postalCode,
+                country_code: cart.shippingAddress.country,
+              },
+            },
         invoice_id: payment.id,
         description: paymentDescription,
         items: cart.lineItems.map((lineItem) =>
-          mapCommercetoolsLineItemsToPayPalItems(lineItem, cart.locale)
+          mapCommercetoolsLineItemsToPayPalItems(
+            lineItem,
+            !!cart.shippingAddress,
+            cart.locale
+          )
         ),
       },
     ],
     ...request,
   } as OrderRequest;
-  if (request?.payment_source?.paypal && settings?.storeInVaultOnSuccess) {
-    request.payment_source.paypal = {
-      attributes: {
-              vault: {
-                store_in_vault: 'ON_SUCCESS',
-                usage_type: 'MERCHANT',
-              },
-            },
-      ...request.payment_source.paypal
-    }
-  }
-  if (request?.payment_source?.venmo && settings?.storeInVaultOnSuccess) {
-    request.payment_source.venmo = {
-      attributes: {
-        vault: {
-          store_in_vault: 'ON_SUCCESS',
-          usage_type: 'MERCHANT',
+  if (request?.storeInVaultOnSuccess) {
+    const userId = await getPayPalUserId(cart);
+    if (request?.payment_source?.paypal) {
+      request.payment_source.paypal = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+            usage_type: 'MERCHANT',
+            customer_type: 'CONSUMER',
+          },
+          customer: {
+            id: userId,
+          },
         },
-      },
-      ...request.payment_source.venmo
+        ...request.payment_source.paypal,
+      };
     }
-  }
-  if (request?.payment_source?.card && settings?.storeInVaultOnSuccess) {
-    request.payment_source.card = {
-      attributes: {
-        vault: {
-          store_in_vault: 'ON_SUCCESS',
+    if (request?.payment_source?.venmo) {
+      request.payment_source.venmo = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+            usage_type: 'MERCHANT',
+          },
+          customer: {
+            id: userId,
+          },
         },
-      },
-      ...request.payment_source.card
+        ...request.payment_source.venmo,
+      };
+    }
+    if (request?.payment_source?.card) {
+      request.payment_source.card = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+          },
+          customer: {
+            id: userId,
+          },
+        },
+        ...request.payment_source.card,
+      };
     }
   }
   return request;
@@ -506,4 +528,17 @@ const getCart = async (paymentId: string) => {
     throw new CustomError(500, 'payment is not associated with a cart.');
   }
   return cart.body.results[0];
+};
+
+const getPayPalUserId = async (cart: Cart): Promise<string | undefined> => {
+  if (!cart.customerId) {
+    return undefined;
+  }
+  const apiRoot = createApiRoot();
+  const user = await apiRoot
+    .customers()
+    .withId({ ID: cart.customerId })
+    .get()
+    .execute();
+  return user.body?.custom?.fields?.PayPalUserId;
 };
