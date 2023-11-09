@@ -15,6 +15,7 @@ import {
 import {
   createPaymentToken,
   createVaultSetupToken,
+  deletePaymentToken,
   generateUserIdToken,
   getPaymentTokens,
 } from './paypal.service';
@@ -39,6 +40,28 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
   } catch (e) {
     logger.error('Call to getUserIDToken resulted in an error', e);
     return handleError('getUserIDToken', e);
+  }
+}
+
+export async function handleDeletePaymentTokenRequest(customer: Customer) {
+  const paymentToken = customer?.custom?.fields?.deletePaymentTokenRequest;
+  if (!paymentToken) {
+    return [];
+  }
+  const updateActions = handleRequest(
+    'deletePaymentToken',
+    { paymentToken },
+    undefined,
+    false
+  );
+  try {
+    const response = await deletePaymentToken(paymentToken);
+    return updateActions.concat(
+      handleCustomerResponse('deletePaymentToken', response ?? '')
+    );
+  } catch (e) {
+    logger.error('Call to deletePaymentToken resulted in an error', e);
+    return handleError('deletePaymentToken', e);
   }
 }
 
