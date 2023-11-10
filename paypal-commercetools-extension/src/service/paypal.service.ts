@@ -30,7 +30,12 @@ import {
 } from '../paypal/webhooks_api';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { logger } from '../utils/logger.utils';
-import { cacheAccessToken, getCachedAccessToken } from './config.service';
+import {
+  cacheAccessToken,
+  getCachedAccessToken,
+  getWebhookId,
+  storeWebhookId,
+} from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -381,5 +386,9 @@ export const createOrUpdateWebhook = async (url: string) => {
       } as EventType,
     ],
   });
+  if (response?.data?.id) {
+    const webhookIdField = await getWebhookId();
+    await storeWebhookId(response.data.id, webhookIdField?.version ?? 0);
+  }
   return response.data;
 };

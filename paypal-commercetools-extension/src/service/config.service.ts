@@ -54,3 +54,36 @@ export const cacheAccessToken = async (
     })
     .execute();
 };
+
+export const getWebhookId = async () => {
+  try {
+    const apiRoot = createApiRoot();
+    return (
+      await apiRoot
+        .customObjects()
+        .withContainerAndKey({
+          container: 'paypal-commercetools-connector',
+          key: 'webhookId',
+        })
+        .get()
+        .execute()
+    ).body;
+  } catch (e) {
+    return undefined;
+  }
+};
+
+export const storeWebhookId = async (webhookId: string, version: number) => {
+  const apiRoot = createApiRoot();
+  return apiRoot
+    .customObjects()
+    .post({
+      body: {
+        container: 'paypal-commercetools-connector',
+        key: 'webhookId',
+        value: webhookId,
+        version: version,
+      },
+    })
+    .execute();
+};
