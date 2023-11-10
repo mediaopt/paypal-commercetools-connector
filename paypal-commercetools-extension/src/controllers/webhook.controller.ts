@@ -5,6 +5,7 @@ import {
   handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
+  handlePaymentTokenWebhook,
 } from '../service/commercetools.service';
 import { getWebhookId } from '../service/config.service';
 import { validateSignature } from '../service/paypal.service';
@@ -68,6 +69,10 @@ export const post = async (request: Request, response: Response) => {
         return;
       case 'checkout-order':
         await handleOrderWebhook(resource);
+        response.status(200).json({});
+        return;
+      case 'payment_token':
+        await handlePaymentTokenWebhook(resource);
         response.status(200).json({});
         return;
       default:

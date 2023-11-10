@@ -1,4 +1,5 @@
 import {
+  CustomerUpdateAction,
   Payment,
   PaymentAddTransactionAction,
   PaymentChangeTransactionStateAction,
@@ -7,6 +8,7 @@ import {
   TransactionDraft,
 } from '@commercetools/platform-sdk';
 import { createApiRoot } from '../client/create.client';
+import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
 import { CheckoutPaymentIntent, Order } from '../paypal/checkout_api';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
@@ -73,6 +75,55 @@ function prepareCreateOrUpdateTransactionAction(
     } as PaymentChangeTransactionStateAction,
   ];
 }
+
+export const handlePaymentTokenWebhook = async (resource: any) => {
+  if (!resource?.customer?.id) {
+    return;
+  }
+  const orderId = resource.metadata.order_id;
+  const payment = await getPaymentByPayPalOrderId(orderId);
+  const cart = await getCart(payment.id);
+  if (!cart.customerId) {
+    return;
+  }
+  const customer = await createApiRoot()
+    .customers()
+    .withId({ ID: cart.customerId })
+    .get()
+    .execute();
+  if (customer.body.custom?.fields?.PayPalUserId !== resource.customer.id) {
+    logger.info(
+      `Changing PayPalUserId to ${resource.customer.id} for ${customer.body.email}`
+    );
+    const action: CustomerUpdateAction = customer.body.custom?.fields
+      ?.PayPalUserId
+      ? {
+          action: 'setCustomField',
+          name: 'PayPalUserId',
+          value: resource.customer.id,
+        }
+      : {
+          action: 'setCustomType',
+          type: {
+            key: PAYPAL_CUSTOMER_TYPE_KEY,
+            typeId: 'type',
+          },
+          fields: {
+            PayPalUserId: resource.customer.id,
+          },
+        };
+    await createApiRoot()
+      .customers()
+      .withId({ ID: cart.customerId })
+      .post({
+        body: {
+          version: customer.body.version,
+          actions: [action],
+        },
+      })
+      .execute();
+  }
+};
 
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
@@ -184,4 +235,20 @@ const handleUpdatePayment = async (
     logger.error('There was an error', e);
     throw e;
   }
+};
+
+export const getCart = async (paymentId: string) => {
+  const apiRoot = createApiRoot();
+  const cart = await apiRoot
+    .carts()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
+  if (cart.body.total !== 1) {
+    throw new CustomError(500, 'payment is not associated with a cart.');
+  }
+  return cart.body.results[0];
 };

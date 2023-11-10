@@ -7,7 +7,6 @@ import {
   TypedMoney,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
@@ -38,6 +37,7 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
+import { getCart } from './commercetools.service';
 import { getSettings } from './config.service';
 import {
   authorizePayPalOrder,
@@ -57,7 +57,6 @@ async function prepareCreateOrderRequest(
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   const cart = await getCart(payment.id);
   if (request?.payment_source?.pay_upon_invoice) {
-    const cart = await getCart(payment.id);
     request.payment_source.pay_upon_invoice = {
       email: cart.customerEmail,
       name: {
@@ -491,19 +490,3 @@ function findSuitableTransactionId(
   }
   return transactions[transactions.length - 1].interactionId;
 }
-
-const getCart = async (paymentId: string) => {
-  const apiRoot = createApiRoot();
-  const cart = await apiRoot
-    .carts()
-    .get({
-      queryArgs: {
-        where: `paymentInfo(payments(id="${paymentId}"))`,
-      },
-    })
-    .execute();
-  if (cart.body.total !== 1) {
-    throw new CustomError(500, 'payment is not associated with a cart.');
-  }
-  return cart.body.results[0];
-};
