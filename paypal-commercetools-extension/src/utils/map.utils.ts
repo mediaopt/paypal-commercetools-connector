@@ -148,17 +148,19 @@ export const mapCommercetoolsLineItemsToPayPalItems = (
   locale?: string
 ): Item => {
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
+  const taxedNetAmount = lineItem.taxedPrice?.totalNet?.centAmount;
+  const currencyCode = lineItem.price.value.currencyCode;
   return {
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: lineItem.taxedPrice?.totalNet?.centAmount
-          ? lineItem.taxedPrice?.totalNet?.centAmount / lineItem.quantity
+        centAmount: taxedNetAmount
+          ? taxedNetAmount / lineItem.quantity
           : lineItem.price.value.centAmount,
         fractionDigits: lineItem.price.value.fractionDigits,
-        currencyCode: lineItem.price.value.currencyCode,
+        currencyCode,
         type: lineItem.price.value.type,
       } as TypedMoney),
-      currency_code: lineItem.price.value.currencyCode,
+      currency_code: currencyCode,
     },
     name: name,
     sku: lineItem.variant.sku,
@@ -174,10 +176,10 @@ export const mapCommercetoolsLineItemsToPayPalItems = (
               (lineItem.taxedPrice?.totalTax?.centAmount ?? 0) /
               lineItem.quantity,
             fractionDigits: lineItem.price.value.fractionDigits,
-            currencyCode: lineItem.price.value.currencyCode,
+            currencyCode,
             type: lineItem.price.value.type,
           } as TypedMoney),
-          currency_code: lineItem.price.value.currencyCode,
+          currency_code: currencyCode,
         },
   } as Item;
 };
