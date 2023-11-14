@@ -1,0 +1,89 @@
+import { defineMessages } from 'react-intl';
+
+export default defineMessages({
+  settings: {
+    id: 'Settings.settings',
+    defaultMessage: 'PayPal Settings',
+  },
+  account: {
+    id: 'Settings.account',
+    defaultMessage: 'PayPal account',
+  },
+  acceptedMethods: {
+    id: 'Settings.acceptedMethods',
+    defaultMessage: 'Payment Methods Accepted',
+  },
+  checkoutButtons: {
+    id: 'Settings.checkoutButtons',
+    defaultMessage: 'PayPal Checkout Buttons',
+  },
+  checkoutButtonsInfo: {
+    id: 'Settings.checkoutButtons.info',
+    defaultMessage:
+      'Let your customers speed through checkout. Place the PayPal button in multiple places in your purchase experience for optimal results.',
+  },
+  checkoutButtonsLayout: {
+    id: 'Settings.checkoutButtons.Layout',
+    defaultMessage: 'Layout:',
+  },
+  checkoutButtonsColor: {
+    id: 'Settings.checkoutButtons.Color',
+    defaultMessage: 'Color',
+  },
+  paylaterMessaging: {
+    id: 'Settings.paylaterMessaging',
+    defaultMessage: 'PayPal PayLater Messaging',
+  },
+  paylaterShowOnPages: {
+    id: 'Settings.paylaterShowOnPages',
+    defaultMessage: 'Show PayLater message on these pages',
+  },
+  homePage: {
+    id: 'Settings.homePage',
+    defaultMessage: 'Home page',
+  },
+  productCategoryPage: {
+    id: 'Settings.productCategoryPage',
+    defaultMessage: 'Product Category page',
+  },
+  productDetailsPage: {
+    id: 'Settings.productDetailsPage',
+    defaultMessage: 'Product Details page',
+  },
+  cartPage: {
+    id: 'Settings.cartPage',
+    defaultMessage: 'Cart page',
+  },
+  paymentPage: {
+    id: 'Settings.paymentPage',
+    defaultMessage: 'Payment page',
+  },
+  threeDSSettings: {
+    id: 'Settings.threeDSSettings',
+    defaultMessage: '3D Secure',
+  },
+  threeDSNotice: {
+    id: 'Settings.threeDSNotice',
+    defaultMessage:
+      '3D Secure enables you to authenticate card holders through card issuers. It reduces the likelihood of fraud when you use supported cards and improves transaction performance. A successful 3D Secure authentication can shift liability for chargebacks due to fraud from you to the card issuer.',
+  },
+  payLaterNotice: {
+    id: 'Settings.payLaterNotice',
+    defaultMessage:
+      'When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.',
+  },
+  partnerAttributionIdNotice: {
+    id: 'Settings.partnerAttributionIdNotice',
+    defaultMessage:
+      'Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.',
+  },
+  threeDSActionTitle: {
+    id: 'Settings.threeDSActionTitle',
+    defaultMessage: 'Response parameters',
+  },
+  threeDSActionSubTitle: {
+    id: 'Settings.threeDSActionSubTitle',
+    defaultMessage:
+      'Here you can set how to proceed with the transaction depending on the received response parameters along PayPals recommended action',
+  },
+});
