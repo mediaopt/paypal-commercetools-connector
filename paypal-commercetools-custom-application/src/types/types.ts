@@ -13,10 +13,8 @@ export type SettingsFormDataType = {
   buttonCartPage: boolean;
   buttonDetailPage: boolean;
   buttonShippingPage: boolean;
-  buttonShape: 'rectangle' | 'pill';
+  buttonShape: 'rect' | 'pill';
   buttonTagline: boolean;
-  buttonColor: 'blue' | 'gold' | 'gray' | 'white' | 'black';
-  buttonLabel: 'pay';
   payLaterMessagingType: 'flex' | 'text';
   payLaterMessageHomePage: boolean;
   payLaterMessageCategoryPage: boolean;
@@ -44,15 +42,25 @@ export type SettingsFormDataType = {
   ratePayLogoUrl: CustomDataStringObject;
   ratePayCustomerServiceInstructions: CustomDataStringObject;
   paymentDescription: CustomDataStringObject;
+  storeInVaultOnSuccess: boolean;
+  paypalButtonConfig: {
+    buttonColor: PayPalButtonColors;
+    buttonLabel: 'paypal' | 'checkout' | 'buynow' | 'pay' | 'installment';
+  };
+  hostedFieldsPayButtonClasses: string;
+  hostedFieldsInputFieldClasses: string;
+  threeDSAction: Record<string, unknown>;
 };
+
+type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';
 
 export type PayPalSettingsType = {
   values: SettingsFormDataType;
   handleChange: {
-    (e: ChangeEvent): void;
-    <T = string | ChangeEvent>(field: T): T extends ChangeEvent
+    (e: ChangeEvent<any>): void;
+    <T = string | ChangeEvent<any>>(field: T): T extends ChangeEvent<any>
       ? void
-      : (e: string | ChangeEvent) => void;
+      : (e: string | ChangeEvent<any>) => void;
   };
 };
 

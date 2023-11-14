@@ -21,9 +21,11 @@ import {
 import { DEFAULT_SETTINGS } from './defaultSettings';
 import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
+import HostedFields from './HostedFields';
 
 const Settings = () => {
   const [isReady, setIsReady] = useState<boolean>(false);
+  const [isLanguageReady, setIsLanguageReady] = useState<boolean>(false);
   const [customObjectVersion, setCustomObjectVersion] = useState<number>();
   const [settingsObject, setSettingsObject] =
     useState<SettingsFormDataType>(DEFAULT_SETTINGS);
@@ -51,13 +53,6 @@ const Settings = () => {
   };
 
   const setMissingLanguages = () => {
-    if (languageLoading) {
-      return;
-    }
-    if (languageError) {
-      console.error(languageError);
-      return;
-    }
     const filteredLanguages = languages?.filter(
       (lang) => !Object.keys(settingsObject.paymentDescription).includes(lang)
     );
@@ -77,13 +72,20 @@ const Settings = () => {
     } else {
       setCustomObjectVersion(customObject.version);
       setSettingsObject({ ...DEFAULT_SETTINGS, ...customObject.value });
-      setMissingLanguages();
+      setIsLanguageReady(true);
     }
   }, [customObject, error, loading]);
 
   useEffect(() => {
+    if (languageLoading || !isLanguageReady) {
+      return;
+    }
+    if (languageError) {
+      console.error(languageError);
+      return;
+    }
     setMissingLanguages();
-  }, [languages, languageLoading, languageError]);
+  }, [languages, languageLoading, languageError, isLanguageReady]);
 
   if (!isReady) {
     return <></>;
@@ -107,6 +109,7 @@ const Settings = () => {
             <ThreeDSecure values={values} handleChange={handleChange} />
             <PayPalPayLater values={values} handleChange={handleChange} />
             <RatePay values={values} handleChange={handleChange} />
+            <HostedFields values={values} handleChange={handleChange} />
             <Spacings.Inline
               scale="s"
               alignItems="flex-start"

@@ -3,7 +3,6 @@ import styles from './settings.module.css';
 import Spacings from '@commercetools-uikit/spacings';
 import Text from '@commercetools-uikit/text';
 import messages from './messages';
-import FlatButton from '@commercetools-uikit/flat-button';
 import CheckboxInput from '@commercetools-uikit/checkbox-input';
 import SelectField from '@commercetools-uikit/select-field';
 import TextField from '@commercetools-uikit/text-field';
@@ -16,25 +15,7 @@ const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
     <div className={styles.border}>
       <Spacings.Inset scale="m">
         <Spacings.Stack alignItems="stretch" scale="m">
-          <Spacings.Inline
-            scale="m"
-            alignItems="flex-start"
-            justifyContent="space-between"
-          >
-            <Text.Headline as="h3" intlMessage={messages.settings} />
-            <div>icons here</div>
-          </Spacings.Inline>
-          <Spacings.Stack scale="xs" alignItems="stretch">
-            <Text.Body intlMessage={messages.account} />
-            <Spacings.Inline
-              scale="xs"
-              alignItems="center"
-              justifyContent="flex-start"
-            >
-              <Text.Detail>prat@gmail.com</Text.Detail>
-              <FlatButton label="change" />
-            </Spacings.Inline>
-          </Spacings.Stack>
+          <Text.Headline as="h3" intlMessage={messages.settings} />
           <TextField
             onChange={handleChange}
             title="Partner attribution ID"
@@ -117,6 +98,14 @@ const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
             selectedLanguage="en"
             onChange={handleChange}
           />
+          <CheckboxInput
+            isChecked={values.storeInVaultOnSuccess}
+            onChange={handleChange}
+            value="storeInVaultOnSuccess"
+            name="storeInVaultOnSuccess"
+          >
+            Store payment info in vault on successful payment
+          </CheckboxInput>
         </Spacings.Stack>
       </Spacings.Inset>
     </div>

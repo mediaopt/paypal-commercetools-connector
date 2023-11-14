@@ -6,7 +6,8 @@ import messages from './messages';
 import Grid from '@commercetools-uikit/grid';
 import CheckboxInput from '@commercetools-uikit/checkbox-input';
 import SelectField from '@commercetools-uikit/select-field';
-import RadioInput from '@commercetools-uikit/radio-input';
+import PayPalButtonConfig from './PayPalButtonConfig';
+import { PayPalButtonShapeValues } from './SelectFieldValues';
 
 const PayPalCheckoutButtons = ({
   values,
@@ -73,10 +74,7 @@ const PayPalCheckoutButtons = ({
                 <SelectField
                   title="Shape"
                   value={values.buttonShape}
-                  options={[
-                    { value: 'rectangle', label: 'Rectangle' },
-                    { value: 'pill', label: 'Pill' },
-                  ]}
+                  options={PayPalButtonShapeValues}
                   onChange={handleChange}
                   name="buttonShape"
                 />
@@ -89,47 +87,7 @@ const PayPalCheckoutButtons = ({
                   <Text.Body nowrap={true}>Display Tagline Text</Text.Body>
                 </CheckboxInput>
               </Spacings.Inline>
-              <Spacings.Inline
-                scale="m"
-                alignItems="flex-end"
-                justifyContent="flex-start"
-              >
-                <Spacings.Stack scale="xs" alignItems="flex-start">
-                  <Text.Body intlMessage={messages.checkoutButtonsColor} />
-                  <div className={styles.border}>
-                    <RadioInput.Group
-                      directionProps={{ scale: 'm' }}
-                      direction="inline"
-                      horizontalConstraint="scale"
-                      value={values.buttonColor}
-                      name="buttonColor"
-                      onChange={handleChange}
-                    >
-                      <RadioInput.Option value="blue">
-                        <div className={styles.colorBlue}></div>
-                      </RadioInput.Option>
-                      <RadioInput.Option value="gold">
-                        <div className={styles.colorGold}></div>
-                      </RadioInput.Option>
-                      <RadioInput.Option value="gray">
-                        <div className={styles.colorGray}></div>
-                      </RadioInput.Option>
-                      <RadioInput.Option value="white">
-                        <div className={styles.colorWhite}></div>
-                      </RadioInput.Option>
-                      <RadioInput.Option value="black">
-                        <div className={styles.colorBlack}></div>
-                      </RadioInput.Option>
-                    </RadioInput.Group>
-                  </div>
-                </Spacings.Stack>
-                <SelectField
-                  title="Label"
-                  value={values.buttonLabel}
-                  options={[{ value: 'pay', label: 'Pay' }]}
-                  name="buttonLabel"
-                />
-              </Spacings.Inline>
+              <PayPalButtonConfig values={values} handleChange={handleChange} />
             </Spacings.Stack>
           </Grid.Item>
           <Grid.Item>Preview here</Grid.Item>

@@ -4,6 +4,7 @@ import Text from '@commercetools-uikit/text';
 import messages from './messages';
 import Spacings from '@commercetools-uikit/spacings';
 import SelectField from '@commercetools-uikit/select-field';
+import ThreeDSecureAcceptanceMatrix from './ThreeDSecureAcceptanceMatrix';
 
 const ThreeDSecure = ({ values, handleChange }: PayPalSettingsType) => {
   return (
@@ -31,6 +32,10 @@ const ThreeDSecure = ({ values, handleChange }: PayPalSettingsType) => {
               onChange={handleChange}
             />
           </Spacings.Inline>
+          <ThreeDSecureAcceptanceMatrix
+            values={values}
+            handleChange={handleChange}
+          />
         </Spacings.Stack>
       </Spacings.Inset>
     </div>

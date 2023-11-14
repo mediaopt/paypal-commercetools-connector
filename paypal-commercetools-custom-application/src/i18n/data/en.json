@@ -27,5 +27,7 @@
   "Settings.payLaterMessagingNoticeLink": "See terms and learn more",
   "Settings.payLaterNotice": "When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.",
   "Settings.partnerAttributionIdNotice": "Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.",
-  "Settings.threeDSSettings": "3D Secure"
+  "Settings.threeDSSettings": "3D Secure",
+  "Settings.threeDSActionTitle": "Response parameters",
+  "Settings.threeDSActionSubTitle": "Here you can set how to proceed with the transaction depending on the received response parameters along PayPals recommended action"
 }

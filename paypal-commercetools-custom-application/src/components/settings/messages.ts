@@ -77,4 +77,13 @@ export default defineMessages({
     defaultMessage:
       'Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.',
   },
+  threeDSActionTitle: {
+    id: 'Settings.threeDSActionTitle',
+    defaultMessage: 'Response parameters',
+  },
+  threeDSActionSubTitle: {
+    id: 'Settings.threeDSActionSubTitle',
+    defaultMessage:
+      'Here you can set how to proceed with the transaction depending on the received response parameters along PayPals recommended action',
+  },
 });
