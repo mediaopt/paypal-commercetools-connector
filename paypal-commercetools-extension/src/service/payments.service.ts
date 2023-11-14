@@ -133,7 +133,9 @@ async function prepareCreateOrderRequest(
     ...request,
   } as OrderRequest;
   if (request?.storeInVaultOnSuccess) {
-    const userId = await getPayPalUserId(cart);
+    const customer = {
+      id: await getPayPalUserId(cart),
+    };
     if (request?.payment_source?.paypal) {
       request.payment_source.paypal = {
         attributes: {
@@ -142,9 +144,7 @@ async function prepareCreateOrderRequest(
             usage_type: 'MERCHANT',
             customer_type: 'CONSUMER',
           },
-          customer: {
-            id: userId,
-          },
+          customer,
         },
         ...request.payment_source.paypal,
       };
@@ -156,9 +156,7 @@ async function prepareCreateOrderRequest(
             store_in_vault: 'ON_SUCCESS',
             usage_type: 'MERCHANT',
           },
-          customer: {
-            id: userId,
-          },
+          customer,
         },
         ...request.payment_source.venmo,
       };
@@ -169,9 +167,7 @@ async function prepareCreateOrderRequest(
           vault: {
             store_in_vault: 'ON_SUCCESS',
           },
-          customer: {
-            id: userId,
-          },
+          customer,
         },
         ...request.payment_source.card,
       };
@@ -530,14 +526,16 @@ const getCart = async (paymentId: string) => {
   return cart.body.results[0];
 };
 
-const getPayPalUserId = async (cart: Cart): Promise<string | undefined> => {
-  if (!cart.customerId) {
+const getPayPalUserId = async ({
+  customerId,
+}: Cart): Promise<string | undefined> => {
+  if (!customerId) {
     return undefined;
   }
   const apiRoot = createApiRoot();
   const user = await apiRoot
     .customers()
-    .withId({ ID: cart.customerId })
+    .withId({ ID: customerId })
     .get()
     .execute();
   return user.body?.custom?.fields?.PayPalUserId;
