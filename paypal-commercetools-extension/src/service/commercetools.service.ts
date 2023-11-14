@@ -12,6 +12,7 @@ import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
 import { CheckoutPaymentIntent, Order } from '../paypal/checkout_api';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
+import { PayPalVaultPaymentTokenResource } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
@@ -76,7 +77,9 @@ function prepareCreateOrUpdateTransactionAction(
   ];
 }
 
-export const handlePaymentTokenWebhook = async (resource: any) => {
+export const handlePaymentTokenWebhook = async (
+  resource: PayPalVaultPaymentTokenResource
+) => {
   if (!resource?.customer?.id) {
     return;
   }
