@@ -82,25 +82,26 @@ export const handlePaymentTokenWebhook = async (resource: any) => {
   }
   const orderId = resource.metadata.order_id;
   const payment = await getPaymentByPayPalOrderId(orderId);
-  const cart = await getCart(payment.id);
-  if (!cart.customerId) {
+  const { customerId } = await getCart(payment.id);
+  if (!customerId) {
     return;
   }
   const customer = await createApiRoot()
     .customers()
-    .withId({ ID: cart.customerId })
+    .withId({ ID: customerId })
     .get()
     .execute();
-  if (customer.body.custom?.fields?.PayPalUserId !== resource.customer.id) {
+  const payPalCustomerId = resource.customer.id;
+  const storedPayPalCustomerId = customer.body.custom?.fields?.PayPalUserId;
+  if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${resource.customer.id} for ${customer.body.email}`
+      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.body.email}`
     );
-    const action: CustomerUpdateAction = customer.body.custom?.fields
-      ?.PayPalUserId
+    const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
           action: 'setCustomField',
           name: 'PayPalUserId',
-          value: resource.customer.id,
+          value: payPalCustomerId,
         }
       : {
           action: 'setCustomType',
@@ -109,12 +110,12 @@ export const handlePaymentTokenWebhook = async (resource: any) => {
             typeId: 'type',
           },
           fields: {
-            PayPalUserId: resource.customer.id,
+            PayPalUserId: payPalCustomerId,
           },
         };
     await createApiRoot()
       .customers()
-      .withId({ ID: cart.customerId })
+      .withId({ ID: customerId })
       .post({
         body: {
           version: customer.body.version,
