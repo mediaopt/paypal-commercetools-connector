@@ -1,4 +1,5 @@
 import {
+  CustomerUpdateAction,
   Payment,
   PaymentAddTransactionAction,
   PaymentChangeTransactionStateAction,
@@ -7,9 +8,11 @@ import {
   TransactionDraft,
 } from '@commercetools/platform-sdk';
 import { createApiRoot } from '../client/create.client';
+import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
 import { CheckoutPaymentIntent, Order } from '../paypal/checkout_api';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
+import { PayPalVaultPaymentTokenResource } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
@@ -73,6 +76,58 @@ function prepareCreateOrUpdateTransactionAction(
     } as PaymentChangeTransactionStateAction,
   ];
 }
+
+export const handlePaymentTokenWebhook = async (
+  resource: PayPalVaultPaymentTokenResource
+) => {
+  if (!resource?.customer?.id) {
+    return;
+  }
+  const orderId = resource.metadata.order_id;
+  const payment = await getPaymentByPayPalOrderId(orderId);
+  const { customerId } = await getCart(payment.id);
+  if (!customerId) {
+    return;
+  }
+  const customer = await createApiRoot()
+    .customers()
+    .withId({ ID: customerId })
+    .get()
+    .execute();
+  const payPalCustomerId = resource.customer.id;
+  const storedPayPalCustomerId = customer.body.custom?.fields?.PayPalUserId;
+  if (storedPayPalCustomerId !== payPalCustomerId) {
+    logger.info(
+      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.body.email}`
+    );
+    const action: CustomerUpdateAction = storedPayPalCustomerId
+      ? {
+          action: 'setCustomField',
+          name: 'PayPalUserId',
+          value: payPalCustomerId,
+        }
+      : {
+          action: 'setCustomType',
+          type: {
+            key: PAYPAL_CUSTOMER_TYPE_KEY,
+            typeId: 'type',
+          },
+          fields: {
+            PayPalUserId: payPalCustomerId,
+          },
+        };
+    await createApiRoot()
+      .customers()
+      .withId({ ID: customerId })
+      .post({
+        body: {
+          version: customer.body.version,
+          actions: [action],
+        },
+      })
+      .execute();
+  }
+};
 
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
@@ -184,4 +239,20 @@ const handleUpdatePayment = async (
     logger.error('There was an error', e);
     throw e;
   }
+};
+
+export const getCart = async (paymentId: string) => {
+  const apiRoot = createApiRoot();
+  const cart = await apiRoot
+    .carts()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
+  if (cart.body.total !== 1) {
+    throw new CustomError(500, 'payment is not associated with a cart.');
+  }
+  return cart.body.results[0];
 };

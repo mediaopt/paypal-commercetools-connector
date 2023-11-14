@@ -1,6 +1,11 @@
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { Patch } from '../paypal/checkout_api';
+import {
+  Customer,
+  LinkDescription,
+  Patch,
+  PaymentSource,
+} from '../paypal/checkout_api';
 
 export type Message = {
   code: string;
@@ -80,4 +85,15 @@ export type PayPalSettings = {
   ratePayLogoUrl: LocalizedString;
   paymentDescription: LocalizedString;
   storeInVaultOnSuccess: boolean;
+};
+
+export type PayPalVaultPaymentTokenResource = {
+  id: string;
+  metadata: {
+    order_id: string;
+  };
+  time_created: string;
+  links?: Array<LinkDescription>;
+  payment_source?: PaymentSource;
+  customer?: Customer;
 };

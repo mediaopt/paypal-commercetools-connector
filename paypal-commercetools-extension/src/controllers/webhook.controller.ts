@@ -5,11 +5,17 @@ import {
   handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
+  handlePaymentTokenWebhook,
 } from '../service/commercetools.service';
+import { getWebhookId } from '../service/config.service';
 import { validateSignature } from '../service/paypal.service';
 import { logger } from '../utils/logger.utils';
 
 async function verifyWebhookSignature(request: Request) {
+  const webhookIdField = await getWebhookId();
+  if (!webhookIdField?.value) {
+    throw new CustomError(500, 'WebhookId is missing');
+  }
   const verificationRequest: VerifyWebhookSignature = {
     cert_url: request.header('paypal-cert-url') ?? '',
     auth_algo: request.header('paypal-auth-algo') ?? '',
@@ -17,7 +23,7 @@ async function verifyWebhookSignature(request: Request) {
     transmission_sig: request.header('paypal-transmission-sig') ?? '',
     transmission_time: request.header('paypal-transmission-time') ?? '',
     webhook_event: request.body,
-    webhook_id: '3C785155UA8032035',
+    webhook_id: webhookIdField.value,
   };
   const response = await validateSignature(verificationRequest);
   logger.info(JSON.stringify(response));
@@ -63,6 +69,10 @@ export const post = async (request: Request, response: Response) => {
         return;
       case 'checkout-order':
         await handleOrderWebhook(resource);
+        response.status(200).json({});
+        return;
+      case 'payment_token':
+        await handlePaymentTokenWebhook(resource);
         response.status(200).json({});
         return;
       default:
