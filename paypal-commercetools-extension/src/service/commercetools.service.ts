@@ -1,4 +1,5 @@
 import {
+  Cart,
   CustomerUpdateAction,
   Payment,
   PaymentAddTransactionAction,
@@ -255,4 +256,19 @@ export const getCart = async (paymentId: string) => {
     throw new CustomError(500, 'payment is not associated with a cart.');
   }
   return cart.body.results[0];
+};
+
+export const getPayPalUserId = async ({
+  customerId,
+}: Cart): Promise<string | undefined> => {
+  if (!customerId) {
+    return undefined;
+  }
+  const apiRoot = createApiRoot();
+  const user = await apiRoot
+    .customers()
+    .withId({ ID: customerId })
+    .get()
+    .execute();
+  return user.body?.custom?.fields?.PayPalUserId;
 };

@@ -144,17 +144,80 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
 
 export const mapCommercetoolsLineItemsToPayPalItems = (
   lineItem: LineItem,
+  isShipped: boolean,
   locale?: string
 ): Item => {
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
+  const taxedNetAmount = lineItem.taxedPrice?.totalNet?.centAmount;
+  const currencyCode = lineItem.price.value.currencyCode;
+  const fractionDigits = lineItem.price.value.fractionDigits;
   return {
     unit_amount: {
-      value: mapCommercetoolsMoneyToPayPalMoney(lineItem.price.value),
-      currency_code: lineItem.price.value.currencyCode,
+      value: mapCommercetoolsMoneyToPayPalMoney({
+        centAmount: taxedNetAmount
+          ? taxedNetAmount / lineItem.quantity
+          : lineItem.price.value.centAmount,
+        fractionDigits,
+        currencyCode,
+        type: lineItem.price.value.type,
+      } as TypedMoney),
+      currency_code: currencyCode,
     },
     name: name,
     sku: lineItem.variant.sku,
     quantity: `${lineItem.quantity}`,
     description: name,
+    category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
+    tax_rate: lineItem.taxRate?.amount ?? 0,
+    tax: !lineItem.taxedPrice?.totalTax
+      ? undefined
+      : {
+          value: mapCommercetoolsMoneyToPayPalMoney({
+            centAmount:
+              (lineItem.taxedPrice?.totalTax?.centAmount ?? 0) /
+              lineItem.quantity,
+            fractionDigits,
+            currencyCode,
+            type: lineItem.price.value.type,
+          } as TypedMoney),
+          currency_code: currencyCode,
+        },
+  } as Item;
+};
+
+export const mapCommercetoolsLineItemsToPayPalPriceBreakdown = (
+  lineItems: LineItem[]
+) => {
+  if (!lineItems[0]) {
+    return undefined;
+  }
+  const { currencyCode, fractionDigits, type } = lineItems[0].price.value;
+  return {
+    item_total: {
+      currency_code: currencyCode,
+      value: mapCommercetoolsMoneyToPayPalMoney({
+        centAmount: lineItems
+          .map(
+            (lineItem) =>
+              lineItem.taxedPrice?.totalNet?.centAmount ??
+              lineItem.price.value.centAmount * lineItem.quantity
+          )
+          .reduce((x, y) => x + y, 0),
+        fractionDigits,
+        currencyCode,
+        type,
+      } as TypedMoney),
+    },
+    tax_total: {
+      currency_code: currencyCode,
+      value: mapCommercetoolsMoneyToPayPalMoney({
+        centAmount: lineItems
+          .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
+          .reduce((x, y) => x + y, 0),
+        fractionDigits,
+        currencyCode,
+        type,
+      } as TypedMoney),
+    },
   };
 };
