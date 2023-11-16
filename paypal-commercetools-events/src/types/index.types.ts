@@ -1,3 +1,9 @@
+import {
+  Delivery,
+  OrderReference,
+  Parcel,
+} from '@commercetools/platform-sdk';
+
 export type Message = {
   code: string;
   message: string;
@@ -15,3 +21,23 @@ export type ValidatorFunction = (o: object) => boolean;
 export type Wrapper = (
   validator: ValidatorFunction
 ) => (value: object) => boolean;
+
+export type ParcelAddedToDeliveryMessagePayload = {
+  notificationType: 'Message';
+  projectKey: string;
+  id: string;
+  version: number;
+  sequenceNumber: number;
+  resource: OrderReference;
+  resourceVersion: number;
+  type: 'ParcelAddedToDelivery';
+  delivery: Delivery;
+  parcel: Parcel;
+  createdAt: string;
+  lastModifiedAt: string;
+};
+
+export type AccessTokenObject = {
+  accessToken: string;
+  validUntil: Date;
+};
