@@ -7,7 +7,9 @@ import {
   OrderCaptureRequest,
   OrderRequest,
   OrdersApi,
+  OrderTrackerRequest,
   Patch,
+  TrackersApi,
 } from '../paypal/checkout_api';
 import { Configuration } from '../paypal/configuration';
 import {
@@ -62,6 +64,10 @@ async function buildConfiguration(timeout: number) {
 
 const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   return new OrdersApi(await buildConfiguration(timeout));
+};
+
+const getPayPalTrackersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+  return new TrackersApi(await buildConfiguration(timeout));
 };
 
 const getPayPalVerifyWebhookSignatureGateway = async (
@@ -389,6 +395,39 @@ export const createOrUpdateWebhook = async (url: string) => {
   if (response?.data?.id) {
     const webhookIdField = await getWebhookId();
     await storeWebhookId(response.data.id, webhookIdField?.version ?? 0);
+  }
+  return response.data;
+};
+
+export const addDeliveryData = async (
+  orderId: string,
+  request: OrderTrackerRequest
+) => {
+  const endpoint = await getPayPalOrdersGateway(TIMEOUT_PAYMENT);
+  const response = await endpoint.ordersTrackCreate(
+    orderId,
+    'application/json',
+    request
+  );
+  return response.data;
+};
+
+export const updateDeliveryData = async (
+  orderId: string,
+  trackerId: string,
+  request: Patch[]
+) => {
+  const endpoint = await getPayPalTrackersGateway(TIMEOUT_PAYMENT);
+  const response = await endpoint.ordersTrackersPatch(
+    orderId,
+    trackerId,
+    'application/json',
+    request
+  );
+  if (response.status === 204) {
+    return {
+      status: 'success',
+    };
   }
   return response.data;
 };

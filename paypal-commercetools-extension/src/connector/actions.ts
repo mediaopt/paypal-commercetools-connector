@@ -21,6 +21,8 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'updatePayPalOrder',
   'getPayPalOrder',
   'refundPayPalOrder',
+  'createTrackingInformation',
+  'updateTrackingInformation',
 ];
 
 export const PAYPAL_API_CUSTOMER_ENDPOINTS = [

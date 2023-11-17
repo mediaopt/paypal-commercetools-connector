@@ -1,4 +1,5 @@
 import {
+  Cart,
   LineItem,
   TransactionState,
   TypedMoney,
@@ -17,9 +18,9 @@ import {
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
 ): string => {
-  return String(
+  return (
     amountPlanned.centAmount * Math.pow(10, -amountPlanned.fractionDigits || 0)
-  );
+  ).toFixed(amountPlanned.fractionDigits || 0);
 };
 
 export const mapPayPalMoneyToCommercetoolsMoney = (
@@ -185,10 +186,11 @@ export const mapCommercetoolsLineItemsToPayPalItems = (
   } as Item;
 };
 
-export const mapCommercetoolsLineItemsToPayPalPriceBreakdown = (
-  lineItems: LineItem[]
-) => {
-  if (!lineItems[0]) {
+export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
+  lineItems,
+  taxedShippingPrice,
+}: Cart) => {
+  if (!lineItems || !lineItems[0]) {
     return undefined;
   }
   const { currencyCode, fractionDigits, type } = lineItems[0].price.value;
@@ -214,6 +216,15 @@ export const mapCommercetoolsLineItemsToPayPalPriceBreakdown = (
         centAmount: lineItems
           .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
           .reduce((x, y) => x + y, 0),
+        fractionDigits,
+        currencyCode,
+        type,
+      } as TypedMoney),
+    },
+    shipping: {
+      currency_code: currencyCode,
+      value: mapCommercetoolsMoneyToPayPalMoney({
+        centAmount: taxedShippingPrice?.totalGross?.centAmount ?? 0,
         fractionDigits,
         currencyCode,
         type,
