@@ -6,6 +6,7 @@ import {
   handleCaptureAuthorizationRequest,
   handleCaptureOrderRequest,
   handleCreateOrderRequest,
+  handleGetCaptureRequest,
   handleGetClientTokenRequest,
   handleGetOrderRequest,
   handleRefundPayPalOrderRequest,
@@ -35,6 +36,7 @@ const update = async (resource: Resource) => {
       await handleAuthorizeOrderRequest(payment.obj),
       await handleGetClientTokenRequest(payment.obj),
       await handleGetOrderRequest(payment.obj),
+      await handleGetCaptureRequest(payment.obj),
       await handleRefundPayPalOrderRequest(payment.obj),
       await handleUpdateOrderRequest(payment.obj)
     );
