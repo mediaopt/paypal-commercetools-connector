@@ -26,7 +26,6 @@
   "Settings.payLaterMessagingNotice": "Displays Pay Later messaging for available offers. Restrictions apply. {link}",
   "Settings.payLaterMessagingNoticeLink": "See terms and learn more",
   "Settings.payLaterNotice": "When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.",
-  "Settings.partnerAttributionIdNotice": "Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.",
   "Settings.threeDSSettings": "3D Secure",
   "Settings.threeDSActionTitle": "Response parameters",
   "Settings.threeDSWarning": "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback."

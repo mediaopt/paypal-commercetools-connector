@@ -72,11 +72,6 @@ export default defineMessages({
     defaultMessage:
       'When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.',
   },
-  partnerAttributionIdNotice: {
-    id: 'Settings.partnerAttributionIdNotice',
-    defaultMessage:
-      'Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.',
-  },
   threeDSActionTitle: {
     id: 'Settings.threeDSActionTitle',
     defaultMessage: 'Response parameters',

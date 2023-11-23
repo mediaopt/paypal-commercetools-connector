@@ -3,7 +3,6 @@ import { ChangeEvent } from 'react';
 type CustomDataStringObject = { [key: string]: string };
 
 export type SettingsFormDataType = {
-  email: string;
   acceptPayPal: boolean;
   acceptPayLater: boolean;
   acceptVenmo: boolean;
@@ -37,7 +36,6 @@ export type SettingsFormDataType = {
   payLaterMessageFlexRatio: '1x1' | '1x4' | '8x1' | '20x1';
   threeDSOption: '' | 'SCA_ALWAYS' | 'SCA_WHEN_REQUIRED';
   payPalIntent: 'Authorize' | 'Capture';
-  partnerAttributionId: string;
   ratePayBrandName: CustomDataStringObject;
   ratePayLogoUrl: CustomDataStringObject;
   ratePayCustomerServiceInstructions: CustomDataStringObject;
