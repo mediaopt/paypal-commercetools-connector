@@ -157,7 +157,6 @@ const ThreeDSecureAcceptanceMatrix = ({
     <>
       <Spacings.Stack scale="xs" alignItems="stretch">
         <Text.Headline as="h3" intlMessage={messages.threeDSActionTitle} />
-        <Text.Detail intlMessage={messages.threeDSActionSubTitle} />
       </Spacings.Stack>
       <DataTable
         itemRenderer={(row, column) => {
