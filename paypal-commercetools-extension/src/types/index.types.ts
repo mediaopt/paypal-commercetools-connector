@@ -2,6 +2,7 @@ import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/s
 import { UpdateAction } from '@commercetools/sdk-client-v2';
 import {
   Customer,
+  DisbursementMode,
   LinkDescription,
   Patch,
   PaymentSource,
@@ -85,6 +86,7 @@ export type PayPalSettings = {
   ratePayLogoUrl: LocalizedString;
   paymentDescription: LocalizedString;
   storeInVaultOnSuccess: boolean;
+  disbursementMode?: DisbursementMode;
 };
 
 export type PayPalVaultPaymentTokenResource = {

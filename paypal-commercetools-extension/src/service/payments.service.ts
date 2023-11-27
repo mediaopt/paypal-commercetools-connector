@@ -9,6 +9,7 @@ import { UpdateAction } from '@commercetools/sdk-client-v2';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
+  DisbursementMode,
   Order,
   OrderAuthorizeRequest,
   OrderCaptureRequest,
@@ -119,6 +120,10 @@ async function prepareCreateOrderRequest(
               },
             },
         invoice_id: payment.id,
+        payment_instruction: {
+          disbursement_mode:
+            settings?.disbursementMode ?? DisbursementMode.Instant,
+        },
         description: paymentDescription,
         items: cart.lineItems.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
