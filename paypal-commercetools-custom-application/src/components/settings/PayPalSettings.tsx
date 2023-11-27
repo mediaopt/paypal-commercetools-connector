@@ -6,8 +6,11 @@ import messages from './messages';
 import CheckboxInput from '@commercetools-uikit/checkbox-input';
 import SelectField from '@commercetools-uikit/select-field';
 import LocalizedMultilineTextField from '@commercetools-uikit/localized-multiline-text-field';
+import { useIntl } from 'react-intl';
+import { PayPalDisbursementModeValues } from './SelectFieldValues';
 
 const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
+  const intl = useIntl();
   return (
     <div className={styles.border}>
       <Spacings.Inset scale="m">
@@ -94,6 +97,34 @@ const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
           >
             Store payment info in vault on successful payment
           </CheckboxInput>
+          <Spacings.Stack scale="xs" alignItems="flex-start">
+            <SelectField
+              value={values.disbursementMode}
+              options={PayPalDisbursementModeValues}
+              title="Disbursement Mode"
+              hint={intl.formatMessage({
+                id: 'Settings.disbursementMode',
+              })}
+              name="disbursementMode"
+              onChange={handleChange}
+            />
+            <Spacings.Inline
+              scale="xs"
+              alignItems="center"
+              justifyContent="flex-start"
+            >
+              <Text.Detail isBold>INSTANT</Text.Detail>
+              <Text.Detail intlMessage={messages.disbursementModeInstant} />
+            </Spacings.Inline>
+            <Spacings.Inline
+              scale="xs"
+              alignItems="center"
+              justifyContent="flex-start"
+            >
+              <Text.Detail isBold>DELAYED</Text.Detail>
+              <Text.Detail intlMessage={messages.disbursementModeDelayed} />
+            </Spacings.Inline>
+          </Spacings.Stack>
         </Spacings.Stack>
       </Spacings.Inset>
     </div>

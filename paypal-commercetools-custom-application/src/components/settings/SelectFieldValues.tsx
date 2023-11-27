@@ -18,3 +18,8 @@ export const PayPalButtonShapeValues = [
   { value: 'rect', label: 'Rectangle' },
   { value: 'pill', label: 'Pill' },
 ];
+
+export const PayPalDisbursementModeValues = [
+  { value: 'INSTANT', label: 'INSTANT' },
+  { value: 'DELAYED', label: 'DELAYED' },
+];

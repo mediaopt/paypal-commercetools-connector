@@ -28,5 +28,8 @@
   "Settings.payLaterNotice": "When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.",
   "Settings.threeDSSettings": "3D Secure",
   "Settings.threeDSActionTitle": "Response parameters",
-  "Settings.threeDSWarning": "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback."
+  "Settings.threeDSWarning": "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback.",
+  "Settings.disbursementMode": "The funds that are held on behalf of the merchant.",
+  "Settings.disbursementModeInstant": "The funds are released to the merchant immediately.",
+  "Settings.disbursementModeDelayed": "The funds are held for a finite number of days. The actual duration depends on the region and type of integration. You can release the funds through a referenced payout. Otherwise, the funds disbursed automatically after the specified duration."
 }

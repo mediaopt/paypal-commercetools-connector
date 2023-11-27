@@ -81,4 +81,17 @@ export default defineMessages({
     defaultMessage:
       "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback.",
   },
+  disbursementMode: {
+    id: 'Settings.disbursement_mode',
+    defaultMessage: 'The funds that are held on behalf of the merchant.',
+  },
+  disbursementModeInstant: {
+    id: 'Settings.disbursementModeInstant',
+    defaultMessage: 'The funds are released to the merchant immediately.',
+  },
+  disbursementModeDelayed: {
+    id: 'Settings.disbursementModeDelayed',
+    defaultMessage:
+      'The funds are held for a finite number of days. The actual duration depends on the region and type of integration. You can release the funds through a referenced payout. Otherwise, the funds disbursed automatically after the specified duration.',
+  },
 });
