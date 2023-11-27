@@ -2,7 +2,6 @@ import { ChangeEvent } from 'react';
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 
 export type SettingsFormDataType = {
-  email: string;
   acceptPayPal: boolean;
   acceptPayLater: boolean;
   acceptVenmo: boolean;
@@ -36,7 +35,6 @@ export type SettingsFormDataType = {
   payLaterMessageFlexRatio: '1x1' | '1x4' | '8x1' | '20x1';
   threeDSOption: '' | 'SCA_ALWAYS' | 'SCA_WHEN_REQUIRED';
   payPalIntent: 'Authorize' | 'Capture';
-  partnerAttributionId: string;
   ratePayBrandName: LocalizedString;
   ratePayLogoUrl: LocalizedString;
   ratePayCustomerServiceInstructions: LocalizedString;

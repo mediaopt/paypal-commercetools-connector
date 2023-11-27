@@ -1,7 +1,7 @@
 import { SettingsFormDataType } from '../../types/types';
 
 export const DEFAULT_SETTINGS: SettingsFormDataType = {
-  email: 'pat.brandt@email.com',
+  merchantId: '',
   acceptPayPal: true,
   acceptPayLater: true,
   acceptVenmo: true,
@@ -28,7 +28,6 @@ export const DEFAULT_SETTINGS: SettingsFormDataType = {
   payLaterMessageFlexRatio: '1x1',
   threeDSOption: 'SCA_WHEN_REQUIRED',
   payPalIntent: 'Capture',
-  partnerAttributionId: '',
   ratePayBrandName: { de: '' },
   ratePayLogoUrl: { de: '' },
   ratePayCustomerServiceInstructions: { de: '' },
