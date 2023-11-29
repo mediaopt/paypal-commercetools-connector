@@ -20,6 +20,7 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'capturePayPalAuthorization',
   'updatePayPalOrder',
   'getPayPalOrder',
+  'getPayPalCapture',
   'refundPayPalOrder',
   'createTrackingInformation',
   'updateTrackingInformation',

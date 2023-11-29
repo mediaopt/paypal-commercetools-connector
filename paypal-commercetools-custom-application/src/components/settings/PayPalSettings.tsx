@@ -5,26 +5,14 @@ import Text from '@commercetools-uikit/text';
 import messages from './messages';
 import CheckboxInput from '@commercetools-uikit/checkbox-input';
 import SelectField from '@commercetools-uikit/select-field';
-import TextField from '@commercetools-uikit/text-field';
-import { useIntl } from 'react-intl';
 import LocalizedMultilineTextField from '@commercetools-uikit/localized-multiline-text-field';
 
 const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
-  const intl = useIntl();
   return (
     <div className={styles.border}>
       <Spacings.Inset scale="m">
         <Spacings.Stack alignItems="stretch" scale="m">
           <Text.Headline as="h3" intlMessage={messages.settings} />
-          <TextField
-            onChange={handleChange}
-            title="Partner attribution ID"
-            value={values.partnerAttributionId}
-            hint={intl.formatMessage({
-              id: 'Settings.partnerAttributionIdNotice',
-            })}
-            name="partnerAttributionId"
-          />
           <Text.Headline as="h3" intlMessage={messages.acceptedMethods} />
           <Spacings.Stack scale="m" alignItems="flex-start">
             <CheckboxInput

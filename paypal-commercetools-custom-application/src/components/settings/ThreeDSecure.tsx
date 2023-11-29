@@ -21,8 +21,14 @@ const ThreeDSecure = ({ values, handleChange }: PayPalSettingsType) => {
             justifyContent="flex-start"
           >
             <SelectField
-              title="3D Secure authentication for hosted fields"
+              title="3D Secure authentication"
               value={values.threeDSOption}
+              hint={
+                <Text.Detail
+                  tone="warning"
+                  intlMessage={messages.threeDSWarning}
+                />
+              }
               options={[
                 { value: '', label: 'Disabled' },
                 { value: 'SCA_WHEN_REQUIRED', label: 'SCA_WHEN_REQUIRED' },
@@ -32,10 +38,12 @@ const ThreeDSecure = ({ values, handleChange }: PayPalSettingsType) => {
               onChange={handleChange}
             />
           </Spacings.Inline>
-          <ThreeDSecureAcceptanceMatrix
-            values={values}
-            handleChange={handleChange}
-          />
+          {values.threeDSOption !== '' && (
+            <ThreeDSecureAcceptanceMatrix
+              values={values}
+              handleChange={handleChange}
+            />
+          )}
         </Spacings.Stack>
       </Spacings.Inset>
     </div>

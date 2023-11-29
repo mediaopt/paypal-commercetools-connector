@@ -47,6 +47,7 @@ import {
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
+  getPayPalCapture,
   getPayPalOrder,
   refundPayPalOrder,
   updateDeliveryData,
@@ -470,6 +471,27 @@ export const handleGetOrderRequest = async (
     );
   } catch (e) {
     return handleError('getPayPalOrder', e);
+  }
+};
+
+export const handleGetCaptureRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.getPayPalCaptureRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalCaptureRequest);
+  const { captureId } = request;
+  const updateActions = handleRequest('getPayPalCapture', request);
+  try {
+    const response = await getPayPalCapture(
+      captureId ?? findSuitableTransactionId(payment, 'Charge')
+    );
+    return updateActions.concat(
+      handlePaymentResponse('getPayPalCapture', response)
+    );
+  } catch (e) {
+    return handleError('getPayPalCapture', e);
   }
 };
 
