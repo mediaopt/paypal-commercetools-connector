@@ -6,7 +6,7 @@ describe('Testing map utilities', () => {
     { name: 'eps', source: { eps: { name: 'TEST' } } },
     {
       name: 'bancontact',
-      source: { bancontact: { card_last_digits: 'TEST' } },
+      source: { bancontact: { name: 'TEST' } },
     },
     { name: 'blik', source: { blik: { name: 'TEST' } } },
     { name: 'p24', source: { p24: { email: 'TEST' } } },
