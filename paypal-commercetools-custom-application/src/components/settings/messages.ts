@@ -81,4 +81,13 @@ export default defineMessages({
     defaultMessage:
       "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback.",
   },
+  automation: {
+    id: 'Settings.automation',
+    defaultMessage: 'Automation',
+  },
+  sendTrackingToPayPal: {
+    id: 'Settings.sendTrackingToPayPal',
+    defaultMessage:
+      'Automatically transfer the Tracking Data to PayPal when a Parcel is created for a delivery of an Order',
+  },
 });
