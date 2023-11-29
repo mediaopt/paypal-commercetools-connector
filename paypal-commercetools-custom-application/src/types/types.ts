@@ -48,6 +48,7 @@ export type SettingsFormDataType = {
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, unknown>;
+  sendTrackingToPayPal: boolean;
 };
 
 type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';
