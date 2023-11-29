@@ -8,6 +8,7 @@ import { findSuitableTransactionId } from '../service/payments.service';
 import { mapCommercetoolsCarrierToPayPalCarrier } from '../utils/map.utils';
 import { OrderTrackerRequest } from '../paypal/checkout_api';
 import { addDeliveryData } from '../service/paypal.service';
+import { getSettings } from '../service/config.service';
 
 function parseRequest(request: Request) {
   if (!request.body) {
@@ -32,6 +33,10 @@ function parseRequest(request: Request) {
 const handleParcelAddedToDelivery = async (
   message: ParcelAddedToDeliveryMessagePayload
 ) => {
+  const settings = await getSettings();
+  if (!settings?.sendTrackingToPayPal) {
+     return;
+  }
   const order = await getOrderById(message.resource.id);
   if (!order) {
     logger.info(`Could not load order with id ${message.resource.id}`);

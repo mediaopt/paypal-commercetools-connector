@@ -85,6 +85,7 @@ export type PayPalSettings = {
   ratePayLogoUrl: LocalizedString;
   paymentDescription: LocalizedString;
   storeInVaultOnSuccess: boolean;
+  sendTrackingToPayPal: boolean;
 };
 
 export type PayPalVaultPaymentTokenResource = {
