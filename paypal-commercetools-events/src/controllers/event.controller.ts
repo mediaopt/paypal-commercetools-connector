@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
 import { logger } from '../utils/logger.utils';
 import { MessagePayload } from '@commercetools/platform-sdk';
@@ -35,7 +35,7 @@ const handleParcelAddedToDelivery = async (
 ) => {
   const settings = await getSettings();
   if (!settings?.sendTrackingToPayPal) {
-     return;
+    return;
   }
   const order = await getOrderById(message.resource.id);
   if (!order) {
@@ -94,21 +94,32 @@ const handleParcelAddedToDelivery = async (
  *
  * @param {Request} request The express request
  * @param {Response} response The express response
+ * @param {NextFunction} next
  * @returns
  */
-export const post = async (request: Request, response: Response) => {
-  const message = parseRequest(request);
+export const post = async (
+  request: Request,
+  response: Response,
+  next: NextFunction
+) => {
   try {
+    const message = parseRequest(request);
     switch (message.type) {
       case 'ParcelAddedToDelivery':
         await handleParcelAddedToDelivery(
           message as unknown as ParcelAddedToDeliveryMessagePayload
         );
+        response.status(204).send();
+        return;
+      default:
+        response.status(204).send();
+        return;
     }
   } catch (error) {
-    throw new CustomError(400, `Bad request: ${error}`);
+    if (error instanceof Error) {
+      next(new CustomError(400, error.message));
+    } else {
+      next(error);
+    }
   }
-
-  // Return the response for the client
-  response.status(204).send();
 };
