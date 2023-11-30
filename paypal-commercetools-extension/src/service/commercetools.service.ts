@@ -258,6 +258,22 @@ export const getCart = async (paymentId: string) => {
   return cart.body.results[0];
 };
 
+export const getOrder = async (paymentId: string) => {
+  const apiRoot = createApiRoot();
+  const order = await apiRoot
+    .orders()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
+  if (order.body.total !== 1) {
+    throw new CustomError(500, 'payment is not associated with an order.');
+  }
+  return order.body.results[0];
+};
+
 export const getPayPalUserId = async ({
   customerId,
 }: Cart): Promise<string | undefined> => {

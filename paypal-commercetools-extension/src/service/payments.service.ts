@@ -13,7 +13,6 @@ import {
   OrderAuthorizeRequest,
   OrderCaptureRequest,
   OrderRequest,
-  OrderTrackerRequest,
 } from '../paypal/checkout_api';
 import { CaptureRequest } from '../paypal/payments_api';
 import {
@@ -24,6 +23,7 @@ import {
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
@@ -38,7 +38,7 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { getCart, getPayPalUserId } from './commercetools.service';
+import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
 import { getSettings } from './config.service';
 import {
   addDeliveryData,
@@ -535,9 +535,21 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
   if (!payment?.custom?.fields?.createTrackingInformationRequest) {
     return [];
   }
-  const request = JSON.parse(
+  let request = JSON.parse(
     payment?.custom?.fields?.createTrackingInformationRequest
-  ) as OrderTrackerRequest;
+  );
+  if (request?.carrier !== 'OTHER') {
+    const order = await getOrder(payment?.id);
+    const carrier = mapCommercetoolsCarrierToPayPalCarrier(
+        request?.carrier,
+        order?.shippingAddress?.country
+    );
+    request = {
+      ...request,
+      carrier,
+      carrier_name_other: carrier === 'OTHER' ? request?.carrier : undefined,
+    };
+  }
   const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
   if (!request.capture_id && captureId) {
     request.capture_id = captureId;
