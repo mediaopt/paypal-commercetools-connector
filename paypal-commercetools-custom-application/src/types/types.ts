@@ -1,6 +1,5 @@
 import { ChangeEvent } from 'react';
-
-type CustomDataStringObject = { [key: string]: string };
+import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 
 export type SettingsFormDataType = {
   acceptPayPal: boolean;
@@ -36,10 +35,10 @@ export type SettingsFormDataType = {
   payLaterMessageFlexRatio: '1x1' | '1x4' | '8x1' | '20x1';
   threeDSOption: '' | 'SCA_ALWAYS' | 'SCA_WHEN_REQUIRED';
   payPalIntent: 'Authorize' | 'Capture';
-  ratePayBrandName: CustomDataStringObject;
-  ratePayLogoUrl: CustomDataStringObject;
-  ratePayCustomerServiceInstructions: CustomDataStringObject;
-  paymentDescription: CustomDataStringObject;
+  ratePayBrandName: LocalizedString;
+  ratePayLogoUrl: LocalizedString;
+  ratePayCustomerServiceInstructions: LocalizedString;
+  paymentDescription: LocalizedString;
   storeInVaultOnSuccess: boolean;
   paypalButtonConfig: {
     buttonColor: PayPalButtonColors;
@@ -49,6 +48,7 @@ export type SettingsFormDataType = {
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, unknown>;
   sendTrackingToPayPal: boolean;
+  merchantId?: string;
 };
 
 type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';

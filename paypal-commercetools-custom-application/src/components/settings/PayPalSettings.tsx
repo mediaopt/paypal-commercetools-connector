@@ -6,6 +6,7 @@ import messages from './messages';
 import CheckboxInput from '@commercetools-uikit/checkbox-input';
 import SelectField from '@commercetools-uikit/select-field';
 import LocalizedMultilineTextField from '@commercetools-uikit/localized-multiline-text-field';
+import TextField from '@commercetools-uikit/text-field';
 
 const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
   return (
@@ -13,6 +14,12 @@ const PayPalSettings = ({ values, handleChange }: PayPalSettingsType) => {
       <Spacings.Inset scale="m">
         <Spacings.Stack alignItems="stretch" scale="m">
           <Text.Headline as="h3" intlMessage={messages.settings} />
+          <TextField
+            onChange={handleChange}
+            title="Merchant ID"
+            value={values.merchantId || ''}
+            name="merchantId"
+          />
           <Text.Headline as="h3" intlMessage={messages.acceptedMethods} />
           <Spacings.Stack scale="m" alignItems="flex-start">
             <CheckboxInput
