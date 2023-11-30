@@ -86,6 +86,15 @@ async function prepareCreateOrderRequest(
     request.intent = 'CAPTURE';
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
   }
+  const paymentSource = request?.payment_source
+      ? request?.payment_source[Object.keys(request?.payment_source)[0]]
+      : undefined;
+  if (paymentSource && cart.shippingAddress) {
+    paymentSource.experience_context = {
+      ...paymentSource?.experience_context,
+      shipping_preference: 'SET_PROVIDED_ADDRESS',
+    };
+  }
   const amountPlanned = payment.amountPlanned;
   const paymentDescription = settings?.paymentDescription
     ? settings?.paymentDescription[
