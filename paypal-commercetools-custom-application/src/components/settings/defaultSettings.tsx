@@ -51,4 +51,5 @@ export const DEFAULT_SETTINGS: SettingsFormDataType = {
     threeDSAction_13: '2',
     threeDSAction_14: '1',
   },
+  sendTrackingToPayPal: false,
 };
