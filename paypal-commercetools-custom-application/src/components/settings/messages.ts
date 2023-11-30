@@ -72,18 +72,22 @@ export default defineMessages({
     defaultMessage:
       'When enabled, a PayPal Pay Later button will be shown alongside with the regular PayPal checkout button.',
   },
-  partnerAttributionIdNotice: {
-    id: 'Settings.partnerAttributionIdNotice',
-    defaultMessage:
-      'Pass your partner attribution ID, or build notation (BN) code, to receive revenue attribution. Your BN code is issued to you as part of the partner onboarding process and provides tracking on all your transactions.',
-  },
   threeDSActionTitle: {
     id: 'Settings.threeDSActionTitle',
     defaultMessage: 'Response parameters',
   },
-  threeDSActionSubTitle: {
-    id: 'Settings.threeDSActionSubTitle',
+  threeDSWarning: {
+    id: 'Settings.threeDSWarning',
     defaultMessage:
-      'Here you can set how to proceed with the transaction depending on the received response parameters along PayPals recommended action',
+      "3D Secure authentication is performed only if the card is enrolled for the service. In scenarios where the 3D Secure authentication hasn't been successful, you have the option to complete the payment at your own risk, meaning that you, as the seller, will be liable in case of a chargeback.",
+  },
+  automation: {
+    id: 'Settings.automation',
+    defaultMessage: 'Automation',
+  },
+  sendTrackingToPayPal: {
+    id: 'Settings.sendTrackingToPayPal',
+    defaultMessage:
+      'Automatically transfer the Tracking Data to PayPal when a Parcel is created for a delivery of an Order',
   },
 });

@@ -45,6 +45,7 @@ import {
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
+  getPayPalCapture,
   getPayPalOrder,
   refundPayPalOrder,
   updatePayPalOrder,
@@ -84,6 +85,15 @@ async function prepareCreateOrderRequest(
     };
     request.intent = 'CAPTURE';
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
+  }
+  const paymentSource = request?.payment_source
+      ? request?.payment_source[Object.keys(request?.payment_source)[0]]
+      : undefined;
+  if (paymentSource && cart.shippingAddress) {
+    paymentSource.experience_context = {
+      ...paymentSource?.experience_context,
+      shipping_preference: 'SET_PROVIDED_ADDRESS',
+    };
   }
   const amountPlanned = payment.amountPlanned;
   const paymentDescription = settings?.paymentDescription
@@ -474,6 +484,27 @@ export const handleGetOrderRequest = async (
     );
   } catch (e) {
     return handleError('getPayPalOrder', e);
+  }
+};
+
+export const handleGetCaptureRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.getPayPalCaptureRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalCaptureRequest);
+  const { captureId } = request;
+  const updateActions = handleRequest('getPayPalCapture', request);
+  try {
+    const response = await getPayPalCapture(
+      captureId ?? findSuitableTransactionId(payment, 'Charge')
+    );
+    return updateActions.concat(
+      handlePaymentResponse('getPayPalCapture', response)
+    );
+  } catch (e) {
+    return handleError('getPayPalCapture', e);
   }
 };
 

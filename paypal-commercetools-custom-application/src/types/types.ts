@@ -47,6 +47,7 @@ export type SettingsFormDataType = {
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, unknown>;
+  sendTrackingToPayPal: boolean;
   merchantId?: string;
 };
 
