@@ -12,7 +12,6 @@ export type SettingsFormDataType = {
   buttonDetailPage: boolean;
   buttonShippingPage: boolean;
   buttonShape: 'rect' | 'pill';
-  buttonTagline: boolean;
   payLaterMessagingType: 'flex' | 'text';
   payLaterMessageHomePage: boolean;
   payLaterMessageCategoryPage: boolean;
