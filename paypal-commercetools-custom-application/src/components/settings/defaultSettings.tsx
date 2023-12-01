@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS: SettingsFormDataType = {
   ratePayCustomerServiceInstructions: { de: '' },
   paymentDescription: { en: '' },
   storeInVaultOnSuccess: false,
-  paypalButtonConfig: { buttonColor: 'gold', buttonLabel: 'paypal' },
+  paypalButtonConfig: { buttonColor: 'gold', buttonLabel: 'buynow' },
   hostedFieldsPayButtonClasses: '',
   hostedFieldsInputFieldClasses: '',
   threeDSAction: {
