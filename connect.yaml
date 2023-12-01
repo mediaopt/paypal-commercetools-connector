@@ -36,3 +36,28 @@ deployAs:
           description: The identifier of the cloud Region that the Custom Application uses to connect to Composable Commerce. The values map to the actual Merchant Center API URL for that Region
           required: true
           default: gcp-eu
+  - name: paypal-commercetools-events
+    applicationType: event
+    endpoint: /paypal-commercetools-events
+    scripts:
+      postDeploy: npm install && npm run build && npm run connector:post-deploy
+      preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
+    configuration:
+      standardConfiguration:
+        - key: CTP_REGION
+          description: commercetools Composable Commerce API region
+        - key: PAYPAL_CLIENT_ID
+          description: PayPal Client Id
+        - key: PAYPAL_ENVIRONMENT
+          description: PayPal environment (Sandbox or Production)
+      securedConfiguration:
+        - key: CTP_PROJECT_KEY
+          description: commercetools Composable Commerce project key
+        - key: CTP_CLIENT_ID
+          description: commercetools Composable Commerce client ID
+        - key: CTP_CLIENT_SECRET
+          description: commercetools Composable Commerce client secret
+        - key: CTP_SCOPE
+          description: commercetools Composable Commerce client scope
+        - key: PAYPAL_CLIENT_SECRET
+          description: PayPal Client Secret

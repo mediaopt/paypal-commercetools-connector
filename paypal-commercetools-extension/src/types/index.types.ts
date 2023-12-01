@@ -99,6 +99,7 @@ export type PayPalSettings = {
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, unknown>;
   merchantId?: string;
+  sendTrackingToPayPal: boolean;
 };
 
 type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';

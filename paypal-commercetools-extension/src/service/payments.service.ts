@@ -23,8 +23,9 @@ import {
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  mapCommercetoolsCarrierToPayPalCarrier,
+  mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsLineItemsToPayPalItems,
-  mapCommercetoolsLineItemsToPayPalPriceBreakdown,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -37,9 +38,10 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
-import { getCart, getPayPalUserId } from './commercetools.service';
+import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
 import { getSettings } from './config.service';
 import {
+  addDeliveryData,
   authorizePayPalOrder,
   capturePayPalAuthorization,
   capturePayPalOrder,
@@ -48,6 +50,7 @@ import {
   getPayPalCapture,
   getPayPalOrder,
   refundPayPalOrder,
+  updateDeliveryData,
   updatePayPalOrder,
 } from './paypal.service';
 
@@ -109,9 +112,7 @@ async function prepareCreateOrderRequest(
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-          breakdown: mapCommercetoolsLineItemsToPayPalPriceBreakdown(
-            cart.lineItems
-          ),
+          breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(cart),
         },
         shipping: !cart.shippingAddress
           ? undefined
@@ -134,7 +135,7 @@ async function prepareCreateOrderRequest(
           : undefined,
         invoice_id: payment.id,
         description: paymentDescription,
-        items: cart.lineItems.map((lineItem) =>
+        items: cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
             lineItem,
             !!cart.shippingAddress,
@@ -543,3 +544,65 @@ function findSuitableTransactionId(
   }
   return transactions[transactions.length - 1].interactionId;
 }
+
+export const handleCreateTrackingInformation = async (payment: Payment) => {
+  if (!payment?.custom?.fields?.createTrackingInformationRequest) {
+    return [];
+  }
+  let request = JSON.parse(
+    payment?.custom?.fields?.createTrackingInformationRequest
+  );
+  if (request?.carrier !== 'OTHER') {
+    const order = await getOrder(payment?.id);
+    const carrier = mapCommercetoolsCarrierToPayPalCarrier(
+        request?.carrier,
+        order?.shippingAddress?.country
+    );
+    request = {
+      ...request,
+      carrier,
+      carrier_name_other: carrier === 'OTHER' ? request?.carrier : undefined,
+    };
+  }
+  const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
+  if (!request.capture_id && captureId) {
+    request.capture_id = captureId;
+  }
+  const updateActions = handleRequest('createTrackingInformation', request);
+  try {
+    const response = await addDeliveryData(
+      payment.custom.fields?.PayPalOrderId,
+      request
+    );
+    return updateActions.concat(
+      handlePaymentResponse('createTrackingInformation', response)
+    );
+  } catch (e) {
+    return handleError('createTrackingInformation', e);
+  }
+};
+
+export const handleUpdateTrackingInformation = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.updateTrackingInformationRequest) {
+    return [];
+  }
+  const request = JSON.parse(
+    payment?.custom?.fields?.updateTrackingInformationRequest
+  );
+  const { trackingId, patch } = request;
+  const updateActions = handleRequest('updateTrackingInformation', request);
+  try {
+    const response = await updateDeliveryData(
+      payment.custom.fields?.PayPalOrderId,
+      trackingId,
+      patch
+    );
+    return updateActions.concat(
+      handlePaymentResponse('updateTrackingInformation', response ?? '')
+    );
+  } catch (e) {
+    return handleError('updateTrackingInformation', e);
+  }
+};

@@ -109,13 +109,18 @@ export const handleError = (
   error: any,
   transactionId?: string
 ): UpdateActions => {
+  const payPalDebugId =
+    error instanceof AxiosError
+      ? error?.response?.headers['paypal-debug-id']
+      : undefined;
   logger.error(
-    `Call to ${requestName} resulted in an error`,
+    `Call to ${requestName} resulted in an error` +
+      (payPalDebugId ? ` (paypalDebugId: ${payPalDebugId})` : ''),
     error?.response?.data ?? error
   );
   const errorMessage =
     error instanceof AxiosError
-      ? `${error.message} (${error?.response?.data?.message})`
+      ? `${error.message} (${error?.response?.data?.message}) (paypalDebugId: ${error?.response?.headers['paypal-debug-id']})`
       : error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
