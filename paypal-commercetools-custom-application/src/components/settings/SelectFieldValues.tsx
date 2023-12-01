@@ -7,9 +7,9 @@ export const PayPalButtonColorValues = [
 ];
 
 export const PayPalButtonLabelValues = [
+  { value: 'buynow', label: 'Buy Now' },
   { value: 'paypal', label: 'PayPal' },
   { value: 'checkout', label: 'Checkout' },
-  { value: 'buynow', label: 'Buy Now' },
   { value: 'pay', label: 'Pay with PayPal' },
   { value: 'installment', label: 'Installment' },
 ];
