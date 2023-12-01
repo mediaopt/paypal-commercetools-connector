@@ -1,6 +1,7 @@
 import { SettingsFormDataType } from '../../types/types';
 
 export const DEFAULT_SETTINGS: SettingsFormDataType = {
+  merchantId: '',
   acceptPayPal: true,
   acceptPayLater: true,
   acceptVenmo: true,
@@ -11,7 +12,6 @@ export const DEFAULT_SETTINGS: SettingsFormDataType = {
   buttonDetailPage: true,
   buttonShippingPage: true,
   buttonShape: 'rect',
-  buttonTagline: true,
   payLaterMessagingType: 'text',
   payLaterMessageCartPage: true,
   payLaterMessagePaymentPage: true,

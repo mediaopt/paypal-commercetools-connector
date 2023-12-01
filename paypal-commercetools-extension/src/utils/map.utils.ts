@@ -105,43 +105,30 @@ export const mapPayPalOrderStatusToCommercetoolsTransactionState = (
 export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
   source: PaymentSourceResponse
 ): string => {
-  if (source.card) {
-    return `Card (${source.card.name})`;
+  const paymentSourceKey: keyof PaymentSourceResponse = Object.keys(
+    source
+  )[0] as keyof PaymentSourceResponse;
+  const paymentSource: any = source[paymentSourceKey];
+  switch (paymentSourceKey) {
+    case 'card':
+    case 'eps':
+    case 'blik':
+    case 'giropay':
+    case 'bancontact':
+      return `${paymentSourceKey} (${paymentSource?.name})`;
+    case 'p24':
+      return `${paymentSourceKey} (${paymentSource?.email})`;
+    case 'ideal':
+    case 'sofort':
+    case 'trustly':
+    case 'mybank':
+      return `${paymentSourceKey} (${paymentSource?.iban_last_chars})`;
+    case 'paypal':
+    case 'venmo':
+      return `${paymentSourceKey} (${paymentSource?.email_address})`;
+    default:
+      return paymentSourceKey;
   }
-  if (source.eps) {
-    return `eps (${source.eps.name})`;
-  }
-  if (source.bancontact) {
-    return `Bancontact (${source.bancontact.card_last_digits})`;
-  }
-  if (source.blik) {
-    return `BLIK (${source.blik.name})`;
-  }
-  if (source.p24) {
-    return `p24 (${source.p24.email})`;
-  }
-  if (source.giropay) {
-    return `giropay (${source.giropay.name})`;
-  }
-  if (source.ideal) {
-    return `iDEAL (${source.ideal.iban_last_chars})`;
-  }
-  if (source.mybank) {
-    return `MyBank (${source.mybank.iban_last_chars})`;
-  }
-  if (source.paypal) {
-    return `PayPal (${source.paypal.email_address})`;
-  }
-  if (source.sofort) {
-    return `SOFORT (${source.sofort.iban_last_chars})`;
-  }
-  if (source.trustly) {
-    return `trustly (${source.trustly.iban_last_chars})`;
-  }
-  if (source.venmo) {
-    return `Venmo (${source.venmo.email_address})`;
-  }
-  return '';
 };
 
 export const mapCommercetoolsLineItemsToPayPalItems = (

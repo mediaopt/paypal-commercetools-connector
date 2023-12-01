@@ -54,7 +54,7 @@ function prepareCreateOrUpdateTransactionAction(
       transaction.interactionId === transactionDraft.interactionId &&
       transaction.type === transactionDraft.type
   );
-  if (!commercetoolsTransactions) {
+  if (commercetoolsTransactions.length === 0) {
     return [
       {
         action: 'addTransaction',
@@ -86,20 +86,16 @@ export const handlePaymentTokenWebhook = async (
   }
   const orderId = resource.metadata.order_id;
   const payment = await getPaymentByPayPalOrderId(orderId);
-  const { customerId } = await getCart(payment.id);
-  if (!customerId) {
+  const cart = await getCart(payment.id);
+  const customer = await getCustomerByCart(cart);
+  if (!customer) {
     return;
   }
-  const customer = await createApiRoot()
-    .customers()
-    .withId({ ID: customerId })
-    .get()
-    .execute();
   const payPalCustomerId = resource.customer.id;
-  const storedPayPalCustomerId = customer.body.custom?.fields?.PayPalUserId;
+  const storedPayPalCustomerId = customer?.custom?.fields?.PayPalUserId;
   if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.body.email}`
+      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email}`
     );
     const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
@@ -119,10 +115,10 @@ export const handlePaymentTokenWebhook = async (
         };
     await createApiRoot()
       .customers()
-      .withId({ ID: customerId })
+      .withId({ ID: customer.id })
       .post({
         body: {
-          version: customer.body.version,
+          version: customer.version,
           actions: [action],
         },
       })
@@ -261,30 +257,31 @@ export const getCart = async (paymentId: string) => {
 export const getOrder = async (paymentId: string) => {
   const apiRoot = createApiRoot();
   const order = await apiRoot
-    .orders()
-    .get({
-      queryArgs: {
-        where: `paymentInfo(payments(id="${paymentId}"))`,
-      },
-    })
-    .execute();
+      .orders()
+      .get({
+        queryArgs: {
+          where: `paymentInfo(payments(id="${paymentId}"))`,
+        },
+      })
+      .execute();
   if (order.body.total !== 1) {
     throw new CustomError(500, 'payment is not associated with an order.');
   }
   return order.body.results[0];
 };
 
-export const getPayPalUserId = async ({
-  customerId,
-}: Cart): Promise<string | undefined> => {
+async function getCustomerByCart({ customerId }: Cart) {
   if (!customerId) {
     return undefined;
   }
   const apiRoot = createApiRoot();
-  const user = await apiRoot
-    .customers()
-    .withId({ ID: customerId })
-    .get()
-    .execute();
-  return user.body?.custom?.fields?.PayPalUserId;
+  return (await apiRoot.customers().withId({ ID: customerId }).get().execute())
+    .body;
+}
+
+export const getPayPalUserId = async (
+  cart: Cart
+): Promise<string | undefined> => {
+  const user = await getCustomerByCart(cart);
+  return user?.custom?.fields?.PayPalUserId;
 };

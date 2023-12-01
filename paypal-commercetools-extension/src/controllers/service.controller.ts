@@ -27,8 +27,6 @@ export const post = async (
       throw new CustomError(400, 'Bad request - Missing body parameters.');
     }
     switch (resource.typeId) {
-      case 'cart':
-        break;
       case 'payment':
         try {
           const data = await paymentController(action, resource);
@@ -66,14 +64,10 @@ export const post = async (
           }
         }
         break;
-
-      case 'order':
-        break;
-
       default:
         throw new CustomError(
           500,
-          `Internal Server Error - Resource not recognized. Allowed values are 'cart', 'payments' or 'orders'.`
+          `Internal Server Error - Resource not recognized. Allowed values are 'payments' or 'customers'.`
         );
     }
   } catch (error) {

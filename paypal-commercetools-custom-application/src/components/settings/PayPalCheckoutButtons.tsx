@@ -70,14 +70,6 @@ const PayPalCheckoutButtons = ({
               onChange={handleChange}
               name="buttonShape"
             />
-            <CheckboxInput
-              onChange={handleChange}
-              isChecked={values.buttonTagline}
-              value="buttonTagline"
-              name="buttonTagline"
-            >
-              <Text.Body nowrap={true}>Display Tagline Text</Text.Body>
-            </CheckboxInput>
           </Spacings.Inline>
           <PayPalButtonConfig values={values} handleChange={handleChange} />
         </Spacings.Stack>
