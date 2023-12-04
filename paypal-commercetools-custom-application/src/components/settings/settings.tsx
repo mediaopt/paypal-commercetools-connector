@@ -94,6 +94,7 @@ const Settings = () => {
 
   return (
     <Formik
+      enableReinitialize
       initialValues={settingsObject}
       onSubmit={(values) => {
         saveSettings(values);
