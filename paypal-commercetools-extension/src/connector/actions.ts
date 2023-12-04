@@ -4,6 +4,11 @@ import {
   TypeDraft,
 } from '@commercetools/platform-sdk';
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
+import {
+  CUSTOM_OBJECT_DEFAULT_VALUES,
+  GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
+  GRAPHQL_CUSTOMOBJECT_KEY_NAME,
+} from '../constants';
 
 export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
@@ -381,4 +386,32 @@ export async function createCustomPaymentInteractionType(
     fieldDefinitions: fieldDefinitions,
   };
   await addOrUpdateCustomType(apiRoot, customType);
+}
+
+export async function createAndSetCustomObject(
+  apiRoot: ByProjectKeyRequestBuilder
+): Promise<void> {
+  const existingSettingsObject = await apiRoot
+    .customObjects()
+    .withContainerAndKey({
+      container: GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
+      key: GRAPHQL_CUSTOMOBJECT_KEY_NAME,
+    })
+    .get()
+    .execute();
+
+  if (existingSettingsObject.body.value) {
+    return;
+  }
+
+  await apiRoot
+    .customObjects()
+    .post({
+      body: {
+        key: GRAPHQL_CUSTOMOBJECT_KEY_NAME,
+        container: GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
+        value: CUSTOM_OBJECT_DEFAULT_VALUES,
+      },
+    })
+    .execute();
 }

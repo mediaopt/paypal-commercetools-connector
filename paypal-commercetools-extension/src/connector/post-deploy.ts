@@ -7,6 +7,7 @@ import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { createOrUpdateWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
 import {
+  createAndSetCustomObject,
   createCustomCustomerType,
   createCustomerUpdateExtension,
   createCustomPaymentInteractionType,
@@ -30,6 +31,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   await createOrUpdateWebhook(
     applicationUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH)
   );
+  await createAndSetCustomObject(apiRoot);
 }
 
 async function run(): Promise<void> {
