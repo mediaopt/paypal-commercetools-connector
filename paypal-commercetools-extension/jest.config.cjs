@@ -6,9 +6,7 @@ module.exports = {
   testPathIgnorePatterns: ['<rootDir>/tests/setup-tests.ts'],
   preset: 'ts-jest',
   testEnvironment: 'node',
-  collectCoverage: true,
   "collectCoverageFrom": [
     "src/{!(paypal),}/*"
-  ],
-  coverageReporters: ["json", "html"]
+  ]
 };
