@@ -6,7 +6,6 @@ import {
   TransactionType,
 } from '@commercetools/platform-sdk';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { createApiRoot } from '../client/create.client';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
@@ -16,10 +15,17 @@ import {
   OrderRequest,
 } from '../paypal/checkout_api';
 import { CaptureRequest } from '../paypal/payments_api';
-import { ClientTokenRequest, UpdateActions } from '../types/index.types';
+import {
+  ClientTokenRequest,
+  PayPalSettings,
+  UpdateActions,
+} from '../types/index.types';
 import { getCurrentTimestamp } from '../utils/data.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  mapCommercetoolsCarrierToPayPalCarrier,
+  mapCommercetoolsCartToPayPalPriceBreakdown,
+  mapCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -32,28 +38,32 @@ import {
   handlePaymentResponse,
   handleRequest,
 } from '../utils/response.utils';
+import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
 import { getSettings } from './config.service';
 import {
+  addDeliveryData,
   authorizePayPalOrder,
   capturePayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
+  getPayPalCapture,
   getPayPalOrder,
   refundPayPalOrder,
+  updateDeliveryData,
   updatePayPalOrder,
 } from './paypal.service';
 
-export const handleCreateOrderRequest = async (
-  payment: Payment
-): Promise<UpdateAction[]> => {
-  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
-    return [];
-  }
+async function prepareCreateOrderRequest(
+  payment: Payment,
+  settings?: PayPalSettings
+) {
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
-  const settings = await getSettings();
+  if (!request?.payment_source && request.paymentSource) {
+    request.payment_source = request.paymentSource;
+  }
+  const cart = await getCart(payment.id);
   if (request?.payment_source?.pay_upon_invoice) {
-    const cart = await getCart(payment.id);
     request.payment_source.pay_upon_invoice = {
       email: cart.customerEmail,
       name: {
@@ -79,7 +89,21 @@ export const handleCreateOrderRequest = async (
     request.intent = 'CAPTURE';
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
   }
+  const paymentSource = request?.payment_source
+      ? request?.payment_source[Object.keys(request?.payment_source)[0]]
+      : undefined;
+  if (paymentSource && cart.shippingAddress) {
+    paymentSource.experience_context = {
+      ...paymentSource?.experience_context,
+      shipping_preference: 'SET_PROVIDED_ADDRESS',
+    };
+  }
   const amountPlanned = payment.amountPlanned;
+  const paymentDescription = settings?.paymentDescription
+    ? settings?.paymentDescription[
+        cart.locale ?? Object.keys(settings?.paymentDescription)[0]
+      ]
+    : undefined;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -88,11 +112,93 @@ export const handleCreateOrderRequest = async (
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
+          breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(cart),
         },
+        shipping: !cart.shippingAddress
+          ? undefined
+          : {
+              type: 'SHIPPING',
+              name: {
+                full_name: `${cart.shippingAddress.firstName} ${cart.shippingAddress.lastName}`,
+              },
+              address: {
+                address_line_1: `${cart.shippingAddress.streetName} ${cart.shippingAddress.streetNumber}`,
+                admin_area_2: cart.shippingAddress.city,
+                postal_code: cart.shippingAddress.postalCode,
+                country_code: cart.shippingAddress.country,
+              },
+            },
+        payee: settings?.merchantId
+          ? {
+              merchant_id: settings.merchantId,
+            }
+          : undefined,
+        invoice_id: payment.id,
+        description: paymentDescription,
+        items: cart?.lineItems?.map((lineItem) =>
+          mapCommercetoolsLineItemsToPayPalItems(
+            lineItem,
+            !!cart.shippingAddress,
+            cart.locale
+          )
+        ),
       },
     ],
     ...request,
   } as OrderRequest;
+  if (request?.storeInVaultOnSuccess) {
+    const customer = {
+      id: await getPayPalUserId(cart),
+    };
+    if (request?.payment_source?.paypal) {
+      request.payment_source.paypal = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+            usage_type: 'MERCHANT',
+            customer_type: 'CONSUMER',
+          },
+          customer,
+        },
+        ...request.payment_source.paypal,
+      };
+    }
+    if (request?.payment_source?.venmo) {
+      request.payment_source.venmo = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+            usage_type: 'MERCHANT',
+          },
+          customer,
+        },
+        ...request.payment_source.venmo,
+      };
+    }
+    if (request?.payment_source?.card) {
+      request.payment_source.card = {
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+          },
+          customer,
+        },
+        ...request.payment_source.card,
+      };
+    }
+  }
+  return request;
+}
+
+export const handleCreateOrderRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.createPayPalOrderRequest) {
+    return [];
+  }
+  const amountPlanned = payment.amountPlanned;
+  const settings = await getSettings();
+  const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(
@@ -382,6 +488,27 @@ export const handleGetOrderRequest = async (
   }
 };
 
+export const handleGetCaptureRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.getPayPalCaptureRequest) {
+    return [];
+  }
+  const request = JSON.parse(payment?.custom?.fields?.getPayPalCaptureRequest);
+  const { captureId } = request;
+  const updateActions = handleRequest('getPayPalCapture', request);
+  try {
+    const response = await getPayPalCapture(
+      captureId ?? findSuitableTransactionId(payment, 'Charge')
+    );
+    return updateActions.concat(
+      handlePaymentResponse('getPayPalCapture', response)
+    );
+  } catch (e) {
+    return handleError('getPayPalCapture', e);
+  }
+};
+
 function updatePaymentFields(response: Order): UpdateActions {
   const { payment_source, status } = response;
   const updateActions: UpdateActions = [
@@ -418,18 +545,64 @@ function findSuitableTransactionId(
   return transactions[transactions.length - 1].interactionId;
 }
 
-const getCart = async (paymentId: string) => {
-  const apiRoot = createApiRoot();
-  const cart = await apiRoot
-    .carts()
-    .get({
-      queryArgs: {
-        where: `paymentInfo(payments(id="${paymentId}"))`,
-      },
-    })
-    .execute();
-  if (cart.body.total !== 1) {
-    throw new CustomError(500, 'payment is not associated with a cart.');
+export const handleCreateTrackingInformation = async (payment: Payment) => {
+  if (!payment?.custom?.fields?.createTrackingInformationRequest) {
+    return [];
   }
-  return cart.body.results[0];
+  let request = JSON.parse(
+    payment?.custom?.fields?.createTrackingInformationRequest
+  );
+  if (request?.carrier !== 'OTHER') {
+    const order = await getOrder(payment?.id);
+    const carrier = mapCommercetoolsCarrierToPayPalCarrier(
+        request?.carrier,
+        order?.shippingAddress?.country
+    );
+    request = {
+      ...request,
+      carrier,
+      carrier_name_other: carrier === 'OTHER' ? request?.carrier : undefined,
+    };
+  }
+  const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
+  if (!request.capture_id && captureId) {
+    request.capture_id = captureId;
+  }
+  const updateActions = handleRequest('createTrackingInformation', request);
+  try {
+    const response = await addDeliveryData(
+      payment.custom.fields?.PayPalOrderId,
+      request
+    );
+    return updateActions.concat(
+      handlePaymentResponse('createTrackingInformation', response)
+    );
+  } catch (e) {
+    return handleError('createTrackingInformation', e);
+  }
+};
+
+export const handleUpdateTrackingInformation = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.updateTrackingInformationRequest) {
+    return [];
+  }
+  const request = JSON.parse(
+    payment?.custom?.fields?.updateTrackingInformationRequest
+  );
+  const { trackingId, patch } = request;
+  const updateActions = handleRequest('updateTrackingInformation', request);
+  try {
+    const response = await updateDeliveryData(
+      payment.custom.fields?.PayPalOrderId,
+      trackingId,
+      patch
+    );
+    return updateActions.concat(
+      handlePaymentResponse('updateTrackingInformation', response ?? '')
+    );
+  } catch (e) {
+    return handleError('updateTrackingInformation', e);
+  }
 };

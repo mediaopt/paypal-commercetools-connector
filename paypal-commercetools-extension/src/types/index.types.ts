@@ -1,6 +1,11 @@
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 import { UpdateAction } from '@commercetools/sdk-client-v2';
-import { Patch } from '../paypal/checkout_api';
+import {
+  Customer,
+  LinkDescription,
+  Patch,
+  PaymentSource,
+} from '../paypal/checkout_api';
 
 export type Message = {
   code: string;
@@ -46,6 +51,7 @@ export type AccessTokenObject = {
 };
 
 export type PayPalSettings = {
+  email: string;
   acceptPayPal: boolean;
   acceptPayLater: boolean;
   acceptVenmo: boolean;
@@ -55,27 +61,56 @@ export type PayPalSettings = {
   buttonCartPage: boolean;
   buttonDetailPage: boolean;
   buttonShippingPage: boolean;
-  buttonLayout: string;
-  buttonShape: string;
+  buttonShape: 'rect' | 'pill';
   buttonTagline: boolean;
-  buttonColor: string;
-  buttonLabel: string;
-  payLaterMessagingType: string;
-  payLaterMessageCartPage: boolean;
-  payLaterMessagePaymentPage: boolean;
+  payLaterMessagingType: 'flex' | 'text';
+  payLaterMessageHomePage: boolean;
   payLaterMessageCategoryPage: boolean;
   payLaterMessageDetailsPage: boolean;
-  payLaterMessageHomePage: boolean;
-  payLaterMessageTextLogoType: string;
-  payLaterMessageTextLogoPosition: string;
-  payLaterMessageTextColor: string;
-  payLaterMessageTextSize: string;
-  payLaterMessageTextAlign: string;
-  payLaterMessageFlexColor: string;
-  payLaterMessageFlexRatio: string;
-  threeDSOption: 'SCA_WHEN_REQUIRED' | 'SCA_ALWAYS';
-  payPalIntent: 'Capture' | 'Authorize';
-  ratePayCustomerServiceInstructions: LocalizedString;
+  payLaterMessageCartPage: boolean;
+  payLaterMessagePaymentPage: boolean;
+  payLaterMessageTextLogoType: 'inline' | 'primary' | 'alternative' | 'none';
+  payLaterMessageTextLogoPosition: 'left' | 'right' | 'top';
+  payLaterMessageTextColor: 'black' | 'white' | 'monochrome' | 'grayscale';
+  payLaterMessageTextSize: '10' | '11' | '12' | '13' | '14' | '15' | '16';
+  payLaterMessageTextAlign: 'left' | 'center' | 'right';
+  payLaterMessageFlexColor:
+    | 'blue'
+    | 'black'
+    | 'white'
+    | 'white-no-border'
+    | 'gray'
+    | 'monochrome'
+    | 'grayscale';
+  payLaterMessageFlexRatio: '1x1' | '1x4' | '8x1' | '20x1';
+  threeDSOption: '' | 'SCA_ALWAYS' | 'SCA_WHEN_REQUIRED';
+  payPalIntent: 'Authorize' | 'Capture';
+  partnerAttributionId: string;
   ratePayBrandName: LocalizedString;
   ratePayLogoUrl: LocalizedString;
+  ratePayCustomerServiceInstructions: LocalizedString;
+  paymentDescription: LocalizedString;
+  storeInVaultOnSuccess: boolean;
+  paypalButtonConfig: {
+    buttonColor: PayPalButtonColors;
+    buttonLabel: 'paypal' | 'checkout' | 'buynow' | 'pay' | 'installment';
+  };
+  hostedFieldsPayButtonClasses: string;
+  hostedFieldsInputFieldClasses: string;
+  threeDSAction: Record<string, unknown>;
+  merchantId?: string;
+  sendTrackingToPayPal: boolean;
+};
+
+type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';
+
+export type PayPalVaultPaymentTokenResource = {
+  id: string;
+  metadata: {
+    order_id: string;
+  };
+  time_created: string;
+  links?: Array<LinkDescription>;
+  payment_source?: PaymentSource;
+  customer?: Customer;
 };

@@ -7,7 +7,9 @@ import {
   OrderCaptureRequest,
   OrderRequest,
   OrdersApi,
+  OrderTrackerRequest,
   Patch,
+  TrackersApi,
 } from '../paypal/checkout_api';
 import { Configuration } from '../paypal/configuration';
 import {
@@ -16,13 +18,26 @@ import {
   CapturesApi,
   RefundRequest,
 } from '../paypal/payments_api';
-import { SetupTokenRequest, SetupTokensApi } from '../paypal/vault_api';
 import {
+  PaymentTokenRequest,
+  PaymentTokensApi,
+  SetupTokenRequest,
+  SetupTokensApi,
+} from '../paypal/vault_api';
+import {
+  EventType,
   VerifyWebhookSignature,
   VerifyWebhookSignatureApi,
+  WebhooksApi,
 } from '../paypal/webhooks_api';
+import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { logger } from '../utils/logger.utils';
-import { cacheAccessToken, getCachedAccessToken } from './config.service';
+import {
+  cacheAccessToken,
+  getCachedAccessToken,
+  getWebhookId,
+  storeWebhookId,
+} from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -51,10 +66,17 @@ const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
   return new OrdersApi(await buildConfiguration(timeout));
 };
 
+const getPayPalTrackersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
+  return new TrackersApi(await buildConfiguration(timeout));
+};
+
 const getPayPalVerifyWebhookSignatureGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
   return new VerifyWebhookSignatureApi(await buildConfiguration(timeout));
+};
+const getPayPalWebhooksGateway = async (timeout = 0) => {
+  return new WebhooksApi(await buildConfiguration(timeout));
 };
 
 const getPayPalAuhorizationsGateway = async (
@@ -71,6 +93,12 @@ const getPayPalSetupTokenGateway = async (
   timeout: number = TIMEOUT_PAYMENT
 ) => {
   return new SetupTokensApi(await buildConfiguration(timeout));
+};
+
+const getPayPalPaymentTokenGateway = async (
+  timeout: number = TIMEOUT_PAYMENT
+) => {
+  return new PaymentTokensApi(await buildConfiguration(timeout));
 };
 
 export const createPayPalOrder = async (
@@ -126,6 +154,12 @@ export const updatePayPalOrder = async (
 export const getPayPalOrder = async (orderId: string) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersGet(orderId, 'application/json');
+  return response.data;
+};
+
+export const getPayPalCapture = async (captureId: string) => {
+  const gateway = await getPayPalCapturesGateway();
+  const response = await gateway.capturesGet(captureId, 'application/json');
   return response.data;
 };
 
@@ -290,6 +324,38 @@ export const createVaultSetupToken = async (request: SetupTokenRequest) => {
   return response.data;
 };
 
+export const createPaymentToken = async (request: PaymentTokenRequest) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.paymentTokensCreate(
+    'application/json',
+    randomUUID(),
+    request
+  );
+  return response.data;
+};
+
+export const deletePaymentToken = async (paymentTokenId: string) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.paymentTokensDelete(
+    paymentTokenId,
+    'application/json'
+  );
+  if (response.status === 204) {
+    return {
+      status: 'success',
+    };
+  }
+  return response.data;
+};
+
+export const getPaymentTokens = async (customerId: string) => {
+  const gateway = await getPayPalPaymentTokenGateway(2000);
+  const response = await gateway.customerPaymentTokensGet(
+    'application/json',
+    customerId
+  );
+  return response.data;
+};
 export const validateSignature = async (signature: VerifyWebhookSignature) => {
   const gateway = await getPayPalVerifyWebhookSignatureGateway(0);
   const response = await gateway.verifyWebhookSignaturePost(signature);
@@ -300,4 +366,74 @@ const getAPIEndpoint = () => {
   return process.env.PAYPAL_ENVIRONMENT === 'Production'
     ? PAYPAL_API_LIVE
     : PAYPAL_API_SANDBOX;
+};
+
+export const createOrUpdateWebhook = async (url: string) => {
+  const gateway = await getPayPalWebhooksGateway();
+  const webhooks = await gateway.webhooksList('APPLICATION');
+  logger.info(JSON.stringify(webhooks.data.webhooks));
+  const oldWebhook = webhooks.data.webhooks?.find((webhook) =>
+    webhook.url.endsWith(PAYPAL_WEBHOOKS_PATH)
+  );
+  if (oldWebhook && oldWebhook?.id) {
+    if (oldWebhook?.url === url) {
+      logger.info('Webhook URL did not change');
+      return oldWebhook;
+    }
+    const response = await gateway.webhooksUpdate(oldWebhook.id, [
+      {
+        op: 'replace',
+        path: '/url',
+        value: url,
+      },
+    ]);
+    logger.info(`Webhook url updated from ${oldWebhook.url} to ${url}`);
+    return response.data;
+  }
+  const response = await gateway.webhooksPost({
+    url: url,
+    event_types: [
+      {
+        name: '*',
+      } as EventType,
+    ],
+  });
+  if (response?.data?.id) {
+    const webhookIdField = await getWebhookId();
+    await storeWebhookId(response.data.id, webhookIdField?.version ?? 0);
+  }
+  return response.data;
+};
+
+export const addDeliveryData = async (
+  orderId: string,
+  request: OrderTrackerRequest
+) => {
+  const endpoint = await getPayPalOrdersGateway(TIMEOUT_PAYMENT);
+  const response = await endpoint.ordersTrackCreate(
+    orderId,
+    'application/json',
+    request
+  );
+  return response.data;
+};
+
+export const updateDeliveryData = async (
+  orderId: string,
+  trackerId: string,
+  request: Patch[]
+) => {
+  const endpoint = await getPayPalTrackersGateway(TIMEOUT_PAYMENT);
+  const response = await endpoint.ordersTrackersPatch(
+    orderId,
+    trackerId,
+    'application/json',
+    request
+  );
+  if (response.status === 204) {
+    return {
+      status: 'success',
+    };
+  }
+  return response.data;
 };

@@ -2,7 +2,10 @@ import { CustomerReference } from '@commercetools/platform-sdk';
 import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
 import {
+  handleCreatePaymentTokenRequest,
   handleCreateVaultSetupTokenRequest,
+  handleDeletePaymentTokenRequest,
+  handleGetPaymentTokensRequest,
   handleGetUserIDTokenRequest,
 } from '../service/customers.service';
 import { UpdateActions } from '../types/index.types';
@@ -24,6 +27,9 @@ const update = async (resource: Resource) => {
     logger.info(`Update customer with id ${customer.obj.id}`);
     updateActions = updateActions.concat(
       await handleGetUserIDTokenRequest(customer.obj),
+      await handleCreatePaymentTokenRequest(customer.obj),
+      await handleGetPaymentTokensRequest(customer.obj),
+      await handleDeletePaymentTokenRequest(customer.obj),
       await handleCreateVaultSetupTokenRequest(customer.obj)
     );
     return { statusCode: 200, actions: updateActions };

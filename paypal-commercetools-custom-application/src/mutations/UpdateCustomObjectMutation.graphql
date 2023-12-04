@@ -1,0 +1,6 @@
+mutation UpdateCustomObjectMutation($draftOfCustomObject: CustomObjectDraft!) {
+  createOrUpdateCustomObject(draft: $draftOfCustomObject) {
+    version
+    value
+  }
+}

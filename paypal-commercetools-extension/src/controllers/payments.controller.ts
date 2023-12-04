@@ -6,10 +6,13 @@ import {
   handleCaptureAuthorizationRequest,
   handleCaptureOrderRequest,
   handleCreateOrderRequest,
+  handleCreateTrackingInformation,
+  handleGetCaptureRequest,
   handleGetClientTokenRequest,
   handleGetOrderRequest,
   handleRefundPayPalOrderRequest,
   handleUpdateOrderRequest,
+  handleUpdateTrackingInformation,
 } from '../service/payments.service';
 import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
@@ -35,7 +38,10 @@ const update = async (resource: Resource) => {
       await handleAuthorizeOrderRequest(payment.obj),
       await handleGetClientTokenRequest(payment.obj),
       await handleGetOrderRequest(payment.obj),
+      await handleGetCaptureRequest(payment.obj),
       await handleRefundPayPalOrderRequest(payment.obj),
+      await handleCreateTrackingInformation(payment.obj),
+      await handleUpdateTrackingInformation(payment.obj),
       await handleUpdateOrderRequest(payment.obj)
     );
     return { statusCode: 200, actions: updateActions };

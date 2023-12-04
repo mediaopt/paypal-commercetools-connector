@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios';
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
+import { ErrorDetails } from '../paypal/checkout_api';
 import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
@@ -108,22 +109,30 @@ export const handleError = (
   error: any,
   transactionId?: string
 ): UpdateActions => {
+  const payPalDebugId =
+    error instanceof AxiosError
+      ? error?.response?.headers['paypal-debug-id']
+      : undefined;
   logger.error(
-    `Call to ${requestName} resulted in an error`,
+    `Call to ${requestName} resulted in an error` +
+      (payPalDebugId ? ` (paypalDebugId: ${payPalDebugId})` : ''),
     error?.response?.data ?? error
   );
   const errorMessage =
     error instanceof AxiosError
-      ? `${error.message} (${error?.response?.data?.message})`
+      ? `${error.message} (${error?.response?.data?.message}) (paypalDebugId: ${error?.response?.headers['paypal-debug-id']})`
       : error instanceof Error && 'message' in error
       ? error.message
       : 'Unknown error';
+  const details = error?.response?.data?.details?.map(
+    (details: ErrorDetails) => details.issue
+  );
   const updateActions: UpdateActions = [];
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
     transactionId: transactionId,
     name: `${requestName}Response`,
-    value: JSON.stringify({ success: false, message: errorMessage }),
+    value: JSON.stringify({ success: false, message: errorMessage, details }),
   });
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
