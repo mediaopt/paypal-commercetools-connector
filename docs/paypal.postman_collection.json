@@ -2,10 +2,10 @@
 	"info": {
 		"_postman_id": "043d36fc-b0b6-41b7-9d4c-bf282daf15a1",
 		"name": "Commercetools",
-		"description": "# Braintree Commercetools API Postman collection\n\nThis Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for Commercetools. For every command the smallest possible payload is given. Please find optional fields in the related official documentation.\n\n## Disclaimer\n\nThis is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/)  \nfor a complete and approved documentation of the Braintree.\n\n## How to use\n\n**:warning: Be aware that postman automatically synchronizes environment variables (including your API client credentials) to your workspace if logged in.****Use this collection only for development purposes and non-production projects.**\n\nTo use this collection in Postman please perform the following steps:\n\n1. Download and install the Postman Client\n2. Import the collection.json and [template.json](https://github.com/commercetools/commercetools-postman-collection/blob/master/api/template.json) in your postman application\n3. In the Merchant Center, create a new API Client and fill in the client credentials in your environment\n4. Obtain an access token by sending the \"Authorization/Obtain access token\" request at the bottom of the request list. Now you can use all other endpoints\n    \n\nFeel free to clone and modify this collection to your needs.\n\nTo automate frequent tasks the collection automatically manages commonly required values and parameters such  \nas resource ids, keys and versions in Postman environment variables for you.\n\nPlease see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools Plattform.",
+		"description": "# PayPal Commercetools API Postman collection\n\nThis Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for Commercetools. For every command the smallest possible payload is given. Please find optional fields in the related official documentation.\n\n## Disclaimer\n\nThis is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/)  \nfor a complete and approved documentation of PayPal.\n\n## How to use\n\n**:warning: Be aware that postman automatically synchronizes environment variables (including your API client credentials) to your workspace if logged in.****Use this collection only for development purposes and non-production projects.**\n\nTo use this collection in Postman please perform the following steps:\n\n1. Download and install the Postman Client\n2. Import the paypal.postman_collection.json and [template.json](https://github.com/commercetools/commercetools-postman-collection/blob/master/api/template.json) in your Postman application\n    \n3. In the Merchant Center, create a new API Client and fill in the client credentials in your environment\n4. Obtain an access token by sending the \"Authorization/Obtain access token\" request at the bottom of the request list. Now you can use all other endpoints\n    \n\nFeel free to clone and modify this collection to your needs.\n\nTo automate frequent tasks the collection automatically manages commonly required values and parameters such  \nas resource ids, keys and versions in Postman environment variables for you.\n\nPlease see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools platform.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "25620848",
-		"_collection_link": "https://mediaopt.postman.co/workspace/Braintree~ddb241ca-9fed-4e2f-a4e4-7accef0a9b89/collection/25620848-043d36fc-b0b6-41b7-9d4c-bf282daf15a1?action=share&source=collection_link&creator=25620848"
+		"_collection_link": "https://mediaopt.postman.co/workspace/Commercetools-Connect-Applicati~ddb241ca-9fed-4e2f-a4e4-7accef0a9b89/collection/25620848-043d36fc-b0b6-41b7-9d4c-bf282daf15a1?action=share&source=collection_link&creator=25620848"
 	},
 	"item": [
 		{
@@ -22342,7 +22342,6 @@
 										{
 											"listen": "test",
 											"script": {
-												"type": "text/javascript",
 												"exec": [
 													"tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
 													"var data = JSON.parse(responseBody);",
@@ -22363,7 +22362,8 @@
 													"    pm.environment.set(\"order-key\", data.key);",
 													"}",
 													""
-												]
+												],
+												"type": "text/javascript"
 											}
 										}
 									],
@@ -22397,7 +22397,7 @@
 										],
 										"body": {
 											"mode": "raw",
-											"raw": "{\n    \"version\": {{order-version}},\n    \"actions\": [\n        {\n            \"action\" : \"addParcelToDelivery\",\n            \"deliveryId\" : \"{{deliveryId}}\",\n            \"measurements\" : {\n              \"heightInMillimeter\" : 11,\n              \"widthInMillimeter\" : 11\n            },\n            \"trackingData\" : {\n              \"trackingId\" : \"{{trackingId}}\",\n              \"carrier\" : \"TNT\",\n              \"provider\" : \"providerName\",\n              \"providerTransaction\" : \"{{transactionId}}\",\n              \"isReturn\" : false\n            },\n            \"items\" : {\n              \"id\" : \"{{lineItemId}}\",\n              \"quantity\" : 2\n            }\n          }\n    ]\n}"
+											"raw": "{\n    \"version\": {{order-version}},\n    \"actions\": [\n        {\n            \"action\" : \"addParcelToDelivery\",\n            \"deliveryId\" : \"{{deliveryId}}\",\n            \"measurements\" : {\n              \"heightInMillimeter\" : 11,\n              \"widthInMillimeter\" : 11\n            },\n            \"trackingData\" : {\n              \"trackingId\" : \"987\",\n              \"carrier\" : \"TNT\"\n            }\n          }\n    ]\n}"
 										},
 										"url": {
 											"raw": "{{host}}/{{project-key}}/orders/{{order-id}}",
@@ -62118,122 +62118,7 @@
 										},
 										"description": "post Extensions"
 									},
-									"response": [
-										{
-											"name": "US",
-											"originalRequest": {
-												"method": "POST",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "application/json"
-													}
-												],
-												"body": {
-													"mode": "raw",
-													"raw": "{\n    \"version\": {{extension-version}},\n    \"actions\": [\n        {\n            \"action\" : \"changeDestination\",\n            \"destination\" : {\n              \"type\" : \"HTTP\",\n              \"url\" : \"https://service-e96ebee6-a48a-41ed-8664-640af5d6dc1a.europe-west1.gcp.preview.commercetools.app/braintree-extension\"\n            }\n          }\n    ]\n}"
-												},
-												"url": {
-													"raw": "{{host}}/{{project-key}}/extensions/{{extension-id}}",
-													"host": [
-														"{{host}}"
-													],
-													"path": [
-														"{{project-key}}",
-														"extensions",
-														"{{extension-id}}"
-													],
-													"query": [
-														{
-															"key": "expand",
-															"value": "",
-															"disabled": true
-														}
-													]
-												}
-											},
-											"_postman_previewlanguage": null,
-											"header": null,
-											"cookie": [],
-											"body": null
-										},
-										{
-											"name": "DE",
-											"originalRequest": {
-												"method": "POST",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "application/json"
-													}
-												],
-												"body": {
-													"mode": "raw",
-													"raw": "{\n    \"version\": {{extension-version}},\n    \"actions\": [\n        {\n            \"action\" : \"changeDestination\",\n            \"destination\" : {\n              \"type\" : \"HTTP\",\n              \"url\" : \"https://service-d24d9e77-9977-428e-96cb-7ae2c49dec2d.europe-west1.gcp.preview.commercetools.app/braintree-extension\"\n            }\n          }\n    ]\n}"
-												},
-												"url": {
-													"raw": "{{host}}/{{project-key}}/extensions/{{extension-id}}",
-													"host": [
-														"{{host}}"
-													],
-													"path": [
-														"{{project-key}}",
-														"extensions",
-														"{{extension-id}}"
-													],
-													"query": [
-														{
-															"key": "expand",
-															"value": "",
-															"disabled": true
-														}
-													]
-												}
-											},
-											"_postman_previewlanguage": null,
-											"header": null,
-											"cookie": [],
-											"body": null
-										},
-										{
-											"name": "DE with US merchant",
-											"originalRequest": {
-												"method": "POST",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "application/json"
-													}
-												],
-												"body": {
-													"mode": "raw",
-													"raw": "{\n    \"version\": {{extension-version}},\n    \"actions\": [\n        {\n            \"action\" : \"changeDestination\",\n            \"destination\" : {\n              \"type\" : \"HTTP\",\n              \"url\" : \"https://service-f29bfd55-5803-46f0-8ba7-ff25cb7e7e82.europe-west1.gcp.preview.commercetools.app/braintree-extension\"\n            }\n          }\n    ]\n}"
-												},
-												"url": {
-													"raw": "{{host}}/{{project-key}}/extensions/{{extension-id}}",
-													"host": [
-														"{{host}}"
-													],
-													"path": [
-														"{{project-key}}",
-														"extensions",
-														"{{extension-id}}"
-													],
-													"query": [
-														{
-															"key": "expand",
-															"value": "",
-															"disabled": true
-														}
-													]
-												}
-											},
-											"_postman_previewlanguage": null,
-											"header": null,
-											"cookie": [],
-											"body": null
-										}
-									]
+									"response": []
 								},
 								{
 									"name": "ChangeTriggers",
@@ -85581,7 +85466,7 @@
 								}
 							]
 						},
-						"description": "Create a PayPal Order.\n\nProvide the payment source in the request.\n\nAdditional fields might be relevant for curtain payment methods (e.g. PayUponInvoice)."
+						"description": "Create a PayPal Order.\n\nProvide the payment source in the request.\n\nAdditional fields might be relevant for certain payment methods (e.g. PayUponInvoice)."
 					},
 					"response": [
 						{
@@ -85710,7 +85595,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"payment_source\\\":{\\\"card\\\":{}}}\"\n          }\n    ]\n}"
+									"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"storeInVaultOnSuccess\\\": true, \\\"paymentSource\\\":{\\\"card\\\":{}}}\"\n          }\n    ]\n}"
 								},
 								"url": {
 									"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
@@ -85819,7 +85704,7 @@
 								}
 							]
 						},
-						"description": "Get Client Token.\n\nReturns a string which contains all authorization and configuration  \ninformation your client needs to initialize the client SDK to  \ncommunicate with PayPal."
+						"description": "Get Client Token.\n\nReturns a string which contains all authorization and configuration  \ninformation that your client needs to initialize the client SDK to  \ncommunicate with PayPal."
 					},
 					"response": []
 				},
@@ -86164,6 +86049,261 @@
 					"response": []
 				},
 				{
+					"name": "GetCapture",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+									"var data = JSON.parse(responseBody);",
+									"if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+									"    pm.environment.set(\"payment-id\", data.results[0].id); ",
+									"    pm.environment.set(\"payment-version\", data.results[0].version);",
+									"}",
+									"if(data.results && data.results[0] && data.results[0].key){",
+									"    pm.environment.set(\"payment-key\", data.results[0].key); ",
+									"}",
+									"if(data.version){",
+									"    pm.environment.set(\"payment-version\", data.version);",
+									"}",
+									"if(data.id){",
+									"    pm.environment.set(\"payment-id\", data.id); ",
+									"}",
+									"if(data.key){",
+									"    pm.environment.set(\"payment-key\", data.key);",
+									"}",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "oauth2",
+							"oauth2": [
+								{
+									"key": "accessToken",
+									"value": "{{ctp_access_token}}",
+									"type": "string"
+								},
+								{
+									"key": "addTokenTo",
+									"value": "header",
+									"type": "string"
+								},
+								{
+									"key": "tokenType",
+									"value": "Bearer",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"getPayPalCaptureRequest\",\n            \"value\" : \"{}\"\n          }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"{{project-key}}",
+								"payments",
+								"{{payment-id}}"
+							],
+							"query": [
+								{
+									"key": "expand",
+									"value": "",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get Capture details.\n\nThe payment needs at least one capture transaction. If there are multiple transactions, the newest one will be refunded."
+					},
+					"response": []
+				},
+				{
+					"name": "createTrackingInformation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+									"var data = JSON.parse(responseBody);",
+									"if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+									"    pm.environment.set(\"payment-id\", data.results[0].id); ",
+									"    pm.environment.set(\"payment-version\", data.results[0].version);",
+									"}",
+									"if(data.results && data.results[0] && data.results[0].key){",
+									"    pm.environment.set(\"payment-key\", data.results[0].key); ",
+									"}",
+									"if(data.version){",
+									"    pm.environment.set(\"payment-version\", data.version);",
+									"}",
+									"if(data.id){",
+									"    pm.environment.set(\"payment-id\", data.id); ",
+									"}",
+									"if(data.key){",
+									"    pm.environment.set(\"payment-key\", data.key);",
+									"}",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "oauth2",
+							"oauth2": [
+								{
+									"key": "accessToken",
+									"value": "{{ctp_access_token}}",
+									"type": "string"
+								},
+								{
+									"key": "addTokenTo",
+									"value": "header",
+									"type": "string"
+								},
+								{
+									"key": "tokenType",
+									"value": "Bearer",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createTrackingInformationRequest\",\n            \"value\" : \"{\\\"tracking_number\\\":\\\"ABCDE\\\", \\\"carrier\\\":\\\"OTHER\\\",\\\"carrier_name_other\\\":\\\"New Carrier\\\"}\"\n          }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"{{project-key}}",
+								"payments",
+								"{{payment-id}}"
+							],
+							"query": [
+								{
+									"key": "expand",
+									"value": "",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other."
+					},
+					"response": []
+				},
+				{
+					"name": "updateTrackingInformation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+									"var data = JSON.parse(responseBody);",
+									"if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+									"    pm.environment.set(\"payment-id\", data.results[0].id); ",
+									"    pm.environment.set(\"payment-version\", data.results[0].version);",
+									"}",
+									"if(data.results && data.results[0] && data.results[0].key){",
+									"    pm.environment.set(\"payment-key\", data.results[0].key); ",
+									"}",
+									"if(data.version){",
+									"    pm.environment.set(\"payment-version\", data.version);",
+									"}",
+									"if(data.id){",
+									"    pm.environment.set(\"payment-id\", data.id); ",
+									"}",
+									"if(data.key){",
+									"    pm.environment.set(\"payment-key\", data.key);",
+									"}",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "oauth2",
+							"oauth2": [
+								{
+									"key": "accessToken",
+									"value": "{{ctp_access_token}}",
+									"type": "string"
+								},
+								{
+									"key": "addTokenTo",
+									"value": "header",
+									"type": "string"
+								},
+								{
+									"key": "tokenType",
+									"value": "Bearer",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"updateTrackingInformationRequest\",\n            \"value\" : \"{\\\"trackingId\\\": \\\"7ED57114A9758913N-ABCDE\\\", \\\"patch\\\":[{\\\"op\\\": \\\"replace\\\",\\\"path\\\": \\\"/notify_payer\\\", \\\"value\\\": true}]}\"\n          }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"{{project-key}}",
+								"payments",
+								"{{payment-id}}"
+							],
+							"query": [
+								{
+									"key": "expand",
+									"value": "",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other."
+					},
+					"response": []
+				},
+				{
 					"name": "UpdateOrder",
 					"event": [
 						{
@@ -86397,13 +86537,13 @@
 							"raw": "{\n    \"version\": {{customer-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomType\",\n            \"type\" : {\n              \"key\" : \"paypal-customer-type\",\n              \"typeId\" : \"type\"\n            }\n          }\n    ]\n}"
 						},
 						"url": {
-							"raw": "{{host}}/{{project-key}}/customer/{{customer-id}}",
+							"raw": "{{host}}/{{project-key}}/customers/{{customer-id}}",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
 								"{{project-key}}",
-								"customer",
+								"customers",
 								"{{customer-id}}"
 							],
 							"query": [
@@ -86414,7 +86554,7 @@
 								}
 							]
 						},
-						"description": "Set the custom type of a payment to braintree-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set."
+						"description": "Set the custom type of a payment to paypal-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set."
 					},
 					"response": []
 				},
@@ -87091,6 +87231,91 @@
 							]
 						},
 						"description": "Get the current list of vaulted payment methods for the customer.\n\nThe list can be displayed in the frontend to reuse those payment methods."
+					},
+					"response": []
+				},
+				{
+					"name": "deletePaymentToken",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+									"var data = JSON.parse(responseBody);",
+									"if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+									"    pm.environment.set(\"customer-id\", data.results[0].id); ",
+									"    pm.environment.set(\"customer-version\", data.results[0].version);",
+									"}",
+									"if(data.results && data.results[0] && data.results[0].key){",
+									"    pm.environment.set(\"customer-key\", data.results[0].key); ",
+									"}",
+									"if(data.version){",
+									"    pm.environment.set(\"customer-version\", data.version);",
+									"}",
+									"if(data.id){",
+									"    pm.environment.set(\"customer-id\", data.id); ",
+									"}",
+									"if(data.key){",
+									"    pm.environment.set(\"customer-key\", data.key);",
+									"}",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "oauth2",
+							"oauth2": [
+								{
+									"key": "accessToken",
+									"value": "{{ctp_access_token}}",
+									"type": "string"
+								},
+								{
+									"key": "addTokenTo",
+									"value": "header",
+									"type": "string"
+								},
+								{
+									"key": "tokenType",
+									"value": "Bearer",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"version\": {{customer-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"deletePaymentTokenRequest\",\n            \"value\" : \"THEPAYMENTTOKEN\"\n          }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{host}}/{{project-key}}/customers/{{customer-id}}",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"{{project-key}}",
+								"customers",
+								"{{customer-id}}"
+							],
+							"query": [
+								{
+									"key": "expand",
+									"value": "",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Delete a saved payment token."
 					},
 					"response": []
 				}

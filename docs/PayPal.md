@@ -8,7 +8,7 @@ This Postman collection contains examples of requests and responses for most end
 ## Disclaimer
 
 This is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/)  
-for a complete and approved documentation of the Braintree.
+for a complete and approved documentation of PayPal.
 
 ## How to use
 
@@ -17,7 +17,8 @@ for a complete and approved documentation of the Braintree.
 To use this collection in Postman please perform the following steps:
 
 1. Download and install the Postman Client
-2. Import the collection.json and [template.json](https://github.com/commercetools/commercetools-postman-collection/blob/master/api/template.json) in your postman application
+2. Import the paypal.postman_collection.json and [template.json](https://github.com/commercetools/commercetools-postman-collection/blob/master/api/template.json) in your Postman application
+    
 3. In the Merchant Center, create a new API Client and fill in the client credentials in your environment
 4. Obtain an access token by sending the "Authorization/Obtain access token" request at the bottom of the request list. Now you can use all other endpoints
     
@@ -27,7 +28,7 @@ Feel free to clone and modify this collection to your needs.
 To automate frequent tasks the collection automatically manages commonly required values and parameters such  
 as resource ids, keys and versions in Postman environment variables for you.
 
-Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools Plattform.
+Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools platform.
 
 <!--- If we have only one group/collection, then no need for the "ungrouped" heading -->
 
@@ -41,28 +42,32 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
     1. [Token for Anonymous Sessions](#3-token-for-anonymous-sessions)
     1. [Token Introspection](#4-token-introspection)
 * [PayPal](#paypal)
-  1. [CreateOrder](#1-createorder)
-      * [PayUponInvoice](#i-example-request-payuponinvoice)
-      * [PayPal](#ii-example-request-paypal)
-      * [Venmo](#iii-example-request-venmo)
-      * [Card](#iv-example-request-card)
-  1. [getClientToken](#2-getclienttoken)
-  1. [CaptureOrder](#3-captureorder)
-  1. [CaptureAuthorization](#4-captureauthorization)
-  1. [AuthorizeOrder](#5-authorizeorder)
-  1. [GetOrder](#6-getorder)
-  1. [UpdateOrder](#7-updateorder)
-  1. [SetCustomType For Payment](#8-setcustomtype-for-payment)
-  1. [SetCustomType For Customer](#9-setcustomtype-for-customer)
-  1. [GetSettings](#10-getsettings)
-  1. [Refund](#11-refund)
-  1. [Partial Refund](#12-partial-refund)
-  1. [CreateVaultSetupToken](#13-createvaultsetuptoken)
-      * [Card](#i-example-request-card)
-      * [PayPal](#ii-example-request-paypal-1)
-  1. [getUserIdToken](#14-getuseridtoken)
-  1. [createPaymentToken](#15-createpaymenttoken)
-  1. [getPaymentTokens](#16-getpaymenttokens)
+    1. [CreateOrder](#1-createorder)
+        * [PayUponInvoice](#i-example-request-payuponinvoice)
+        * [PayPal](#ii-example-request-paypal)
+        * [Venmo](#iii-example-request-venmo)
+        * [Card](#iv-example-request-card)
+    1. [getClientToken](#2-getclienttoken)
+    1. [CaptureOrder](#3-captureorder)
+    1. [CaptureAuthorization](#4-captureauthorization)
+    1. [AuthorizeOrder](#5-authorizeorder)
+    1. [GetOrder](#6-getorder)
+    1. [GetCapture](#7-getcapture)
+    1. [createTrackingInformation](#8-createtrackinginformation)
+    1. [updateTrackingInformation](#9-updatetrackinginformation)
+    1. [UpdateOrder](#10-updateorder)
+    1. [SetCustomType For Payment](#11-setcustomtype-for-payment)
+    1. [SetCustomType For Customer](#12-setcustomtype-for-customer)
+    1. [GetSettings](#13-getsettings)
+    1. [Refund](#14-refund)
+    1. [Partial Refund](#15-partial-refund)
+    1. [CreateVaultSetupToken](#16-createvaultsetuptoken)
+        * [Card](#i-example-request-card)
+        * [PayPal](#ii-example-request-paypal-1)
+    1. [getUserIdToken](#17-getuseridtoken)
+    1. [createPaymentToken](#18-createpaymenttoken)
+    1. [getPaymentTokens](#19-getpaymenttokens)
+    1. [deletePaymentToken](#20-deletepaymenttoken)
 
 --------
 
@@ -190,7 +195,7 @@ Create a PayPal Order.
 
 Provide the payment source in the request.
 
-Additional fields might be relevant for curtain payment methods (e.g. PayUponInvoice).
+Additional fields might be relevant for certain payment methods (e.g. PayUponInvoice).
 
 
 ***Endpoint:***
@@ -352,7 +357,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
         {
             "action" : "setCustomField",
             "name" : "createPayPalOrderRequest",
-            "value" : "{\"payment_source\":{\"card\":{}}}"
+            "value" : "{\"storeInVaultOnSuccess\": true, \"paymentSource\":{\"card\":{}}}"
           }
     ]
 }
@@ -372,7 +377,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 Get Client Token.
 
 Returns a string which contains all authorization and configuration  
-information your client needs to initialize the client SDK to  
+information that your client needs to initialize the client SDK to  
 communicate with PayPal.
 
 
@@ -576,7 +581,137 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 
 
-### 7. UpdateOrder
+### 7. GetCapture
+
+
+Get Capture details.
+
+The payment needs at least one capture transaction. If there are multiple transactions, the newest one will be refunded.
+
+
+***Endpoint:***
+
+```bash
+Method: POST
+Type: RAW
+URL: {{host}}/{{project-key}}/payments/{{payment-id}}
+```
+
+
+***Headers:***
+
+| Key | Value | Description |
+| --- | ------|-------------|
+| Content-Type | application/json |  |
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "getPayPalCaptureRequest",
+            "value" : "{}"
+          }
+    ]
+}
+```
+
+
+
+### 8. createTrackingInformation
+
+
+Create Tracking Data for Payment.
+
+The order id will be read from the payment object and the capture_id will be used from the transactions.
+
+Please provide a tracking_number, carrier and optionally a carrier_name_other.
+
+
+***Endpoint:***
+
+```bash
+Method: POST
+Type: RAW
+URL: {{host}}/{{project-key}}/payments/{{payment-id}}
+```
+
+
+***Headers:***
+
+| Key | Value | Description |
+| --- | ------|-------------|
+| Content-Type | application/json |  |
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "createTrackingInformationRequest",
+            "value" : "{\"tracking_number\":\"ABCDE\", \"carrier\":\"OTHER\",\"carrier_name_other\":\"New Carrier\"}"
+          }
+    ]
+}
+```
+
+
+
+### 9. updateTrackingInformation
+
+
+Create Tracking Data for Payment.
+
+The order id will be read from the payment object and the capture_id will be used from the transactions.
+
+Please provide a tracking_number, carrier and optionally a carrier_name_other.
+
+
+***Endpoint:***
+
+```bash
+Method: POST
+Type: RAW
+URL: {{host}}/{{project-key}}/payments/{{payment-id}}
+```
+
+
+***Headers:***
+
+| Key | Value | Description |
+| --- | ------|-------------|
+| Content-Type | application/json |  |
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "updateTrackingInformationRequest",
+            "value" : "{\"trackingId\": \"7ED57114A9758913N-ABCDE\", \"patch\":[{\"op\": \"replace\",\"path\": \"/notify_payer\", \"value\": true}]}"
+          }
+    ]
+}
+```
+
+
+
+### 10. UpdateOrder
 
 
 Update an order.
@@ -620,7 +755,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 
 
-### 8. SetCustomType For Payment
+### 11. SetCustomType For Payment
 
 
 Set the custom type of a payment to paypal-payment-type so that custom fields like createOrderRequest can be set.
@@ -662,10 +797,10 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 
 
-### 9. SetCustomType For Customer
+### 12. SetCustomType For Customer
 
 
-Set the custom type of a payment to braintree-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set.
+Set the custom type of a payment to paypal-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set.
 
 
 ***Endpoint:***
@@ -673,7 +808,7 @@ Set the custom type of a payment to braintree-customer-type so that custom field
 ```bash
 Method: POST
 Type: RAW
-URL: {{host}}/{{project-key}}/customer/{{customer-id}}
+URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 ```
 
 
@@ -704,7 +839,7 @@ URL: {{host}}/{{project-key}}/customer/{{customer-id}}
 
 
 
-### 10. GetSettings
+### 13. GetSettings
 
 
 Get CustomObject for the PayPal settings.
@@ -727,7 +862,7 @@ URL: {{host}}/{{project-key}}/custom-objects/paypal-commercetools-connector/sett
 
 
 
-### 11. Refund
+### 14. Refund
 
 
 Refund a captured order.
@@ -771,7 +906,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 
 
-### 12. Partial Refund
+### 15. Partial Refund
 
 
 Refund a captured order.
@@ -813,7 +948,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 
 
-### 13. CreateVaultSetupToken
+### 16. CreateVaultSetupToken
 
 
 Create a Vault Setup Toklen for the customer. This token is needed for vaulting payment methods.
@@ -924,7 +1059,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 
 
-### 14. getUserIdToken
+### 17. getUserIdToken
 
 
 Get a User Id Token for the customer.
@@ -966,7 +1101,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 
 
-### 15. createPaymentToken
+### 18. createPaymentToken
 
 
 Create a payment token for the customer.
@@ -1010,7 +1145,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 
 
-### 16. getPaymentTokens
+### 19. getPaymentTokens
 
 
 Get the current list of vaulted payment methods for the customer.
@@ -1045,6 +1180,46 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
             "action" : "setCustomField",
             "name" : "getPaymentTokensRequest",
             "value" : "{}"
+          }
+    ]
+}
+```
+
+
+
+### 20. deletePaymentToken
+
+
+Delete a saved payment token.
+
+
+***Endpoint:***
+
+```bash
+Method: POST
+Type: RAW
+URL: {{host}}/{{project-key}}/customers/{{customer-id}}
+```
+
+
+***Headers:***
+
+| Key | Value | Description |
+| --- | ------|-------------|
+| Content-Type | application/json |  |
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{customer-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "deletePaymentTokenRequest",
+            "value" : "THEPAYMENTTOKEN"
           }
     ]
 }
