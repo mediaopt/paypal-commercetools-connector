@@ -1,5 +1,9 @@
 import { describe, test } from '@jest/globals';
-import { mapPayPalPaymentSourceToCommercetoolsMethodInfo } from '../src/utils/map.utils';
+import {
+  mapCommercetoolsMoneyToPayPalMoney, mapPayPalMoneyToCommercetoolsMoney,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo
+} from '../src/utils/map.utils';
+import {TypedMoney} from "@commercetools/platform-sdk";
 describe('Testing map utilities', () => {
   test.each([
     { name: 'card', source: { card: { name: 'TEST' } } },
@@ -22,4 +26,62 @@ describe('Testing map utilities', () => {
     expect(mapped.toLowerCase()).toContain(name);
     expect(mapped).toContain('TEST');
   });
+
+  test.each([
+    {
+      commercetoolsMoney: {
+        centAmount: 1,
+        fractionDigits: 2,
+      } as TypedMoney,
+      expectedPayPalAmount: '0.01',
+    },
+    {
+      commercetoolsMoney: {
+        centAmount: 6532,
+        fractionDigits: 2,
+      } as TypedMoney,
+      expectedPayPalAmount: '65.32',
+    },
+    {
+      commercetoolsMoney: {
+        centAmount: 3097,
+        fractionDigits: 2,
+      } as TypedMoney,
+      expectedPayPalAmount: '30.97',
+    },
+    {
+      commercetoolsMoney: {
+        centAmount: 1,
+        fractionDigits: 3,
+      } as TypedMoney,
+      expectedPayPalAmount: '0.001',
+    },
+    {
+      commercetoolsMoney: {
+        centAmount: 6532,
+        fractionDigits: 4,
+      } as TypedMoney,
+      expectedPayPalAmount: '0.6532',
+    },
+    {
+      commercetoolsMoney: {
+        centAmount: 3097,
+        fractionDigits: 1,
+      } as TypedMoney,
+      expectedPayPalAmount: '309.7',
+    },
+  ])(
+      'test mapping of commercetools amount to braintree amount and vise versa',
+      ({ commercetoolsMoney, expectedPayPalAmount }) => {
+        expect(mapCommercetoolsMoneyToPayPalMoney(commercetoolsMoney)).toBe(
+            expectedPayPalAmount
+        );
+        expect(
+            mapPayPalMoneyToCommercetoolsMoney(
+                expectedPayPalAmount,
+                commercetoolsMoney.fractionDigits
+            )
+        ).toBe(commercetoolsMoney.centAmount);
+      }
+  );
 });
