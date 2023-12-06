@@ -5,7 +5,7 @@ This connector has three application:
 - Endpoint /paypal-commercetools-extension
   - this extension endpoint handles updates of payments of the type `paypal-payment-type` and customers of type `paypal-customer-type`.
   - updates to the fields `createOrderRequest`, `captureOrderRequest`, etc. will be handled by calling the corresponding PayPal endpoint and returning the response in the corresponding custom fields (e.g. `createOrderResponse`)
-  - the docs provide a [postman collection](paypal.postman_collection.json) to illustrate the payment and customer update actions to use. The documentation for the collection can be found [here](PayPal.md).
+  - the docs provide a [Postman Collection](paypal.postman_collection.json) to illustrate the payment and customer update actions to use. The documentation for the collection can be found [here](PayPal.md).
 - Endpoint /paypal-webhooks
   - this extension handles webhook messages from PayPal
   - the messages will result in a status 200 response
@@ -13,11 +13,11 @@ This connector has three application:
 
 # paypal-commercetools-custom-application
 
-- this application provides a custom application in the commercetools merchant center
-- please create a custom application in the commercetools merchant center and use the following settings:
+- this application provides a custom application in the commercetools Merchant Center
+- please create a custom application in the commercetools Merchant Center and use the following settings:
   - name: PayPal - Partner Payment Panel
   - URI-Path: paypal-payment-panel
-- when deploying the connect app, provide the Custom Application ID which is provided when you added the Custom Application in the Merchant Center
+- when deploying the connect app, provide the Custom Application ID that is provided when you added the Custom Application in the Merchant Center
 
 # paypal-commercetools-events
 

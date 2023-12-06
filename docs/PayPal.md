@@ -418,7 +418,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ### 3. CaptureOrder
 
 
-Capture an order. The Order Id will be read from the payment object.
+Capture an order. The order id will be read from the payment object.
 
 
 ***Endpoint:***
@@ -670,11 +670,11 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ### 9. updateTrackingInformation
 
 
-Create Tracking Data for Payment.
+Update Tracking Data for Payment.
 
-The order id will be read from the payment object and the capture_id will be used from the transactions.
+The order id will be read from the payment object.
 
-Please provide a tracking_number, carrier and optionally a carrier_name_other.
+Please provide a the trackingId and the patch information.
 
 
 ***Endpoint:***
