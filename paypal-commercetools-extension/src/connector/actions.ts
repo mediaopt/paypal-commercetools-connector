@@ -391,19 +391,6 @@ export async function createCustomPaymentInteractionType(
 export async function createAndSetCustomObject(
   apiRoot: ByProjectKeyRequestBuilder
 ): Promise<void> {
-  const existingSettingsObject = await apiRoot
-    .customObjects()
-    .withContainerAndKey({
-      container: GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
-      key: GRAPHQL_CUSTOMOBJECT_KEY_NAME,
-    })
-    .get()
-    .execute();
-
-  if (existingSettingsObject.body.value) {
-    return;
-  }
-
   await apiRoot
     .customObjects()
     .post({
