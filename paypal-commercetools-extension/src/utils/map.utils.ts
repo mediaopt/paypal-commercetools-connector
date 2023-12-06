@@ -28,7 +28,7 @@ export const mapPayPalMoneyToCommercetoolsMoney = (
   amount: string,
   fractionDigits?: number
 ): number => {
-  return parseFloat(amount) * Math.pow(10, fractionDigits ?? 0);
+  return Math.round(parseFloat(amount) * Math.pow(10, fractionDigits ?? 0));
 };
 
 export const mapPayPalRefundStatusToCommercetoolsTransactionState = (

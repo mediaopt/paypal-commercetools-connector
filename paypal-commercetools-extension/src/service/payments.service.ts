@@ -13,6 +13,7 @@ import {
   OrderAuthorizeRequest,
   OrderCaptureRequest,
   OrderRequest,
+  Patch,
 } from '../paypal/checkout_api';
 import { CaptureRequest } from '../paypal/payments_api';
 import {
@@ -90,8 +91,8 @@ async function prepareCreateOrderRequest(
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
   }
   const paymentSource = request?.payment_source
-      ? request?.payment_source[Object.keys(request?.payment_source)[0]]
-      : undefined;
+    ? request?.payment_source[Object.keys(request?.payment_source)[0]]
+    : undefined;
   if (paymentSource && cart.shippingAddress) {
     paymentSource.experience_context = {
       ...paymentSource?.experience_context,
@@ -452,16 +453,56 @@ export const handleUpdateOrderRequest = async (
   if (!payment?.custom?.fields?.updatePayPalOrderRequest) {
     return [];
   }
-  const request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
-  const { orderId, patch } = request;
-  const updateActions = handleRequest('updatePayPalOrder', request);
   try {
+    let request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
+    const cart = await getCart(payment.id);
+    let amountPlanned = payment.amountPlanned;
+    let updateActions: UpdateActions = [];
+    if (cart && cart.totalPrice.centAmount !== amountPlanned.centAmount) {
+      updateActions.push({
+        action: 'changeAmountPlanned',
+        amount: cart.totalPrice,
+      });
+      amountPlanned = cart.totalPrice;
+    }
+    request = {
+      ...request,
+      orderId: payment.custom.fields?.PayPalOrderId,
+      patch: [
+        {
+          op: 'replace',
+          path: "/purchase_units/@reference_id=='default'/amount",
+          value: {
+            currency_code: amountPlanned.currencyCode,
+            value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
+            breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(
+              await getCart(payment.id)
+            ),
+          },
+        } as Patch,
+        {
+          op: 'replace',
+          path: "/purchase_units/@reference_id=='default'/items",
+          value: cart?.lineItems?.map((lineItem) =>
+            mapCommercetoolsLineItemsToPayPalItems(
+              lineItem,
+              !!cart.shippingAddress,
+              cart.locale
+            )
+          ),
+        } as Patch,
+      ],
+    };
+    const { orderId, patch } = request;
+
+    updateActions = updateActions.concat(
+      handleRequest('updatePayPalOrder', request)
+    );
     const response = await updatePayPalOrder(orderId, patch);
     return updateActions.concat(
       handlePaymentResponse('updatePayPalOrder', response ?? '')
     );
   } catch (e) {
-    logger.error('Call to updatePayPalOrder resulted in an error', e);
     return handleError('updatePayPalOrder', e);
   }
 };
@@ -555,8 +596,8 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
   if (request?.carrier !== 'OTHER') {
     const order = await getOrder(payment?.id);
     const carrier = mapCommercetoolsCarrierToPayPalCarrier(
-        request?.carrier,
-        order?.shippingAddress?.country
+      request?.carrier,
+      order?.shippingAddress?.country
     );
     request = {
       ...request,
