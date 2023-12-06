@@ -23,6 +23,7 @@ const mockConfigModule = () => {
   });
   jest.mock('../src/service/paypal.service', () => ({
     validateSignature: () => ({ verification_status: 'SUCCESS' }),
+    getPayPalOrder: jest.fn(),
   }));
   return apiRoot;
 };

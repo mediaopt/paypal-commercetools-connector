@@ -90,8 +90,8 @@ async function prepareCreateOrderRequest(
     request.processing_instruction = 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL';
   }
   const paymentSource = request?.payment_source
-      ? request?.payment_source[Object.keys(request?.payment_source)[0]]
-      : undefined;
+    ? request?.payment_source[Object.keys(request?.payment_source)[0]]
+    : undefined;
   if (paymentSource && cart.shippingAddress) {
     paymentSource.experience_context = {
       ...paymentSource?.experience_context,
@@ -555,8 +555,8 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
   if (request?.carrier !== 'OTHER') {
     const order = await getOrder(payment?.id);
     const carrier = mapCommercetoolsCarrierToPayPalCarrier(
-        request?.carrier,
-        order?.shippingAddress?.country
+      request?.carrier,
+      order?.shippingAddress?.country
     );
     request = {
       ...request,

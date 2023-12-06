@@ -13,6 +13,14 @@ deployAs:
           description: PayPal Client Id
         - key: PAYPAL_ENVIRONMENT
           description: PayPal environment (Sandbox or Production)
+        - key: SMTP_HOST
+          description: SMTP Host for sending pay upon invoice mail
+        - key: SMTP_PORT
+          description: SMTP Port for sending pay upon invoice mail
+        - key: SMTP_USERNAME
+          description: SMTP Username for sending pay upon invoice mail
+        - key: SMTP_SENDER
+          description: SMTP Sender for sending pay upon invoice mail
       securedConfiguration:
         - key: CTP_PROJECT_KEY
           description: commercetools Composable Commerce project key
@@ -24,6 +32,8 @@ deployAs:
           description: commercetools Composable Commerce client scope
         - key: PAYPAL_CLIENT_SECRET
           description: PayPal Client Secret
+        - key: SMTP_PASSWORD
+          description: SMTP Password for sending pay upon invoice mail
   - name: paypal-commercetools-custom-application
     applicationType: mc-app
     endpoint: /

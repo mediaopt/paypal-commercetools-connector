@@ -31,6 +31,7 @@ import {
   WebhooksApi,
 } from '../paypal/webhooks_api';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
+import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   cacheAccessToken,
@@ -154,7 +155,7 @@ export const updatePayPalOrder = async (
 export const getPayPalOrder = async (orderId: string) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersGet(orderId, 'application/json');
-  return response.data;
+  return response.data as Order;
 };
 
 export const getPayPalCapture = async (captureId: string) => {
