@@ -48,6 +48,8 @@ export type SettingsFormDataType = {
   threeDSAction: Record<string, unknown>;
   sendTrackingToPayPal: boolean;
   merchantId?: string;
+  payUponInvoiceMailSubject: LocalizedString;
+  payUponInvoiceMailEmailText: LocalizedString;
 };
 
 type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';

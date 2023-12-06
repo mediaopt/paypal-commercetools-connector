@@ -52,4 +52,15 @@ export const DEFAULT_SETTINGS: SettingsFormDataType = {
     threeDSAction_14: '1',
   },
   sendTrackingToPayPal: false,
+  payUponInvoiceMailSubject: { de: 'Pay Upon Invoice' },
+  payUponInvoiceMailEmailText: {
+    de:
+      'Bitte überweisen Sie den Betrag von ##price## an folgendes Konto!\n' +
+      'Verwendungszweck: ##payment_reference##\n' +
+      'BIC: ##bic##\n' +
+      'Bank Name: ##bank_name##\n' +
+      'IBAN: ##iban##\n' +
+      'Kontoinhaber: ##account_holder_name##\n' +
+      'Instructions: ##customer_service_instructions##',
+  },
 };

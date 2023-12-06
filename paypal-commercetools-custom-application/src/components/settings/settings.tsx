@@ -23,6 +23,7 @@ import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
 import HostedFields from './HostedFields';
 import Tracking from './Tracking';
+import PayUponInvoice from './PayUponInvoice';
 
 const Settings = () => {
   const [isReady, setIsReady] = useState<boolean>(false);
@@ -110,6 +111,7 @@ const Settings = () => {
             <ThreeDSecure values={values} handleChange={handleChange} />
             <PayPalPayLater values={values} handleChange={handleChange} />
             <RatePay values={values} handleChange={handleChange} />
+            <PayUponInvoice values={values} handleChange={handleChange} />
             <Tracking values={values} handleChange={handleChange} />
             <HostedFields values={values} handleChange={handleChange} />
             <Spacings.Inline
