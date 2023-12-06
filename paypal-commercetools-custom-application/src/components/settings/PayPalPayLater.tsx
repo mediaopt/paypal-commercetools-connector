@@ -108,13 +108,53 @@ const PayPalPayLater = ({ values, handleChange }: PayPalSettingsType) => {
             justifyContent="flex-start"
           >
             <SelectField
-              title="Layout"
-              value={values.payLaterMessagingType}
+              title="Layout on home page"
+              value={values.payLaterMessagingType.home}
               options={[
                 { value: 'flex', label: 'flex' },
                 { value: 'text', label: 'text' },
               ]}
-              name="payLaterMessagingType"
+              name="payLaterMessagingType.home"
+              onChange={handleChange}
+            />
+            <SelectField
+              title="Layout on category page"
+              value={values.payLaterMessagingType.category}
+              options={[
+                { value: 'flex', label: 'flex' },
+                { value: 'text', label: 'text' },
+              ]}
+              name="payLaterMessagingType.category"
+              onChange={handleChange}
+            />
+            <SelectField
+              title="Layout on product page"
+              value={values.payLaterMessagingType.product}
+              options={[
+                { value: 'flex', label: 'flex' },
+                { value: 'text', label: 'text' },
+              ]}
+              name="payLaterMessagingType.product"
+              onChange={handleChange}
+            />
+            <SelectField
+              title="Layout on payment page"
+              value={values.payLaterMessagingType.payment}
+              options={[
+                { value: 'flex', label: 'flex' },
+                { value: 'text', label: 'text' },
+              ]}
+              name="payLaterMessagingType.payment"
+              onChange={handleChange}
+            />
+            <SelectField
+              title="Layout on cart page"
+              value={values.payLaterMessagingType.cart}
+              options={[
+                { value: 'flex', label: 'flex' },
+                { value: 'text', label: 'text' },
+              ]}
+              name="payLaterMessagingType.cart"
               onChange={handleChange}
             />
           </Spacings.Inline>
