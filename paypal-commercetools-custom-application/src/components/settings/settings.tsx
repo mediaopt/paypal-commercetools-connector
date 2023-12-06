@@ -111,7 +111,6 @@ const Settings = () => {
             <ThreeDSecure values={values} handleChange={handleChange} />
             <PayPalPayLater values={values} handleChange={handleChange} />
             <RatePay values={values} handleChange={handleChange} />
-            <PayUponInvoice values={values} handleChange={handleChange} />
             <Tracking values={values} handleChange={handleChange} />
             <HostedFields values={values} handleChange={handleChange} />
             <Spacings.Inline
