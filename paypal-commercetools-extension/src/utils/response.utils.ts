@@ -6,13 +6,13 @@ import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
 
 const errorDetailsMapping = {
-  'PAYMENT_SOURCE_DECLINED_BY_PROCESSOR': 'paymentSourceDeclined',
-  'PAYMENT_SOURCE_CANNOT_BE_USED': 'paymentSourceDeclined',
-  'PAYMENT_SOURCE_INFO_CANNOT_BE_VERIFIED': 'paymentSourceNotVerified',
-  'SHIPPING_ADDRESS_INVALID': 'paymentSourceNotVerified',
-  'BILLING_ADDRESS_INVALID': 'paymentSourceNotVerified',
-  'INVALID_COUNTRY_CODE': 'paymentSourceNotVerified',
-  'POSTAL_CODE_REQUIRED': 'paymentSourceNotVerified',
+  PAYMENT_SOURCE_DECLINED_BY_PROCESSOR: 'paymentSourceDeclined',
+  PAYMENT_SOURCE_CANNOT_BE_USED: 'paymentSourceDeclined',
+  PAYMENT_SOURCE_INFO_CANNOT_BE_VERIFIED: 'paymentSourceNotVerified',
+  SHIPPING_ADDRESS_INVALID: 'paymentSourceNotVerified',
+  BILLING_ADDRESS_INVALID: 'paymentSourceNotVerified',
+  INVALID_COUNTRY_CODE: 'paymentSourceNotVerified',
+  POSTAL_CODE_REQUIRED: 'paymentSourceNotVerified',
 };
 
 export const handleRequest = (
@@ -115,27 +115,30 @@ export const removeEmptyProperties = (response: any) => {
 };
 
 function parseErrorMessage(error: any, requestName: string) {
-  const details = error?.response?.data?.details?.map(
+  const details =
+    error?.response?.data?.details?.map(
       (details: ErrorDetails) => details.issue
-  ) ?? [];
+    ) ?? [];
   if (requestName === 'createPayPalOrder') {
-
     for (const detail of details) {
       const indexOfDetail = Object.keys(errorDetailsMapping).indexOf(detail);
       if (indexOfDetail !== -1) {
-        return {message: Object.values(errorDetailsMapping)[indexOfDetail], details: undefined};
+        return {
+          message: Object.values(errorDetailsMapping)[indexOfDetail],
+          details: undefined,
+        };
       }
     }
-    return {message: 'OTHER', details: undefined};
+    return { message: 'OTHER', details: undefined };
   }
   const errorMessage =
-      error instanceof AxiosError
-          ? `${error.message} (${error?.response?.data?.message}) (paypalDebugId: ${error?.response?.headers['paypal-debug-id']})`
-          : error instanceof Error && 'message' in error
-              ? error.message
-              : 'Unknown error';
+    error instanceof AxiosError
+      ? `${error.message} (${error?.response?.data?.message}) (paypalDebugId: ${error?.response?.headers['paypal-debug-id']})`
+      : error instanceof Error && 'message' in error
+      ? error.message
+      : 'Unknown error';
 
-  return {message: errorMessage, details};
+  return { message: errorMessage, details };
 }
 
 export const handleError = (
@@ -152,7 +155,7 @@ export const handleError = (
       (payPalDebugId ? ` (paypalDebugId: ${payPalDebugId})` : ''),
     error?.response?.data ?? error
   );
-  const {message, details} = parseErrorMessage(error, requestName);
+  const { message, details } = parseErrorMessage(error, requestName);
   const updateActions: UpdateActions = [];
   updateActions.push({
     action: transactionId ? 'setTransactionCustomField' : 'setCustomField',

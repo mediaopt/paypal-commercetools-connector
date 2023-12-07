@@ -42,14 +42,14 @@ async function verifyWebhookSignature(request: Request) {
  * @returns
  */
 export const post = async (request: Request, response: Response) => {
-  logger.info('Webhook called');
-  await verifyWebhookSignature(request);
-  const { resource_type, event_type, resource, summary } = request.body;
   try {
+    logger.info('Webhook called');
+    const { resource_type, event_type, resource, summary } = request.body;
     logger.info(
       `Got ${event_type} for ${resource_type} with id ${resource.id}`
     );
     logger.info(summary);
+    await verifyWebhookSignature(request);
     logger.info(JSON.stringify(resource));
     if (!resource_type) {
       throw new CustomError(400, 'Bad request - Missing body parameters.');

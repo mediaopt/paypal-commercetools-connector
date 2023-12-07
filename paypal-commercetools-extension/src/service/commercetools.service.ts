@@ -23,6 +23,7 @@ import {
 } from '../utils/map.utils';
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
+import { updatePaymentFields } from './payments.service';
 import { getPayPalOrder } from './paypal.service';
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
@@ -51,7 +52,7 @@ const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
 function prepareCreateOrUpdateTransactionAction(
   payment: Payment,
   transactionDraft: TransactionDraft
-) {
+): PaymentUpdateAction[] {
   const commercetoolsTransactions = payment.transactions.filter(
     (transaction: Transaction) =>
       transaction.interactionId === transactionDraft.interactionId &&
@@ -131,30 +132,32 @@ export const handlePaymentTokenWebhook = async (
 
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
+  const order = await getPayPalOrder(orderId);
   const payment = await getPaymentByPayPalOrderId(orderId);
   const transaction = {
     type:
-      resource?.intent === CheckoutPaymentIntent.Capture
+      order?.intent === CheckoutPaymentIntent.Capture
         ? 'Charge'
         : 'Authorization',
     amount:
-      resource?.purchase_units && resource.purchase_units[0]?.amount?.value
+      order?.purchase_units && order.purchase_units[0]?.amount?.value
         ? {
             centAmount: mapPayPalMoneyToCommercetoolsMoney(
-              resource?.purchase_units[0].amount.value,
+              order?.purchase_units[0].amount.value,
               payment?.amountPlanned?.fractionDigits
             ),
             currencyCode: payment?.amountPlanned?.currencyCode,
           }
         : payment.amountPlanned,
-    interactionId: resource.id,
-    timestamp: resource.update_time ?? resource.create_time,
-    state: mapPayPalOrderStatusToCommercetoolsTransactionState(resource.status),
+    interactionId: order.id,
+    timestamp: order.update_time ?? order.create_time,
+    state: mapPayPalOrderStatusToCommercetoolsTransactionState(order.status),
   };
-  const updateActions = prepareCreateOrUpdateTransactionAction(
+  let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction
   );
+  updateActions = updateActions.concat(updatePaymentFields(order));
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
@@ -220,10 +223,14 @@ export const handleCaptureWebhook = async (
       resource.status
     ),
   };
-  const updateActions = prepareCreateOrUpdateTransactionAction(
+  let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction
   );
+  updateActions = updateActions.concat(
+    updatePaymentFields(await getPayPalOrder(orderId))
+  );
+
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 

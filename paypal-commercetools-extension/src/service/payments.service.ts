@@ -1,6 +1,7 @@
 import {
   Payment,
   PaymentAddTransactionAction,
+  PaymentUpdateAction,
   Transaction,
   TransactionState,
   TransactionType,
@@ -139,7 +140,8 @@ async function prepareCreateOrderRequest(
         items: cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
             lineItem,
-              (paymentSource?.experience_context?.shipping_preference !== 'NO_SHIPPING') || !!cart.shippingAddress,
+            paymentSource?.experience_context?.shipping_preference !==
+              'NO_SHIPPING' || !!cart.shippingAddress,
             cart.locale
           )
         ),
@@ -550,16 +552,16 @@ export const handleGetCaptureRequest = async (
   }
 };
 
-function updatePaymentFields(response: Order): UpdateActions {
+export function updatePaymentFields(response: Order): PaymentUpdateAction[] {
   const { payment_source, status } = response;
-  const updateActions: UpdateActions = [
+  const updateActions: PaymentUpdateAction[] = [
     {
       action: 'setStatusInterfaceCode',
       interfaceCode: status,
     },
     {
       action: 'setStatusInterfaceText',
-      interfaceText: status,
+      interfaceText: status ?? '',
     },
   ];
   if (payment_source) {
