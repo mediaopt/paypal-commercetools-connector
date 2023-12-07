@@ -32,6 +32,23 @@ const RatePay = ({ values, handleChange }: PayPalSettingsType) => {
             onChange={handleChange}
           />
         </Spacings.Stack>
+        <Spacings.Stack scale="m" alignItems="stretch">
+          <Text.Headline as="h3">Mailing</Text.Headline>
+          <LocalizedMultilineTextField
+            title="Mail Subject"
+            name="payUponInvoiceMailSubject"
+            value={values.payUponInvoiceMailSubject}
+            selectedLanguage="de"
+            onChange={handleChange}
+          />
+          <LocalizedMultilineTextField
+            title="Mail Body"
+            name="payUponInvoiceMailEmailText"
+            value={values.payUponInvoiceMailEmailText}
+            selectedLanguage="de"
+            onChange={handleChange}
+          />
+        </Spacings.Stack>
       </Spacings.Inset>
     </div>
   );
