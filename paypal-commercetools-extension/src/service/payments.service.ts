@@ -95,8 +95,8 @@ async function prepareCreateOrderRequest(
     : undefined;
   if (paymentSource && cart.shippingAddress) {
     paymentSource.experience_context = {
-      ...paymentSource?.experience_context,
       shipping_preference: 'SET_PROVIDED_ADDRESS',
+      ...paymentSource?.experience_context,
     };
   }
   const amountPlanned = payment.amountPlanned;
@@ -139,7 +139,7 @@ async function prepareCreateOrderRequest(
         items: cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
             lineItem,
-            !!cart.shippingAddress,
+              (paymentSource?.experience_context?.shipping_preference !== 'NO_SHIPPING') || !!cart.shippingAddress,
             cart.locale
           )
         ),
