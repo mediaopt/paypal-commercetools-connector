@@ -23,7 +23,6 @@ import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
 import HostedFields from './HostedFields';
 import Tracking from './Tracking';
-import PayUponInvoice from './PayUponInvoice';
 
 const Settings = () => {
   const [isReady, setIsReady] = useState<boolean>(false);
