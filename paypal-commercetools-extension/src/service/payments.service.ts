@@ -634,6 +634,15 @@ export const handleUpdateTrackingInformation = async (
   const request = JSON.parse(
     payment?.custom?.fields?.updateTrackingInformationRequest
   );
+  if (!request?.trackingId) {
+    const order = await getOrder(payment.id);
+    const deliveryWithParcel = order?.shippingInfo?.deliveries?.find((delivery) => delivery.parcels.length > 0);
+    if (deliveryWithParcel) {
+      const parcel = deliveryWithParcel?.parcels[0];
+      const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
+      request.trackingId = `${captureId}-${parcel?.trackingData?.trackingId}`;
+    }
+  }
   const { trackingId, patch } = request;
   const updateActions = handleRequest('updateTrackingInformation', request);
   try {
