@@ -21,9 +21,9 @@ import {
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalOrderStatusToCommercetoolsTransactionState,
 } from '../utils/map.utils';
+import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
 import { getPayPalOrder } from './paypal.service';
-import {getSettings} from "./config.service";
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
   const payments = await createApiRoot()
@@ -165,33 +165,32 @@ export const handleCaptureWebhook = async (
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payment = await getPaymentByPayPalOrderId(orderId);
   const payPalOrder = await getPayPalOrder(orderId);
-  if (
-    payPalOrder?.payment_source?.pay_upon_invoice &&
-    eventType === 'PAYMENT.CAPTURE.COMPLETED'
-  ) {
+  const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
+  if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
     const settings = await getSettings();
-    let customerEmail = payPalOrder?.payment_source?.pay_upon_invoice.email;
+    let customerEmail = payUponInvoiceSource.email;
     if (!customerEmail) {
       const order = await getOrder(payment.id);
       customerEmail = order.customerEmail ?? '';
     }
-    const fallbackEmailText = 'Bitte überweisen Sie den Betrag von ##price## an folgendes Konto!\n' +
-        'Verwendungszweck: ##payment_reference##\n' +
-        'BIC: ##bic##\n' +
-        'Bank Name: ##bank_name##\n' +
-        'IBAN: ##iban##\n' +
-        'Kontoinhaber: ##account_holder_name##\n' +
-        'Instructions: ##customer_service_instructions##';
-    let emailText = settings?.payUponInvoiceMailEmailText?.de ?? fallbackEmailText;
+    const fallbackEmailText =
+      'Bitte überweisen Sie den Betrag von ##price## an folgendes Konto!\n' +
+      'Verwendungszweck: ##payment_reference##\n' +
+      'BIC: ##bic##\n' +
+      'Bank Name: ##bank_name##\n' +
+      'IBAN: ##iban##\n' +
+      'Kontoinhaber: ##account_holder_name##\n' +
+      'Instructions: ##customer_service_instructions##';
+    let emailText =
+      settings?.payUponInvoiceMailEmailText?.de ?? fallbackEmailText;
     const purchaseUnit = payPalOrder?.purchase_units
       ? payPalOrder?.purchase_units[0]
       : undefined;
     const mapping = {
-      ...payPalOrder?.payment_source?.pay_upon_invoice.deposit_bank_details,
-      payment_reference:
-        payPalOrder?.payment_source?.pay_upon_invoice.payment_reference,
+      ...payUponInvoiceSource.deposit_bank_details,
+      payment_reference: payUponInvoiceSource.payment_reference,
       customer_service_instructions:
-        payPalOrder?.payment_source?.pay_upon_invoice?.experience_context?.customer_service_instructions.join(
+        payUponInvoiceSource?.experience_context?.customer_service_instructions.join(
           '\n'
         ),
       price:
@@ -200,7 +199,11 @@ export const handleCaptureWebhook = async (
     Object.entries(mapping).forEach(([key, value]: string[]) => {
       emailText = emailText.replace(`##${key}##`, value);
     });
-    await sendEmail(customerEmail, settings?.payUponInvoiceMailSubject?.de ?? 'Pay Upon Invoice', emailText);
+    await sendEmail(
+      customerEmail,
+      settings?.payUponInvoiceMailSubject?.de ?? 'Pay Upon Invoice',
+      emailText
+    );
   }
   const transaction = {
     type: 'Charge',
