@@ -14,7 +14,7 @@ done
 sleep 0.5
 
 # Get NGROK dynamic URL from its own exposed local API
-NGROK_REMOTE_URL="$(curl http://localhost:4040/api/tunnels | sed 's#.*"public_url":"\([^"]*\)".*#\1#g')"
+NGROK_REMOTE_URL="$(curl http://localhost:4040/api/tunnels | sed 's#.*"public_url":"\(https:[^"]*\)".*#\1#g')"
 
 if ! [[ "${NGROK_REMOTE_URL}" = http* ]]
 then
@@ -22,7 +22,7 @@ then
   exit 1
 fi
 
-NGROK_REMOTE_URL=${NGROK_REMOTE_URL}"/paypal-commercetools-extension/"
+NGROK_REMOTE_URL=${NGROK_REMOTE_URL}"/paypal-commercetools-extension"
 echo "✓ SUCCESS: dynamic url endpoint: ${NGROK_REMOTE_URL}"
 
 # Write CONNECT_SERVICE_URL to .env file

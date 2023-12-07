@@ -11,9 +11,9 @@ import {
 import { createApiRoot } from '../client/create.client';
 import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
-import { CheckoutPaymentIntent, Order } from '../paypal/checkout_api';
+import { CheckoutPaymentIntent } from '../paypal/checkout_api';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
-import { PayPalVaultPaymentTokenResource } from '../types/index.types';
+import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
@@ -21,6 +21,9 @@ import {
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalOrderStatusToCommercetoolsTransactionState,
 } from '../utils/map.utils';
+import { getSettings } from './config.service';
+import { sendEmail } from './mail.service';
+import { getPayPalOrder } from './paypal.service';
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
   const payments = await createApiRoot()
@@ -155,9 +158,53 @@ export const handleOrderWebhook = async (resource: Order) => {
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
-export const handleCaptureWebhook = async (resource: Capture2) => {
+export const handleCaptureWebhook = async (
+  resource: Capture2,
+  eventType: string
+) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payment = await getPaymentByPayPalOrderId(orderId);
+  const payPalOrder = await getPayPalOrder(orderId);
+  const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
+  if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+    const settings = await getSettings();
+    let customerEmail = payUponInvoiceSource.email;
+    if (!customerEmail) {
+      const order = await getOrder(payment.id);
+      customerEmail = order.customerEmail ?? '';
+    }
+    const fallbackEmailText =
+      'Bitte überweisen Sie den Betrag von ##price## an folgendes Konto!\n' +
+      'Verwendungszweck: ##payment_reference##\n' +
+      'BIC: ##bic##\n' +
+      'Bank Name: ##bank_name##\n' +
+      'IBAN: ##iban##\n' +
+      'Kontoinhaber: ##account_holder_name##\n' +
+      'Instructions: ##customer_service_instructions##';
+    let emailText =
+      settings?.payUponInvoiceMailEmailText?.de ?? fallbackEmailText;
+    const purchaseUnit = payPalOrder?.purchase_units
+      ? payPalOrder?.purchase_units[0]
+      : undefined;
+    const mapping = {
+      ...payUponInvoiceSource.deposit_bank_details,
+      payment_reference: payUponInvoiceSource.payment_reference,
+      customer_service_instructions:
+        payUponInvoiceSource?.experience_context?.customer_service_instructions.join(
+          '\n'
+        ),
+      price:
+        purchaseUnit?.amount?.value + ' ' + purchaseUnit?.amount?.currency_code,
+    };
+    Object.entries(mapping).forEach(([key, value]: string[]) => {
+      emailText = emailText.replace(`##${key}##`, value);
+    });
+    await sendEmail(
+      customerEmail,
+      settings?.payUponInvoiceMailSubject?.de ?? 'Pay Upon Invoice',
+      emailText
+    );
+  }
   const transaction = {
     type: 'Charge',
     amount: {
@@ -257,13 +304,13 @@ export const getCart = async (paymentId: string) => {
 export const getOrder = async (paymentId: string) => {
   const apiRoot = createApiRoot();
   const order = await apiRoot
-      .orders()
-      .get({
-        queryArgs: {
-          where: `paymentInfo(payments(id="${paymentId}"))`,
-        },
-      })
-      .execute();
+    .orders()
+    .get({
+      queryArgs: {
+        where: `paymentInfo(payments(id="${paymentId}"))`,
+      },
+    })
+    .execute();
   if (order.body.total !== 1) {
     throw new CustomError(500, 'payment is not associated with an order.');
   }

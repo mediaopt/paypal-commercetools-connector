@@ -56,7 +56,7 @@ export const post = async (request: Request, response: Response) => {
     }
     switch (resource_type) {
       case 'capture':
-        await handleCaptureWebhook(resource);
+        await handleCaptureWebhook(resource, event_type);
         response.status(200).json({});
         return;
       case 'refund':

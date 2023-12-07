@@ -41,10 +41,12 @@
     "@commercetools-backend/loggers": "^21.19.0",
     "@commercetools/platform-sdk": "^4.0.0",
     "@commercetools/sdk-client-v2": "^2.0.0",
+    "@types/nodemailer": "^6.4.14",
     "axios": "^1.5.1",
     "body-parser": "^1.20.0",
     "dotenv": "^16.0.3",
     "express": "4.18.2",
+    "nodemailer": "^6.9.7",
     "validator": "^13.7.0"
   }
 }
