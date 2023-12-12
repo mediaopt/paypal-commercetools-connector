@@ -23,7 +23,9 @@ const mockConfigModule = () => {
   });
   jest.mock('../src/service/paypal.service', () => ({
     validateSignature: () => ({ verification_status: 'SUCCESS' }),
-    getPayPalOrder: jest.fn(),
+    getPayPalOrder: () => ({
+      status: 'COMPLETED',
+    }),
   }));
   return apiRoot;
 };
@@ -85,6 +87,7 @@ describe('Testing webhook controller', () => {
       resource: { id: 1 },
       action: 'changeTransactionState',
       executeCalls: 3,
+      actionsCount: 3,
     },
     {
       name: 'test payment_token',
@@ -92,13 +95,15 @@ describe('Testing webhook controller', () => {
       resource: { id: 1, customer: { id: 123 }, metadata: { order_id: 2 } },
       action: 'setCustomType',
       executeCalls: 5,
+      actionsCount: 1,
     },
     {
       name: 'test order with authorization with missing transaction',
       resource_type: 'checkout-order',
       resource: { id: 1, intent: CheckoutPaymentIntent.Authorize },
-      action: 'addTransaction',
+      action: 'setStatusInterfaceCode',
       executeCalls: 3,
+      actionsCount: 2,
     },
     {
       name: 'test authorization with missing transaction',
@@ -106,8 +111,9 @@ describe('Testing webhook controller', () => {
       resource: { id: 1 },
       action: 'addTransaction',
       executeCalls: 3,
+      actionsCount: 3,
     },
-  ])('$name', async ({ action, resource, resource_type, executeCalls }) => {
+  ])('$name', async ({ action, resource, resource_type, executeCalls, actionsCount }) => {
     const request = {
       header: jest.fn(),
       body: {
@@ -125,7 +131,7 @@ describe('Testing webhook controller', () => {
     expect(response.status).toBeCalledTimes(1);
     expect(response.status).toBeCalledWith(200);
     expect(apiRequest.execute).toBeCalledTimes(executeCalls);
-    expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(1);
+    expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(actionsCount);
     expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
   });
 });

@@ -199,7 +199,6 @@ export const handleCreateOrderRequest = async (
   if (!payment?.custom?.fields?.createPayPalOrderRequest) {
     return [];
   }
-  const amountPlanned = payment.amountPlanned;
   const settings = await getSettings();
   const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
@@ -217,35 +216,11 @@ export const handleCreateOrderRequest = async (
         interfaceId: response.id,
       });
     }
-    const requestAmount = request?.amount;
     updateActions.push({
       action: 'setCustomField',
       name: 'PayPalOrderId',
       value: response.id,
     });
-    updateActions.push({
-      action: 'addTransaction',
-      transaction: {
-        type:
-          settings?.payPalIntent.toUpperCase() === 'CAPTURE'
-            ? 'Charge'
-            : 'Authorization',
-        amount: requestAmount
-          ? {
-              centAmount: mapPayPalMoneyToCommercetoolsMoney(
-                requestAmount,
-                amountPlanned.fractionDigits
-              ),
-              currencyCode: amountPlanned.currencyCode,
-            }
-          : amountPlanned,
-        interactionId: response.id,
-        timestamp: getCurrentTimestamp(),
-        state: mapPayPalOrderStatusToCommercetoolsTransactionState(
-          response.status
-        ),
-      },
-    } as PaymentAddTransactionAction);
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
     return handleError('createPayPalOrder', e);
