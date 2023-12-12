@@ -377,6 +377,10 @@ export const createOrUpdateWebhook = async (url: string) => {
     webhook.url.endsWith(PAYPAL_WEBHOOKS_PATH)
   );
   if (oldWebhook && oldWebhook?.id) {
+    const webhookIdField = await getWebhookId();
+    if (webhookIdField?.value !== oldWebhook?.id) {
+      await storeWebhookId(oldWebhook?.id, webhookIdField?.version ?? 0);
+    }
     if (oldWebhook?.url === url) {
       logger.info('Webhook URL did not change');
       return oldWebhook;

@@ -1,9 +1,10 @@
+import { TypedMoney } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import {
-  mapCommercetoolsMoneyToPayPalMoney, mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalPaymentSourceToCommercetoolsMethodInfo
+  mapCommercetoolsMoneyToPayPalMoney,
+  mapPayPalMoneyToCommercetoolsMoney,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
 } from '../src/utils/map.utils';
-import {TypedMoney} from "@commercetools/platform-sdk";
 describe('Testing map utilities', () => {
   test.each([
     { name: 'card', source: { card: { name: 'TEST' } } },
@@ -71,17 +72,17 @@ describe('Testing map utilities', () => {
       expectedPayPalAmount: '309.7',
     },
   ])(
-      'test mapping of commercetools amount to braintree amount and vise versa',
-      ({ commercetoolsMoney, expectedPayPalAmount }) => {
-        expect(mapCommercetoolsMoneyToPayPalMoney(commercetoolsMoney)).toBe(
-            expectedPayPalAmount
-        );
-        expect(
-            mapPayPalMoneyToCommercetoolsMoney(
-                expectedPayPalAmount,
-                commercetoolsMoney.fractionDigits
-            )
-        ).toBe(commercetoolsMoney.centAmount);
-      }
+    'test mapping of commercetools amount to braintree amount and vise versa',
+    ({ commercetoolsMoney, expectedPayPalAmount }) => {
+      expect(mapCommercetoolsMoneyToPayPalMoney(commercetoolsMoney)).toBe(
+        expectedPayPalAmount
+      );
+      expect(
+        mapPayPalMoneyToCommercetoolsMoney(
+          expectedPayPalAmount,
+          commercetoolsMoney.fractionDigits
+        )
+      ).toBe(commercetoolsMoney.centAmount);
+    }
   );
 });

@@ -11,7 +11,6 @@ import {
 import { createApiRoot } from '../client/create.client';
 import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
-import { CheckoutPaymentIntent } from '../paypal/checkout_api';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
 import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
@@ -19,10 +18,10 @@ import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalOrderStatusToCommercetoolsTransactionState,
 } from '../utils/map.utils';
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
+import { updatePaymentFields } from './payments.service';
 import { getPayPalOrder } from './paypal.service';
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
@@ -51,7 +50,7 @@ const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
 function prepareCreateOrUpdateTransactionAction(
   payment: Payment,
   transactionDraft: TransactionDraft
-) {
+): PaymentUpdateAction[] {
   const commercetoolsTransactions = payment.transactions.filter(
     (transaction: Transaction) =>
       transaction.interactionId === transactionDraft.interactionId &&
@@ -131,30 +130,9 @@ export const handlePaymentTokenWebhook = async (
 
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
+  const order = await getPayPalOrder(orderId);
   const payment = await getPaymentByPayPalOrderId(orderId);
-  const transaction = {
-    type:
-      resource?.intent === CheckoutPaymentIntent.Capture
-        ? 'Charge'
-        : 'Authorization',
-    amount:
-      resource?.purchase_units && resource.purchase_units[0]?.amount?.value
-        ? {
-            centAmount: mapPayPalMoneyToCommercetoolsMoney(
-              resource?.purchase_units[0].amount.value,
-              payment?.amountPlanned?.fractionDigits
-            ),
-            currencyCode: payment?.amountPlanned?.currencyCode,
-          }
-        : payment.amountPlanned,
-    interactionId: resource.id,
-    timestamp: resource.update_time ?? resource.create_time,
-    state: mapPayPalOrderStatusToCommercetoolsTransactionState(resource.status),
-  };
-  const updateActions = prepareCreateOrUpdateTransactionAction(
-    payment,
-    transaction
-  );
+  const updateActions = updatePaymentFields(order);
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
@@ -220,10 +198,14 @@ export const handleCaptureWebhook = async (
       resource.status
     ),
   };
-  const updateActions = prepareCreateOrUpdateTransactionAction(
+  let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction
   );
+  updateActions = updateActions.concat(
+    updatePaymentFields(await getPayPalOrder(orderId))
+  );
+
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
@@ -245,9 +227,12 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
       resource.status
     ),
   } as TransactionDraft;
-  const updateActions = prepareCreateOrUpdateTransactionAction(
+  let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction
+  );
+  updateActions = updateActions.concat(
+      updatePaymentFields(await getPayPalOrder(orderId))
   );
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };

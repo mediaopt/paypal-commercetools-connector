@@ -1,6 +1,7 @@
 import {
   Payment,
   PaymentAddTransactionAction,
+  PaymentUpdateAction,
   Transaction,
   TransactionState,
   TransactionType,
@@ -95,8 +96,8 @@ async function prepareCreateOrderRequest(
     : undefined;
   if (paymentSource && cart.shippingAddress) {
     paymentSource.experience_context = {
-      ...paymentSource?.experience_context,
       shipping_preference: 'SET_PROVIDED_ADDRESS',
+      ...paymentSource?.experience_context,
     };
   }
   const amountPlanned = payment.amountPlanned;
@@ -139,7 +140,8 @@ async function prepareCreateOrderRequest(
         items: cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
             lineItem,
-            !!cart.shippingAddress,
+            paymentSource?.experience_context?.shipping_preference !==
+              'NO_SHIPPING' || !!cart.shippingAddress,
             cart.locale
           )
         ),
@@ -197,7 +199,6 @@ export const handleCreateOrderRequest = async (
   if (!payment?.custom?.fields?.createPayPalOrderRequest) {
     return [];
   }
-  const amountPlanned = payment.amountPlanned;
   const settings = await getSettings();
   const request = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
@@ -215,35 +216,11 @@ export const handleCreateOrderRequest = async (
         interfaceId: response.id,
       });
     }
-    const requestAmount = request?.amount;
     updateActions.push({
       action: 'setCustomField',
       name: 'PayPalOrderId',
       value: response.id,
     });
-    updateActions.push({
-      action: 'addTransaction',
-      transaction: {
-        type:
-          settings?.payPalIntent.toUpperCase() === 'CAPTURE'
-            ? 'Charge'
-            : 'Authorization',
-        amount: requestAmount
-          ? {
-              centAmount: mapPayPalMoneyToCommercetoolsMoney(
-                requestAmount,
-                amountPlanned.fractionDigits
-              ),
-              currencyCode: amountPlanned.currencyCode,
-            }
-          : amountPlanned,
-        interactionId: response.id,
-        timestamp: getCurrentTimestamp(),
-        state: mapPayPalOrderStatusToCommercetoolsTransactionState(
-          response.status
-        ),
-      },
-    } as PaymentAddTransactionAction);
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
     return handleError('createPayPalOrder', e);
@@ -550,16 +527,16 @@ export const handleGetCaptureRequest = async (
   }
 };
 
-function updatePaymentFields(response: Order): UpdateActions {
+export function updatePaymentFields(response: Order): PaymentUpdateAction[] {
   const { payment_source, status } = response;
-  const updateActions: UpdateActions = [
+  const updateActions: PaymentUpdateAction[] = [
     {
       action: 'setStatusInterfaceCode',
       interfaceCode: status,
     },
     {
       action: 'setStatusInterfaceText',
-      interfaceText: status,
+      interfaceText: status ?? '',
     },
   ];
   if (payment_source) {
@@ -632,6 +609,15 @@ export const handleUpdateTrackingInformation = async (
   const request = JSON.parse(
     payment?.custom?.fields?.updateTrackingInformationRequest
   );
+  if (!request?.trackingId) {
+    const order = await getOrder(payment.id);
+    const deliveryWithParcel = order?.shippingInfo?.deliveries?.find((delivery) => delivery.parcels.length > 0);
+    if (deliveryWithParcel) {
+      const parcel = deliveryWithParcel?.parcels[0];
+      const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
+      request.trackingId = `${captureId}-${parcel?.trackingData?.trackingId}`;
+    }
+  }
   const { trackingId, patch } = request;
   const updateActions = handleRequest('updateTrackingInformation', request);
   try {
