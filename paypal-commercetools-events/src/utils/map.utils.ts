@@ -7,7 +7,9 @@ export const mapCommercetoolsCarrierToPayPalCarrier = (
   if (!carrier) {
     return 'OTHER';
   }
-  if (Object.values(CARRIERMAPPING[shippingCountry ?? 'GLOBAL']).includes(carrier)) {
+  if (
+    Object.values(CARRIERMAPPING[shippingCountry ?? 'GLOBAL']).includes(carrier)
+  ) {
     return carrier as ShipmentCarrier;
   }
   return (

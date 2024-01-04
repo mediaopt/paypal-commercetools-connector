@@ -8,7 +8,7 @@ import { getValidateMessages } from '../validators/helpers.validators';
  *
  * @returns The configuration with the correct env vars
  */
-export const readConfiguration = () => {
+export const readConfiguration = (validate = false) => {
   const envVars = {
     clientId: process.env.CTP_CLIENT_ID as string,
     clientSecret: process.env.CTP_CLIENT_SECRET as string,
@@ -17,14 +17,16 @@ export const readConfiguration = () => {
     region: process.env.CTP_REGION as string,
   };
 
-  const validationErrors = getValidateMessages(envValidators, envVars);
+  if (validate) {
+    const validationErrors = getValidateMessages(envValidators, envVars);
 
-  if (validationErrors.length) {
-    throw new CustomError(
-      'InvalidEnvironmentVariablesError',
-      'Invalid Environment Variables please check your .env file',
-      validationErrors
-    );
+    if (validationErrors.length) {
+      throw new CustomError(
+        'InvalidEnvironmentVariablesError',
+        'Invalid Environment Variables please check your .env file',
+        validationErrors
+      );
+    }
   }
 
   return envVars;

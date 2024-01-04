@@ -611,7 +611,9 @@ export const handleUpdateTrackingInformation = async (
   );
   if (!request?.trackingId) {
     const order = await getOrder(payment.id);
-    const deliveryWithParcel = order?.shippingInfo?.deliveries?.find((delivery) => delivery.parcels.length > 0);
+    const deliveryWithParcel = order?.shippingInfo?.deliveries?.find(
+      (delivery) => delivery.parcels.length > 0
+    );
     if (deliveryWithParcel) {
       const parcel = deliveryWithParcel?.parcels[0];
       const captureId = findSuitableTransactionId(payment, 'Charge', 'Success');
