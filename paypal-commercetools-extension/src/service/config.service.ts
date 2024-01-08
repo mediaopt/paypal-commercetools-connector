@@ -1,5 +1,6 @@
 import { createApiRoot } from '../client/create.client';
 import { AccessTokenObject, PayPalSettings } from '../types/index.types';
+import { logger } from '../utils/logger.utils';
 
 export const getSettings = async () => {
   try {
@@ -16,6 +17,7 @@ export const getSettings = async () => {
     ).body;
     return customObject.value as PayPalSettings;
   } catch (e) {
+    logger.error('Failed to load settings from custom object', e);
     return undefined;
   }
 };
@@ -33,6 +35,7 @@ export const getCachedAccessToken = async () => {
         .execute()
     ).body;
   } catch (e) {
+    logger.warn('Failed to load cached access token', e);
     return undefined;
   }
 };
@@ -69,6 +72,7 @@ export const getWebhookId = async () => {
         .execute()
     ).body;
   } catch (e) {
+    logger.warn('Failed to load stored webhookId', e);
     return undefined;
   }
 };
@@ -85,5 +89,17 @@ export const storeWebhookId = async (webhookId: string, version: number) => {
         version: version,
       },
     })
+    .execute();
+};
+
+export const deleteWebhookId = async () => {
+  const apiRoot = createApiRoot();
+  return apiRoot
+    .customObjects()
+    .withContainerAndKey({
+      container: 'paypal-commercetools-connector',
+      key: 'webhookId',
+    })
+    .delete()
     .execute();
 };

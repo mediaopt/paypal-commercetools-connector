@@ -14,6 +14,14 @@ This connector has three application:
 # paypal-commercetools-custom-application
 
 - this application provides a custom application in the commercetools Merchant Center
+- the custom application creates a new entry in the merchant center menu where you can adjust certain settings for PayPal including
+  - accepted payment methods
+  - whether the intent should be capture or authorize
+  - where to include the checkout buttons
+  - the styling of the buttons
+  - 3D secure settings
+  - PayLater Messaging
+  - RatePay
 - please create a custom application in the commercetools Merchant Center and use the following settings:
   - name: PayPal - Partner Payment Panel
   - URI-Path: paypal-payment-panel
@@ -21,5 +29,5 @@ This connector has three application:
 
 # paypal-commercetools-events
 
-- this application listenes to certain commercetools events
-- when a parcel is created for an order which was paid with a PayPal integrated payment, the tracking information will be sent to PayPal (you can deactivate that feature by diableing the `sendTrackingToPayPal` flag in the custom object (key: `settings`, container: `paypal-commercetools-connector`) or in the custom app)
+- this application listenes to certain commercetools events:
+  - when a parcel is created for an order which was paid with a PayPal integrated payment, the tracking information will be sent to PayPal (you can deactivate that feature by diableing the `sendTrackingToPayPal` flag in the custom object (key: `settings`, container: `paypal-commercetools-connector`) or in the custom app)

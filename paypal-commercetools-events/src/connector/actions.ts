@@ -7,30 +7,7 @@ export async function createParcelAddedToDeliverySubscription(
   topicName: string,
   projectId: string
 ): Promise<void> {
-  const {
-    body: { results: subscriptions },
-  } = await apiRoot
-    .subscriptions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_PARCEL_ADDED_TO_DELIVERY_KEY}"`,
-      },
-    })
-    .execute();
-
-  if (subscriptions.length > 0) {
-    const subscription = subscriptions[0];
-
-    await apiRoot
-      .subscriptions()
-      .withKey({ key: PAYPAL_PARCEL_ADDED_TO_DELIVERY_KEY })
-      .delete({
-        queryArgs: {
-          version: subscription.version,
-        },
-      })
-      .execute();
-  }
+  await deleteParcelAddedToDeliverySubscription(apiRoot);
 
   await apiRoot
     .subscriptions()

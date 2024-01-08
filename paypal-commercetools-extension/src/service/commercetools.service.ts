@@ -232,7 +232,7 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
     transaction
   );
   updateActions = updateActions.concat(
-      updatePaymentFields(await getPayPalOrder(orderId))
+    updatePaymentFields(await getPayPalOrder(orderId))
   );
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };

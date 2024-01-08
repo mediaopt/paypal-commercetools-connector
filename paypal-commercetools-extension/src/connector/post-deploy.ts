@@ -6,6 +6,7 @@ import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { createOrUpdateWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
+import { readConfiguration } from '../utils/config.utils';
 import {
   createAndSetCustomObject,
   createCustomCustomerType,
@@ -36,6 +37,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
 
 async function run(): Promise<void> {
   try {
+    readConfiguration(true);
     const properties = new Map(Object.entries(process.env));
     await postDeploy(properties);
   } catch (error) {

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { randomUUID } from 'crypto';
 import qs from 'qs';
 import CustomError from '../errors/custom.error';
@@ -35,6 +35,7 @@ import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   cacheAccessToken,
+  deleteWebhookId,
   getCachedAccessToken,
   getWebhookId,
   storeWebhookId,
@@ -408,6 +409,26 @@ export const createOrUpdateWebhook = async (url: string) => {
     await storeWebhookId(response.data.id, webhookIdField?.version ?? 0);
   }
   return response.data;
+};
+
+export const deleteWebhook = async () => {
+  const gateway = await getPayPalWebhooksGateway();
+  const webhookIdField = await getWebhookId();
+  const webhookId = webhookIdField?.value;
+  if (!webhookId) {
+    return;
+  }
+  logger.info(`Deleting webhook with WebhookId ${webhookId}`);
+  try {
+    await gateway.webhooksDelete(webhookId);
+  } catch (e) {
+    if (e instanceof AxiosError && e.response?.status === 404) {
+      logger.info('Webhook is already deleted');
+    } else {
+      throw e;
+    }
+  }
+  await deleteWebhookId();
 };
 
 export const addDeliveryData = async (

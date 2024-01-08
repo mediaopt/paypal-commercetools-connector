@@ -113,25 +113,30 @@ describe('Testing webhook controller', () => {
       executeCalls: 3,
       actionsCount: 3,
     },
-  ])('$name', async ({ action, resource, resource_type, executeCalls, actionsCount }) => {
-    const request = {
-      header: jest.fn(),
-      body: {
-        resource_type,
-        event_type: 'Captured',
-        resource,
-        summary: 'Capture is done.',
-      },
-    } as any;
-    const response = {
-      status: jest.fn(() => response),
-      json: jest.fn(),
-    } as unknown as Response;
-    await post(request, response);
-    expect(response.status).toBeCalledTimes(1);
-    expect(response.status).toBeCalledWith(200);
-    expect(apiRequest.execute).toBeCalledTimes(executeCalls);
-    expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(actionsCount);
-    expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
-  });
+  ])(
+    '$name',
+    async ({ action, resource, resource_type, executeCalls, actionsCount }) => {
+      const request = {
+        header: jest.fn(),
+        body: {
+          resource_type,
+          event_type: 'Captured',
+          resource,
+          summary: 'Capture is done.',
+        },
+      } as any;
+      const response = {
+        status: jest.fn(() => response),
+        json: jest.fn(),
+      } as unknown as Response;
+      await post(request, response);
+      expect(response.status).toBeCalledTimes(1);
+      expect(response.status).toBeCalledWith(200);
+      expect(apiRequest.execute).toBeCalledTimes(executeCalls);
+      expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(
+        actionsCount
+      );
+      expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
+    }
+  );
 });
