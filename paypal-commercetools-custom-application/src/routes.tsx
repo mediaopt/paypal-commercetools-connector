@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
+import { Switch, Route, useRouteMatch } from 'react-router-dom';
 import Spacings from '@commercetools-uikit/spacings';
 import Settings from './components/settings';
+import Welcome from './components/welcome';
 
 type ApplicationRoutesProps = {
   children?: ReactNode;
 };
 const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
+  const match = useRouteMatch();
+
   /**
    * When using routes, there is a good chance that you might want to
    * restrict the access to a certain route based on the user permissions.
@@ -19,7 +23,32 @@ const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
 
   return (
     <Spacings.Inset scale="l">
-      <Settings />
+      <Switch>
+        <Route path={`${match.path}/settings`}>
+          <Settings component="Settings" />
+        </Route>
+        <Route path={`${match.path}/payPalCheckoutButtons`}>
+          <Settings component="CheckoutButtons" />
+        </Route>
+        <Route path={`${match.path}/payPalPayLater`}>
+          <Settings component="PayLater" />
+        </Route>
+        <Route path={`${match.path}/threeDS`}>
+          <Settings component="ThreeDS" />
+        </Route>
+        <Route path={`${match.path}/ratePay`}>
+          <Settings component="RatePay" />
+        </Route>
+        <Route path={`${match.path}/tracking`}>
+          <Settings component="Tracking" />
+        </Route>
+        <Route path={`${match.path}/ccFields`}>
+          <Settings component="CCFields" />
+        </Route>
+        <Route>
+          <Welcome />
+        </Route>
+      </Switch>
     </Spacings.Inset>
   );
 };
