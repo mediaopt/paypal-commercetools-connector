@@ -7,31 +7,25 @@ This Postman collection contains examples of requests and responses for most end
 
 ## Disclaimer
 
-This is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/)  
-for a complete and approved documentation of PayPal.
+This is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/) for a complete and approved documentation of PayPal.
 
 ## How to use
 
-**:warning: Be aware that postman automatically synchronizes environment variables (including your API client credentials) to your workspace if logged in.****Use this collection only for development purposes and non-production projects.**
+**:warning: Be aware that postman automatically synchronizes environment variables (including your API client credentials) to your workspace if logged in.** **Use this collection only for development purposes and non-production projects.**
 
 To use this collection in Postman please perform the following steps:
 
 1. Download and install the Postman Client
 2. Import the paypal.postman_collection.json and [template.json](https://github.com/commercetools/commercetools-postman-collection/blob/master/api/template.json) in your Postman application
-    
 3. In the Merchant Center, create a new API Client and fill in the client credentials in your environment
 4. Obtain an access token by sending the "Authorization/Obtain access token" request at the bottom of the request list. Now you can use all other endpoints
     
 
 Feel free to clone and modify this collection to your needs.
 
-To automate frequent tasks the collection automatically manages commonly required values and parameters such  
-as resource ids, keys and versions in Postman environment variables for you.
+To automate frequent tasks the collection automatically manages commonly required values and parameters such as resource ids, keys and versions in Postman environment variables for you.
 
 Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools platform.
-
-<!--- If we have only one group/collection, then no need for the "ungrouped" heading -->
-
 
 
 ## Endpoints
@@ -75,10 +69,6 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
 
 ## Authorization
 
-Authorization
-
-
-
 ### 1. Obtain access token
 
 
@@ -97,11 +87,18 @@ URL: {{auth_url}}/oauth/token
 
 ***Query params:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| grant_type | client_credentials |  |
+| Key | Value |
+| --- | ------|
+| grant_type | client_credentials |
 
+***🔑 Authentication basic***
 
+| Key      | Value             |
+|----------|-------------------|
+| username | {{client_id}}     |
+| password | {{client_secret}} |
+
+<br>
 
 ### 2. Obtain access token through password flow
 
@@ -121,12 +118,20 @@ URL: {{auth_url}}/oauth/{{project-key}}/customers/token
 
 ***Query params:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| grant_type | password |  |
-| username |  |  |
-| password |  |  |
+| Key | Value | 
+| --- | ------|
+| grant_type | password |  
+| username |  |  
+| password |  |  
 
+***🔑 Authentication basic***
+
+| Key      | Value             |
+|----------|-------------------|
+| username | {{client_id}}     |
+| password | {{client_secret}} |
+
+<br>
 
 
 ### 3. Token for Anonymous Sessions
@@ -147,11 +152,18 @@ URL: {{auth_url}}/oauth/{{project-key}}/anonymous/token
 
 ***Query params:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| grant_type | client_credentials |  |
+| Key | Value | 
+| --- | ------|
+| grant_type | client_credentials |  
 
+***🔑 Authentication basic***
 
+| Key      | Value             |
+|----------|-------------------|
+| username | {{client_id}}     |
+| password | {{client_secret}} |
+
+<br>
 
 ### 4. Token Introspection
 
@@ -170,23 +182,29 @@ URL: {{auth_url}}/oauth/introspect
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
 ***Query params:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| token | {{ctp_access_token}} |  |
+| Key | Value |
+| --- | ------|
+| token | {{ctp_access_token}} |
 
+***🔑 Authentication basic***
+
+| Key      | Value             |
+|----------|-------------------|
+| username | {{client_id}}     |
+| password | {{client_secret}} |
+
+<br>
 
 
 ## PayPal
-
-
 
 ### 1. CreateOrder
 
@@ -209,9 +227,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -229,7 +247,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
     ]
 }
 ```
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 
 ***More example Requests/Responses:***
@@ -240,9 +266,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -261,7 +287,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 ***Status Code:*** 0
 
@@ -274,9 +306,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -295,7 +327,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 ***Status Code:*** 0
 
@@ -308,9 +346,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -330,6 +368,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ```
 
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 ***Status Code:*** 0
 
@@ -342,9 +387,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -364,6 +409,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ```
 
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 ***Status Code:*** 0
 
@@ -392,9 +444,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -414,11 +466,20 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ```
 
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 3. CaptureOrder
 
 
-Capture an order. The order id will be read from the payment object.
+Capture an order. The Order Id will be read from the payment object.
 
 
 ***Endpoint:***
@@ -432,9 +493,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -454,6 +515,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ```
 
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 4. CaptureAuthorization
 
@@ -474,10 +544,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
-
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 ***Body:***
@@ -494,7 +563,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
     ]
 }
 ```
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 
 ### 5. AuthorizeOrder
@@ -516,9 +593,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -537,7 +614,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 6. GetOrder
 
@@ -558,9 +643,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -579,7 +664,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 7. GetCapture
 
@@ -600,9 +693,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -621,7 +714,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 8. createTrackingInformation
 
@@ -644,9 +745,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -665,16 +766,24 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 9. updateTrackingInformation
 
 
-Update Tracking Data for Payment.
+Create Tracking Data for Payment.
 
-The order id will be read from the payment object.
+The order id will be read from the payment object and the capture_id will be used from the transactions.
 
-Please provide a the trackingId and the patch information.
+Please provide a tracking_number, carrier and optionally a carrier_name_other.
 
 
 ***Endpoint:***
@@ -688,9 +797,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -709,7 +818,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 10. UpdateOrder
 
@@ -732,9 +849,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -753,7 +870,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 11. SetCustomType For Payment
 
@@ -772,9 +897,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -795,7 +920,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 12. SetCustomType For Customer
 
@@ -814,9 +947,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -837,7 +970,15 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 13. GetSettings
 
@@ -856,11 +997,19 @@ URL: {{host}}/{{project-key}}/custom-objects/paypal-commercetools-connector/sett
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 14. Refund
 
@@ -883,9 +1032,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -904,7 +1053,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 15. Partial Refund
 
@@ -925,9 +1082,9 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -946,7 +1103,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 16. CreateVaultSetupToken
 
@@ -965,9 +1130,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -986,7 +1151,15 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ***More example Requests/Responses:***
 
@@ -996,9 +1169,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -1017,7 +1190,13 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 ***Status Code:*** 0
 
@@ -1030,9 +1209,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |
 
 
 
@@ -1051,6 +1230,13 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 
 ***Status Code:*** 0
@@ -1078,9 +1264,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -1099,6 +1285,15 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 
 ### 18. createPaymentToken
@@ -1122,9 +1317,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -1143,7 +1338,15 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 19. getPaymentTokens
 
@@ -1164,9 +1367,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value |
+| --- | ------|
+| Content-Type | application/json |  
 
 
 
@@ -1185,7 +1388,15 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
 
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
 
 ### 20. deletePaymentToken
 
@@ -1204,9 +1415,9 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 ***Headers:***
 
-| Key | Value | Description |
-| --- | ------|-------------|
-| Content-Type | application/json |  |
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json | 
 
 
 
@@ -1225,6 +1436,13 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 }
 ```
 
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
 
 
 ---
