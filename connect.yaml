@@ -58,6 +58,7 @@ deployAs:
           description: commercetools Composable Commerce API region
         - key: PAYPAL_CLIENT_ID
           description: PayPal Client Id
+          required: true
         - key: PAYPAL_ENVIRONMENT
           description: PayPal environment (Sandbox or Production)
       securedConfiguration:
@@ -71,3 +72,4 @@ deployAs:
           description: commercetools Composable Commerce client scope
         - key: PAYPAL_CLIENT_SECRET
           description: PayPal Client Secret
+          required: true
