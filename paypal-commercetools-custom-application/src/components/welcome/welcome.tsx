@@ -21,25 +21,28 @@ const Welcome = () => {
       <Spacings.Inset scale="m">
         <Spacings.Stack scale="m" alignItems="stretch">
           <Text.Headline as="h3" intlMessage={messages.title} />
-          <Link isExternal={false} to="settings">
+          <Link isExternal={false} to="paypal-payment-panel/settings">
             PayPal general settings
           </Link>
-          <Link isExternal={false} to="payPalCheckoutButtons">
+          <Link
+            isExternal={false}
+            to="paypal-payment-panel/payPalCheckoutButtons"
+          >
             Checkout buttons settings
           </Link>
-          <Link isExternal={false} to="payPalPayLater">
+          <Link isExternal={false} to="paypal-payment-panel/payPalPayLater">
             PayLater settings
           </Link>
-          <Link isExternal={false} to="threeDS">
+          <Link isExternal={false} to="paypal-payment-panel/threeDS">
             3D Secure settings
           </Link>
-          <Link isExternal={false} to="ratePay">
+          <Link isExternal={false} to="paypal-payment-panel/ratePay">
             RatePay settings
           </Link>
-          <Link isExternal={false} to="tracking">
+          <Link isExternal={false} to="paypal-payment-panel/tracking">
             Parcel tracking settings
           </Link>
-          <Link isExternal={false} to="ccFields">
+          <Link isExternal={false} to="paypal-payment-panel/ccFields">
             Credit card field settings
           </Link>
         </Spacings.Stack>
