@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import {
   ApollonFetchedCustomObjectType,
+  PayPalSettingsType,
   SettingsFormDataType,
 } from '../../types/types';
 import {
@@ -23,8 +24,18 @@ import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
 import HostedFields from './HostedFields';
 import Tracking from './Tracking';
-
-const Settings = () => {
+type SettingsProp = {
+  component:
+    | 'Settings'
+    | 'CheckoutButtons'
+    | 'PayLater'
+    | 'ThreeDS'
+    | 'RatePay'
+    | 'Tracking'
+    | 'CCFields'
+    | '';
+};
+const Settings = ({ component }: SettingsProp) => {
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isLanguageReady, setIsLanguageReady] = useState<boolean>(false);
   const [customObjectVersion, setCustomObjectVersion] = useState<number>();
@@ -38,6 +49,7 @@ const Settings = () => {
   const [setSettingsFunc] = useSetSettings();
 
   const saveSettings = (values: SettingsFormDataType) => {
+    // @ts-ignore
     setSettingsFunc({
       variables: {
         draftOfCustomObject: {
@@ -88,6 +100,104 @@ const Settings = () => {
     setMissingLanguages();
   }, [languages, languageLoading, languageError, isLanguageReady]);
 
+  const getComponent = ({ values, handleChange }: PayPalSettingsType) => {
+    switch (component) {
+      case 'Settings':
+        return <PayPalSettings values={values} handleChange={handleChange} />;
+      case 'CheckoutButtons':
+        return (
+          <PayPalCheckoutButtons values={values} handleChange={handleChange} />
+        );
+      case 'PayLater':
+        return <PayPalPayLater values={values} handleChange={handleChange} />;
+      case 'ThreeDS':
+        return <ThreeDSecure values={values} handleChange={handleChange} />;
+      case 'RatePay':
+        return <RatePay values={values} handleChange={handleChange} />;
+      case 'Tracking':
+        return <Tracking values={values} handleChange={handleChange} />;
+      case 'CCFields':
+        return <HostedFields values={values} handleChange={handleChange} />;
+      default:
+        return <></>;
+    }
+  };
+
+  const getComponentDefaults = (): Record<string, any> => {
+    switch (component) {
+      case 'Settings':
+        return {
+          merchantId: DEFAULT_SETTINGS.merchantId,
+          acceptPayPal: DEFAULT_SETTINGS.acceptPayPal,
+          acceptPayLater: DEFAULT_SETTINGS.acceptPayLater,
+          acceptVenmo: DEFAULT_SETTINGS.acceptVenmo,
+          acceptLocal: DEFAULT_SETTINGS.acceptLocal,
+          acceptCredit: DEFAULT_SETTINGS.acceptCredit,
+          payPalIntent: DEFAULT_SETTINGS.payPalIntent,
+          paymentDescription: DEFAULT_SETTINGS.paymentDescription,
+          storeInVaultOnSuccess: DEFAULT_SETTINGS.storeInVaultOnSuccess,
+        };
+      case 'CheckoutButtons':
+        return {
+          buttonPaymentPage: DEFAULT_SETTINGS.buttonPaymentPage,
+          buttonCartPage: DEFAULT_SETTINGS.buttonCartPage,
+          buttonDetailPage: DEFAULT_SETTINGS.buttonDetailPage,
+          buttonShippingPage: DEFAULT_SETTINGS.buttonShippingPage,
+          buttonShape: DEFAULT_SETTINGS.buttonShape,
+          paypalButtonConfig: DEFAULT_SETTINGS.paypalButtonConfig,
+        };
+      case 'PayLater':
+        return {
+          payLaterMessagingType: DEFAULT_SETTINGS.payLaterMessagingType,
+          payLaterMessageCartPage: DEFAULT_SETTINGS.payLaterMessageCartPage,
+          payLaterMessagePaymentPage:
+            DEFAULT_SETTINGS.payLaterMessagePaymentPage,
+          payLaterMessageCategoryPage:
+            DEFAULT_SETTINGS.payLaterMessageCategoryPage,
+          payLaterMessageDetailsPage:
+            DEFAULT_SETTINGS.payLaterMessageDetailsPage,
+          payLaterMessageHomePage: DEFAULT_SETTINGS.payLaterMessageHomePage,
+          payLaterMessageTextLogoType:
+            DEFAULT_SETTINGS.payLaterMessageTextLogoType,
+          payLaterMessageTextLogoPosition:
+            DEFAULT_SETTINGS.payLaterMessageTextLogoPosition,
+          payLaterMessageTextColor: DEFAULT_SETTINGS.payLaterMessageTextColor,
+          payLaterMessageTextSize: DEFAULT_SETTINGS.payLaterMessageTextSize,
+          payLaterMessageTextAlign: DEFAULT_SETTINGS.payLaterMessageTextAlign,
+          payLaterMessageFlexColor: DEFAULT_SETTINGS.payLaterMessageFlexColor,
+          payLaterMessageFlexRatio: DEFAULT_SETTINGS.payLaterMessageFlexRatio,
+        };
+      case 'ThreeDS':
+        return {
+          threeDSOption: DEFAULT_SETTINGS.threeDSOption,
+          threeDSAction: DEFAULT_SETTINGS.threeDSAction,
+        };
+      case 'RatePay':
+        return {
+          ratePayBrandName: DEFAULT_SETTINGS.ratePayBrandName,
+          ratePayLogoUrl: DEFAULT_SETTINGS.ratePayLogoUrl,
+          ratePayCustomerServiceInstructions:
+            DEFAULT_SETTINGS.ratePayCustomerServiceInstructions,
+          payUponInvoiceMailSubject: DEFAULT_SETTINGS.payUponInvoiceMailSubject,
+          payUponInvoiceMailEmailText:
+            DEFAULT_SETTINGS.payUponInvoiceMailEmailText,
+        };
+      case 'Tracking':
+        return {
+          sendTrackingToPayPal: DEFAULT_SETTINGS.sendTrackingToPayPal,
+        };
+      case 'CCFields':
+        return {
+          hostedFieldsPayButtonClasses:
+            DEFAULT_SETTINGS.hostedFieldsPayButtonClasses,
+          hostedFieldsInputFieldClasses:
+            DEFAULT_SETTINGS.hostedFieldsInputFieldClasses,
+        };
+      default:
+        return {};
+    }
+  };
+
   if (!isReady) {
     return <></>;
   }
@@ -103,16 +213,7 @@ const Settings = () => {
       {({ values, handleChange, handleSubmit }) => (
         <form onSubmit={handleSubmit}>
           <Spacings.Stack alignItems="stretch" scale="xl">
-            <PayPalSettings values={values} handleChange={handleChange} />
-            <PayPalCheckoutButtons
-              values={values}
-              handleChange={handleChange}
-            />
-            <ThreeDSecure values={values} handleChange={handleChange} />
-            <PayPalPayLater values={values} handleChange={handleChange} />
-            <RatePay values={values} handleChange={handleChange} />
-            <Tracking values={values} handleChange={handleChange} />
-            <HostedFields values={values} handleChange={handleChange} />
+            {getComponent({ values, handleChange })}
             <Spacings.Inline
               scale="s"
               alignItems="flex-start"
@@ -120,9 +221,12 @@ const Settings = () => {
             >
               <PrimaryButton label="save" type="submit" />
               <PrimaryButton
-                label="reset"
+                label="reset current settings"
                 onClick={() => {
-                  saveSettings(DEFAULT_SETTINGS);
+                  saveSettings({
+                    ...values,
+                    ...getComponentDefaults(),
+                  });
                 }}
                 tone="critical"
               />

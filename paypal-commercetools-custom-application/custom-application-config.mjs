@@ -30,7 +30,43 @@ const config = {
   submenuLinks: [
     {
       uriPath: 'settings',
-      defaultLabel: 'Settings',
+      defaultLabel: 'PayPal Settings',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'payPalCheckoutButtons',
+      defaultLabel: 'Checkout Buttons',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'payPalPayLater',
+      defaultLabel: 'PayLater',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'threeDS',
+      defaultLabel: '3D Secure',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'ratePay',
+      defaultLabel: 'Rate Pay',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'tracking',
+      defaultLabel: 'Parcel tracking',
+      labelAllLocales: [],
+      permissions: [PERMISSIONS.Manage],
+    },
+    {
+      uriPath: 'ccFields',
+      defaultLabel: 'Advanced Payment with credit cards',
       labelAllLocales: [],
       permissions: [PERMISSIONS.Manage],
     },
