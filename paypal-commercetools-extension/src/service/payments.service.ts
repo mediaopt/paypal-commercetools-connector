@@ -180,13 +180,14 @@ async function prepareCreateOrderRequest(
     }
     if (request?.payment_source?.card) {
       request.payment_source.card = {
+        ...request.payment_source.card,
         attributes: {
           vault: {
             store_in_vault: 'ON_SUCCESS',
           },
           customer,
+          ...request.payment_source.card.attributes,
         },
-        ...request.payment_source.card,
       };
     }
   }
