@@ -46,9 +46,6 @@ deployAs:
           description: The identifier of the cloud Region that the Custom Application uses to connect to Composable Commerce. The values map to the actual Merchant Center API URL for that Region
           required: true
           default: gcp-eu
-        - key: ENTRY_POINT_URI_PATH
-          description: unique within cloud region route at which the Custom Application is served by the Merchant Center Proxy. The variable must be between 2 and 64 lowercase alphanumeric characters, underscores and hyphens are allowed except as leading, trailing, and adjacent characters
-          required: true
   - name: paypal-commercetools-events
     applicationType: event
     endpoint: /paypal-commercetools-events
