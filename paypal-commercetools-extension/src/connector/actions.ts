@@ -287,12 +287,12 @@ async function addOrUpdateCustomType(
     .types()
     .get({
       queryArgs: {
-        where: `key = "${customType.key}"`,
+        where: `resourceTypeIds contains any ("${customType.resourceTypeIds[0]}")`,
       },
     })
     .execute();
-  if (types.length > 0) {
-    const type = types[0];
+
+  for (const type of types) {
     const updates = (customType.fieldDefinitions ?? [])
       .filter(
         (newFieldDefinition: FieldDefinition): boolean =>
@@ -307,27 +307,28 @@ async function addOrUpdateCustomType(
           fieldDefinition: fieldDefinition,
         };
       });
-    if (updates.length === 0) {
+    if (updates.length != 0) {
+      await apiRoot
+        .types()
+        .withKey({ key: type.key })
+        .post({
+          body: {
+            version: type.version,
+            actions: updates,
+          },
+        })
+        .execute();
       return;
     }
+  }
+  if (!types.find((type) => type.key === customType.key)) {
     await apiRoot
       .types()
-      .withKey({ key: customType.key })
       .post({
-        body: {
-          version: type.version,
-          actions: updates,
-        },
+        body: customType,
       })
       .execute();
-    return;
   }
-  await apiRoot
-    .types()
-    .post({
-      body: customType,
-    })
-    .execute();
 }
 
 function mapEndpointsToCondition(endpoints: string[]) {
