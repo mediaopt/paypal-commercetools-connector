@@ -1,19 +1,19 @@
-import { PERMISSIONS, entryPointUriPath } from './src/constants';
+import { PERMISSIONS } from './src/constants';
 
 /**
  * @type {import('@commercetools-frontend/application-config').ConfigOptions}
  */
 const config = {
   name: 'PayPal - Partner Payment Panel',
+  entryPointUriPath: '${env:ENTRY_POINT_URI_PATH}',
   description: 'The all-in-one checkout solution',
-  entryPointUriPath,
   cloudIdentifier: '${env:CLOUD_IDENTIFIER}',
   env: {
     development: {
       initialProjectKey: 'paypal-dev',
     },
     production: {
-      applicationId: '${env:APPLICATION_ID}',
+      applicationId: '${env:CUSTOM_APPLICATION_ID}',
       url: '${env:APPLICATION_URL}',
     },
   },

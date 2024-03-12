@@ -15,34 +15,36 @@ const WrapWith = (props: TWrapWithProps) => (
 );
 WrapWith.displayName = 'WrapWith';
 
+const entryPointUriPath = '${env:ENTRY_POINT_URI_PATH}';
+
 const Welcome = () => {
   return (
     <Constraints.Horizontal max={16}>
       <Spacings.Inset scale="m">
         <Spacings.Stack scale="m" alignItems="stretch">
           <Text.Headline as="h3" intlMessage={messages.title} />
-          <Link isExternal={false} to="paypal-payment-panel/settings">
+          <Link isExternal={false} to={`${entryPointUriPath}/settings`}>
             PayPal general settings
           </Link>
           <Link
             isExternal={false}
-            to="paypal-payment-panel/payPalCheckoutButtons"
+            to={`${entryPointUriPath}/payPalCheckoutButtons`}
           >
             Checkout buttons settings
           </Link>
-          <Link isExternal={false} to="paypal-payment-panel/payPalPayLater">
+          <Link isExternal={false} to={`${entryPointUriPath}/payPalPayLater`}>
             PayLater settings
           </Link>
-          <Link isExternal={false} to="paypal-payment-panel/threeDS">
+          <Link isExternal={false} to={`${entryPointUriPath}/threeDS`}>
             3D Secure settings
           </Link>
-          <Link isExternal={false} to="paypal-payment-panel/ratePay">
+          <Link isExternal={false} to={`${entryPointUriPath}/ratePay`}>
             RatePay settings
           </Link>
-          <Link isExternal={false} to="paypal-payment-panel/tracking">
+          <Link isExternal={false} to={`${entryPointUriPath}/tracking`}>
             Parcel tracking settings
           </Link>
-          <Link isExternal={false} to="paypal-payment-panel/ccFields">
+          <Link isExternal={false} to={`${entryPointUriPath}/ccFields`}>
             Credit card field settings
           </Link>
         </Spacings.Stack>
