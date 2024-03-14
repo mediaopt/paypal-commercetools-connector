@@ -38,7 +38,6 @@ deployAs:
           description: SMTP Password for sending pay upon invoice mail
   - name: paypal-commercetools-custom-application
     applicationType: merchant-center-custom-application
-    endpoint: /
     configuration:
       standardConfiguration:
         - key: CUSTOM_APPLICATION_ID
@@ -50,6 +49,9 @@ deployAs:
           default: gcp-eu
         - key: ENTRY_POINT_URI_PATH
           description: The Application entry point URI path
+          required: true
+        - key: ENTRY_POINT_URL_PATH
+          description: The Application entry point URL path
           required: true
   - name: paypal-commercetools-events
     applicationType: event

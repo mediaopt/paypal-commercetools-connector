@@ -15,7 +15,10 @@ const WrapWith = (props: TWrapWithProps) => (
 );
 WrapWith.displayName = 'WrapWith';
 
-const entryPointUriPath = '${env:ENTRY_POINT_URI_PATH}';
+const entryPointUriPath =
+  typeof window === 'undefined'
+    ? process.env.ENTRY_POINT_URI_PATH
+    : (window as any).app.entryPointUriPath;
 
 const Welcome = () => {
   return (
