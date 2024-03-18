@@ -56,20 +56,23 @@ describe('Testing actions', () => {
   test.each([
     {
       method: createCustomPaymentType,
+      key: 'paypal-payment-type',
       expectedLength: PAYPAL_API_PAYMENT_ENDPOINTS.length * 2 + 1,
     },
     {
       method: createCustomCustomerType,
+      key: 'paypal-customer-type',
       expectedLength: PAYPAL_API_CUSTOMER_ENDPOINTS.length * 2 + 1,
     },
     {
       method: createCustomPaymentInteractionType,
+      key: 'paypal-payment-interaction-type',
       expectedLength: 3,
     },
-  ])('$method', async ({ method, expectedLength }) => {
+  ])('$method', async ({ method, key, expectedLength }) => {
     const apiRequest: any = {
       execute: jest.fn(() => ({
-        body: { results: [{ fieldDefinitions: [] }] },
+        body: { results: [{ key, fieldDefinitions: [] }] },
       })),
     };
     const apiRoot: any = {
