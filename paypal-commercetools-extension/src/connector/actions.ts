@@ -318,7 +318,6 @@ async function addOrUpdateCustomType(
           },
         })
         .execute();
-      return;
     }
   }
   if (!types.find((type) => type.key === customType.key)) {
