@@ -372,7 +372,7 @@ export async function createCustomPaymentInteractionType(
         en: 'timestamp',
       },
       type: {
-        name: 'DateTime',
+        name: 'String',
       },
       required: false,
     },
