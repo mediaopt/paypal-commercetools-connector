@@ -109,9 +109,8 @@ export const createPayPalOrder = async (
 ) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersCreate(
-    randomUUID(),
-    'application/json',
     request,
+    randomUUID(),
     undefined,
     clientMetadataId
   );
@@ -124,9 +123,8 @@ export const authorizePayPalOrder = async (
 ) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersAuthorize(
-    randomUUID(),
     orderId,
-    'application/json',
+    randomUUID(),
     undefined,
     undefined,
     undefined,
@@ -140,11 +138,7 @@ export const updatePayPalOrder = async (
   request: Array<Patch>
 ) => {
   const gateway = await getPayPalOrdersGateway();
-  const response = await gateway.ordersPatch(
-    orderId,
-    'application/json',
-    request
-  );
+  const response = await gateway.ordersPatch(orderId, request);
   if (response.status === 204) {
     return {
       status: 'success',
@@ -155,7 +149,7 @@ export const updatePayPalOrder = async (
 
 export const getPayPalOrder = async (orderId: string) => {
   const gateway = await getPayPalOrdersGateway();
-  const response = await gateway.ordersGet(orderId, 'application/json');
+  const response = await gateway.ordersGet(orderId);
   return response.data as Order;
 };
 
@@ -186,9 +180,8 @@ export const capturePayPalOrder = async (
 ) => {
   const gateway = await getPayPalOrdersGateway();
   const response = await gateway.ordersCapture(
-    randomUUID(),
     orderId,
-    'application/json',
+    randomUUID(),
     'return=representation',
     undefined,
     undefined,
@@ -436,11 +429,7 @@ export const addDeliveryData = async (
   request: OrderTrackerRequest
 ) => {
   const endpoint = await getPayPalOrdersGateway(TIMEOUT_PAYMENT);
-  const response = await endpoint.ordersTrackCreate(
-    orderId,
-    'application/json',
-    request
-  );
+  const response = await endpoint.ordersTrackCreate(orderId, request);
   return response.data;
 };
 
@@ -453,7 +442,6 @@ export const updateDeliveryData = async (
   const response = await endpoint.ordersTrackersPatch(
     orderId,
     trackerId,
-    'application/json',
     request
   );
   if (response.status === 204) {
