@@ -12,23 +12,26 @@
  * Do not edit the class manually.
  */
 
-import type { AxiosInstance, AxiosPromise, AxiosRequestConfig } from 'axios';
-import globalAxios from 'axios';
 import type { Configuration } from './configuration';
+import type { AxiosPromise, AxiosInstance, AxiosRequestConfig } from 'axios';
+import globalAxios from 'axios';
 // Some imports not used depending on template conditions
 // @ts-ignore
-import type { RequestArgs } from './base';
 import {
-  assertParamExists,
-  createRequestFunction,
   DUMMY_BASE_URL,
-  serializeDataIfNeeded,
+  assertParamExists,
+  setApiKeyToObject,
+  setBasicAuthToObject,
+  setBearerAuthToObject,
   setOAuthToObject,
   setSearchParams,
+  serializeDataIfNeeded,
   toPathString,
+  createRequestFunction,
 } from './common';
+import type { RequestArgs } from './base';
 // @ts-ignore
-import { BaseAPI, BASE_PATH } from './base';
+import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError } from './base';
 
 /**
  *
@@ -97,6 +100,40 @@ export const AGREEMENTALREADYCANCELLEDDescriptionEnum = {
 
 export type AGREEMENTALREADYCANCELLEDDescriptionEnum =
   (typeof AGREEMENTALREADYCANCELLEDDescriptionEnum)[keyof typeof AGREEMENTALREADYCANCELLEDDescriptionEnum];
+
+/**
+ *
+ * @export
+ * @interface ALIASDECLINEDBYPROCESSOR
+ */
+export interface ALIASDECLINEDBYPROCESSOR {
+  /**
+   *
+   * @type {string}
+   * @memberof ALIASDECLINEDBYPROCESSOR
+   */
+  issue?: ALIASDECLINEDBYPROCESSORIssueEnum;
+  /**
+   *
+   * @type {string}
+   * @memberof ALIASDECLINEDBYPROCESSOR
+   */
+  description?: ALIASDECLINEDBYPROCESSORDescriptionEnum;
+}
+
+export const ALIASDECLINEDBYPROCESSORIssueEnum = {
+  AliasDeclinedByProcessor: 'ALIAS_DECLINED_BY_PROCESSOR',
+} as const;
+
+export type ALIASDECLINEDBYPROCESSORIssueEnum =
+  (typeof ALIASDECLINEDBYPROCESSORIssueEnum)[keyof typeof ALIASDECLINEDBYPROCESSORIssueEnum];
+export const ALIASDECLINEDBYPROCESSORDescriptionEnum = {
+  TheProvidedAliasWasDeclinedByTheProcessorPleaseCreateANewOrderWithADifferentAliasKeyAndOrAliasLabelAndTryAgain:
+    'The provided alias was declined by the processor. Please create a new order with a different alias_key and/or alias_label and try again.',
+} as const;
+
+export type ALIASDECLINEDBYPROCESSORDescriptionEnum =
+  (typeof ALIASDECLINEDBYPROCESSORDescriptionEnum)[keyof typeof ALIASDECLINEDBYPROCESSORDescriptionEnum];
 
 /**
  *
@@ -852,6 +889,12 @@ export interface AuthenticationResponse {
    * @memberof AuthenticationResponse
    */
   authentication_flow?: any;
+  /**
+   *
+   * @type {any}
+   * @memberof AuthenticationResponse
+   */
+  exemption_details?: any;
 }
 
 /**
@@ -1301,6 +1344,41 @@ export type BILLINGAGREEMENTNOTFOUNDDescriptionEnum =
   (typeof BILLINGAGREEMENTNOTFOUNDDescriptionEnum)[keyof typeof BILLINGAGREEMENTNOTFOUNDDescriptionEnum];
 
 /**
+ *
+ * @export
+ * @interface BLIKONECLICKMISSINGREQUIREDPARAMETER
+ */
+export interface BLIKONECLICKMISSINGREQUIREDPARAMETER {
+  /**
+   *
+   * @type {string}
+   * @memberof BLIKONECLICKMISSINGREQUIREDPARAMETER
+   */
+  issue?: BLIKONECLICKMISSINGREQUIREDPARAMETERIssueEnum;
+  /**
+   *
+   * @type {string}
+   * @memberof BLIKONECLICKMISSINGREQUIREDPARAMETER
+   */
+  description?: BLIKONECLICKMISSINGREQUIREDPARAMETERDescriptionEnum;
+}
+
+export const BLIKONECLICKMISSINGREQUIREDPARAMETERIssueEnum = {
+  BlikOneClickMissingRequiredParameter:
+    'BLIK_ONE_CLICK_MISSING_REQUIRED_PARAMETER',
+} as const;
+
+export type BLIKONECLICKMISSINGREQUIREDPARAMETERIssueEnum =
+  (typeof BLIKONECLICKMISSINGREQUIREDPARAMETERIssueEnum)[keyof typeof BLIKONECLICKMISSINGREQUIREDPARAMETERIssueEnum];
+export const BLIKONECLICKMISSINGREQUIREDPARAMETERDescriptionEnum = {
+  BliksOneClickFlowRequiresOneClickAuthCodeAndOneClickAliasLabelParametersForTheBuyersFirstTransactionForAllSubsequentTransactionsonlyTheOneClickAliasKeyParameterIsRequired:
+    "Blik's one_click flow requires one_click.auth_code and one_click.alias_label parameters for the buyer's first transaction. For all subsequent transactions,only the one_click.alias_key parameter is required.",
+} as const;
+
+export type BLIKONECLICKMISSINGREQUIREDPARAMETERDescriptionEnum =
+  (typeof BLIKONECLICKMISSINGREQUIREDPARAMETERDescriptionEnum)[keyof typeof BLIKONECLICKMISSINGREQUIREDPARAMETERDescriptionEnum];
+
+/**
  * Information used to pay Bancontact.
  * @export
  * @interface Bancontact
@@ -1336,6 +1414,12 @@ export interface Bancontact {
    * @memberof Bancontact
    */
   card_last_digits?: string;
+  /**
+   *
+   * @type {any}
+   * @memberof Bancontact
+   */
+  attributes?: any;
 }
 /**
  * Information needed to pay using Bancontact.
@@ -1361,6 +1445,12 @@ export interface BancontactRequest {
    * @memberof BancontactRequest
    */
   experience_context?: ExperienceContextBase;
+  /**
+   *
+   * @type {any}
+   * @memberof BancontactRequest
+   */
+  attributes?: any;
 }
 /**
  * Bank Identification Number (BIN) details used to fund a payment.
@@ -1417,6 +1507,134 @@ export interface Blik {
    * @memberof Blik
    */
   email?: string;
+  /**
+   *
+   * @type {BlikOneClickResponse}
+   * @memberof Blik
+   */
+  one_click?: BlikOneClickResponse;
+}
+/**
+ * Customizes the payer experience during the approval process for the BLIK payment.
+ * @export
+ * @interface BlikExperienceContext
+ */
+export interface BlikExperienceContext {
+  /**
+   * The label that overrides the business name in the PayPal account on the PayPal site. The pattern is defined by an external party and supports Unicode.
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  brand_name?: string;
+  /**
+   * The [language tag](https://tools.ietf.org/html/bcp47#section-2) for the language in which to localize the error-related strings, such as messages, issues, and suggested actions. The tag is made up of the [ISO 639-2 language code](https://www.loc.gov/standards/iso639-2/php/code_list.php), the optional [ISO-15924 script tag](https://www.unicode.org/iso15924/codelists.html), and the [ISO-3166 alpha-2 country code](/api/rest/reference/country-codes/) or [M49 region code](https://unstats.un.org/unsd/methodology/m49/).
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  locale?: string;
+  /**
+   * The location from which the shipping address is derived.
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  shipping_preference?: BlikExperienceContextShippingPreferenceEnum;
+  /**
+   * Describes the URL.
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  return_url?: string;
+  /**
+   * Describes the URL.
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  cancel_url?: string;
+  /**
+   * An Internet Protocol address (IP address). This address assigns a numerical label to each device that is connected to a computer network through the Internet Protocol. Supports IPv4 and IPv6 addresses.
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  consumer_ip?: string;
+  /**
+   * The payer\'s User Agent. For example, Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0).
+   * @type {string}
+   * @memberof BlikExperienceContext
+   */
+  consumer_user_agent?: string;
+}
+
+export const BlikExperienceContextShippingPreferenceEnum = {
+  GetFromFile: 'GET_FROM_FILE',
+  NoShipping: 'NO_SHIPPING',
+  SetProvidedAddress: 'SET_PROVIDED_ADDRESS',
+} as const;
+
+export type BlikExperienceContextShippingPreferenceEnum =
+  (typeof BlikExperienceContextShippingPreferenceEnum)[keyof typeof BlikExperienceContextShippingPreferenceEnum];
+
+/**
+ *
+ * @export
+ * @interface BlikExperienceContextAllOf
+ */
+export interface BlikExperienceContextAllOf {
+  /**
+   * An Internet Protocol address (IP address). This address assigns a numerical label to each device that is connected to a computer network through the Internet Protocol. Supports IPv4 and IPv6 addresses.
+   * @type {string}
+   * @memberof BlikExperienceContextAllOf
+   */
+  consumer_ip?: string;
+  /**
+   * The payer\'s User Agent. For example, Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0).
+   * @type {string}
+   * @memberof BlikExperienceContextAllOf
+   */
+  consumer_user_agent?: string;
+}
+/**
+ * Information used to pay using BLIK one-click flow.
+ * @export
+ * @interface BlikOneClick
+ */
+export interface BlikOneClick {
+  /**
+   * The 6-digit code used to authenticate a consumer within BLIK.
+   * @type {string}
+   * @memberof BlikOneClick
+   */
+  auth_code?: string;
+  /**
+   * The merchant generated, unique reference serving as a primary identifier for accounts connected between Blik and a merchant.
+   * @type {string}
+   * @memberof BlikOneClick
+   */
+  consumer_reference: string;
+  /**
+   * A bank defined identifier used as a display name to allow the payer to differentiate between multiple registered bank accounts.
+   * @type {string}
+   * @memberof BlikOneClick
+   */
+  alias_label?: string;
+  /**
+   * A Blik-defined identifier for a specific Blik-enabled bank account that is associated with a given merchant. Used only in conjunction with a Consumer Reference.
+   * @type {string}
+   * @memberof BlikOneClick
+   */
+  alias_key?: string;
+}
+/**
+ * Information used to pay using BLIK one-click flow.
+ * @export
+ * @interface BlikOneClickResponse
+ */
+export interface BlikOneClickResponse {
+  /**
+   * The merchant generated, unique reference serving as a primary identifier for accounts connected between Blik and a merchant.
+   * @type {string}
+   * @memberof BlikOneClickResponse
+   */
+  consumer_reference?: string;
 }
 /**
  * Information needed to pay using BLIK.
@@ -1444,10 +1662,35 @@ export interface BlikRequest {
   email?: string;
   /**
    *
-   * @type {ExperienceContextBase}
+   * @type {BlikExperienceContext}
    * @memberof BlikRequest
    */
-  experience_context?: ExperienceContextBase;
+  experience_context?: BlikExperienceContext;
+  /**
+   *
+   * @type {BlikSeamless}
+   * @memberof BlikRequest
+   */
+  level_0?: BlikSeamless;
+  /**
+   *
+   * @type {BlikOneClick}
+   * @memberof BlikRequest
+   */
+  one_click?: BlikOneClick;
+}
+/**
+ * Information used to pay using BLIK level_0 flow.
+ * @export
+ * @interface BlikSeamless
+ */
+export interface BlikSeamless {
+  /**
+   * The 6-digit code used to authenticate a consumer within BLIK.
+   * @type {string}
+   * @memberof BlikSeamless
+   */
+  auth_code: string;
 }
 /**
  *
@@ -2441,6 +2684,25 @@ export const CardBrand = {
 export type CardBrand = (typeof CardBrand)[keyof typeof CardBrand];
 
 /**
+ * Customizes the payer experience during the 3DS Approval for payment.
+ * @export
+ * @interface CardExperienceContext
+ */
+export interface CardExperienceContext {
+  /**
+   * Describes the URL.
+   * @type {string}
+   * @memberof CardExperienceContext
+   */
+  return_url?: string;
+  /**
+   * Describes the URL.
+   * @type {string}
+   * @memberof CardExperienceContext
+   */
+  cancel_url?: string;
+}
+/**
  * Representation of card details as received in the request.
  * @export
  * @interface CardFromRequest
@@ -2543,6 +2805,18 @@ export interface CardRequest {
    * @memberof CardRequest
    */
   stored_credential?: CardStoredCredential;
+  /**
+   *
+   * @type {NetworkTokenRequest}
+   * @memberof CardRequest
+   */
+  network_token?: NetworkTokenRequest;
+  /**
+   *
+   * @type {CardExperienceContext}
+   * @memberof CardRequest
+   */
+  experience_context?: CardExperienceContext;
 }
 
 /**
@@ -2563,6 +2837,18 @@ export interface CardRequestAllOf {
    * @memberof CardRequestAllOf
    */
   stored_credential?: CardStoredCredential;
+  /**
+   *
+   * @type {NetworkTokenRequest}
+   * @memberof CardRequestAllOf
+   */
+  network_token?: NetworkTokenRequest;
+  /**
+   *
+   * @type {CardExperienceContext}
+   * @memberof CardRequestAllOf
+   */
+  experience_context?: CardExperienceContext;
 }
 /**
  * The payment card to use to fund a payment. Card can be a credit or debit card.
@@ -3086,6 +3372,25 @@ export type EMVDATAREQUIREDDescriptionEnum =
   (typeof EMVDATAREQUIREDDescriptionEnum)[keyof typeof EMVDATAREQUIREDDescriptionEnum];
 
 /**
+ * Electronic Commerce Indicator (ECI). The ECI value is part of the 2 data elements that indicate the transaction was processed electronically. This should be passed on the authorization transaction to the Gateway/Processor.
+ * @export
+ * @enum {string}
+ */
+
+export const EciFlag = {
+  MastercardNon3DSecureTransaction: 'MASTERCARD_NON_3D_SECURE_TRANSACTION',
+  MastercardAttemptedAuthenticationTransaction:
+    'MASTERCARD_ATTEMPTED_AUTHENTICATION_TRANSACTION',
+  MastercardFullyAuthenticatedTransaction:
+    'MASTERCARD_FULLY_AUTHENTICATED_TRANSACTION',
+  FullyAuthenticatedTransaction: 'FULLY_AUTHENTICATED_TRANSACTION',
+  AttemptedAuthenticationTransaction: 'ATTEMPTED_AUTHENTICATION_TRANSACTION',
+  Non3DSecureTransaction: 'NON_3D_SECURE_TRANSACTION',
+} as const;
+
+export type EciFlag = (typeof EciFlag)[keyof typeof EciFlag];
+
+/**
  * Status of Authentication eligibility.
  * @export
  * @enum {string}
@@ -3151,7 +3456,7 @@ export interface EpsRequest {
   experience_context?: ExperienceContextBase;
 }
 /**
- * Error response for 400
+ * Request is not well-formed, syntactically incorrect, or violates schema.
  * @export
  * @interface Error400
  */
@@ -3173,7 +3478,7 @@ export interface Error400 {
    * @type {Array<ErrorDetails>}
    * @memberof Error400
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3181,11 +3486,11 @@ export interface Error400 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error400
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error400NameEnum = {
@@ -3203,7 +3508,7 @@ export type Error400MessageEnum =
   (typeof Error400MessageEnum)[keyof typeof Error400MessageEnum];
 
 /**
- * Error response for 401
+ * Authentication failed due to missing Authorization header, or invalid authentication credentials.
  * @export
  * @interface Error401
  */
@@ -3225,7 +3530,7 @@ export interface Error401 {
    * @type {Array<ErrorDetails>}
    * @memberof Error401
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3233,11 +3538,11 @@ export interface Error401 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error401
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error401NameEnum = {
@@ -3255,7 +3560,7 @@ export type Error401MessageEnum =
   (typeof Error401MessageEnum)[keyof typeof Error401MessageEnum];
 
 /**
- * Error response for 403
+ * The client is not authorized to access this resource, although it may have valid credentials.
  * @export
  * @interface Error403
  */
@@ -3277,7 +3582,7 @@ export interface Error403 {
    * @type {Array<ErrorDetails>}
    * @memberof Error403
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3285,11 +3590,11 @@ export interface Error403 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error403
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error403NameEnum = {
@@ -3307,7 +3612,7 @@ export type Error403MessageEnum =
   (typeof Error403MessageEnum)[keyof typeof Error403MessageEnum];
 
 /**
- * Error response for 404
+ * The server has not found anything matching the request URI. This either means that the URI is incorrect or the resource is not available.
  * @export
  * @interface Error404
  */
@@ -3329,7 +3634,7 @@ export interface Error404 {
    * @type {Array<ErrorDetails>}
    * @memberof Error404
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3337,11 +3642,11 @@ export interface Error404 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error404
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error404NameEnum = {
@@ -3358,7 +3663,7 @@ export type Error404MessageEnum =
   (typeof Error404MessageEnum)[keyof typeof Error404MessageEnum];
 
 /**
- * Error response for 409
+ * The server has detected a conflict while processing this request.
  * @export
  * @interface Error409
  */
@@ -3380,7 +3685,7 @@ export interface Error409 {
    * @type {Array<ErrorDetails>}
    * @memberof Error409
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3388,11 +3693,11 @@ export interface Error409 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error409
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error409NameEnum = {
@@ -3410,7 +3715,7 @@ export type Error409MessageEnum =
   (typeof Error409MessageEnum)[keyof typeof Error409MessageEnum];
 
 /**
- * Error response for 415
+ * The server does not support the request payload\'s media type.
  * @export
  * @interface Error415
  */
@@ -3432,7 +3737,7 @@ export interface Error415 {
    * @type {Array<ErrorDetails>}
    * @memberof Error415
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3440,11 +3745,11 @@ export interface Error415 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error415
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error415NameEnum = {
@@ -3462,7 +3767,7 @@ export type Error415MessageEnum =
   (typeof Error415MessageEnum)[keyof typeof Error415MessageEnum];
 
 /**
- * Error response for 422
+ * The requested action cannot be performed and may require interaction with APIs or processes outside of the current request. This is distinct from a 500 response in that there are no systemic problems limiting the API from performing the request.
  * @export
  * @interface Error422
  */
@@ -3484,7 +3789,7 @@ export interface Error422 {
    * @type {Array<ErrorDetails>}
    * @memberof Error422
    */
-  issues?: Array<ErrorDetails>;
+  details?: Array<ErrorDetails>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -3492,11 +3797,11 @@ export interface Error422 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error422
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error422NameEnum = {
@@ -3514,7 +3819,7 @@ export type Error422MessageEnum =
   (typeof Error422MessageEnum)[keyof typeof Error422MessageEnum];
 
 /**
- * Error response for 500
+ * This is either a system or application error, and generally indicates that although the client appeared to provide a correct request, something unexpected has gone wrong on the server.
  * @export
  * @interface Error500
  */
@@ -3538,11 +3843,11 @@ export interface Error500 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error500
    */
-  information_link?: Error500InformationLinkEnum;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error500NameEnum = {
@@ -3557,16 +3862,9 @@ export const Error500MessageEnum = {
 
 export type Error500MessageEnum =
   (typeof Error500MessageEnum)[keyof typeof Error500MessageEnum];
-export const Error500InformationLinkEnum = {
-  HttpsDeveloperPaypalComApiOrdersV2ErrorInternalServerError:
-    'https://developer.paypal.com/api/orders/v2/#error-INTERNAL_SERVER_ERROR',
-} as const;
-
-export type Error500InformationLinkEnum =
-  (typeof Error500InformationLinkEnum)[keyof typeof Error500InformationLinkEnum];
 
 /**
- * Error response for 503
+ * The server is temporarily unable to handle the request, for example, because of planned maintenance or downtime.
  * @export
  * @interface Error503
  */
@@ -3590,11 +3888,11 @@ export interface Error503 {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof Error503
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const Error503NameEnum = {
@@ -3645,11 +3943,11 @@ export interface ErrorDetails {
    */
   value?: string;
   /**
-   * The location of the field that caused the error. Value is `body`, `path`, or `query`.
-   * @type {string}
+   *
+   * @type {ErrorLocation}
    * @memberof ErrorDetails
    */
-  location?: string;
+  location?: ErrorLocation;
   /**
    * The unique, fine-grained application-level error code.
    * @type {string}
@@ -3663,6 +3961,58 @@ export interface ErrorDetails {
    */
   description?: string;
 }
+
+/**
+ * The request-related [HATEOAS link](/api/rest/responses/#hateoas-links) information.
+ * @export
+ * @interface ErrorLinkDescription
+ */
+export interface ErrorLinkDescription {
+  /**
+   * The complete target URL. To make the related call, combine the method with this [URI Template-formatted](https://tools.ietf.org/html/rfc6570) link. For pre-processing, include the `$`, `(`, and `)` characters. The `href` is the key HATEOAS component that links a completed call with a subsequent call.
+   * @type {string}
+   * @memberof ErrorLinkDescription
+   */
+  href: string;
+  /**
+   * The [link relation type](https://tools.ietf.org/html/rfc5988#section-4), which serves as an ID for a link that unambiguously describes the semantics of the link. See [Link Relations](https://www.iana.org/assignments/link-relations/link-relations.xhtml).
+   * @type {string}
+   * @memberof ErrorLinkDescription
+   */
+  rel: string;
+  /**
+   * The HTTP method required to make the related call.
+   * @type {string}
+   * @memberof ErrorLinkDescription
+   */
+  method?: ErrorLinkDescriptionMethodEnum;
+}
+
+export const ErrorLinkDescriptionMethodEnum = {
+  Get: 'GET',
+  Post: 'POST',
+  Put: 'PUT',
+  Delete: 'DELETE',
+  Patch: 'PATCH',
+} as const;
+
+export type ErrorLinkDescriptionMethodEnum =
+  (typeof ErrorLinkDescriptionMethodEnum)[keyof typeof ErrorLinkDescriptionMethodEnum];
+
+/**
+ * The location of the field that caused the error. Value is `body`, `path`, or `query`.
+ * @export
+ * @enum {string}
+ */
+
+export const ErrorLocation = {
+  Body: 'body',
+  Path: 'path',
+  Query: 'query',
+} as const;
+
+export type ErrorLocation = (typeof ErrorLocation)[keyof typeof ErrorLocation];
+
 /**
  * The exchange rate that determines the amount to convert from one currency to another currency.
  * @export
@@ -5103,6 +5453,12 @@ export interface Ideal {
    * @memberof Ideal
    */
   iban_last_chars?: string;
+  /**
+   *
+   * @type {any}
+   * @memberof Ideal
+   */
+  attributes?: any;
 }
 /**
  * Information needed to pay using iDEAL.
@@ -5134,6 +5490,12 @@ export interface IdealRequest {
    * @memberof IdealRequest
    */
   experience_context?: ExperienceContextBase;
+  /**
+   *
+   * @type {any}
+   * @memberof IdealRequest
+   */
+  attributes?: any;
 }
 /**
  * The details for the items to be purchased.
@@ -6201,43 +6563,43 @@ export interface MerchantPayableBreakdown {
 export interface Model400 {
   /**
    *
-   * @type {Array<Model400IssuesInner>}
+   * @type {Array<Model400DetailsInner>}
    * @memberof Model400
    */
-  issues?: Array<Model400IssuesInner>;
+  details?: Array<Model400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface Model400IssuesInner
+ * @interface Model400DetailsInner
  */
-export interface Model400IssuesInner {
+export interface Model400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof Model400IssuesInner
+   * @memberof Model400DetailsInner
    */
-  issue?: Model400IssuesInnerIssueEnum;
+  issue?: Model400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof Model400IssuesInner
+   * @memberof Model400DetailsInner
    */
-  description?: Model400IssuesInnerDescriptionEnum;
+  description?: Model400DetailsInnerDescriptionEnum;
 }
 
-export const Model400IssuesInnerIssueEnum = {
+export const Model400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type Model400IssuesInnerIssueEnum =
-  (typeof Model400IssuesInnerIssueEnum)[keyof typeof Model400IssuesInnerIssueEnum];
-export const Model400IssuesInnerDescriptionEnum = {
+export type Model400DetailsInnerIssueEnum =
+  (typeof Model400DetailsInnerIssueEnum)[keyof typeof Model400DetailsInnerIssueEnum];
+export const Model400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type Model400IssuesInnerDescriptionEnum =
-  (typeof Model400IssuesInnerDescriptionEnum)[keyof typeof Model400IssuesInnerDescriptionEnum];
+export type Model400DetailsInnerDescriptionEnum =
+  (typeof Model400DetailsInnerDescriptionEnum)[keyof typeof Model400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -6247,44 +6609,44 @@ export type Model400IssuesInnerDescriptionEnum =
 export interface Model401 {
   /**
    *
-   * @type {Array<Model401IssuesInner>}
+   * @type {Array<Model401DetailsInner>}
    * @memberof Model401
    */
-  issues?: Array<Model401IssuesInner>;
+  details?: Array<Model401DetailsInner>;
 }
 /**
  *
  * @export
- * @interface Model401IssuesInner
+ * @interface Model401DetailsInner
  */
-export interface Model401IssuesInner {
+export interface Model401DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof Model401IssuesInner
+   * @memberof Model401DetailsInner
    */
-  issue?: Model401IssuesInnerIssueEnum;
+  issue?: Model401DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof Model401IssuesInner
+   * @memberof Model401DetailsInner
    */
-  description?: Model401IssuesInnerDescriptionEnum;
+  description?: Model401DetailsInnerDescriptionEnum;
 }
 
-export const Model401IssuesInnerIssueEnum = {
+export const Model401DetailsInnerIssueEnum = {
   InvalidAccountStatus: 'INVALID_ACCOUNT_STATUS',
 } as const;
 
-export type Model401IssuesInnerIssueEnum =
-  (typeof Model401IssuesInnerIssueEnum)[keyof typeof Model401IssuesInnerIssueEnum];
-export const Model401IssuesInnerDescriptionEnum = {
+export type Model401DetailsInnerIssueEnum =
+  (typeof Model401DetailsInnerIssueEnum)[keyof typeof Model401DetailsInnerIssueEnum];
+export const Model401DetailsInnerDescriptionEnum = {
   AccountValidationsFailedForTheUser:
     'Account validations failed for the user.',
 } as const;
 
-export type Model401IssuesInnerDescriptionEnum =
-  (typeof Model401IssuesInnerDescriptionEnum)[keyof typeof Model401IssuesInnerDescriptionEnum];
+export type Model401DetailsInnerDescriptionEnum =
+  (typeof Model401DetailsInnerDescriptionEnum)[keyof typeof Model401DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -6294,44 +6656,44 @@ export type Model401IssuesInnerDescriptionEnum =
 export interface Model403 {
   /**
    *
-   * @type {Array<Model403IssuesInner>}
+   * @type {Array<Model403DetailsInner>}
    * @memberof Model403
    */
-  issues?: Array<Model403IssuesInner>;
+  details?: Array<Model403DetailsInner>;
 }
 /**
  *
  * @export
- * @interface Model403IssuesInner
+ * @interface Model403DetailsInner
  */
-export interface Model403IssuesInner {
+export interface Model403DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof Model403IssuesInner
+   * @memberof Model403DetailsInner
    */
-  issue?: Model403IssuesInnerIssueEnum;
+  issue?: Model403DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof Model403IssuesInner
+   * @memberof Model403DetailsInner
    */
-  description?: Model403IssuesInnerDescriptionEnum;
+  description?: Model403DetailsInnerDescriptionEnum;
 }
 
-export const Model403IssuesInnerIssueEnum = {
+export const Model403DetailsInnerIssueEnum = {
   PayeeAccountNotVerified: 'PAYEE_ACCOUNT_NOT_VERIFIED',
 } as const;
 
-export type Model403IssuesInnerIssueEnum =
-  (typeof Model403IssuesInnerIssueEnum)[keyof typeof Model403IssuesInnerIssueEnum];
-export const Model403IssuesInnerDescriptionEnum = {
+export type Model403DetailsInnerIssueEnum =
+  (typeof Model403DetailsInnerIssueEnum)[keyof typeof Model403DetailsInnerIssueEnum];
+export const Model403DetailsInnerDescriptionEnum = {
   PayeeHasNotVerifiedTheirAccountWithPayPalTheSelectedPaymentMethodRequiresTheRecipientToHaveAVerifiedPayPalAccountBeforeTransactionsCanBeProcessedOnTheirBehalf:
     'Payee has not verified their account with PayPal. The selected payment method requires the recipient to have a verified PayPal account before transactions can be processed on their behalf.',
 } as const;
 
-export type Model403IssuesInnerDescriptionEnum =
-  (typeof Model403IssuesInnerDescriptionEnum)[keyof typeof Model403IssuesInnerDescriptionEnum];
+export type Model403DetailsInnerDescriptionEnum =
+  (typeof Model403DetailsInnerDescriptionEnum)[keyof typeof Model403DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -6341,44 +6703,44 @@ export type Model403IssuesInnerDescriptionEnum =
 export interface Model404 {
   /**
    *
-   * @type {Array<Model404IssuesInner>}
+   * @type {Array<Model404DetailsInner>}
    * @memberof Model404
    */
-  issues?: Array<Model404IssuesInner>;
+  details?: Array<Model404DetailsInner>;
 }
 /**
  *
  * @export
- * @interface Model404IssuesInner
+ * @interface Model404DetailsInner
  */
-export interface Model404IssuesInner {
+export interface Model404DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof Model404IssuesInner
+   * @memberof Model404DetailsInner
    */
-  issue?: Model404IssuesInnerIssueEnum;
+  issue?: Model404DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof Model404IssuesInner
+   * @memberof Model404DetailsInner
    */
-  description?: Model404IssuesInnerDescriptionEnum;
+  description?: Model404DetailsInnerDescriptionEnum;
 }
 
-export const Model404IssuesInnerIssueEnum = {
+export const Model404DetailsInnerIssueEnum = {
   InvalidResourceId: 'INVALID_RESOURCE_ID',
 } as const;
 
-export type Model404IssuesInnerIssueEnum =
-  (typeof Model404IssuesInnerIssueEnum)[keyof typeof Model404IssuesInnerIssueEnum];
-export const Model404IssuesInnerDescriptionEnum = {
+export type Model404DetailsInnerIssueEnum =
+  (typeof Model404DetailsInnerIssueEnum)[keyof typeof Model404DetailsInnerIssueEnum];
+export const Model404DetailsInnerDescriptionEnum = {
   SpecifiedResourceIdDoesNotExistPleaseCheckTheResourceIdAndTryAgain:
     'Specified resource ID does not exist. Please check the resource ID and try again.',
 } as const;
 
-export type Model404IssuesInnerDescriptionEnum =
-  (typeof Model404IssuesInnerDescriptionEnum)[keyof typeof Model404IssuesInnerDescriptionEnum];
+export type Model404DetailsInnerDescriptionEnum =
+  (typeof Model404DetailsInnerDescriptionEnum)[keyof typeof Model404DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -6388,44 +6750,45 @@ export type Model404IssuesInnerDescriptionEnum =
 export interface Model422 {
   /**
    *
-   * @type {Array<Model422IssuesInner>}
+   * @type {Array<Model422DetailsInner>}
    * @memberof Model422
    */
-  issues?: Array<Model422IssuesInner>;
+  details?: Array<Model422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface Model422IssuesInner
+ * @interface Model422DetailsInner
  */
-export interface Model422IssuesInner {
+export interface Model422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof Model422IssuesInner
+   * @memberof Model422DetailsInner
    */
-  issue?: Model422IssuesInnerIssueEnum;
+  issue?: Model422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof Model422IssuesInner
+   * @memberof Model422DetailsInner
    */
-  description?: Model422IssuesInnerDescriptionEnum;
+  description?: Model422DetailsInnerDescriptionEnum;
 }
 
-export const Model422IssuesInnerIssueEnum = {
-  OneOfParametersRequired: 'ONE_OF_PARAMETERS_REQUIRED',
+export const Model422DetailsInnerIssueEnum = {
+  BlikOneClickMissingRequiredParameter:
+    'BLIK_ONE_CLICK_MISSING_REQUIRED_PARAMETER',
 } as const;
 
-export type Model422IssuesInnerIssueEnum =
-  (typeof Model422IssuesInnerIssueEnum)[keyof typeof Model422IssuesInnerIssueEnum];
-export const Model422IssuesInnerDescriptionEnum = {
-  OneOrMoreFieldIsRequiredToContinueWithThisRequest:
-    'One or more field is required to continue with this request.',
+export type Model422DetailsInnerIssueEnum =
+  (typeof Model422DetailsInnerIssueEnum)[keyof typeof Model422DetailsInnerIssueEnum];
+export const Model422DetailsInnerDescriptionEnum = {
+  BliksOneClickFlowRequiresOneClickAuthCodeAndOneClickAliasLabelParametersForTheBuyersFirstTransactionForAllSubsequentTransactionsonlyTheOneClickAliasKeyParameterIsRequired:
+    "Blik's one_click flow requires one_click.auth_code and one_click.alias_label parameters for the buyer's first transaction. For all subsequent transactions,only the one_click.alias_key parameter is required.",
 } as const;
 
-export type Model422IssuesInnerDescriptionEnum =
-  (typeof Model422IssuesInnerDescriptionEnum)[keyof typeof Model422IssuesInnerDescriptionEnum];
+export type Model422DetailsInnerDescriptionEnum =
+  (typeof Model422DetailsInnerDescriptionEnum)[keyof typeof Model422DetailsInnerDescriptionEnum];
 
 /**
  * The currency and amount for a financial transaction, such as a balance or payment due.
@@ -7045,6 +7408,44 @@ export interface NetAmountBreakdownItem {
    */
   exchange_rate?: ExchangeRate;
 }
+/**
+ * The Third Party Network token used to fund a payment.
+ * @export
+ * @interface NetworkTokenRequest
+ */
+export interface NetworkTokenRequest {
+  /**
+   * Third party network token number.
+   * @type {string}
+   * @memberof NetworkTokenRequest
+   */
+  number: string;
+  /**
+   * The year and month, in ISO-8601 `YYYY-MM` date format. See [Internet date and time format](https://tools.ietf.org/html/rfc3339#section-5.6).
+   * @type {string}
+   * @memberof NetworkTokenRequest
+   */
+  expiry: string;
+  /**
+   * An Encrypted one-time use value that\'s sent along with Network Token. This field is not required to be present for recurring transactions.
+   * @type {string}
+   * @memberof NetworkTokenRequest
+   */
+  cryptogram?: string;
+  /**
+   *
+   * @type {EciFlag}
+   * @memberof NetworkTokenRequest
+   */
+  eci_flag?: EciFlag;
+  /**
+   * A TRID, or a Token Requestor ID, is an identifier used by merchants to request network tokens from card networks. A TRID is a precursor to obtaining a network token for a credit card primary account number (PAN), and will aid in enabling secure card on file (COF) payments and reducing fraud.
+   * @type {string}
+   * @memberof NetworkTokenRequest
+   */
+  token_requestor_id?: string;
+}
+
 /**
  * Reference values used by the card network to identify a transaction.
  * @export
@@ -8280,43 +8681,43 @@ export interface OrderTrackerRequestAllOf {
 export interface OrdersAuthorize400 {
   /**
    *
-   * @type {Array<OrdersAuthorize400IssuesInner>}
+   * @type {Array<OrdersAuthorize400DetailsInner>}
    * @memberof OrdersAuthorize400
    */
-  issues?: Array<OrdersAuthorize400IssuesInner>;
+  details?: Array<OrdersAuthorize400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersAuthorize400IssuesInner
+ * @interface OrdersAuthorize400DetailsInner
  */
-export interface OrdersAuthorize400IssuesInner {
+export interface OrdersAuthorize400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize400IssuesInner
+   * @memberof OrdersAuthorize400DetailsInner
    */
-  issue?: OrdersAuthorize400IssuesInnerIssueEnum;
+  issue?: OrdersAuthorize400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize400IssuesInner
+   * @memberof OrdersAuthorize400DetailsInner
    */
-  description?: OrdersAuthorize400IssuesInnerDescriptionEnum;
+  description?: OrdersAuthorize400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersAuthorize400IssuesInnerIssueEnum = {
+export const OrdersAuthorize400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type OrdersAuthorize400IssuesInnerIssueEnum =
-  (typeof OrdersAuthorize400IssuesInnerIssueEnum)[keyof typeof OrdersAuthorize400IssuesInnerIssueEnum];
-export const OrdersAuthorize400IssuesInnerDescriptionEnum = {
+export type OrdersAuthorize400DetailsInnerIssueEnum =
+  (typeof OrdersAuthorize400DetailsInnerIssueEnum)[keyof typeof OrdersAuthorize400DetailsInnerIssueEnum];
+export const OrdersAuthorize400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type OrdersAuthorize400IssuesInnerDescriptionEnum =
-  (typeof OrdersAuthorize400IssuesInnerDescriptionEnum)[keyof typeof OrdersAuthorize400IssuesInnerDescriptionEnum];
+export type OrdersAuthorize400DetailsInnerDescriptionEnum =
+  (typeof OrdersAuthorize400DetailsInnerDescriptionEnum)[keyof typeof OrdersAuthorize400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8338,10 +8739,10 @@ export interface OrdersAuthorize400Response {
   message?: OrdersAuthorize400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersAuthorize400IssuesInner>}
+   * @type {Array<OrdersAuthorize400DetailsInner>}
    * @memberof OrdersAuthorize400Response
    */
-  issues?: Array<OrdersAuthorize400IssuesInner>;
+  details?: Array<OrdersAuthorize400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8349,11 +8750,11 @@ export interface OrdersAuthorize400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersAuthorize400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersAuthorize400ResponseNameEnum = {
@@ -8378,44 +8779,44 @@ export type OrdersAuthorize400ResponseMessageEnum =
 export interface OrdersAuthorize403 {
   /**
    *
-   * @type {Array<OrdersAuthorize403IssuesInner>}
+   * @type {Array<OrdersAuthorize403DetailsInner>}
    * @memberof OrdersAuthorize403
    */
-  issues?: Array<OrdersAuthorize403IssuesInner>;
+  details?: Array<OrdersAuthorize403DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersAuthorize403IssuesInner
+ * @interface OrdersAuthorize403DetailsInner
  */
-export interface OrdersAuthorize403IssuesInner {
+export interface OrdersAuthorize403DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize403IssuesInner
+   * @memberof OrdersAuthorize403DetailsInner
    */
-  issue?: OrdersAuthorize403IssuesInnerIssueEnum;
+  issue?: OrdersAuthorize403DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize403IssuesInner
+   * @memberof OrdersAuthorize403DetailsInner
    */
-  description?: OrdersAuthorize403IssuesInnerDescriptionEnum;
+  description?: OrdersAuthorize403DetailsInnerDescriptionEnum;
 }
 
-export const OrdersAuthorize403IssuesInnerIssueEnum = {
+export const OrdersAuthorize403DetailsInnerIssueEnum = {
   PermissionDeniedForDonationItems: 'PERMISSION_DENIED_FOR_DONATION_ITEMS',
 } as const;
 
-export type OrdersAuthorize403IssuesInnerIssueEnum =
-  (typeof OrdersAuthorize403IssuesInnerIssueEnum)[keyof typeof OrdersAuthorize403IssuesInnerIssueEnum];
-export const OrdersAuthorize403IssuesInnerDescriptionEnum = {
+export type OrdersAuthorize403DetailsInnerIssueEnum =
+  (typeof OrdersAuthorize403DetailsInnerIssueEnum)[keyof typeof OrdersAuthorize403DetailsInnerIssueEnum];
+export const OrdersAuthorize403DetailsInnerDescriptionEnum = {
   TheApiCallerOrPayeeHaveNotBeenGrantedAppropriatePermissionsToSendItemsCategoryAsDonationPleaseSpeakToYourAccountManagerIfYouWantToProcessTheseTypeOfItems:
     "The API Caller or Payee have not been granted appropriate permissions to send 'items.category' as 'DONATION'. Please speak to your account manager if you want to process these type of items.",
 } as const;
 
-export type OrdersAuthorize403IssuesInnerDescriptionEnum =
-  (typeof OrdersAuthorize403IssuesInnerDescriptionEnum)[keyof typeof OrdersAuthorize403IssuesInnerDescriptionEnum];
+export type OrdersAuthorize403DetailsInnerDescriptionEnum =
+  (typeof OrdersAuthorize403DetailsInnerDescriptionEnum)[keyof typeof OrdersAuthorize403DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8437,10 +8838,10 @@ export interface OrdersAuthorize403Response {
   message?: OrdersAuthorize403ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersAuthorize403IssuesInner>}
+   * @type {Array<OrdersAuthorize403DetailsInner>}
    * @memberof OrdersAuthorize403Response
    */
-  issues?: Array<OrdersAuthorize403IssuesInner>;
+  details?: Array<OrdersAuthorize403DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8448,11 +8849,11 @@ export interface OrdersAuthorize403Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersAuthorize403Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersAuthorize403ResponseNameEnum = {
@@ -8477,45 +8878,45 @@ export type OrdersAuthorize403ResponseMessageEnum =
 export interface OrdersAuthorize422 {
   /**
    *
-   * @type {Array<OrdersAuthorize422IssuesInner>}
+   * @type {Array<OrdersAuthorize422DetailsInner>}
    * @memberof OrdersAuthorize422
    */
-  issues?: Array<OrdersAuthorize422IssuesInner>;
+  details?: Array<OrdersAuthorize422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersAuthorize422IssuesInner
+ * @interface OrdersAuthorize422DetailsInner
  */
-export interface OrdersAuthorize422IssuesInner {
+export interface OrdersAuthorize422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize422IssuesInner
+   * @memberof OrdersAuthorize422DetailsInner
    */
-  issue?: OrdersAuthorize422IssuesInnerIssueEnum;
+  issue?: OrdersAuthorize422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersAuthorize422IssuesInner
+   * @memberof OrdersAuthorize422DetailsInner
    */
-  description?: OrdersAuthorize422IssuesInnerDescriptionEnum;
+  description?: OrdersAuthorize422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersAuthorize422IssuesInnerIssueEnum = {
+export const OrdersAuthorize422DetailsInnerIssueEnum = {
   RequiredParameterForCustomerInitiatedPayment:
     'REQUIRED_PARAMETER_FOR_CUSTOMER_INITIATED_PAYMENT',
 } as const;
 
-export type OrdersAuthorize422IssuesInnerIssueEnum =
-  (typeof OrdersAuthorize422IssuesInnerIssueEnum)[keyof typeof OrdersAuthorize422IssuesInnerIssueEnum];
-export const OrdersAuthorize422IssuesInnerDescriptionEnum = {
+export type OrdersAuthorize422DetailsInnerIssueEnum =
+  (typeof OrdersAuthorize422DetailsInnerIssueEnum)[keyof typeof OrdersAuthorize422DetailsInnerIssueEnum];
+export const OrdersAuthorize422DetailsInnerDescriptionEnum = {
   ThisParameterIsRequiredWhenTheCustomerIsPresentIfTheCustomerIsNotPresentIndicateSoBySendingPaymentInitiatorMerchantForDetailsSeeAHrefhttpsDeveloperPaypalComDocsApiOrdersV2DefinitionCardStoredCredentialStoredCredentialA:
     'This parameter is required when the customer is present. If the customer is not present, indicate so by sending payment_initiator=`MERCHANT`. For details, see <a href="https://developer.paypal.com/docs/api/orders/v2/#definition-card_stored_credential">Stored Credential</a>.',
 } as const;
 
-export type OrdersAuthorize422IssuesInnerDescriptionEnum =
-  (typeof OrdersAuthorize422IssuesInnerDescriptionEnum)[keyof typeof OrdersAuthorize422IssuesInnerDescriptionEnum];
+export type OrdersAuthorize422DetailsInnerDescriptionEnum =
+  (typeof OrdersAuthorize422DetailsInnerDescriptionEnum)[keyof typeof OrdersAuthorize422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8537,10 +8938,10 @@ export interface OrdersAuthorize422Response {
   message?: OrdersAuthorize422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersAuthorize422IssuesInner>}
+   * @type {Array<OrdersAuthorize422DetailsInner>}
    * @memberof OrdersAuthorize422Response
    */
-  issues?: Array<OrdersAuthorize422IssuesInner>;
+  details?: Array<OrdersAuthorize422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8548,11 +8949,11 @@ export interface OrdersAuthorize422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersAuthorize422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersAuthorize422ResponseNameEnum = {
@@ -8577,43 +8978,43 @@ export type OrdersAuthorize422ResponseMessageEnum =
 export interface OrdersCapture400 {
   /**
    *
-   * @type {Array<OrdersCapture400IssuesInner>}
+   * @type {Array<OrdersCapture400DetailsInner>}
    * @memberof OrdersCapture400
    */
-  issues?: Array<OrdersCapture400IssuesInner>;
+  details?: Array<OrdersCapture400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersCapture400IssuesInner
+ * @interface OrdersCapture400DetailsInner
  */
-export interface OrdersCapture400IssuesInner {
+export interface OrdersCapture400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture400IssuesInner
+   * @memberof OrdersCapture400DetailsInner
    */
-  issue?: OrdersCapture400IssuesInnerIssueEnum;
+  issue?: OrdersCapture400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture400IssuesInner
+   * @memberof OrdersCapture400DetailsInner
    */
-  description?: OrdersCapture400IssuesInnerDescriptionEnum;
+  description?: OrdersCapture400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersCapture400IssuesInnerIssueEnum = {
+export const OrdersCapture400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type OrdersCapture400IssuesInnerIssueEnum =
-  (typeof OrdersCapture400IssuesInnerIssueEnum)[keyof typeof OrdersCapture400IssuesInnerIssueEnum];
-export const OrdersCapture400IssuesInnerDescriptionEnum = {
+export type OrdersCapture400DetailsInnerIssueEnum =
+  (typeof OrdersCapture400DetailsInnerIssueEnum)[keyof typeof OrdersCapture400DetailsInnerIssueEnum];
+export const OrdersCapture400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type OrdersCapture400IssuesInnerDescriptionEnum =
-  (typeof OrdersCapture400IssuesInnerDescriptionEnum)[keyof typeof OrdersCapture400IssuesInnerDescriptionEnum];
+export type OrdersCapture400DetailsInnerDescriptionEnum =
+  (typeof OrdersCapture400DetailsInnerDescriptionEnum)[keyof typeof OrdersCapture400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8635,10 +9036,10 @@ export interface OrdersCapture400Response {
   message?: OrdersCapture400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersCapture400IssuesInner>}
+   * @type {Array<OrdersCapture400DetailsInner>}
    * @memberof OrdersCapture400Response
    */
-  issues?: Array<OrdersCapture400IssuesInner>;
+  details?: Array<OrdersCapture400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8646,11 +9047,11 @@ export interface OrdersCapture400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCapture400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCapture400ResponseNameEnum = {
@@ -8675,44 +9076,44 @@ export type OrdersCapture400ResponseMessageEnum =
 export interface OrdersCapture403 {
   /**
    *
-   * @type {Array<OrdersCapture403IssuesInner>}
+   * @type {Array<OrdersCapture403DetailsInner>}
    * @memberof OrdersCapture403
    */
-  issues?: Array<OrdersCapture403IssuesInner>;
+  details?: Array<OrdersCapture403DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersCapture403IssuesInner
+ * @interface OrdersCapture403DetailsInner
  */
-export interface OrdersCapture403IssuesInner {
+export interface OrdersCapture403DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture403IssuesInner
+   * @memberof OrdersCapture403DetailsInner
    */
-  issue?: OrdersCapture403IssuesInnerIssueEnum;
+  issue?: OrdersCapture403DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture403IssuesInner
+   * @memberof OrdersCapture403DetailsInner
    */
-  description?: OrdersCapture403IssuesInnerDescriptionEnum;
+  description?: OrdersCapture403DetailsInnerDescriptionEnum;
 }
 
-export const OrdersCapture403IssuesInnerIssueEnum = {
+export const OrdersCapture403DetailsInnerIssueEnum = {
   PermissionDeniedForDonationItems: 'PERMISSION_DENIED_FOR_DONATION_ITEMS',
 } as const;
 
-export type OrdersCapture403IssuesInnerIssueEnum =
-  (typeof OrdersCapture403IssuesInnerIssueEnum)[keyof typeof OrdersCapture403IssuesInnerIssueEnum];
-export const OrdersCapture403IssuesInnerDescriptionEnum = {
+export type OrdersCapture403DetailsInnerIssueEnum =
+  (typeof OrdersCapture403DetailsInnerIssueEnum)[keyof typeof OrdersCapture403DetailsInnerIssueEnum];
+export const OrdersCapture403DetailsInnerDescriptionEnum = {
   TheApiCallerOrPayeeHaveNotBeenGrantedAppropriatePermissionsToSendItemsCategoryAsDonationPleaseSpeakToYourAccountManagerIfYouWantToProcessTheseTypeOfItems:
     "The API Caller or Payee have not been granted appropriate permissions to send 'items.category' as 'DONATION'. Please speak to your account manager if you want to process these type of items.",
 } as const;
 
-export type OrdersCapture403IssuesInnerDescriptionEnum =
-  (typeof OrdersCapture403IssuesInnerDescriptionEnum)[keyof typeof OrdersCapture403IssuesInnerDescriptionEnum];
+export type OrdersCapture403DetailsInnerDescriptionEnum =
+  (typeof OrdersCapture403DetailsInnerDescriptionEnum)[keyof typeof OrdersCapture403DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8734,10 +9135,10 @@ export interface OrdersCapture403Response {
   message?: OrdersCapture403ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersCapture403IssuesInner>}
+   * @type {Array<OrdersCapture403DetailsInner>}
    * @memberof OrdersCapture403Response
    */
-  issues?: Array<OrdersCapture403IssuesInner>;
+  details?: Array<OrdersCapture403DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8745,11 +9146,11 @@ export interface OrdersCapture403Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCapture403Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCapture403ResponseNameEnum = {
@@ -8774,44 +9175,44 @@ export type OrdersCapture403ResponseMessageEnum =
 export interface OrdersCapture422 {
   /**
    *
-   * @type {Array<OrdersCapture422IssuesInner>}
+   * @type {Array<OrdersCapture422DetailsInner>}
    * @memberof OrdersCapture422
    */
-  issues?: Array<OrdersCapture422IssuesInner>;
+  details?: Array<OrdersCapture422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersCapture422IssuesInner
+ * @interface OrdersCapture422DetailsInner
  */
-export interface OrdersCapture422IssuesInner {
+export interface OrdersCapture422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture422IssuesInner
+   * @memberof OrdersCapture422DetailsInner
    */
-  issue?: OrdersCapture422IssuesInnerIssueEnum;
+  issue?: OrdersCapture422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersCapture422IssuesInner
+   * @memberof OrdersCapture422DetailsInner
    */
-  description?: OrdersCapture422IssuesInnerDescriptionEnum;
+  description?: OrdersCapture422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersCapture422IssuesInnerIssueEnum = {
+export const OrdersCapture422DetailsInnerIssueEnum = {
   IdentifierNotFound: 'IDENTIFIER_NOT_FOUND',
 } as const;
 
-export type OrdersCapture422IssuesInnerIssueEnum =
-  (typeof OrdersCapture422IssuesInnerIssueEnum)[keyof typeof OrdersCapture422IssuesInnerIssueEnum];
-export const OrdersCapture422IssuesInnerDescriptionEnum = {
+export type OrdersCapture422DetailsInnerIssueEnum =
+  (typeof OrdersCapture422DetailsInnerIssueEnum)[keyof typeof OrdersCapture422DetailsInnerIssueEnum];
+export const OrdersCapture422DetailsInnerDescriptionEnum = {
   SpecifiedIdentifierWasNotFoundPleaseVerifyTheCorrectIdentifierWasUsedAndTryTheRequestAgain:
     'Specified identifier was not found. Please verify the correct identifier was used and try the request again.',
 } as const;
 
-export type OrdersCapture422IssuesInnerDescriptionEnum =
-  (typeof OrdersCapture422IssuesInnerDescriptionEnum)[keyof typeof OrdersCapture422IssuesInnerDescriptionEnum];
+export type OrdersCapture422DetailsInnerDescriptionEnum =
+  (typeof OrdersCapture422DetailsInnerDescriptionEnum)[keyof typeof OrdersCapture422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8833,10 +9234,10 @@ export interface OrdersCapture422Response {
   message?: OrdersCapture422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersCapture422IssuesInner>}
+   * @type {Array<OrdersCapture422DetailsInner>}
    * @memberof OrdersCapture422Response
    */
-  issues?: Array<OrdersCapture422IssuesInner>;
+  details?: Array<OrdersCapture422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8844,11 +9245,11 @@ export interface OrdersCapture422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCapture422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCapture422ResponseNameEnum = {
@@ -8873,43 +9274,43 @@ export type OrdersCapture422ResponseMessageEnum =
 export interface OrdersConfirm400 {
   /**
    *
-   * @type {Array<OrdersConfirm400IssuesInner>}
+   * @type {Array<OrdersConfirm400DetailsInner>}
    * @memberof OrdersConfirm400
    */
-  issues?: Array<OrdersConfirm400IssuesInner>;
+  details?: Array<OrdersConfirm400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersConfirm400IssuesInner
+ * @interface OrdersConfirm400DetailsInner
  */
-export interface OrdersConfirm400IssuesInner {
+export interface OrdersConfirm400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersConfirm400IssuesInner
+   * @memberof OrdersConfirm400DetailsInner
    */
-  issue?: OrdersConfirm400IssuesInnerIssueEnum;
+  issue?: OrdersConfirm400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersConfirm400IssuesInner
+   * @memberof OrdersConfirm400DetailsInner
    */
-  description?: OrdersConfirm400IssuesInnerDescriptionEnum;
+  description?: OrdersConfirm400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersConfirm400IssuesInnerIssueEnum = {
+export const OrdersConfirm400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type OrdersConfirm400IssuesInnerIssueEnum =
-  (typeof OrdersConfirm400IssuesInnerIssueEnum)[keyof typeof OrdersConfirm400IssuesInnerIssueEnum];
-export const OrdersConfirm400IssuesInnerDescriptionEnum = {
+export type OrdersConfirm400DetailsInnerIssueEnum =
+  (typeof OrdersConfirm400DetailsInnerIssueEnum)[keyof typeof OrdersConfirm400DetailsInnerIssueEnum];
+export const OrdersConfirm400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type OrdersConfirm400IssuesInnerDescriptionEnum =
-  (typeof OrdersConfirm400IssuesInnerDescriptionEnum)[keyof typeof OrdersConfirm400IssuesInnerDescriptionEnum];
+export type OrdersConfirm400DetailsInnerDescriptionEnum =
+  (typeof OrdersConfirm400DetailsInnerDescriptionEnum)[keyof typeof OrdersConfirm400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -8931,10 +9332,10 @@ export interface OrdersConfirm400Response {
   message?: OrdersConfirm400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersConfirm400IssuesInner>}
+   * @type {Array<OrdersConfirm400DetailsInner>}
    * @memberof OrdersConfirm400Response
    */
-  issues?: Array<OrdersConfirm400IssuesInner>;
+  details?: Array<OrdersConfirm400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8942,11 +9343,11 @@ export interface OrdersConfirm400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersConfirm400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersConfirm400ResponseNameEnum = {
@@ -8983,10 +9384,10 @@ export interface OrdersConfirm403Response {
   message?: OrdersConfirm403ResponseMessageEnum;
   /**
    *
-   * @type {Array<Model403IssuesInner>}
+   * @type {Array<Model403DetailsInner>}
    * @memberof OrdersConfirm403Response
    */
-  issues?: Array<Model403IssuesInner>;
+  details?: Array<Model403DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -8994,11 +9395,11 @@ export interface OrdersConfirm403Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersConfirm403Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersConfirm403ResponseNameEnum = {
@@ -9023,44 +9424,44 @@ export type OrdersConfirm403ResponseMessageEnum =
 export interface OrdersConfirm422 {
   /**
    *
-   * @type {Array<OrdersConfirm422IssuesInner>}
+   * @type {Array<OrdersConfirm422DetailsInner>}
    * @memberof OrdersConfirm422
    */
-  issues?: Array<OrdersConfirm422IssuesInner>;
+  details?: Array<OrdersConfirm422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersConfirm422IssuesInner
+ * @interface OrdersConfirm422DetailsInner
  */
-export interface OrdersConfirm422IssuesInner {
+export interface OrdersConfirm422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersConfirm422IssuesInner
+   * @memberof OrdersConfirm422DetailsInner
    */
-  issue?: OrdersConfirm422IssuesInnerIssueEnum;
+  issue?: OrdersConfirm422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersConfirm422IssuesInner
+   * @memberof OrdersConfirm422DetailsInner
    */
-  description?: OrdersConfirm422IssuesInnerDescriptionEnum;
+  description?: OrdersConfirm422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersConfirm422IssuesInnerIssueEnum = {
-  EmvDataRequired: 'EMV_DATA_REQUIRED',
+export const OrdersConfirm422DetailsInnerIssueEnum = {
+  TransactionLimitExceeded: 'TRANSACTION_LIMIT_EXCEEDED',
 } as const;
 
-export type OrdersConfirm422IssuesInnerIssueEnum =
-  (typeof OrdersConfirm422IssuesInnerIssueEnum)[keyof typeof OrdersConfirm422IssuesInnerIssueEnum];
-export const OrdersConfirm422IssuesInnerDescriptionEnum = {
-  EmvDataIsRequiredIfAuthenticationMethodIsEmv:
-    'EMV Data is required if authentication method is EMV.',
+export type OrdersConfirm422DetailsInnerIssueEnum =
+  (typeof OrdersConfirm422DetailsInnerIssueEnum)[keyof typeof OrdersConfirm422DetailsInnerIssueEnum];
+export const OrdersConfirm422DetailsInnerDescriptionEnum = {
+  TotalPaymentAmountExceededTransactionLimit:
+    'Total payment amount exceeded transaction limit.',
 } as const;
 
-export type OrdersConfirm422IssuesInnerDescriptionEnum =
-  (typeof OrdersConfirm422IssuesInnerDescriptionEnum)[keyof typeof OrdersConfirm422IssuesInnerDescriptionEnum];
+export type OrdersConfirm422DetailsInnerDescriptionEnum =
+  (typeof OrdersConfirm422DetailsInnerDescriptionEnum)[keyof typeof OrdersConfirm422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9082,10 +9483,10 @@ export interface OrdersConfirm422Response {
   message?: OrdersConfirm422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersConfirm422IssuesInner>}
+   * @type {Array<OrdersConfirm422DetailsInner>}
    * @memberof OrdersConfirm422Response
    */
-  issues?: Array<OrdersConfirm422IssuesInner>;
+  details?: Array<OrdersConfirm422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9093,11 +9494,11 @@ export interface OrdersConfirm422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersConfirm422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersConfirm422ResponseNameEnum = {
@@ -9134,10 +9535,10 @@ export interface OrdersCreate400Response {
   message?: OrdersCreate400ResponseMessageEnum;
   /**
    *
-   * @type {Array<Model400IssuesInner>}
+   * @type {Array<Model400DetailsInner>}
    * @memberof OrdersCreate400Response
    */
-  issues?: Array<Model400IssuesInner>;
+  details?: Array<Model400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9145,11 +9546,11 @@ export interface OrdersCreate400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCreate400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCreate400ResponseNameEnum = {
@@ -9186,10 +9587,10 @@ export interface OrdersCreate401Response {
   message?: OrdersCreate401ResponseMessageEnum;
   /**
    *
-   * @type {Array<Model401IssuesInner>}
+   * @type {Array<Model401DetailsInner>}
    * @memberof OrdersCreate401Response
    */
-  issues?: Array<Model401IssuesInner>;
+  details?: Array<Model401DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9197,11 +9598,11 @@ export interface OrdersCreate401Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCreate401Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCreate401ResponseNameEnum = {
@@ -9238,10 +9639,10 @@ export interface OrdersCreate422Response {
   message?: OrdersCreate422ResponseMessageEnum;
   /**
    *
-   * @type {Array<Model422IssuesInner>}
+   * @type {Array<Model422DetailsInner>}
    * @memberof OrdersCreate422Response
    */
-  issues?: Array<Model422IssuesInner>;
+  details?: Array<Model422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9249,11 +9650,11 @@ export interface OrdersCreate422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersCreate422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersCreate422ResponseNameEnum = {
@@ -9290,10 +9691,10 @@ export interface OrdersGet404Response {
   message?: OrdersGet404ResponseMessageEnum;
   /**
    *
-   * @type {Array<Model404IssuesInner>}
+   * @type {Array<Model404DetailsInner>}
    * @memberof OrdersGet404Response
    */
-  issues?: Array<Model404IssuesInner>;
+  details?: Array<Model404DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9301,11 +9702,11 @@ export interface OrdersGet404Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersGet404Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersGet404ResponseNameEnum = {
@@ -9329,43 +9730,43 @@ export type OrdersGet404ResponseMessageEnum =
 export interface OrdersPatch400 {
   /**
    *
-   * @type {Array<OrdersPatch400IssuesInner>}
+   * @type {Array<OrdersPatch400DetailsInner>}
    * @memberof OrdersPatch400
    */
-  issues?: Array<OrdersPatch400IssuesInner>;
+  details?: Array<OrdersPatch400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersPatch400IssuesInner
+ * @interface OrdersPatch400DetailsInner
  */
-export interface OrdersPatch400IssuesInner {
+export interface OrdersPatch400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersPatch400IssuesInner
+   * @memberof OrdersPatch400DetailsInner
    */
-  issue?: OrdersPatch400IssuesInnerIssueEnum;
+  issue?: OrdersPatch400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersPatch400IssuesInner
+   * @memberof OrdersPatch400DetailsInner
    */
-  description?: OrdersPatch400IssuesInnerDescriptionEnum;
+  description?: OrdersPatch400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersPatch400IssuesInnerIssueEnum = {
+export const OrdersPatch400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type OrdersPatch400IssuesInnerIssueEnum =
-  (typeof OrdersPatch400IssuesInnerIssueEnum)[keyof typeof OrdersPatch400IssuesInnerIssueEnum];
-export const OrdersPatch400IssuesInnerDescriptionEnum = {
+export type OrdersPatch400DetailsInnerIssueEnum =
+  (typeof OrdersPatch400DetailsInnerIssueEnum)[keyof typeof OrdersPatch400DetailsInnerIssueEnum];
+export const OrdersPatch400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type OrdersPatch400IssuesInnerDescriptionEnum =
-  (typeof OrdersPatch400IssuesInnerDescriptionEnum)[keyof typeof OrdersPatch400IssuesInnerDescriptionEnum];
+export type OrdersPatch400DetailsInnerDescriptionEnum =
+  (typeof OrdersPatch400DetailsInnerDescriptionEnum)[keyof typeof OrdersPatch400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9387,10 +9788,10 @@ export interface OrdersPatch400Response {
   message?: OrdersPatch400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersPatch400IssuesInner>}
+   * @type {Array<OrdersPatch400DetailsInner>}
    * @memberof OrdersPatch400Response
    */
-  issues?: Array<OrdersPatch400IssuesInner>;
+  details?: Array<OrdersPatch400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9398,11 +9799,11 @@ export interface OrdersPatch400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersPatch400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersPatch400ResponseNameEnum = {
@@ -9427,44 +9828,44 @@ export type OrdersPatch400ResponseMessageEnum =
 export interface OrdersPatch422 {
   /**
    *
-   * @type {Array<OrdersPatch422IssuesInner>}
+   * @type {Array<OrdersPatch422DetailsInner>}
    * @memberof OrdersPatch422
    */
-  issues?: Array<OrdersPatch422IssuesInner>;
+  details?: Array<OrdersPatch422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersPatch422IssuesInner
+ * @interface OrdersPatch422DetailsInner
  */
-export interface OrdersPatch422IssuesInner {
+export interface OrdersPatch422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersPatch422IssuesInner
+   * @memberof OrdersPatch422DetailsInner
    */
-  issue?: OrdersPatch422IssuesInnerIssueEnum;
+  issue?: OrdersPatch422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersPatch422IssuesInner
+   * @memberof OrdersPatch422DetailsInner
    */
-  description?: OrdersPatch422IssuesInnerDescriptionEnum;
+  description?: OrdersPatch422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersPatch422IssuesInnerIssueEnum = {
+export const OrdersPatch422DetailsInnerIssueEnum = {
   AmountChangeNotAllowed: 'AMOUNT_CHANGE_NOT_ALLOWED',
 } as const;
 
-export type OrdersPatch422IssuesInnerIssueEnum =
-  (typeof OrdersPatch422IssuesInnerIssueEnum)[keyof typeof OrdersPatch422IssuesInnerIssueEnum];
-export const OrdersPatch422IssuesInnerDescriptionEnum = {
+export type OrdersPatch422DetailsInnerIssueEnum =
+  (typeof OrdersPatch422DetailsInnerIssueEnum)[keyof typeof OrdersPatch422DetailsInnerIssueEnum];
+export const OrdersPatch422DetailsInnerDescriptionEnum = {
   TheAmountSpecifiedIsDifferentFromTheAmountAuthorizedByPayer:
     'The amount specified is different from the amount authorized by payer.',
 } as const;
 
-export type OrdersPatch422IssuesInnerDescriptionEnum =
-  (typeof OrdersPatch422IssuesInnerDescriptionEnum)[keyof typeof OrdersPatch422IssuesInnerDescriptionEnum];
+export type OrdersPatch422DetailsInnerDescriptionEnum =
+  (typeof OrdersPatch422DetailsInnerDescriptionEnum)[keyof typeof OrdersPatch422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9486,10 +9887,10 @@ export interface OrdersPatch422Response {
   message?: OrdersPatch422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersPatch422IssuesInner>}
+   * @type {Array<OrdersPatch422DetailsInner>}
    * @memberof OrdersPatch422Response
    */
-  issues?: Array<OrdersPatch422IssuesInner>;
+  details?: Array<OrdersPatch422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9497,11 +9898,11 @@ export interface OrdersPatch422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersPatch422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersPatch422ResponseNameEnum = {
@@ -9526,44 +9927,44 @@ export type OrdersPatch422ResponseMessageEnum =
 export interface OrdersTrackCreate400 {
   /**
    *
-   * @type {Array<OrdersTrackCreate400IssuesInner>}
+   * @type {Array<OrdersTrackCreate400DetailsInner>}
    * @memberof OrdersTrackCreate400
    */
-  issues?: Array<OrdersTrackCreate400IssuesInner>;
+  details?: Array<OrdersTrackCreate400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackCreate400IssuesInner
+ * @interface OrdersTrackCreate400DetailsInner
  */
-export interface OrdersTrackCreate400IssuesInner {
+export interface OrdersTrackCreate400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate400IssuesInner
+   * @memberof OrdersTrackCreate400DetailsInner
    */
-  issue?: OrdersTrackCreate400IssuesInnerIssueEnum;
+  issue?: OrdersTrackCreate400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate400IssuesInner
+   * @memberof OrdersTrackCreate400DetailsInner
    */
-  description?: OrdersTrackCreate400IssuesInnerDescriptionEnum;
+  description?: OrdersTrackCreate400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackCreate400IssuesInnerIssueEnum = {
+export const OrdersTrackCreate400DetailsInnerIssueEnum = {
   InvalidParameterSyntax: 'INVALID_PARAMETER_SYNTAX',
 } as const;
 
-export type OrdersTrackCreate400IssuesInnerIssueEnum =
-  (typeof OrdersTrackCreate400IssuesInnerIssueEnum)[keyof typeof OrdersTrackCreate400IssuesInnerIssueEnum];
-export const OrdersTrackCreate400IssuesInnerDescriptionEnum = {
+export type OrdersTrackCreate400DetailsInnerIssueEnum =
+  (typeof OrdersTrackCreate400DetailsInnerIssueEnum)[keyof typeof OrdersTrackCreate400DetailsInnerIssueEnum];
+export const OrdersTrackCreate400DetailsInnerDescriptionEnum = {
   TheValueOfAFieldDoesNotConformToTheExpectedFormat:
     'The value of a field does not conform to the expected format.',
 } as const;
 
-export type OrdersTrackCreate400IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackCreate400IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackCreate400IssuesInnerDescriptionEnum];
+export type OrdersTrackCreate400DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackCreate400DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackCreate400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9585,10 +9986,10 @@ export interface OrdersTrackCreate400Response {
   message?: OrdersTrackCreate400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackCreate400IssuesInner>}
+   * @type {Array<OrdersTrackCreate400DetailsInner>}
    * @memberof OrdersTrackCreate400Response
    */
-  issues?: Array<OrdersTrackCreate400IssuesInner>;
+  details?: Array<OrdersTrackCreate400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9596,11 +9997,11 @@ export interface OrdersTrackCreate400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackCreate400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackCreate400ResponseNameEnum = {
@@ -9625,44 +10026,44 @@ export type OrdersTrackCreate400ResponseMessageEnum =
 export interface OrdersTrackCreate403 {
   /**
    *
-   * @type {Array<OrdersTrackCreate403IssuesInner>}
+   * @type {Array<OrdersTrackCreate403DetailsInner>}
    * @memberof OrdersTrackCreate403
    */
-  issues?: Array<OrdersTrackCreate403IssuesInner>;
+  details?: Array<OrdersTrackCreate403DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackCreate403IssuesInner
+ * @interface OrdersTrackCreate403DetailsInner
  */
-export interface OrdersTrackCreate403IssuesInner {
+export interface OrdersTrackCreate403DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate403IssuesInner
+   * @memberof OrdersTrackCreate403DetailsInner
    */
-  issue?: OrdersTrackCreate403IssuesInnerIssueEnum;
+  issue?: OrdersTrackCreate403DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate403IssuesInner
+   * @memberof OrdersTrackCreate403DetailsInner
    */
-  description?: OrdersTrackCreate403IssuesInnerDescriptionEnum;
+  description?: OrdersTrackCreate403DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackCreate403IssuesInnerIssueEnum = {
+export const OrdersTrackCreate403DetailsInnerIssueEnum = {
   PermissionDenied: 'PERMISSION_DENIED',
 } as const;
 
-export type OrdersTrackCreate403IssuesInnerIssueEnum =
-  (typeof OrdersTrackCreate403IssuesInnerIssueEnum)[keyof typeof OrdersTrackCreate403IssuesInnerIssueEnum];
-export const OrdersTrackCreate403IssuesInnerDescriptionEnum = {
+export type OrdersTrackCreate403DetailsInnerIssueEnum =
+  (typeof OrdersTrackCreate403DetailsInnerIssueEnum)[keyof typeof OrdersTrackCreate403DetailsInnerIssueEnum];
+export const OrdersTrackCreate403DetailsInnerDescriptionEnum = {
   YouDoNotHavePermissionToAccessOrPerformOperationsOnThisResource:
     'You do not have permission to access or perform operations on this resource.',
 } as const;
 
-export type OrdersTrackCreate403IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackCreate403IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackCreate403IssuesInnerDescriptionEnum];
+export type OrdersTrackCreate403DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackCreate403DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackCreate403DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9684,10 +10085,10 @@ export interface OrdersTrackCreate403Response {
   message?: OrdersTrackCreate403ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackCreate403IssuesInner>}
+   * @type {Array<OrdersTrackCreate403DetailsInner>}
    * @memberof OrdersTrackCreate403Response
    */
-  issues?: Array<OrdersTrackCreate403IssuesInner>;
+  details?: Array<OrdersTrackCreate403DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9695,11 +10096,11 @@ export interface OrdersTrackCreate403Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackCreate403Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackCreate403ResponseNameEnum = {
@@ -9724,44 +10125,44 @@ export type OrdersTrackCreate403ResponseMessageEnum =
 export interface OrdersTrackCreate422 {
   /**
    *
-   * @type {Array<OrdersTrackCreate422IssuesInner>}
+   * @type {Array<OrdersTrackCreate422DetailsInner>}
    * @memberof OrdersTrackCreate422
    */
-  issues?: Array<OrdersTrackCreate422IssuesInner>;
+  details?: Array<OrdersTrackCreate422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackCreate422IssuesInner
+ * @interface OrdersTrackCreate422DetailsInner
  */
-export interface OrdersTrackCreate422IssuesInner {
+export interface OrdersTrackCreate422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate422IssuesInner
+   * @memberof OrdersTrackCreate422DetailsInner
    */
-  issue?: OrdersTrackCreate422IssuesInnerIssueEnum;
+  issue?: OrdersTrackCreate422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackCreate422IssuesInner
+   * @memberof OrdersTrackCreate422DetailsInner
    */
-  description?: OrdersTrackCreate422IssuesInnerDescriptionEnum;
+  description?: OrdersTrackCreate422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackCreate422IssuesInnerIssueEnum = {
+export const OrdersTrackCreate422DetailsInnerIssueEnum = {
   MspNotSupported: 'MSP_NOT_SUPPORTED',
 } as const;
 
-export type OrdersTrackCreate422IssuesInnerIssueEnum =
-  (typeof OrdersTrackCreate422IssuesInnerIssueEnum)[keyof typeof OrdersTrackCreate422IssuesInnerIssueEnum];
-export const OrdersTrackCreate422IssuesInnerDescriptionEnum = {
+export type OrdersTrackCreate422DetailsInnerIssueEnum =
+  (typeof OrdersTrackCreate422DetailsInnerIssueEnum)[keyof typeof OrdersTrackCreate422DetailsInnerIssueEnum];
+export const OrdersTrackCreate422DetailsInnerDescriptionEnum = {
   MultiplePurchaseUnitsAreNotSupportedForThisOperation:
     'Multiple purchase units are not supported for this operation.',
 } as const;
 
-export type OrdersTrackCreate422IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackCreate422IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackCreate422IssuesInnerDescriptionEnum];
+export type OrdersTrackCreate422DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackCreate422DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackCreate422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9783,10 +10184,10 @@ export interface OrdersTrackCreate422Response {
   message?: OrdersTrackCreate422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackCreate422IssuesInner>}
+   * @type {Array<OrdersTrackCreate422DetailsInner>}
    * @memberof OrdersTrackCreate422Response
    */
-  issues?: Array<OrdersTrackCreate422IssuesInner>;
+  details?: Array<OrdersTrackCreate422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9794,11 +10195,11 @@ export interface OrdersTrackCreate422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackCreate422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackCreate422ResponseNameEnum = {
@@ -9823,43 +10224,43 @@ export type OrdersTrackCreate422ResponseMessageEnum =
 export interface OrdersTrackersPatch400 {
   /**
    *
-   * @type {Array<OrdersTrackersPatch400IssuesInner>}
+   * @type {Array<OrdersTrackersPatch400DetailsInner>}
    * @memberof OrdersTrackersPatch400
    */
-  issues?: Array<OrdersTrackersPatch400IssuesInner>;
+  details?: Array<OrdersTrackersPatch400DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackersPatch400IssuesInner
+ * @interface OrdersTrackersPatch400DetailsInner
  */
-export interface OrdersTrackersPatch400IssuesInner {
+export interface OrdersTrackersPatch400DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch400IssuesInner
+   * @memberof OrdersTrackersPatch400DetailsInner
    */
-  issue?: OrdersTrackersPatch400IssuesInnerIssueEnum;
+  issue?: OrdersTrackersPatch400DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch400IssuesInner
+   * @memberof OrdersTrackersPatch400DetailsInner
    */
-  description?: OrdersTrackersPatch400IssuesInnerDescriptionEnum;
+  description?: OrdersTrackersPatch400DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackersPatch400IssuesInnerIssueEnum = {
+export const OrdersTrackersPatch400DetailsInnerIssueEnum = {
   MalformedRequestJson: 'MALFORMED_REQUEST_JSON',
 } as const;
 
-export type OrdersTrackersPatch400IssuesInnerIssueEnum =
-  (typeof OrdersTrackersPatch400IssuesInnerIssueEnum)[keyof typeof OrdersTrackersPatch400IssuesInnerIssueEnum];
-export const OrdersTrackersPatch400IssuesInnerDescriptionEnum = {
+export type OrdersTrackersPatch400DetailsInnerIssueEnum =
+  (typeof OrdersTrackersPatch400DetailsInnerIssueEnum)[keyof typeof OrdersTrackersPatch400DetailsInnerIssueEnum];
+export const OrdersTrackersPatch400DetailsInnerDescriptionEnum = {
   TheRequestJsonIsNotWellFormed: 'The request JSON is not well formed.',
 } as const;
 
-export type OrdersTrackersPatch400IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackersPatch400IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch400IssuesInnerDescriptionEnum];
+export type OrdersTrackersPatch400DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackersPatch400DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch400DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -9881,10 +10282,10 @@ export interface OrdersTrackersPatch400Response {
   message?: OrdersTrackersPatch400ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackersPatch400IssuesInner>}
+   * @type {Array<OrdersTrackersPatch400DetailsInner>}
    * @memberof OrdersTrackersPatch400Response
    */
-  issues?: Array<OrdersTrackersPatch400IssuesInner>;
+  details?: Array<OrdersTrackersPatch400DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9892,11 +10293,11 @@ export interface OrdersTrackersPatch400Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackersPatch400Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackersPatch400ResponseNameEnum = {
@@ -9921,10 +10322,10 @@ export type OrdersTrackersPatch400ResponseMessageEnum =
 export interface OrdersTrackersPatch403 {
   /**
    *
-   * @type {Array<OrdersTrackCreate403IssuesInner>}
+   * @type {Array<OrdersTrackCreate403DetailsInner>}
    * @memberof OrdersTrackersPatch403
    */
-  issues?: Array<OrdersTrackCreate403IssuesInner>;
+  details?: Array<OrdersTrackCreate403DetailsInner>;
 }
 /**
  *
@@ -9946,10 +10347,10 @@ export interface OrdersTrackersPatch403Response {
   message?: OrdersTrackersPatch403ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackCreate403IssuesInner>}
+   * @type {Array<OrdersTrackCreate403DetailsInner>}
    * @memberof OrdersTrackersPatch403Response
    */
-  issues?: Array<OrdersTrackCreate403IssuesInner>;
+  details?: Array<OrdersTrackCreate403DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -9957,11 +10358,11 @@ export interface OrdersTrackersPatch403Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackersPatch403Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackersPatch403ResponseNameEnum = {
@@ -9986,44 +10387,44 @@ export type OrdersTrackersPatch403ResponseMessageEnum =
 export interface OrdersTrackersPatch404 {
   /**
    *
-   * @type {Array<OrdersTrackersPatch404IssuesInner>}
+   * @type {Array<OrdersTrackersPatch404DetailsInner>}
    * @memberof OrdersTrackersPatch404
    */
-  issues?: Array<OrdersTrackersPatch404IssuesInner>;
+  details?: Array<OrdersTrackersPatch404DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackersPatch404IssuesInner
+ * @interface OrdersTrackersPatch404DetailsInner
  */
-export interface OrdersTrackersPatch404IssuesInner {
+export interface OrdersTrackersPatch404DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch404IssuesInner
+   * @memberof OrdersTrackersPatch404DetailsInner
    */
-  issue?: OrdersTrackersPatch404IssuesInnerIssueEnum;
+  issue?: OrdersTrackersPatch404DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch404IssuesInner
+   * @memberof OrdersTrackersPatch404DetailsInner
    */
-  description?: OrdersTrackersPatch404IssuesInnerDescriptionEnum;
+  description?: OrdersTrackersPatch404DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackersPatch404IssuesInnerIssueEnum = {
+export const OrdersTrackersPatch404DetailsInnerIssueEnum = {
   TrackerIdNotFound: 'TRACKER_ID_NOT_FOUND',
 } as const;
 
-export type OrdersTrackersPatch404IssuesInnerIssueEnum =
-  (typeof OrdersTrackersPatch404IssuesInnerIssueEnum)[keyof typeof OrdersTrackersPatch404IssuesInnerIssueEnum];
-export const OrdersTrackersPatch404IssuesInnerDescriptionEnum = {
+export type OrdersTrackersPatch404DetailsInnerIssueEnum =
+  (typeof OrdersTrackersPatch404DetailsInnerIssueEnum)[keyof typeof OrdersTrackersPatch404DetailsInnerIssueEnum];
+export const OrdersTrackersPatch404DetailsInnerDescriptionEnum = {
   SpecifiedTrackerIdDoesNotExistCheckTheTrackerIdAndTryAgain:
     'Specified tracker ID does not exist. Check the tracker ID and try again.',
 } as const;
 
-export type OrdersTrackersPatch404IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackersPatch404IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch404IssuesInnerDescriptionEnum];
+export type OrdersTrackersPatch404DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackersPatch404DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch404DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -10045,10 +10446,10 @@ export interface OrdersTrackersPatch404Response {
   message?: OrdersTrackersPatch404ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackersPatch404IssuesInner>}
+   * @type {Array<OrdersTrackersPatch404DetailsInner>}
    * @memberof OrdersTrackersPatch404Response
    */
-  issues?: Array<OrdersTrackersPatch404IssuesInner>;
+  details?: Array<OrdersTrackersPatch404DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -10056,11 +10457,11 @@ export interface OrdersTrackersPatch404Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackersPatch404Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackersPatch404ResponseNameEnum = {
@@ -10084,44 +10485,44 @@ export type OrdersTrackersPatch404ResponseMessageEnum =
 export interface OrdersTrackersPatch422 {
   /**
    *
-   * @type {Array<OrdersTrackersPatch422IssuesInner>}
+   * @type {Array<OrdersTrackersPatch422DetailsInner>}
    * @memberof OrdersTrackersPatch422
    */
-  issues?: Array<OrdersTrackersPatch422IssuesInner>;
+  details?: Array<OrdersTrackersPatch422DetailsInner>;
 }
 /**
  *
  * @export
- * @interface OrdersTrackersPatch422IssuesInner
+ * @interface OrdersTrackersPatch422DetailsInner
  */
-export interface OrdersTrackersPatch422IssuesInner {
+export interface OrdersTrackersPatch422DetailsInner {
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch422IssuesInner
+   * @memberof OrdersTrackersPatch422DetailsInner
    */
-  issue?: OrdersTrackersPatch422IssuesInnerIssueEnum;
+  issue?: OrdersTrackersPatch422DetailsInnerIssueEnum;
   /**
    *
    * @type {string}
-   * @memberof OrdersTrackersPatch422IssuesInner
+   * @memberof OrdersTrackersPatch422DetailsInner
    */
-  description?: OrdersTrackersPatch422IssuesInnerDescriptionEnum;
+  description?: OrdersTrackersPatch422DetailsInnerDescriptionEnum;
 }
 
-export const OrdersTrackersPatch422IssuesInnerIssueEnum = {
+export const OrdersTrackersPatch422DetailsInnerIssueEnum = {
   ItemSkuMismatch: 'ITEM_SKU_MISMATCH',
 } as const;
 
-export type OrdersTrackersPatch422IssuesInnerIssueEnum =
-  (typeof OrdersTrackersPatch422IssuesInnerIssueEnum)[keyof typeof OrdersTrackersPatch422IssuesInnerIssueEnum];
-export const OrdersTrackersPatch422IssuesInnerDescriptionEnum = {
+export type OrdersTrackersPatch422DetailsInnerIssueEnum =
+  (typeof OrdersTrackersPatch422DetailsInnerIssueEnum)[keyof typeof OrdersTrackersPatch422DetailsInnerIssueEnum];
+export const OrdersTrackersPatch422DetailsInnerDescriptionEnum = {
   ItemSkuMustMatchOneOfTheItemsSkuThatWasProvidedDuringOrderCreation:
     'Item sku must match one of the items sku that was provided during order creation.',
 } as const;
 
-export type OrdersTrackersPatch422IssuesInnerDescriptionEnum =
-  (typeof OrdersTrackersPatch422IssuesInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch422IssuesInnerDescriptionEnum];
+export type OrdersTrackersPatch422DetailsInnerDescriptionEnum =
+  (typeof OrdersTrackersPatch422DetailsInnerDescriptionEnum)[keyof typeof OrdersTrackersPatch422DetailsInnerDescriptionEnum];
 
 /**
  *
@@ -10143,10 +10544,10 @@ export interface OrdersTrackersPatch422Response {
   message?: OrdersTrackersPatch422ResponseMessageEnum;
   /**
    *
-   * @type {Array<OrdersTrackersPatch422IssuesInner>}
+   * @type {Array<OrdersTrackersPatch422DetailsInner>}
    * @memberof OrdersTrackersPatch422Response
    */
-  issues?: Array<OrdersTrackersPatch422IssuesInner>;
+  details?: Array<OrdersTrackersPatch422DetailsInner>;
   /**
    * The PayPal internal ID. Used for correlation purposes.
    * @type {string}
@@ -10154,11 +10555,11 @@ export interface OrdersTrackersPatch422Response {
    */
   debug_id?: string;
   /**
-   * The information link, or URI, that shows detailed information about this error for the developer.
-   * @type {string}
+   * An array of request-related [HATEOAS links](https://en.wikipedia.org/wiki/HATEOAS).
+   * @type {Array<ErrorLinkDescription>}
    * @memberof OrdersTrackersPatch422Response
    */
-  information_link?: string;
+  links?: Array<ErrorLinkDescription>;
 }
 
 export const OrdersTrackersPatch422ResponseNameEnum = {
@@ -12216,10 +12617,10 @@ export interface PaypalWallet {
 export interface PaypalWalletAttributes {
   /**
    *
-   * @type {Customer}
+   * @type {PaypalWalletCustomer}
    * @memberof PaypalWalletAttributes
    */
-  customer?: Customer;
+  customer?: PaypalWalletCustomer;
   /**
    *
    * @type {VaultPaypalWalletBase}
@@ -12235,16 +12636,41 @@ export interface PaypalWalletAttributes {
 export interface PaypalWalletAttributesResponse {
   /**
    *
-   * @type {VaultResponse}
+   * @type {PaypalWalletVaultResponse}
    * @memberof PaypalWalletAttributesResponse
    */
-  vault?: VaultResponse;
+  vault?: PaypalWalletVaultResponse;
   /**
    * An array of merchant cobranded cards used by buyer to complete an order. This array will be present if a merchant has onboarded their cobranded card with PayPal and provided corresponding label(s).
    * @type {Array<CobrandedCard>}
    * @memberof PaypalWalletAttributesResponse
    */
   cobranded_cards?: Array<CobrandedCard>;
+}
+/**
+ * The details about a customer in PayPal\'s system of record.
+ * @export
+ * @interface PaypalWalletCustomer
+ */
+export interface PaypalWalletCustomer {
+  /**
+   * The unique ID for a customer generated by PayPal.
+   * @type {string}
+   * @memberof PaypalWalletCustomer
+   */
+  id?: string;
+  /**
+   * The internationalized email address.<blockquote><strong>Note:</strong> Up to 64 characters are allowed before and 255 characters are allowed after the <code>@</code> sign. However, the generally accepted maximum length for an email address is 254 characters. The pattern verifies that an unquoted <code>@</code> sign exists.</blockquote>
+   * @type {string}
+   * @memberof PaypalWalletCustomer
+   */
+  email_address?: string;
+  /**
+   *
+   * @type {PhoneWithType}
+   * @memberof PaypalWalletCustomer
+   */
+  phone?: PhoneWithType;
 }
 /**
  * Customizes the payer experience during the approval process for payment with PayPal.<blockquote><strong>Note:</strong> Partners and Marketplaces might configure <code>brand_name</code> and <code>shipping_preference</code> during partner account setup, which overrides the request values.</blockquote>
@@ -12352,6 +12778,12 @@ export interface PaypalWalletResponse {
    */
   account_id?: string;
   /**
+   * The account status indicates whether the buyer has verified the financial details associated with their PayPal account.
+   * @type {string}
+   * @memberof PaypalWalletResponse
+   */
+  account_status?: PaypalWalletResponseAccountStatusEnum;
+  /**
    *
    * @type {Name2}
    * @memberof PaypalWalletResponse
@@ -12395,6 +12827,81 @@ export interface PaypalWalletResponse {
   attributes?: PaypalWalletAttributesResponse;
 }
 
+export const PaypalWalletResponseAccountStatusEnum = {
+  Verified: 'VERIFIED',
+  Unverified: 'UNVERIFIED',
+} as const;
+
+export type PaypalWalletResponseAccountStatusEnum =
+  (typeof PaypalWalletResponseAccountStatusEnum)[keyof typeof PaypalWalletResponseAccountStatusEnum];
+
+/**
+ * The details about a saved PayPal Wallet payment source.
+ * @export
+ * @interface PaypalWalletVaultResponse
+ */
+export interface PaypalWalletVaultResponse {
+  /**
+   * The PayPal-generated ID for the saved payment source.
+   * @type {string}
+   * @memberof PaypalWalletVaultResponse
+   */
+  id?: string;
+  /**
+   * The vault status.
+   * @type {string}
+   * @memberof PaypalWalletVaultResponse
+   * @deprecated
+   */
+  status?: PaypalWalletVaultResponseStatusEnum;
+  /**
+   *
+   * @type {PaypalWalletCustomer}
+   * @memberof PaypalWalletVaultResponse
+   */
+  customer?: PaypalWalletCustomer;
+  /**
+   * An array of request-related HATEOAS links.
+   * @type {Array<LinkDescription>}
+   * @memberof PaypalWalletVaultResponse
+   */
+  links?: Array<LinkDescription>;
+  /**
+   *
+   * @type {any}
+   * @memberof PaypalWalletVaultResponse
+   */
+  owner_id?: any;
+}
+
+export const PaypalWalletVaultResponseStatusEnum = {
+  Vaulted: 'VAULTED',
+  Created: 'CREATED',
+  Approved: 'APPROVED',
+} as const;
+
+export type PaypalWalletVaultResponseStatusEnum =
+  (typeof PaypalWalletVaultResponseStatusEnum)[keyof typeof PaypalWalletVaultResponseStatusEnum];
+
+/**
+ *
+ * @export
+ * @interface PaypalWalletVaultResponseAllOf
+ */
+export interface PaypalWalletVaultResponseAllOf {
+  /**
+   *
+   * @type {PaypalWalletCustomer}
+   * @memberof PaypalWalletVaultResponseAllOf
+   */
+  customer?: PaypalWalletCustomer;
+  /**
+   *
+   * @type {any}
+   * @memberof PaypalWalletVaultResponseAllOf
+   */
+  owner_id?: any;
+}
 /**
  * The phone number, in its canonical international [E.164 numbering plan format](https://www.itu.int/rec/T-REC-E.164/en).
  * @export
@@ -15153,11 +15660,17 @@ export interface ShippingDetail {
    */
   name?: Name;
   /**
-   * The method by which the payer wants to get their items from the payee e.g shipping, in-person pickup. Either type or options but not both may be present.
+   * A classification for the method of purchase fulfillment (e.g shipping, in-store pickup, etc). Either `type` or `options` may be present, but not both.
    * @type {string}
    * @memberof ShippingDetail
    */
   type?: ShippingDetailTypeEnum;
+  /**
+   * An array of shipping options that the payee or merchant offers to the payer to ship or pick up their items.
+   * @type {Array<ShippingOption>}
+   * @memberof ShippingDetail
+   */
+  options?: Array<ShippingOption>;
   /**
    *
    * @type {AddressPortable}
@@ -15169,10 +15682,65 @@ export interface ShippingDetail {
 export const ShippingDetailTypeEnum = {
   Shipping: 'SHIPPING',
   PickupInPerson: 'PICKUP_IN_PERSON',
+  PickupInStore: 'PICKUP_IN_STORE',
+  PickupFromPerson: 'PICKUP_FROM_PERSON',
 } as const;
 
 export type ShippingDetailTypeEnum =
   (typeof ShippingDetailTypeEnum)[keyof typeof ShippingDetailTypeEnum];
+
+/**
+ * The options that the payee or merchant offers to the payer to ship or pick up their items.
+ * @export
+ * @interface ShippingOption
+ */
+export interface ShippingOption {
+  /**
+   * A unique ID that identifies a payer-selected shipping option.
+   * @type {string}
+   * @memberof ShippingOption
+   */
+  id: string;
+  /**
+   * A description that the payer sees, which helps them choose an appropriate shipping option. For example, `Free Shipping`, `USPS Priority Shipping`, `Expédition prioritaire USPS`, or `USPS yōuxiān fā huò`. Localize this description to the payer\'s locale.
+   * @type {string}
+   * @memberof ShippingOption
+   */
+  label: string;
+  /**
+   *
+   * @type {ShippingType}
+   * @memberof ShippingOption
+   */
+  type?: ShippingType;
+  /**
+   *
+   * @type {Money}
+   * @memberof ShippingOption
+   */
+  amount?: Money;
+  /**
+   * If the API request sets `selected = true`, it represents the shipping option that the payee or merchant expects to be pre-selected for the payer when they first view the `shipping.options` in the PayPal Checkout experience. As part of the response if a `shipping.option` contains `selected=true`, it represents the shipping option that the payer selected during the course of checkout with PayPal. Only one `shipping.option` can be set to `selected=true`.
+   * @type {boolean}
+   * @memberof ShippingOption
+   */
+  selected: boolean;
+}
+
+/**
+ * A classification for the method of purchase fulfillment.
+ * @export
+ * @enum {string}
+ */
+
+export const ShippingType = {
+  Shipping: 'SHIPPING',
+  Pickup: 'PICKUP',
+  PickupInStore: 'PICKUP_IN_STORE',
+  PickupFromPerson: 'PICKUP_FROM_PERSON',
+} as const;
+
+export type ShippingType = (typeof ShippingType)[keyof typeof ShippingType];
 
 /**
  * The order shipping details.
@@ -15187,11 +15755,17 @@ export interface ShippingWithTrackingDetails {
    */
   name?: Name;
   /**
-   * The method by which the payer wants to get their items from the payee e.g shipping, in-person pickup. Either type or options but not both may be present.
+   * A classification for the method of purchase fulfillment (e.g shipping, in-store pickup, etc). Either `type` or `options` may be present, but not both.
    * @type {string}
    * @memberof ShippingWithTrackingDetails
    */
   type?: ShippingWithTrackingDetailsTypeEnum;
+  /**
+   * An array of shipping options that the payee or merchant offers to the payer to ship or pick up their items.
+   * @type {Array<ShippingOption>}
+   * @memberof ShippingWithTrackingDetails
+   */
+  options?: Array<ShippingOption>;
   /**
    *
    * @type {AddressPortable}
@@ -15209,6 +15783,8 @@ export interface ShippingWithTrackingDetails {
 export const ShippingWithTrackingDetailsTypeEnum = {
   Shipping: 'SHIPPING',
   PickupInPerson: 'PICKUP_IN_PERSON',
+  PickupInStore: 'PICKUP_IN_STORE',
+  PickupFromPerson: 'PICKUP_FROM_PERSON',
 } as const;
 
 export type ShippingWithTrackingDetailsTypeEnum =
@@ -15763,6 +16339,12 @@ export interface Tracker {
    */
   id?: string;
   /**
+   *
+   * @type {any}
+   * @memberof Tracker
+   */
+  status?: any;
+  /**
    * An array of details of items in the shipment.
    * @type {Array<TrackerItem>}
    * @memberof Tracker
@@ -15800,6 +16382,12 @@ export interface TrackerAllOf {
    */
   id?: string;
   /**
+   *
+   * @type {any}
+   * @memberof TrackerAllOf
+   */
+  status?: any;
+  /**
    * An array of details of items in the shipment.
    * @type {Array<TrackerItem>}
    * @memberof TrackerAllOf
@@ -15836,6 +16424,12 @@ export interface TrackerItem {
    * @memberof TrackerItem
    */
   sku?: string;
+  /**
+   * The URL to the item being purchased. Visible to buyer and used in buyer experiences.
+   * @type {string}
+   * @memberof TrackerItem
+   */
+  url?: string;
   /**
    * The URL of the item\'s image. File type and size restrictions apply. An image that violates these restrictions will not be honored.
    * @type {string}
@@ -16242,6 +16836,12 @@ export interface VaultPaypalWalletBase {
    */
   usage_type: VaultPaypalWalletBaseUsageTypeEnum;
   /**
+   *
+   * @type {any}
+   * @memberof VaultPaypalWalletBase
+   */
+  owner_id?: any;
+  /**
    * The customer type associated with the PayPal payment token. This is to indicate whether the customer acting on the merchant / platform is either a business or a consumer.
    * @type {string}
    * @memberof VaultPaypalWalletBase
@@ -16311,6 +16911,12 @@ export interface VaultPaypalWalletBaseAllOf {
    * @memberof VaultPaypalWalletBaseAllOf
    */
   usage_type?: VaultPaypalWalletBaseAllOfUsageTypeEnum;
+  /**
+   *
+   * @type {any}
+   * @memberof VaultPaypalWalletBaseAllOf
+   */
+  owner_id?: any;
   /**
    * The customer type associated with the PayPal payment token. This is to indicate whether the customer acting on the merchant / platform is either a business or a consumer.
    * @type {string}
@@ -16680,9 +17286,8 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Authorizes payment for an order. To successfully authorize payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#authorize-order\">Orders v2 errors</a>.</blockquote>
      * @summary Authorize payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -16691,21 +17296,16 @@ export const OrdersApiAxiosParamCreator = function (
      * @throws {RequiredError}
      */
     ordersAuthorize: async (
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
       orderAuthorizeRequest?: OrderAuthorizeRequest,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
-      // verify required parameter 'payPalRequestId' is not null or undefined
-      assertParamExists('ordersAuthorize', 'payPalRequestId', payPalRequestId);
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersAuthorize', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersAuthorize', 'contentType', contentType);
       const localVarPath = `/v2/checkout/orders/{id}/authorize`.replace(
         `{${'id'}}`,
         encodeURIComponent(String(id))
@@ -16756,10 +17356,6 @@ export const OrdersApiAxiosParamCreator = function (
           String(payPalAuthAssertion);
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
       setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -16784,9 +17380,8 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Captures payment for an order. To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#capture-order\">Orders v2 errors</a>.</blockquote>
      * @summary Capture payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -16795,21 +17390,16 @@ export const OrdersApiAxiosParamCreator = function (
      * @throws {RequiredError}
      */
     ordersCapture: async (
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
       orderCaptureRequest?: OrderCaptureRequest,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
-      // verify required parameter 'payPalRequestId' is not null or undefined
-      assertParamExists('ordersCapture', 'payPalRequestId', payPalRequestId);
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersCapture', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersCapture', 'contentType', contentType);
       const localVarPath = `/v2/checkout/orders/{id}/capture`.replace(
         `{${'id'}}`,
         encodeURIComponent(String(id))
@@ -16860,10 +17450,6 @@ export const OrdersApiAxiosParamCreator = function (
           String(payPalAuthAssertion);
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
       setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -16888,8 +17474,7 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Payer confirms their intent to pay for the the Order with the given payment source.
      * @summary Confirm the Order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {ConfirmOrderRequest} [confirmOrderRequest]
@@ -16898,7 +17483,6 @@ export const OrdersApiAxiosParamCreator = function (
      */
     ordersConfirm: async (
       id: string,
-      contentType: string,
       payPalClientMetadataId?: string,
       prefer?: string,
       confirmOrderRequest?: ConfirmOrderRequest,
@@ -16906,8 +17490,6 @@ export const OrdersApiAxiosParamCreator = function (
     ): Promise<RequestArgs> => {
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersConfirm', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersConfirm', 'contentType', contentType);
       const localVarPath =
         `/v2/checkout/orders/{id}/confirm-payment-source`.replace(
           `{${'id'}}`,
@@ -16946,10 +17528,6 @@ export const OrdersApiAxiosParamCreator = function (
         );
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       if (prefer != null) {
         localVarHeaderParameter['Prefer'] = String(prefer);
       }
@@ -16978,9 +17556,8 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Creates an order. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#create-order\">Orders v2 errors</a>.</blockquote>
      * @summary Create order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {OrderRequest} orderRequest
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [payPalPartnerAttributionId]
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
@@ -16988,18 +17565,13 @@ export const OrdersApiAxiosParamCreator = function (
      * @throws {RequiredError}
      */
     ordersCreate: async (
-      payPalRequestId: string,
-      contentType: string,
       orderRequest: OrderRequest,
+      payPalRequestId?: string,
       payPalPartnerAttributionId?: string,
       payPalClientMetadataId?: string,
       prefer?: string,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
-      // verify required parameter 'payPalRequestId' is not null or undefined
-      assertParamExists('ordersCreate', 'payPalRequestId', payPalRequestId);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersCreate', 'contentType', contentType);
       // verify required parameter 'orderRequest' is not null or undefined
       assertParamExists('ordersCreate', 'orderRequest', orderRequest);
       const localVarPath = `/v2/checkout/orders`;
@@ -17050,10 +17622,6 @@ export const OrdersApiAxiosParamCreator = function (
         localVarHeaderParameter['Prefer'] = String(prefer);
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
       setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -17078,22 +17646,18 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Shows details for an order, by ID.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#get-order\">Orders v2 errors</a>.</blockquote>
      * @summary Show order details
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [fields] A comma-separated list of fields that should be returned for the order. Valid filter field is &#x60;payment_source&#x60;.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     ordersGet: async (
       id: string,
-      contentType: string,
       fields?: string,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersGet', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersGet', 'contentType', contentType);
       const localVarPath = `/v2/checkout/orders/{id}`.replace(
         `{${'id'}}`,
         encodeURIComponent(String(id))
@@ -17129,10 +17693,6 @@ export const OrdersApiAxiosParamCreator = function (
         localVarQueryParameter['fields'] = fields;
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       setSearchParams(localVarUrlObj, localVarQueryParameter);
       let headersFromBaseOptions =
         baseOptions && baseOptions.headers ? baseOptions.headers : {};
@@ -17150,22 +17710,18 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Updates an order with a `CREATED` or `APPROVED` status. You cannot update an order with the `COMPLETED` status.<br/><br/>To make an update, you must provide a `reference_id`. If you omit this value with an order that contains only one purchase unit, PayPal sets the value to `default` which enables you to use the path: <code>\\\"/purchase_units/@reference_id==\'default\'/{attribute-or-object}\\\"</code>. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\\\"/api/rest/reference/orders/v2/errors/#patch-order\\\">Orders v2 errors</a>.</blockquote>Patchable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody><tr><td><code>intent</code></td><td>replace</td><td></td></tr><tr><td><code>payer</code></td><td>replace, add</td><td>Using replace op for <code>payer</code> will replace the whole <code>payer</code> object with the value sent in request.</td></tr><tr><td><code>purchase_units</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].custom_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].description</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payee.email</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].shipping.name</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.address</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.type</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].soft_descriptor</code></td><td>replace, remove</td><td></td></tr><tr><td><code>purchase_units[].amount</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].items</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].invoice_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction.disbursement_mode</code></td><td>replace</td><td>By default, <code>disbursement_mode</code> is <code>INSTANT</code>.</td></tr><tr><td><code>purchase_units[].payment_instruction.platform_fees</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.airline</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.card</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>application_context.client_configuration</code></td><td>replace, add</td><td></td></tr></tbody></table>
      * @summary Update order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     ordersPatch: async (
       id: string,
-      contentType: string,
       patch?: Array<Patch>,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersPatch', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersPatch', 'contentType', contentType);
       const localVarPath = `/v2/checkout/orders/{id}`.replace(
         `{${'id'}}`,
         encodeURIComponent(String(id))
@@ -17197,10 +17753,6 @@ export const OrdersApiAxiosParamCreator = function (
         configuration
       );
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
       setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -17225,8 +17777,7 @@ export const OrdersApiAxiosParamCreator = function (
     /**
      * Adds tracking information for an Order.
      * @summary Add tracking information for an Order.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {OrderTrackerRequest} orderTrackerRequest
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
      * @param {*} [options] Override http request option.
@@ -17234,15 +17785,12 @@ export const OrdersApiAxiosParamCreator = function (
      */
     ordersTrackCreate: async (
       id: string,
-      contentType: string,
       orderTrackerRequest: OrderTrackerRequest,
       payPalAuthAssertion?: string,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
       // verify required parameter 'id' is not null or undefined
       assertParamExists('ordersTrackCreate', 'id', id);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersTrackCreate', 'contentType', contentType);
       // verify required parameter 'orderTrackerRequest' is not null or undefined
       assertParamExists(
         'ordersTrackCreate',
@@ -17282,10 +17830,6 @@ export const OrdersApiAxiosParamCreator = function (
           String(payPalAuthAssertion);
       }
 
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
-
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
       setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -17320,9 +17864,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Authorizes payment for an order. To successfully authorize payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#authorize-order\">Orders v2 errors</a>.</blockquote>
      * @summary Authorize payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17331,9 +17874,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
      * @throws {RequiredError}
      */
     async ordersAuthorize(
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
@@ -17346,9 +17888,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
       ) => AxiosPromise<OrderAuthorizeResponse>
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersAuthorize(
-        payPalRequestId,
         id,
-        contentType,
+        payPalRequestId,
         prefer,
         payPalClientMetadataId,
         payPalAuthAssertion,
@@ -17365,9 +17906,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Captures payment for an order. To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#capture-order\">Orders v2 errors</a>.</blockquote>
      * @summary Capture payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17376,9 +17916,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
      * @throws {RequiredError}
      */
     async ordersCapture(
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
@@ -17388,9 +17927,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
       (axios?: AxiosInstance, basePath?: string) => AxiosPromise<Order>
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersCapture(
-        payPalRequestId,
         id,
-        contentType,
+        payPalRequestId,
         prefer,
         payPalClientMetadataId,
         payPalAuthAssertion,
@@ -17407,8 +17945,7 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Payer confirms their intent to pay for the the Order with the given payment source.
      * @summary Confirm the Order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {ConfirmOrderRequest} [confirmOrderRequest]
@@ -17417,7 +17954,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
      */
     async ordersConfirm(
       id: string,
-      contentType: string,
       payPalClientMetadataId?: string,
       prefer?: string,
       confirmOrderRequest?: ConfirmOrderRequest,
@@ -17427,7 +17963,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersConfirm(
         id,
-        contentType,
         payPalClientMetadataId,
         prefer,
         confirmOrderRequest,
@@ -17443,9 +17978,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Creates an order. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#create-order\">Orders v2 errors</a>.</blockquote>
      * @summary Create order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {OrderRequest} orderRequest
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [payPalPartnerAttributionId]
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
@@ -17453,9 +17987,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
      * @throws {RequiredError}
      */
     async ordersCreate(
-      payPalRequestId: string,
-      contentType: string,
       orderRequest: OrderRequest,
+      payPalRequestId?: string,
       payPalPartnerAttributionId?: string,
       payPalClientMetadataId?: string,
       prefer?: string,
@@ -17464,9 +17997,8 @@ export const OrdersApiFp = function (configuration?: Configuration) {
       (axios?: AxiosInstance, basePath?: string) => AxiosPromise<Order>
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersCreate(
-        payPalRequestId,
-        contentType,
         orderRequest,
+        payPalRequestId,
         payPalPartnerAttributionId,
         payPalClientMetadataId,
         prefer,
@@ -17482,15 +18014,13 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Shows details for an order, by ID.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#get-order\">Orders v2 errors</a>.</blockquote>
      * @summary Show order details
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [fields] A comma-separated list of fields that should be returned for the order. Valid filter field is &#x60;payment_source&#x60;.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     async ordersGet(
       id: string,
-      contentType: string,
       fields?: string,
       options?: AxiosRequestConfig
     ): Promise<
@@ -17498,7 +18028,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersGet(
         id,
-        contentType,
         fields,
         options
       );
@@ -17512,15 +18041,13 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Updates an order with a `CREATED` or `APPROVED` status. You cannot update an order with the `COMPLETED` status.<br/><br/>To make an update, you must provide a `reference_id`. If you omit this value with an order that contains only one purchase unit, PayPal sets the value to `default` which enables you to use the path: <code>\\\"/purchase_units/@reference_id==\'default\'/{attribute-or-object}\\\"</code>. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\\\"/api/rest/reference/orders/v2/errors/#patch-order\\\">Orders v2 errors</a>.</blockquote>Patchable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody><tr><td><code>intent</code></td><td>replace</td><td></td></tr><tr><td><code>payer</code></td><td>replace, add</td><td>Using replace op for <code>payer</code> will replace the whole <code>payer</code> object with the value sent in request.</td></tr><tr><td><code>purchase_units</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].custom_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].description</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payee.email</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].shipping.name</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.address</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.type</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].soft_descriptor</code></td><td>replace, remove</td><td></td></tr><tr><td><code>purchase_units[].amount</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].items</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].invoice_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction.disbursement_mode</code></td><td>replace</td><td>By default, <code>disbursement_mode</code> is <code>INSTANT</code>.</td></tr><tr><td><code>purchase_units[].payment_instruction.platform_fees</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.airline</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.card</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>application_context.client_configuration</code></td><td>replace, add</td><td></td></tr></tbody></table>
      * @summary Update order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     async ordersPatch(
       id: string,
-      contentType: string,
       patch?: Array<Patch>,
       options?: AxiosRequestConfig
     ): Promise<
@@ -17528,7 +18055,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     > {
       const localVarAxiosArgs = await localVarAxiosParamCreator.ordersPatch(
         id,
-        contentType,
         patch,
         options
       );
@@ -17542,8 +18068,7 @@ export const OrdersApiFp = function (configuration?: Configuration) {
     /**
      * Adds tracking information for an Order.
      * @summary Add tracking information for an Order.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {OrderTrackerRequest} orderTrackerRequest
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
      * @param {*} [options] Override http request option.
@@ -17551,7 +18076,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
      */
     async ordersTrackCreate(
       id: string,
-      contentType: string,
       orderTrackerRequest: OrderTrackerRequest,
       payPalAuthAssertion?: string,
       options?: AxiosRequestConfig
@@ -17561,7 +18085,6 @@ export const OrdersApiFp = function (configuration?: Configuration) {
       const localVarAxiosArgs =
         await localVarAxiosParamCreator.ordersTrackCreate(
           id,
-          contentType,
           orderTrackerRequest,
           payPalAuthAssertion,
           options
@@ -17590,9 +18113,8 @@ export const OrdersApiFactory = function (
     /**
      * Authorizes payment for an order. To successfully authorize payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#authorize-order\">Orders v2 errors</a>.</blockquote>
      * @summary Authorize payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17601,9 +18123,8 @@ export const OrdersApiFactory = function (
      * @throws {RequiredError}
      */
     ordersAuthorize(
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
@@ -17612,9 +18133,8 @@ export const OrdersApiFactory = function (
     ): AxiosPromise<OrderAuthorizeResponse> {
       return localVarFp
         .ordersAuthorize(
-          payPalRequestId,
           id,
-          contentType,
+          payPalRequestId,
           prefer,
           payPalClientMetadataId,
           payPalAuthAssertion,
@@ -17626,9 +18146,8 @@ export const OrdersApiFactory = function (
     /**
      * Captures payment for an order. To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#capture-order\">Orders v2 errors</a>.</blockquote>
      * @summary Capture payment for order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {string} [payPalClientMetadataId]
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17637,9 +18156,8 @@ export const OrdersApiFactory = function (
      * @throws {RequiredError}
      */
     ordersCapture(
-      payPalRequestId: string,
       id: string,
-      contentType: string,
+      payPalRequestId?: string,
       prefer?: string,
       payPalClientMetadataId?: string,
       payPalAuthAssertion?: string,
@@ -17648,9 +18166,8 @@ export const OrdersApiFactory = function (
     ): AxiosPromise<Order> {
       return localVarFp
         .ordersCapture(
-          payPalRequestId,
           id,
-          contentType,
+          payPalRequestId,
           prefer,
           payPalClientMetadataId,
           payPalAuthAssertion,
@@ -17662,8 +18179,7 @@ export const OrdersApiFactory = function (
     /**
      * Payer confirms their intent to pay for the the Order with the given payment source.
      * @summary Confirm the Order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
      * @param {ConfirmOrderRequest} [confirmOrderRequest]
@@ -17672,7 +18188,6 @@ export const OrdersApiFactory = function (
      */
     ordersConfirm(
       id: string,
-      contentType: string,
       payPalClientMetadataId?: string,
       prefer?: string,
       confirmOrderRequest?: ConfirmOrderRequest,
@@ -17681,7 +18196,6 @@ export const OrdersApiFactory = function (
       return localVarFp
         .ordersConfirm(
           id,
-          contentType,
           payPalClientMetadataId,
           prefer,
           confirmOrderRequest,
@@ -17692,9 +18206,8 @@ export const OrdersApiFactory = function (
     /**
      * Creates an order. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#create-order\">Orders v2 errors</a>.</blockquote>
      * @summary Create order
-     * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {OrderRequest} orderRequest
+     * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
      * @param {string} [payPalPartnerAttributionId]
      * @param {string} [payPalClientMetadataId]
      * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
@@ -17702,9 +18215,8 @@ export const OrdersApiFactory = function (
      * @throws {RequiredError}
      */
     ordersCreate(
-      payPalRequestId: string,
-      contentType: string,
       orderRequest: OrderRequest,
+      payPalRequestId?: string,
       payPalPartnerAttributionId?: string,
       payPalClientMetadataId?: string,
       prefer?: string,
@@ -17712,9 +18224,8 @@ export const OrdersApiFactory = function (
     ): AxiosPromise<Order> {
       return localVarFp
         .ordersCreate(
-          payPalRequestId,
-          contentType,
           orderRequest,
+          payPalRequestId,
           payPalPartnerAttributionId,
           payPalClientMetadataId,
           prefer,
@@ -17725,46 +18236,37 @@ export const OrdersApiFactory = function (
     /**
      * Shows details for an order, by ID.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#get-order\">Orders v2 errors</a>.</blockquote>
      * @summary Show order details
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} [fields] A comma-separated list of fields that should be returned for the order. Valid filter field is &#x60;payment_source&#x60;.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    ordersGet(
-      id: string,
-      contentType: string,
-      fields?: string,
-      options?: any
-    ): AxiosPromise<Order> {
+    ordersGet(id: string, fields?: string, options?: any): AxiosPromise<Order> {
       return localVarFp
-        .ordersGet(id, contentType, fields, options)
+        .ordersGet(id, fields, options)
         .then((request) => request(axios, basePath));
     },
     /**
      * Updates an order with a `CREATED` or `APPROVED` status. You cannot update an order with the `COMPLETED` status.<br/><br/>To make an update, you must provide a `reference_id`. If you omit this value with an order that contains only one purchase unit, PayPal sets the value to `default` which enables you to use the path: <code>\\\"/purchase_units/@reference_id==\'default\'/{attribute-or-object}\\\"</code>. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\\\"/api/rest/reference/orders/v2/errors/#patch-order\\\">Orders v2 errors</a>.</blockquote>Patchable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody><tr><td><code>intent</code></td><td>replace</td><td></td></tr><tr><td><code>payer</code></td><td>replace, add</td><td>Using replace op for <code>payer</code> will replace the whole <code>payer</code> object with the value sent in request.</td></tr><tr><td><code>purchase_units</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].custom_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].description</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payee.email</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].shipping.name</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.address</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.type</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].soft_descriptor</code></td><td>replace, remove</td><td></td></tr><tr><td><code>purchase_units[].amount</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].items</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].invoice_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction.disbursement_mode</code></td><td>replace</td><td>By default, <code>disbursement_mode</code> is <code>INSTANT</code>.</td></tr><tr><td><code>purchase_units[].payment_instruction.platform_fees</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.airline</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.card</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>application_context.client_configuration</code></td><td>replace, add</td><td></td></tr></tbody></table>
      * @summary Update order
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
     ordersPatch(
       id: string,
-      contentType: string,
       patch?: Array<Patch>,
       options?: any
     ): AxiosPromise<void> {
       return localVarFp
-        .ordersPatch(id, contentType, patch, options)
+        .ordersPatch(id, patch, options)
         .then((request) => request(axios, basePath));
     },
     /**
      * Adds tracking information for an Order.
      * @summary Add tracking information for an Order.
-     * @param {string} id The ID of the order for which to update payment details.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {OrderTrackerRequest} orderTrackerRequest
      * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
      * @param {*} [options] Override http request option.
@@ -17772,7 +18274,6 @@ export const OrdersApiFactory = function (
      */
     ordersTrackCreate(
       id: string,
-      contentType: string,
       orderTrackerRequest: OrderTrackerRequest,
       payPalAuthAssertion?: string,
       options?: any
@@ -17780,7 +18281,6 @@ export const OrdersApiFactory = function (
       return localVarFp
         .ordersTrackCreate(
           id,
-          contentType,
           orderTrackerRequest,
           payPalAuthAssertion,
           options
@@ -17800,9 +18300,8 @@ export class OrdersApi extends BaseAPI {
   /**
    * Authorizes payment for an order. To successfully authorize payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#authorize-order\">Orders v2 errors</a>.</blockquote>
    * @summary Authorize payment for order
-   * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
+   * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
    * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
    * @param {string} [payPalClientMetadataId]
    * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17812,9 +18311,8 @@ export class OrdersApi extends BaseAPI {
    * @memberof OrdersApi
    */
   public ordersAuthorize(
-    payPalRequestId: string,
     id: string,
-    contentType: string,
+    payPalRequestId?: string,
     prefer?: string,
     payPalClientMetadataId?: string,
     payPalAuthAssertion?: string,
@@ -17823,9 +18321,8 @@ export class OrdersApi extends BaseAPI {
   ) {
     return OrdersApiFp(this.configuration)
       .ordersAuthorize(
-        payPalRequestId,
         id,
-        contentType,
+        payPalRequestId,
         prefer,
         payPalClientMetadataId,
         payPalAuthAssertion,
@@ -17838,9 +18335,8 @@ export class OrdersApi extends BaseAPI {
   /**
    * Captures payment for an order. To successfully capture payment for an order, the buyer must first approve the order or a valid payment_source must be provided in the request. A buyer can approve the order upon being redirected to the rel:approve URL that was returned in the HATEOAS links in the create order response.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#capture-order\">Orders v2 errors</a>.</blockquote>
    * @summary Capture payment for order
-   * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
+   * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
    * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
    * @param {string} [payPalClientMetadataId]
    * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
@@ -17850,9 +18346,8 @@ export class OrdersApi extends BaseAPI {
    * @memberof OrdersApi
    */
   public ordersCapture(
-    payPalRequestId: string,
     id: string,
-    contentType: string,
+    payPalRequestId?: string,
     prefer?: string,
     payPalClientMetadataId?: string,
     payPalAuthAssertion?: string,
@@ -17861,9 +18356,8 @@ export class OrdersApi extends BaseAPI {
   ) {
     return OrdersApiFp(this.configuration)
       .ordersCapture(
-        payPalRequestId,
         id,
-        contentType,
+        payPalRequestId,
         prefer,
         payPalClientMetadataId,
         payPalAuthAssertion,
@@ -17876,8 +18370,7 @@ export class OrdersApi extends BaseAPI {
   /**
    * Payer confirms their intent to pay for the the Order with the given payment source.
    * @summary Confirm the Order
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
    * @param {string} [payPalClientMetadataId]
    * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
    * @param {ConfirmOrderRequest} [confirmOrderRequest]
@@ -17887,7 +18380,6 @@ export class OrdersApi extends BaseAPI {
    */
   public ordersConfirm(
     id: string,
-    contentType: string,
     payPalClientMetadataId?: string,
     prefer?: string,
     confirmOrderRequest?: ConfirmOrderRequest,
@@ -17896,7 +18388,6 @@ export class OrdersApi extends BaseAPI {
     return OrdersApiFp(this.configuration)
       .ordersConfirm(
         id,
-        contentType,
         payPalClientMetadataId,
         prefer,
         confirmOrderRequest,
@@ -17908,9 +18399,8 @@ export class OrdersApi extends BaseAPI {
   /**
    * Creates an order. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#create-order\">Orders v2 errors</a>.</blockquote>
    * @summary Create order
-   * @param {string} payPalRequestId The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
    * @param {OrderRequest} orderRequest
+   * @param {string} [payPalRequestId] The server stores keys for 6 hours. The API callers can request the times to up to 72 hours by speaking to their Account Manager.
    * @param {string} [payPalPartnerAttributionId]
    * @param {string} [payPalClientMetadataId]
    * @param {string} [prefer] The preferred server response upon successful completion of the request. Value is:&lt;ul&gt;&lt;li&gt;&lt;code&gt;return&#x3D;minimal&lt;/code&gt;. The server returns a minimal response to optimize communication between the API caller and the server. A minimal response includes the &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt; and HATEOAS links.&lt;/li&gt;&lt;li&gt;&lt;code&gt;return&#x3D;representation&lt;/code&gt;. The server returns a complete resource representation, including the current state of the resource.&lt;/li&gt;&lt;/ul&gt;
@@ -17919,9 +18409,8 @@ export class OrdersApi extends BaseAPI {
    * @memberof OrdersApi
    */
   public ordersCreate(
-    payPalRequestId: string,
-    contentType: string,
     orderRequest: OrderRequest,
+    payPalRequestId?: string,
     payPalPartnerAttributionId?: string,
     payPalClientMetadataId?: string,
     prefer?: string,
@@ -17929,9 +18418,8 @@ export class OrdersApi extends BaseAPI {
   ) {
     return OrdersApiFp(this.configuration)
       .ordersCreate(
-        payPalRequestId,
-        contentType,
         orderRequest,
+        payPalRequestId,
         payPalPartnerAttributionId,
         payPalClientMetadataId,
         prefer,
@@ -17943,29 +18431,22 @@ export class OrdersApi extends BaseAPI {
   /**
    * Shows details for an order, by ID.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\"/api/rest/reference/orders/v2/errors/#get-order\">Orders v2 errors</a>.</blockquote>
    * @summary Show order details
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
    * @param {string} [fields] A comma-separated list of fields that should be returned for the order. Valid filter field is &#x60;payment_source&#x60;.
    * @param {*} [options] Override http request option.
    * @throws {RequiredError}
    * @memberof OrdersApi
    */
-  public ordersGet(
-    id: string,
-    contentType: string,
-    fields?: string,
-    options?: AxiosRequestConfig
-  ) {
+  public ordersGet(id: string, fields?: string, options?: AxiosRequestConfig) {
     return OrdersApiFp(this.configuration)
-      .ordersGet(id, contentType, fields, options)
+      .ordersGet(id, fields, options)
       .then((request) => request(this.axios, this.basePath));
   }
 
   /**
    * Updates an order with a `CREATED` or `APPROVED` status. You cannot update an order with the `COMPLETED` status.<br/><br/>To make an update, you must provide a `reference_id`. If you omit this value with an order that contains only one purchase unit, PayPal sets the value to `default` which enables you to use the path: <code>\\\"/purchase_units/@reference_id==\'default\'/{attribute-or-object}\\\"</code>. Merchants and partners can add Level 2 and 3 data to payments to reduce risk and payment processing costs. For more information about processing payments, see <a href=\"https://developer.paypal.com/docs/checkout/advanced/processing/\">checkout</a> or <a href=\"https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/\">multiparty checkout</a>.<blockquote><strong>Note:</strong> For error handling and troubleshooting, see <a href=\\\"/api/rest/reference/orders/v2/errors/#patch-order\\\">Orders v2 errors</a>.</blockquote>Patchable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody><tr><td><code>intent</code></td><td>replace</td><td></td></tr><tr><td><code>payer</code></td><td>replace, add</td><td>Using replace op for <code>payer</code> will replace the whole <code>payer</code> object with the value sent in request.</td></tr><tr><td><code>purchase_units</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].custom_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].description</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payee.email</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].shipping.name</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.address</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].shipping.type</code></td><td>replace, add</td><td></td></tr><tr><td><code>purchase_units[].soft_descriptor</code></td><td>replace, remove</td><td></td></tr><tr><td><code>purchase_units[].amount</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].items</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].invoice_id</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction</code></td><td>replace</td><td></td></tr><tr><td><code>purchase_units[].payment_instruction.disbursement_mode</code></td><td>replace</td><td>By default, <code>disbursement_mode</code> is <code>INSTANT</code>.</td></tr><tr><td><code>purchase_units[].payment_instruction.platform_fees</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.airline</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>purchase_units[].supplementary_data.card</code></td><td>replace, add, remove</td><td></td></tr><tr><td><code>application_context.client_configuration</code></td><td>replace, add</td><td></td></tr></tbody></table>
    * @summary Update order
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
    * @param {Array<Patch>} [patch]
    * @param {*} [options] Override http request option.
    * @throws {RequiredError}
@@ -17973,20 +18454,18 @@ export class OrdersApi extends BaseAPI {
    */
   public ordersPatch(
     id: string,
-    contentType: string,
     patch?: Array<Patch>,
     options?: AxiosRequestConfig
   ) {
     return OrdersApiFp(this.configuration)
-      .ordersPatch(id, contentType, patch, options)
+      .ordersPatch(id, patch, options)
       .then((request) => request(this.axios, this.basePath));
   }
 
   /**
    * Adds tracking information for an Order.
    * @summary Add tracking information for an Order.
-   * @param {string} id The ID of the order for which to update payment details.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
+   * @param {string} id The ID of the order that the tracking information is associated with.
    * @param {OrderTrackerRequest} orderTrackerRequest
    * @param {string} [payPalAuthAssertion] An API-caller-provided JSON Web Token (JWT) assertion that identifies the merchant. For details, see &lt;a href&#x3D;\&quot;/api/rest/requests/#paypal-auth-assertion\&quot;&gt;PayPal-Auth-Assertion&lt;/a&gt;.
    * @param {*} [options] Override http request option.
@@ -17995,19 +18474,12 @@ export class OrdersApi extends BaseAPI {
    */
   public ordersTrackCreate(
     id: string,
-    contentType: string,
     orderTrackerRequest: OrderTrackerRequest,
     payPalAuthAssertion?: string,
     options?: AxiosRequestConfig
   ) {
     return OrdersApiFp(this.configuration)
-      .ordersTrackCreate(
-        id,
-        contentType,
-        orderTrackerRequest,
-        payPalAuthAssertion,
-        options
-      )
+      .ordersTrackCreate(id, orderTrackerRequest, payPalAuthAssertion, options)
       .then((request) => request(this.axios, this.basePath));
   }
 }
@@ -18021,11 +18493,10 @@ export const TrackersApiAxiosParamCreator = function (
 ) {
   return {
     /**
-     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr></tbody></table>
+     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr><tr><td><code>status</code></td><td>replace</td><td>Only patching status to CANCELLED is currently supported.</td></tr></tbody></table>
      * @summary Update or cancel tracking information for a PayPal order
-     * @param {string} id The ID of the order for which to update payment details.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} trackerId The order tracking ID.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -18033,7 +18504,6 @@ export const TrackersApiAxiosParamCreator = function (
     ordersTrackersPatch: async (
       id: string,
       trackerId: string,
-      contentType: string,
       patch?: Array<Patch>,
       options: AxiosRequestConfig = {}
     ): Promise<RequestArgs> => {
@@ -18041,8 +18511,6 @@ export const TrackersApiAxiosParamCreator = function (
       assertParamExists('ordersTrackersPatch', 'id', id);
       // verify required parameter 'trackerId' is not null or undefined
       assertParamExists('ordersTrackersPatch', 'trackerId', trackerId);
-      // verify required parameter 'contentType' is not null or undefined
-      assertParamExists('ordersTrackersPatch', 'contentType', contentType);
       const localVarPath = `/v2/checkout/orders/{id}/trackers/{tracker_id}`
         .replace(`{${'id'}}`, encodeURIComponent(String(id)))
         .replace(`{${'tracker_id'}}`, encodeURIComponent(String(trackerId)));
@@ -18069,10 +18537,6 @@ export const TrackersApiAxiosParamCreator = function (
         ['https://uri.paypal.com/services/payments/payment'],
         configuration
       );
-
-      if (contentType != null) {
-        localVarHeaderParameter['Content-Type'] = String(contentType);
-      }
 
       localVarHeaderParameter['Content-Type'] = 'application/json';
 
@@ -18106,11 +18570,10 @@ export const TrackersApiFp = function (configuration?: Configuration) {
   const localVarAxiosParamCreator = TrackersApiAxiosParamCreator(configuration);
   return {
     /**
-     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr></tbody></table>
+     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr><tr><td><code>status</code></td><td>replace</td><td>Only patching status to CANCELLED is currently supported.</td></tr></tbody></table>
      * @summary Update or cancel tracking information for a PayPal order
-     * @param {string} id The ID of the order for which to update payment details.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} trackerId The order tracking ID.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -18118,7 +18581,6 @@ export const TrackersApiFp = function (configuration?: Configuration) {
     async ordersTrackersPatch(
       id: string,
       trackerId: string,
-      contentType: string,
       patch?: Array<Patch>,
       options?: AxiosRequestConfig
     ): Promise<
@@ -18128,7 +18590,6 @@ export const TrackersApiFp = function (configuration?: Configuration) {
         await localVarAxiosParamCreator.ordersTrackersPatch(
           id,
           trackerId,
-          contentType,
           patch,
           options
         );
@@ -18154,11 +18615,10 @@ export const TrackersApiFactory = function (
   const localVarFp = TrackersApiFp(configuration);
   return {
     /**
-     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr></tbody></table>
+     * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr><tr><td><code>status</code></td><td>replace</td><td>Only patching status to CANCELLED is currently supported.</td></tr></tbody></table>
      * @summary Update or cancel tracking information for a PayPal order
-     * @param {string} id The ID of the order for which to update payment details.
+     * @param {string} id The ID of the order that the tracking information is associated with.
      * @param {string} trackerId The order tracking ID.
-     * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
      * @param {Array<Patch>} [patch]
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -18166,12 +18626,11 @@ export const TrackersApiFactory = function (
     ordersTrackersPatch(
       id: string,
       trackerId: string,
-      contentType: string,
       patch?: Array<Patch>,
       options?: any
     ): AxiosPromise<void> {
       return localVarFp
-        .ordersTrackersPatch(id, trackerId, contentType, patch, options)
+        .ordersTrackersPatch(id, trackerId, patch, options)
         .then((request) => request(axios, basePath));
     },
   };
@@ -18185,11 +18644,10 @@ export const TrackersApiFactory = function (
  */
 export class TrackersApi extends BaseAPI {
   /**
-   * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr></tbody></table>
+   * Updates or cancels the tracking information for a PayPal order, by ID. Updatable attributes or objects:<br/><br/><table><thead><th>Attribute</th><th>Op</th><th>Notes</th></thead><tbody></tr><tr><td><code>items</code></td><td>replace</td><td>Using replace op for <code>items</code> will replace the entire <code>items</code> object with the value sent in request.</td></tr><tr><td><code>notify_payer</code></td><td>replace, add</td><td></td></tr><tr><td><code>status</code></td><td>replace</td><td>Only patching status to CANCELLED is currently supported.</td></tr></tbody></table>
    * @summary Update or cancel tracking information for a PayPal order
-   * @param {string} id The ID of the order for which to update payment details.
+   * @param {string} id The ID of the order that the tracking information is associated with.
    * @param {string} trackerId The order tracking ID.
-   * @param {string} contentType The media type. Required for operations with a request body. The value is &#x60;application/&lt;format&gt;&#x60;, where &#x60;format&#x60; is &#x60;json&#x60;.
    * @param {Array<Patch>} [patch]
    * @param {*} [options] Override http request option.
    * @throws {RequiredError}
@@ -18198,12 +18656,11 @@ export class TrackersApi extends BaseAPI {
   public ordersTrackersPatch(
     id: string,
     trackerId: string,
-    contentType: string,
     patch?: Array<Patch>,
     options?: AxiosRequestConfig
   ) {
     return TrackersApiFp(this.configuration)
-      .ordersTrackersPatch(id, trackerId, contentType, patch, options)
+      .ordersTrackersPatch(id, trackerId, patch, options)
       .then((request) => request(this.axios, this.basePath));
   }
 }

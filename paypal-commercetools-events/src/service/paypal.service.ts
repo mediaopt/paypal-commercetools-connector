@@ -93,10 +93,6 @@ export const addDeliveryData = async (
   request: OrderTrackerRequest
 ) => {
   const endpoint = await getPayPalOrdersGateway(2000);
-  const response = await endpoint.ordersTrackCreate(
-    orderId,
-    'application/json',
-    request
-  );
+  const response = await endpoint.ordersTrackCreate(orderId, request);
   return response.data;
 };
