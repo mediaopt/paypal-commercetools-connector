@@ -435,13 +435,16 @@ describe('Testing PayPal aftersales', () => {
     if (!payPalOrder.purchase_units) {
       return;
     }
-    expect(payPalOrder?.purchase_units[0].shipping?.trackers).toHaveLength(1);
     if (!payPalOrder.purchase_units[0].shipping?.trackers) {
       return;
     }
+    expect(payPalOrder.purchase_units[0].shipping.trackers).toHaveLength(1);
+
+    expect(payPalOrder.purchase_units[0].shipping.trackers[0].id).toBeDefined();
+
     expect(
-      payPalOrder?.purchase_units[0].shipping?.trackers[0].id
-    ).toBeDefined();
+      payPalOrder.purchase_units[0].shipping.trackers[0].update_time
+    ).not.toBeDefined();
 
     // UPDATE TRACKING INFORMATION
 
