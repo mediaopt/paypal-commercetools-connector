@@ -6,6 +6,35 @@ import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
 import isBase64 = validator.isBase64;
 let configMock: any;
+
+const currencyData = {
+  type: 'centPrecision',
+  currencyCode: 'EUR',
+  fractionDigits: 2,
+};
+
+const taxedPrice = {
+  totalNet: {
+    ...currencyData,
+    centAmount: 6891,
+  },
+  totalGross: {
+    ...currencyData,
+    centAmount: 8200,
+  },
+  totalTax: {
+    ...currencyData,
+    centAmount: 1309,
+  },
+};
+
+const prices = {
+  totalPrice: {
+    ...currencyData,
+    centAmount: 8200,
+  },
+  taxedPrice,
+};
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
     getCart: jest.fn(() => {
@@ -25,10 +54,8 @@ const mockConfigModule = () => {
             price: {
               id: 'fb35cb7a-44e8-4065-a1d0-60ff1e69420c',
               value: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
+                ...currencyData,
                 centAmount: 8200,
-                fractionDigits: 2,
               },
               country: 'DE',
             },
@@ -41,60 +68,10 @@ const mockConfigModule = () => {
               id: 'ztfE6U8r',
               subRates: [],
             },
-            totalPrice: {
-              type: 'centPrecision',
-              currencyCode: 'EUR',
-              centAmount: 8200,
-              fractionDigits: 2,
-            },
-            taxedPrice: {
-              totalNet: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 6891,
-                fractionDigits: 2,
-              },
-              totalGross: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 8200,
-                fractionDigits: 2,
-              },
-              totalTax: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 1309,
-                fractionDigits: 2,
-              },
-            },
+            ...prices,
           },
         ],
-        totalPrice: {
-          type: 'centPrecision',
-          currencyCode: 'EUR',
-          centAmount: 8200,
-          fractionDigits: 2,
-        },
-        taxedPrice: {
-          totalNet: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 6891,
-            fractionDigits: 2,
-          },
-          totalGross: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 8200,
-            fractionDigits: 2,
-          },
-          totalTax: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 1309,
-            fractionDigits: 2,
-          },
-        },
+        ...prices,
       };
     }),
   }));
