@@ -360,4 +360,110 @@ describe('Testing PayPal aftersales', () => {
     expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
     expect(payPalOrder?.amount?.value).toBe('2.00');
   }, 30000);
+
+  test('tracking information', async () => {
+    configMock.getSettings = jest.fn(
+      () =>
+        ({
+          payPalIntent: 'Capture',
+        } as PayPalSettings)
+    );
+    const paymentRequest = {
+      obj: {
+        amountPlanned,
+        ...customFieldCreateOrder,
+      },
+    } as any;
+    let paymentResponse = await paymentController('Update', paymentRequest);
+    let payPalOrder = expectSuccessfulResponse(paymentResponse);
+    expect(payPalOrder).toHaveProperty('status', 'CREATED');
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      interfaceId: payPalOrder.id,
+      custom: {
+        fields: {
+          capturePayPalOrderRequest: JSON.stringify({
+            payment_source,
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'capturePayPalOrderResponse'
+    ) as Order;
+    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    if (!payPalOrder.purchase_units[0]?.payments?.captures) {
+      return;
+    }
+    const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
+
+    // CREATE TRACKING INFORMATION
+
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      transactions: [
+        {
+          type: 'Charge',
+          interactionId: capture?.id,
+          state: 'Success',
+        },
+      ],
+      custom: {
+        fields: {
+          createTrackingInformationRequest: JSON.stringify({
+            tracking_number: 'ABCDE',
+            carrier: 'OTHER',
+            carrier_name_other: 'New Carrier',
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'createTrackingInformationResponse'
+    ) as Order;
+    logger.info(JSON.stringify(payPalOrder));
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    expect(payPalOrder?.purchase_units[0].shipping?.trackers).toHaveLength(1);
+    if (!payPalOrder.purchase_units[0].shipping?.trackers) {
+      return;
+    }
+    expect(
+      payPalOrder?.purchase_units[0].shipping?.trackers[0].id
+    ).toBeDefined();
+
+    // UPDATE TRACKING INFORMATION
+
+    const trackerId = payPalOrder?.purchase_units[0].shipping.trackers[0].id;
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          updateTrackingInformationRequest: JSON.stringify({
+            trackingId: trackerId,
+            patch: [{ op: 'replace', path: '/notify_payer', value: true }],
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'updateTrackingInformationResponse'
+    ) as Order;
+    logger.info(JSON.stringify(payPalOrder));
+    expect(payPalOrder.status).toBe('success');
+  }, 30000);
 });
