@@ -114,6 +114,28 @@ mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
 
+const amountPlanned = {
+  centAmount: 8200,
+  fractionDigits: 2,
+  currencyCode: 'EUR',
+};
+
+const payment_source = {
+  card: {
+    number: 4012000033330026,
+    expiry: '2030-12',
+    security_code: '123',
+  },
+};
+
+const customFieldCreateOrder = {
+  custom: {
+    fields: {
+      createPayPalOrderRequest: '{}',
+    },
+  },
+};
+
 describe('Testing Braintree GetClient Token', () => {
   test('create client token', async () => {
     const paymentRequest = {
@@ -164,16 +186,8 @@ describe('Testing PayPal aftersales', () => {
   test('Settle an authorization', async () => {
     const paymentRequest = {
       obj: {
-        amountPlanned: {
-          centAmount: 8200,
-          fractionDigits: 2,
-          currencyCode: 'EUR',
-        },
-        custom: {
-          fields: {
-            createPayPalOrderRequest: '{}',
-          },
-        },
+        amountPlanned,
+        ...customFieldCreateOrder,
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -185,13 +199,7 @@ describe('Testing PayPal aftersales', () => {
       custom: {
         fields: {
           authorizePayPalOrderRequest: JSON.stringify({
-            payment_source: {
-              card: {
-                number: 4012000033330026,
-                expiry: '2030-12',
-                security_code: '123',
-              },
-            },
+            payment_source,
           }),
           PayPalOrderId: payPalOrder.id,
         },
@@ -283,16 +291,8 @@ describe('Testing PayPal aftersales', () => {
     );
     const paymentRequest = {
       obj: {
-        amountPlanned: {
-          centAmount: 8200,
-          fractionDigits: 2,
-          currencyCode: 'EUR',
-        },
-        custom: {
-          fields: {
-            createPayPalOrderRequest: '{}',
-          },
-        },
+        amountPlanned,
+        ...customFieldCreateOrder,
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -304,13 +304,7 @@ describe('Testing PayPal aftersales', () => {
       custom: {
         fields: {
           capturePayPalOrderRequest: JSON.stringify({
-            payment_source: {
-              card: {
-                number: 4012000033330026,
-                expiry: '2030-12',
-                security_code: '123',
-              },
-            },
+            payment_source,
           }),
           PayPalOrderId: payPalOrder.id,
         },
