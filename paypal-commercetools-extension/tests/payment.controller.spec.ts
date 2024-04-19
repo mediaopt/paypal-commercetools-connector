@@ -6,6 +6,35 @@ import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
 import isBase64 = validator.isBase64;
 let configMock: any;
+
+const currencyData = {
+  type: 'centPrecision',
+  currencyCode: 'EUR',
+  fractionDigits: 2,
+};
+
+const taxedPrice = {
+  totalNet: {
+    ...currencyData,
+    centAmount: 6891,
+  },
+  totalGross: {
+    ...currencyData,
+    centAmount: 8200,
+  },
+  totalTax: {
+    ...currencyData,
+    centAmount: 1309,
+  },
+};
+
+const prices = {
+  totalPrice: {
+    ...currencyData,
+    centAmount: 8200,
+  },
+  taxedPrice,
+};
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
     getCart: jest.fn(() => {
@@ -25,10 +54,8 @@ const mockConfigModule = () => {
             price: {
               id: 'fb35cb7a-44e8-4065-a1d0-60ff1e69420c',
               value: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
+                ...currencyData,
                 centAmount: 8200,
-                fractionDigits: 2,
               },
               country: 'DE',
             },
@@ -41,60 +68,10 @@ const mockConfigModule = () => {
               id: 'ztfE6U8r',
               subRates: [],
             },
-            totalPrice: {
-              type: 'centPrecision',
-              currencyCode: 'EUR',
-              centAmount: 8200,
-              fractionDigits: 2,
-            },
-            taxedPrice: {
-              totalNet: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 6891,
-                fractionDigits: 2,
-              },
-              totalGross: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 8200,
-                fractionDigits: 2,
-              },
-              totalTax: {
-                type: 'centPrecision',
-                currencyCode: 'EUR',
-                centAmount: 1309,
-                fractionDigits: 2,
-              },
-            },
+            ...prices,
           },
         ],
-        totalPrice: {
-          type: 'centPrecision',
-          currencyCode: 'EUR',
-          centAmount: 8200,
-          fractionDigits: 2,
-        },
-        taxedPrice: {
-          totalNet: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 6891,
-            fractionDigits: 2,
-          },
-          totalGross: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 8200,
-            fractionDigits: 2,
-          },
-          totalTax: {
-            type: 'centPrecision',
-            currencyCode: 'EUR',
-            centAmount: 1309,
-            fractionDigits: 2,
-          },
-        },
+        ...prices,
       };
     }),
   }));
@@ -113,6 +90,28 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
+
+const amountPlanned = {
+  centAmount: 8200,
+  fractionDigits: 2,
+  currencyCode: 'EUR',
+};
+
+const payment_source = {
+  card: {
+    number: 4012000033330026,
+    expiry: '2030-12',
+    security_code: '123',
+  },
+};
+
+const customFieldCreateOrder = {
+  custom: {
+    fields: {
+      createPayPalOrderRequest: '{}',
+    },
+  },
+};
 
 describe('Testing Braintree GetClient Token', () => {
   test('create client token', async () => {
@@ -164,16 +163,8 @@ describe('Testing PayPal aftersales', () => {
   test('Settle an authorization', async () => {
     const paymentRequest = {
       obj: {
-        amountPlanned: {
-          centAmount: 8200,
-          fractionDigits: 2,
-          currencyCode: 'EUR',
-        },
-        custom: {
-          fields: {
-            createPayPalOrderRequest: '{}',
-          },
-        },
+        amountPlanned,
+        ...customFieldCreateOrder,
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -185,13 +176,7 @@ describe('Testing PayPal aftersales', () => {
       custom: {
         fields: {
           authorizePayPalOrderRequest: JSON.stringify({
-            payment_source: {
-              card: {
-                number: 4012000033330026,
-                expiry: '2030-12',
-                security_code: '123',
-              },
-            },
+            payment_source,
           }),
           PayPalOrderId: payPalOrder.id,
         },
@@ -283,16 +268,8 @@ describe('Testing PayPal aftersales', () => {
     );
     const paymentRequest = {
       obj: {
-        amountPlanned: {
-          centAmount: 8200,
-          fractionDigits: 2,
-          currencyCode: 'EUR',
-        },
-        custom: {
-          fields: {
-            createPayPalOrderRequest: '{}',
-          },
-        },
+        amountPlanned,
+        ...customFieldCreateOrder,
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -304,13 +281,7 @@ describe('Testing PayPal aftersales', () => {
       custom: {
         fields: {
           capturePayPalOrderRequest: JSON.stringify({
-            payment_source: {
-              card: {
-                number: 4012000033330026,
-                expiry: '2030-12',
-                security_code: '123',
-              },
-            },
+            payment_source,
           }),
           PayPalOrderId: payPalOrder.id,
         },
@@ -388,5 +359,114 @@ describe('Testing PayPal aftersales', () => {
     logger.info(JSON.stringify(payPalOrder));
     expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
     expect(payPalOrder?.amount?.value).toBe('2.00');
+  }, 30000);
+
+  test('tracking information', async () => {
+    configMock.getSettings = jest.fn(
+      () =>
+        ({
+          payPalIntent: 'Capture',
+        } as PayPalSettings)
+    );
+    const paymentRequest = {
+      obj: {
+        amountPlanned,
+        ...customFieldCreateOrder,
+      },
+    } as any;
+    let paymentResponse = await paymentController('Update', paymentRequest);
+    let payPalOrder = expectSuccessfulResponse(paymentResponse);
+    expect(payPalOrder).toHaveProperty('status', 'CREATED');
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      interfaceId: payPalOrder.id,
+      custom: {
+        fields: {
+          capturePayPalOrderRequest: JSON.stringify({
+            payment_source,
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'capturePayPalOrderResponse'
+    ) as Order;
+    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    if (!payPalOrder.purchase_units[0]?.payments?.captures) {
+      return;
+    }
+    const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
+
+    // CREATE TRACKING INFORMATION
+
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      transactions: [
+        {
+          type: 'Charge',
+          interactionId: capture?.id,
+          state: 'Success',
+        },
+      ],
+      custom: {
+        fields: {
+          createTrackingInformationRequest: JSON.stringify({
+            tracking_number: 'ABCDE',
+            carrier: 'OTHER',
+            carrier_name_other: 'New Carrier',
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'createTrackingInformationResponse'
+    ) as Order;
+    logger.info(JSON.stringify(payPalOrder));
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    if (!payPalOrder.purchase_units[0].shipping?.trackers) {
+      return;
+    }
+    expect(payPalOrder.purchase_units[0].shipping.trackers).toHaveLength(1);
+
+    expect(payPalOrder.purchase_units[0].shipping.trackers[0].id).toBeDefined();
+
+    expect(
+      payPalOrder.purchase_units[0].shipping.trackers[0].update_time
+    ).not.toBeDefined();
+
+    // UPDATE TRACKING INFORMATION
+
+    const trackerId = payPalOrder?.purchase_units[0].shipping.trackers[0].id;
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          updateTrackingInformationRequest: JSON.stringify({
+            trackingId: trackerId,
+            patch: [{ op: 'replace', path: '/notify_payer', value: true }],
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'updateTrackingInformationResponse'
+    ) as Order;
+    logger.info(JSON.stringify(payPalOrder));
+    expect(payPalOrder.status).toBe('success');
   }, 30000);
 });
