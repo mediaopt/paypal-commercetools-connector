@@ -190,6 +190,30 @@ async function prepareCreateOrderRequest(
         },
       };
     }
+    if (request?.payment_source?.apple_pay && !request?.payment_source?.apple_pay?.vault_id) {
+      request.payment_source.apple_pay = {
+        stored_credential: {
+          payment_initiator: "CUSTOMER",
+          payment_type: "RECURRING"
+        },
+        attributes: {
+          vault: {
+            store_in_vault: 'ON_SUCCESS',
+          },
+          customer,
+        },
+        ...request.payment_source.apple_pay,
+      };
+    }
+  }
+  if (request?.payment_source?.apple_pay && request?.payment_source?.apple_pay?.vault_id) {
+    request.payment_source.apple_pay = {
+      stored_credential: {
+        payment_initiator: "MERCHANT",
+        payment_type: "RECURRING"
+      },
+      ...request.payment_source.apple_pay,
+    };
   }
   return request;
 }
