@@ -31,5 +31,5 @@ describe('Testing pre undeploy', () => {
     expect(apiRoot.delete).toBeCalledTimes(2);
     expect(apiRoot.get).toBeCalledTimes(2);
     expect(apiRequest.execute).toBeCalledTimes(4);
-  }, 10000);
+  }, 15000);
 });

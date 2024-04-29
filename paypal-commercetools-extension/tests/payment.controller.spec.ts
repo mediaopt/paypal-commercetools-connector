@@ -1,10 +1,10 @@
 import { PaymentReference } from '@commercetools/platform-sdk';
 import { describe, expect, test } from '@jest/globals';
-import validator from 'validator';
+import { isBase64 } from 'validator';
 import { Capture, Order, Refund } from '../src/paypal/checkout_api';
 import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
-import isBase64 = validator.isBase64;
+
 let configMock: any;
 
 const currencyData = {
