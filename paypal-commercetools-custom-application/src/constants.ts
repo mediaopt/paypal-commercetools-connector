@@ -4,7 +4,7 @@ import { entryPointUriPathToPermissionKeys } from '@commercetools-frontend/appli
 export const entryPointUriPath =
   typeof window === 'undefined'
     ? process.env.ENTRY_POINT_URI_PATH
-    : (window as any).app.entryPointUriPath;
+    : (window as any).app.entryPointUriPath ?? 'paypal-payment-panel';
 export const PERMISSIONS = entryPointUriPathToPermissionKeys(entryPointUriPath);
 
 export const GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME =
