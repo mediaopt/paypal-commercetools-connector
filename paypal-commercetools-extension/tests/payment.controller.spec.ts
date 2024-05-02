@@ -1,9 +1,9 @@
 import { PaymentReference } from '@commercetools/platform-sdk';
 import { describe, expect, test } from '@jest/globals';
-import { isBase64 } from 'validator';
 import { Capture, Order, Refund } from '../src/paypal/checkout_api';
 import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
+import validator from 'validator';
 
 let configMock: any;
 
@@ -133,7 +133,7 @@ describe('Testing Braintree GetClient Token', () => {
     expect(getClientTokenResponse).toBeDefined();
     expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
     const token = getClientTokenResponse?.value;
-    expect(isBase64(token)).toBeTruthy();
+    expect(validator.isBase64(token)).toBeTruthy();
     const data = JSON.parse(Buffer.from(token, 'base64').toString());
     expect(data).toBeDefined();
     expect(data).toHaveProperty('braintree');
