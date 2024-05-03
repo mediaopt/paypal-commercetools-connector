@@ -1,10 +1,17 @@
 import { TypedMoney } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import {
+  mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
+  mapPayPalRefundStatusToCommercetoolsTransactionState,
 } from '../src/utils/map.utils';
+import { RefundStatusEnum } from '../src/paypal/payments_api';
+
+const refundStatusEnum = (status: string) => {
+  return status as RefundStatusEnum;
+};
 describe('Testing map utilities', () => {
   test.each([
     { name: 'card', source: { card: { name: 'TEST' } } },
@@ -83,6 +90,46 @@ describe('Testing map utilities', () => {
           commercetoolsMoney.fractionDigits
         )
       ).toBe(commercetoolsMoney.centAmount);
+    }
+  );
+
+  test.each([
+    { paypalStatus: undefined, expectedResult: 'Failure' },
+    { paypalStatus: refundStatusEnum('COMPLETED'), expectedResult: 'Success' },
+    { paypalStatus: refundStatusEnum('FAILED'), expectedResult: 'Failure' },
+    { paypalStatus: refundStatusEnum('CANCELLED'), expectedResult: 'Failure' },
+    { paypalStatus: refundStatusEnum('PENDING'), expectedResult: 'Pending' },
+    { paypalStatus: refundStatusEnum('bla'), expectedResult: 'Pending' },
+  ])(
+    'paypal refund status to commercetools transaction state',
+    async ({ paypalStatus, expectedResult }) => {
+      expect(
+        mapPayPalRefundStatusToCommercetoolsTransactionState(paypalStatus)
+      ).toBe(expectedResult);
+    }
+  );
+
+  test.each([
+    {
+      carrier: undefined,
+      shippingCountry: undefined,
+      expectedCarrier: 'OTHER',
+    },
+    {
+      carrier: undefined,
+      shippingCountry: 'DE',
+      expectedCarrier: 'OTHER',
+    },
+    { carrier: 'OTHER', shippingCountry: undefined, expectedCarrier: 'OTHER' },
+    { carrier: 'OTHER', shippingCountry: 'DE', expectedCarrier: 'OTHER' },
+    { carrier: 'DHL', shippingCountry: undefined, expectedCarrier: 'DHL' },
+    { carrier: 'DHL', shippingCountry: 'DE', expectedCarrier: 'DHL_API' },
+  ])(
+    'test mapping of commercetools carrier to paypal',
+    async ({ carrier, shippingCountry, expectedCarrier }) => {
+      expect(
+        mapCommercetoolsCarrierToPayPalCarrier(carrier, shippingCountry)
+      ).toBe(expectedCarrier);
     }
   );
 });
