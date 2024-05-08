@@ -23,7 +23,6 @@ describe('Testing PayPal-commercetools-events Controller', () => {
   const payPalOrderId = 1234;
   const captureId = 12345;
   const orderId = '123';
-  const trackingNumber = '123456';
   const imageUrl = 'https://example.com/image.jpg';
   const parcelId = 'parcelId';
 
@@ -106,7 +105,10 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     return { validDeliveryItem, validLineItem, validResponseItem };
   };
 
-  const setMessage = (deliveryItems?: DeliveryItem[]) => {
+  const setMessage = (
+    trackingNumber: string,
+    deliveryItems?: DeliveryItem[]
+  ) => {
     return {
       type: 'ParcelAddedToDelivery',
       notificationType: 'Message',
@@ -132,8 +134,9 @@ describe('Testing PayPal-commercetools-events Controller', () => {
   };
 
   test('test parcel added with no items', async () => {
+    const trackingNumber = 'noItemsTrackingNumber';
     api = setApiMock([]);
-    const message = setMessage([]);
+    const message = setMessage(trackingNumber);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     const request = {
       body: {
@@ -161,10 +164,11 @@ describe('Testing PayPal-commercetools-events Controller', () => {
   });
 
   test('test parcel added with one item', async () => {
+    const trackingNumber = 'oneValidItemTrackingNumber';
     const { validDeliveryItem, validLineItem, validResponseItem } =
       setValidItems('oneParcelItem');
     api = setApiMock([validLineItem]);
-    const message = setMessage([validDeliveryItem]);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     const request = {
       body: {
@@ -192,10 +196,11 @@ describe('Testing PayPal-commercetools-events Controller', () => {
   });
 
   test('test parcel added with wrong item', async () => {
+    const trackingNumber = 'wrongItemTrackingNumber';
     const { validLineItem } = setValidItems('orderLineItem');
     const { validDeliveryItem } = setValidItems('parcelDeliveryItem');
     api = setApiMock([validLineItem]);
-    const message = setMessage([validDeliveryItem]);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     const request = {
       body: {
@@ -223,10 +228,11 @@ describe('Testing PayPal-commercetools-events Controller', () => {
   });
 
   test('test parcel items from order deliveries', async () => {
+    const trackingNumber = 'orderDeliveryItemTrackingNumber';
     const { validLineItem, validDeliveryItem, validResponseItem } =
       setValidItems('orderDeliveryitem');
     api = setApiMock([validLineItem], [validDeliveryItem]);
-    const message = setMessage();
+    const message = setMessage(trackingNumber);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     const request = {
       body: {
