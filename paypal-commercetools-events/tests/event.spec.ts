@@ -10,6 +10,7 @@ jest.mock('../src/service/paypal.service', () => ({
 }));
 import { post } from '../src/controllers/event.controller';
 import { DeliveryItem, LineItem } from '@commercetools/platform-sdk';
+import { TrackerItem } from '../src/paypal/checkout_api';
 
 describe('Testing PayPal-commercetools-events Controller', () => {
   function expectSuccessfulResponse(next: NextFunction, response: Response) {
@@ -96,13 +97,13 @@ describe('Testing PayPal-commercetools-events Controller', () => {
           : undefined,
       },
     };
-    const validResponseItem = {
+    const validTrackerItem = {
       name: itemId,
       quantity: `${itemsQuantity}`,
       productCode: undefined,
       image_url: images ? imageUrl : undefined,
     };
-    return { validDeliveryItem, validLineItem, validResponseItem };
+    return { validDeliveryItem, validLineItem, validTrackerItem };
   };
 
   const setMessage = (
@@ -133,6 +134,19 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     };
   };
 
+  const trackerData = (
+    trackingNumber: string,
+    trackerItems?: TrackerItem[]
+  ) => {
+    return {
+      tracking_number: trackingNumber,
+      carrier: 'DHL_API',
+      carrier_name_other: undefined,
+      capture_id: captureId,
+      items: trackerItems ?? [],
+    };
+  };
+
   test('test parcel added with no items', async () => {
     const trackingNumber = 'noItemsTrackingNumber';
     api = setApiMock([]);
@@ -154,18 +168,15 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     expectSuccessfulResponse(next, response);
     expect(api.withId).toBeCalledWith({ ID: orderId });
     expect(addDeliveryDataCallback).toBeCalledTimes(1);
-    expect(addDeliveryDataCallback).toBeCalledWith(payPalOrderId, {
-      capture_id: captureId,
-      carrier: 'DHL_API',
-      carrier_name_other: undefined,
-      tracking_number: trackingNumber,
-      items: [],
-    });
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber)
+    );
   });
 
   test('test parcel added with one item', async () => {
     const trackingNumber = 'oneValidItemTrackingNumber';
-    const { validDeliveryItem, validLineItem, validResponseItem } =
+    const { validDeliveryItem, validLineItem, validTrackerItem } =
       setValidItems('oneParcelItem');
     api = setApiMock([validLineItem]);
     const message = setMessage(trackingNumber, [validDeliveryItem]);
@@ -186,13 +197,10 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     expectSuccessfulResponse(next, response);
     expect(api.withId).toBeCalledWith({ ID: orderId });
     expect(addDeliveryDataCallback).toBeCalledTimes(2);
-    expect(addDeliveryDataCallback).toBeCalledWith(payPalOrderId, {
-      capture_id: captureId,
-      carrier: 'DHL_API',
-      carrier_name_other: undefined,
-      tracking_number: trackingNumber,
-      items: [validResponseItem],
-    });
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [validTrackerItem])
+    );
   });
 
   test('test parcel added with wrong item', async () => {
@@ -218,18 +226,15 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     expectSuccessfulResponse(next, response);
     expect(api.withId).toBeCalledWith({ ID: orderId });
     expect(addDeliveryDataCallback).toBeCalledTimes(3);
-    expect(addDeliveryDataCallback).toBeCalledWith(payPalOrderId, {
-      capture_id: captureId,
-      carrier: 'DHL_API',
-      carrier_name_other: undefined,
-      tracking_number: trackingNumber,
-      items: [],
-    });
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [])
+    );
   });
 
   test('test parcel items from order deliveries', async () => {
     const trackingNumber = 'orderDeliveryItemTrackingNumber';
-    const { validLineItem, validDeliveryItem, validResponseItem } =
+    const { validLineItem, validDeliveryItem, validTrackerItem } =
       setValidItems('orderDeliveryitem');
     api = setApiMock([validLineItem], [validDeliveryItem]);
     const message = setMessage(trackingNumber);
@@ -250,13 +255,10 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     expectSuccessfulResponse(next, response);
     expect(api.withId).toBeCalledWith({ ID: orderId });
     expect(addDeliveryDataCallback).toBeCalledTimes(4);
-    expect(addDeliveryDataCallback).toBeCalledWith(payPalOrderId, {
-      capture_id: captureId,
-      carrier: 'DHL_API',
-      carrier_name_other: undefined,
-      tracking_number: trackingNumber,
-      items: [validResponseItem],
-    });
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [validTrackerItem])
+    );
   });
 });
 
