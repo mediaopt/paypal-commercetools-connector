@@ -79,7 +79,7 @@ describe('Testing map utilities', () => {
       expectedPayPalAmount: '309.7',
     },
   ])(
-    'test mapping of commercetools amount to braintree amount and vise versa',
+    'test mapping of commercetools amount to PayPal amount and vise versa',
     ({ commercetoolsMoney, expectedPayPalAmount }) => {
       expect(mapCommercetoolsMoneyToPayPalMoney(commercetoolsMoney)).toBe(
         expectedPayPalAmount

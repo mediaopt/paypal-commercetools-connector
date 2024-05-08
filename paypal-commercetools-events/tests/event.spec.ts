@@ -10,7 +10,7 @@ jest.mock('../src/service/paypal.service', () => ({
 }));
 import { post } from '../src/controllers/event.controller';
 
-describe('Testing braintree-commercetools-events Controller', () => {
+describe('Testing PayPal-commercetools-events Controller', () => {
   function expectSuccessfulResponse(next: NextFunction, response: Response) {
     expect(next).toBeCalledTimes(0);
     expect(response.status).toBeCalledTimes(1);
