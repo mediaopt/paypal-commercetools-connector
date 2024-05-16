@@ -9,8 +9,10 @@ jest.mock('../src/service/paypal.service', () => ({
   addDeliveryData: addDeliveryDataCallback,
 }));
 import { post } from '../src/controllers/event.controller';
+import { DeliveryItem, LineItem } from '@commercetools/platform-sdk';
+import { TrackerItem } from '../src/paypal/checkout_api';
 
-describe('Testing braintree-commercetools-events Controller', () => {
+describe('Testing PayPal-commercetools-events Controller', () => {
   function expectSuccessfulResponse(next: NextFunction, response: Response) {
     expect(next).toBeCalledTimes(0);
     expect(response.status).toBeCalledTimes(1);
@@ -19,11 +21,17 @@ describe('Testing braintree-commercetools-events Controller', () => {
     expect(response.send).toBeCalledWith();
   }
 
-  test('test parcel added', async () => {
-    const payPalOrderId = 1234;
-    const captureId = 12345;
-    const orderId = '123';
-    api = {
+  const payPalOrderId = 1234;
+  const captureId = 12345;
+  const orderId = '123';
+  const imageUrl = 'https://example.com/image.jpg';
+  const parcelId = 'parcelId';
+
+  const setApiMock = (
+    orderLineItems?: Partial<LineItem>[],
+    orderDeliveryItems?: DeliveryItem[]
+  ) => {
+    return {
       customers: jest.fn(() => api),
       payments: jest.fn(() => api),
       orders: jest.fn(() => api),
@@ -45,6 +53,12 @@ describe('Testing braintree-commercetools-events Controller', () => {
             id: orderId,
             shippingAddress: { country: 'DE' },
             paymentInfo: { payments: [{ id: '12' }] },
+            lineItems: orderLineItems,
+            shippingInfo: {
+              deliveries: orderDeliveryItems
+                ? [{ parcels: [{ id: parcelId }], items: orderDeliveryItems }]
+                : undefined,
+            },
           },
         })
         .mockReturnValueOnce({
@@ -56,8 +70,47 @@ describe('Testing braintree-commercetools-events Controller', () => {
         }),
       post: jest.fn(() => api),
     };
-    const trackingNumber = '123456';
-    const message = {
+  };
+
+  const setValidItems = (
+    itemId: string,
+    quantity?: number,
+    images?: boolean
+  ) => {
+    const itemsQuantity = quantity ?? 1;
+    const validDeliveryItem: DeliveryItem = {
+      id: itemId,
+      quantity: itemsQuantity,
+    };
+    const validLineItem: Partial<LineItem> = {
+      id: itemId,
+      name: { name: itemId },
+      variant: {
+        id: 1,
+        images: images
+          ? [
+              {
+                url: imageUrl,
+                dimensions: { w: 1, h: 1 },
+              },
+            ]
+          : undefined,
+      },
+    };
+    const validTrackerItem = {
+      name: itemId,
+      quantity: `${itemsQuantity}`,
+      productCode: undefined,
+      image_url: images ? imageUrl : undefined,
+    };
+    return { validDeliveryItem, validLineItem, validTrackerItem };
+  };
+
+  const setMessage = (
+    trackingNumber: string,
+    deliveryItems?: DeliveryItem[]
+  ) => {
+    return {
       type: 'ParcelAddedToDelivery',
       notificationType: 'Message',
       id: '1',
@@ -70,13 +123,34 @@ describe('Testing braintree-commercetools-events Controller', () => {
       resourceVersion: 1,
       delivery: undefined,
       parcel: {
+        id: parcelId,
         trackingData: {
           trackingId: trackingNumber,
           carrier: 'DHL',
         },
+        items: deliveryItems,
         key: '',
       },
     };
+  };
+
+  const trackerData = (
+    trackingNumber: string,
+    trackerItems?: TrackerItem[]
+  ) => {
+    return {
+      tracking_number: trackingNumber,
+      carrier: 'DHL_API',
+      carrier_name_other: undefined,
+      capture_id: captureId,
+      items: trackerItems ?? [],
+    };
+  };
+
+  test('test parcel added with no items', async () => {
+    const trackingNumber = 'noItemsTrackingNumber';
+    api = setApiMock([]);
+    const message = setMessage(trackingNumber);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     const request = {
       body: {
@@ -94,12 +168,97 @@ describe('Testing braintree-commercetools-events Controller', () => {
     expectSuccessfulResponse(next, response);
     expect(api.withId).toBeCalledWith({ ID: orderId });
     expect(addDeliveryDataCallback).toBeCalledTimes(1);
-    expect(addDeliveryDataCallback).toBeCalledWith(payPalOrderId, {
-      capture_id: captureId,
-      carrier: 'DHL_API',
-      carrier_name_other: undefined,
-      tracking_number: trackingNumber,
-    });
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber)
+    );
+  });
+
+  test('test parcel added with one item', async () => {
+    const trackingNumber = 'oneValidItemTrackingNumber';
+    const { validDeliveryItem, validLineItem, validTrackerItem } =
+      setValidItems('oneParcelItem');
+    api = setApiMock([validLineItem]);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    const request = {
+      body: {
+        message: {
+          data: data,
+        },
+      },
+    } as unknown as Request;
+    const response = {
+      status: jest.fn(() => response),
+      send: jest.fn(),
+    } as unknown as Response;
+    const next = jest.fn();
+    await post(request, response, next);
+    expectSuccessfulResponse(next, response);
+    expect(api.withId).toBeCalledWith({ ID: orderId });
+    expect(addDeliveryDataCallback).toBeCalledTimes(2);
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [validTrackerItem])
+    );
+  });
+
+  test('test parcel added with wrong item', async () => {
+    const trackingNumber = 'wrongItemTrackingNumber';
+    const { validLineItem } = setValidItems('orderLineItem');
+    const { validDeliveryItem } = setValidItems('parcelDeliveryItem');
+    api = setApiMock([validLineItem]);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    const request = {
+      body: {
+        message: {
+          data: data,
+        },
+      },
+    } as unknown as Request;
+    const response = {
+      status: jest.fn(() => response),
+      send: jest.fn(),
+    } as unknown as Response;
+    const next = jest.fn();
+    await post(request, response, next);
+    expectSuccessfulResponse(next, response);
+    expect(api.withId).toBeCalledWith({ ID: orderId });
+    expect(addDeliveryDataCallback).toBeCalledTimes(3);
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [])
+    );
+  });
+
+  test('test parcel items from order deliveries', async () => {
+    const trackingNumber = 'orderDeliveryItemTrackingNumber';
+    const { validLineItem, validDeliveryItem, validTrackerItem } =
+      setValidItems('orderDeliveryitem');
+    api = setApiMock([validLineItem], [validDeliveryItem]);
+    const message = setMessage(trackingNumber);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    const request = {
+      body: {
+        message: {
+          data: data,
+        },
+      },
+    } as unknown as Request;
+    const response = {
+      status: jest.fn(() => response),
+      send: jest.fn(),
+    } as unknown as Response;
+    const next = jest.fn();
+    await post(request, response, next);
+    expectSuccessfulResponse(next, response);
+    expect(api.withId).toBeCalledWith({ ID: orderId });
+    expect(addDeliveryDataCallback).toBeCalledTimes(4);
+    expect(addDeliveryDataCallback).toBeCalledWith(
+      payPalOrderId,
+      trackerData(trackingNumber, [validTrackerItem])
+    );
   });
 });
 

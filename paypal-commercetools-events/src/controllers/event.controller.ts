@@ -1,11 +1,14 @@
 import { NextFunction, Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
 import { logger } from '../utils/logger.utils';
-import { MessagePayload } from '@commercetools/platform-sdk';
+import { DeliveryItem, MessagePayload } from '@commercetools/platform-sdk';
 import { getOrderById, getPaymentById } from '../service/commercetools.service';
 import { ParcelAddedToDeliveryMessagePayload } from '../types/index.types';
 import { findSuitableTransactionId } from '../service/payments.service';
-import { mapCommercetoolsCarrierToPayPalCarrier } from '../utils/map.utils';
+import {
+  mapCommercetoolsCarrierToPayPalCarrier,
+  mapItems,
+} from '../utils/map.utils';
 import { OrderTrackerRequest } from '../paypal/checkout_api';
 import { addDeliveryData } from '../service/paypal.service';
 import { getSettings } from '../service/config.service';
@@ -72,12 +75,22 @@ const handleParcelAddedToDelivery = async (
     parcel?.trackingData?.carrier,
     order.shippingAddress?.country
   );
+  const deliveryItems: DeliveryItem[] =
+    parcel.items ??
+    order.shippingInfo?.deliveries?.find(
+      (delivery) =>
+        !!delivery?.parcels?.find(
+          (deliveryParcel) => deliveryParcel.id === parcel.id
+        )
+    )?.items ??
+    [];
   const request = {
     tracking_number: parcel?.trackingData?.trackingId,
     carrier: carrier,
     carrier_name_other:
       carrier === 'OTHER' ? parcel?.trackingData?.carrier : undefined,
     capture_id: findSuitableTransactionId(payment, 'Charge'),
+    items: mapItems(order, deliveryItems),
   } as OrderTrackerRequest;
   logger.info(JSON.stringify(request));
   const response = await addDeliveryData(
