@@ -51,7 +51,7 @@ const handleParcelAddedToDelivery = async (
     return;
   }
   const parcel = message.parcel;
-  logger.info(parcel);
+  logger.info(`Parcel targeted for delivery: ${JSON.stringify(parcel)}`);
   const payment = (
     await Promise.all(
       order.paymentInfo?.payments.map(async ({ id }) => {
@@ -64,7 +64,9 @@ const handleParcelAddedToDelivery = async (
       })
     )
   ).find((id) => id);
-  logger.info(payment);
+  logger.info(
+    `Payment, related to target parcel ${parcel.id}, ${JSON.stringify(payment)}`
+  );
   if (!payment) {
     logger.info(
       `No charged PayPal payment assigned to order with id ${order.id}`
@@ -84,6 +86,7 @@ const handleParcelAddedToDelivery = async (
         )
     )?.items ??
     [];
+  logger.info(`Items targeted for delivery: ${JSON.stringify(deliveryItems)}`);
   const request = {
     tracking_number: parcel?.trackingData?.trackingId,
     carrier: carrier,
