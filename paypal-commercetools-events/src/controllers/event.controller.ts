@@ -78,14 +78,14 @@ const handleParcelAddedToDelivery = async (
     order.shippingAddress?.country
   );
   const deliveryItems: DeliveryItem[] =
-    parcel.items ??
-    order.shippingInfo?.deliveries?.find(
-      (delivery) =>
-        !!delivery?.parcels?.find(
-          (deliveryParcel) => deliveryParcel.id === parcel.id
-        )
-    )?.items ??
-    [];
+    parcel.items && parcel.items.length
+      ? parcel.items
+      : order.shippingInfo?.deliveries?.find(
+          (delivery) =>
+            !!delivery?.parcels?.find(
+              (deliveryParcel) => deliveryParcel.id === parcel.id
+            )
+        )?.items ?? [];
   logger.info(`Items targeted for delivery: ${JSON.stringify(deliveryItems)}`);
   const request = {
     tracking_number: parcel?.trackingData?.trackingId,
