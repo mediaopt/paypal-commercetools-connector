@@ -2,21 +2,19 @@
   <a href="https://commercetools.com/">
     <img alt="commercetools logo" src="https://unpkg.com/@commercetools-frontend/assets/logos/commercetools_primary-logo_horizontal_RGB.png">
   </a><br/>
-  <b>Connect Application Starter in TypeScript</b>
-</p>
+    <a href="https://www.paypal.com/de/business/accept-payments">
+    <img alt="PayPal logo" src="https://www.paypalobjects.com/webstatic/de_DE/i/de-pp-logo-200px.png">
+  </a><br>
 
-This is the `starter-typescript` template to develop [connect applications](https://marketplace.commercetools.com/) in TypeScript.
+This is a <a href="https://marketplace.commercetools.com/">connect application</a> to integrate PayPal into Commercetools. It follows the folder structure to ensure certification & deployment from commercetools connect team as stated <a href="https://github.com/commercetools/connect-application-kit#readme"> here </a>.
+
+</p>
 
 ## Instructions
 
-Use `create-connect-app` cli with `starter-typescript` as `template` value to download this template repository to build the integration application , folder structure needs to be followed to ensure certification & deployment from commercetools connect team as stated [here](https://github.com/commercetools/connect-application-kit#readme) 
-
-## Architecture principles for building an connect application 
-
-* Connector solution should be lightweight in nature
-* Connector solutions should follow test driven development. Unit , Integration (& E2E) tests should be included and successfully passed to be used
-* No hardcoding of customer related config. If needed, values in an environment file which should not be maintained in repository
-* Connector solution should be supported with detailed documentation
-* Connectors should be point to point in nature, currently doesnt support any persistence capabilities apart from in memory persistence
-* Connector solution should use open source technologies, although connector itself can be private for specific customer(s)
-* Code should not contain console.log statements, use [the included logger](https://github.com/commercetools/merchant-center-application-kit/tree/main/packages-backend/loggers#readme) instead.
+- `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
+- run `yarn` to install the dependencies
+- insert commercetools and PayPal credentials to `.env` file
+- run `./bin/ngrok.sh` or `ngrok http 8080` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
+- run `yarn connector:post-deploy` to register the extension with the public ngrok url
+- run `ỳarn start:dev` to build the application
