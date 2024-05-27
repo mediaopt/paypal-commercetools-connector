@@ -5,11 +5,13 @@
     <a href="https://www.paypal.com/de/business/accept-payments">
     <img alt="PayPal logo" src="https://www.paypalobjects.com/webstatic/de_DE/i/de-pp-logo-200px.png">
   </a><br>
-
-This is a <a href="https://marketplace.commercetools.com/">connect application</a> to integrate PayPal payment methods and package tracking into Commercetools. It follows the folder structure to ensure certification & deployment from commercetools connect team as stated <a href="https://github.com/commercetools/connect-application-kit#readme"> here </a>.
-[PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is also available in the commercetools marketplace.
-
 </p>
+
+This is a [connect application](https://marketplace.commercetools.com/) to integrate PayPal payment methods and package tracking into Commercetools. It follows the folder structure to ensure certification & deployment from commercetools connect team as stated [here](https://github.com/commercetools/connect-application-kit#readme).
+
+[PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
+
+The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/  and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
 ## Prerequisites
 
@@ -28,15 +30,15 @@ To use the connector you need to have the following:
 
 ## Instructions
 
-The [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect).
+The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect).
 
 To run the connector locally:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
 - run `yarn` to install the dependencies
 - insert commercetools and PayPal credentials to `.env` file
-- run `./bin/ngrok.sh` or `ngrok http 8080` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
-- run `yarn connector:post-deploy` to register the extension with the public ngrok url
+- for paypal-commercetools-extension run `./bin/ngrok.sh` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
+- for paypal-commercetools-extension run `yarn connector:post-deploy` to register the extension with the public ngrok url
 - run `ỳarn start:dev` to build the application
 
 ## Technology Stack
@@ -44,6 +46,7 @@ To run the connector locally:
 The connector is written in TypeScript and yarn is used as the package manager.
 
 ## Contributing
+
 Feel free to contribute to the project by opening an issue.
 
 ## Additional information
@@ -53,4 +56,3 @@ In the docs folder you can find:
 - description of each application included (README.md)
 - architecture of the connector (Architecture.pdf)
 - documented PayPal Commercetools API Postman collection (PayPal.md, paypal.postman_collection.json)
-
