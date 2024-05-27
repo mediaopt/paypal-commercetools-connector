@@ -21,7 +21,7 @@ To use the connector you need to have the following:
   - client ID (CTP_CLIENT_ID) - the ID of your commercetools API client
   - client secret (CTP_CLIENT_SECRET) - the secret of your commercetools API client
   - scope (CTP_SCOPE) - the scope of your commercetools API client
-- [PayPal business customer account](https://www.google.com/aclk?sa=l&ai=DChcSEwjPz82wyK2GAxWSiVAGHUwzAVoYABABGgJkZw&gclid=Cj0KCQjw3tCyBhDBARIsAEY0XNnOcx462M0ej3RizrdN9a_6fl2O5_bfwVqOOzyHxz_9M7L10B8NfL0aAgA6EALw_wcB&sig=AOD64_0bOBSNaFhCg-wypewofyWkrpoBWg&q&adurl&ved=2ahUKEwiIqcewyK2GAxXlSkEAHejBBbQQqyQoAHoECAIQDA) and credentials,namely:
+- [PayPal business customer account](https://www.google.com/aclk?sa=l&ai=DChcSEwjPz82wyK2GAxWSiVAGHUwzAVoYABABGgJkZw&gclid=Cj0KCQjw3tCyBhDBARIsAEY0XNnOcx462M0ej3RizrdN9a_6fl2O5_bfwVqOOzyHxz_9M7L10B8NfL0aAgA6EALw_wcB&sig=AOD64_0bOBSNaFhCg-wypewofyWkrpoBWg&q&adurl&ved=2ahUKEwiIqcewyK2GAxXlSkEAHejBBbQQqyQoAHoECAIQDA) and [API client](https://developer.paypal.com/api/rest/#link-getclientidandclientsecret) credentials,namely:
   - client ID (PAYPAL_CLIENT_ID) - the ID of your PayPal API client
   - client secret (PAYPAL_CLIENT_SECRET) - the secret of your PayPal API client
   - environment (PAYPAL_ENVIRONMENT) - the environment of your PayPal API client (production or sandbox)
