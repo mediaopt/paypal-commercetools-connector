@@ -41,6 +41,8 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
         * [PayPal](#ii-example-request-paypal)
         * [Venmo](#iii-example-request-venmo)
         * [Card](#iv-example-request-card)
+        * [Google Pay](#iv-example-request-google-pay)
+        * [Apple Pay](#iv-example-request-apple-pay)
     1. [getClientToken](#2-getclienttoken)
     1. [CaptureOrder](#3-captureorder)
     1. [CaptureAuthorization](#4-captureauthorization)
@@ -421,7 +423,83 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
+#### V. Example Request: Google Pay
 
+
+***Headers:***
+
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "createPayPalOrderRequest",
+            "value" : "{\"payment_source\":{\"google_pay\":{}}}"
+          }
+    ]
+}
+```
+
+
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+***Status Code:*** 0
+
+<br>
+
+#### VI. Example Request: Apple Pay
+
+
+***Headers:***
+
+| Key | Value | 
+| --- | ------|
+| Content-Type | application/json |  
+
+
+
+***Body:***
+
+```js        
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "createPayPalOrderRequest",
+            "value" : "{\"payment_source\":{\"apple_pay\":{}}}"
+          }
+    ]
+}
+```
+
+
+***🔑 Authentication oauth2***
+
+| Key         | Value                |
+|-------------|----------------------|
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+***Status Code:*** 0
+
+<br>
 
 ### 2. getClientToken
 
@@ -779,7 +857,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ### 9. updateTrackingInformation
 
 
-Create Tracking Data for Payment.
+Update Tracking Data for Payment.
 
 The order id will be read from the payment object and the capture_id will be used from the transactions.
 
