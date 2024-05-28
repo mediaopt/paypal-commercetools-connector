@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { describe, expect, test } from '@jest/globals';
 let api: any;
 const addDeliveryDataCallback = jest.fn();
@@ -13,23 +13,17 @@ import { DeliveryItem, LineItem } from '@commercetools/platform-sdk';
 import { TrackerItem } from '../src/paypal/checkout_api';
 
 describe('Testing PayPal-commercetools-events Controller', () => {
-  function expectSuccessfulResponse(next: NextFunction, response: Response) {
-    expect(next).toBeCalledTimes(0);
-    expect(response.status).toBeCalledTimes(1);
-    expect(response.status).toBeCalledWith(204);
-    expect(response.send).toBeCalledTimes(1);
-    expect(response.send).toBeCalledWith();
-  }
-
   const payPalOrderId = 1234;
   const captureId = 12345;
   const orderId = '123';
   const imageUrl = 'https://example.com/image.jpg';
   const parcelId = 'parcelId';
+  const itemsQuantity = [1, 2, 3, 4];
 
   const setApiMock = (
     orderLineItems?: Partial<LineItem>[],
-    orderDeliveryItems?: DeliveryItem[]
+    orderDeliveryItems?: DeliveryItem[],
+    sendTrackingToPayPal = true
   ) => {
     return {
       customers: jest.fn(() => api),
@@ -44,7 +38,7 @@ describe('Testing PayPal-commercetools-events Controller', () => {
         .mockReturnValueOnce({
           body: {
             value: {
-              sendTrackingToPayPal: true,
+              sendTrackingToPayPal,
             },
           },
         })
@@ -146,12 +140,7 @@ describe('Testing PayPal-commercetools-events Controller', () => {
       items: trackerItems ?? [],
     };
   };
-
-  test('test parcel added with no items', async () => {
-    const trackingNumber = 'noItemsTrackingNumber';
-    api = setApiMock([]);
-    const message = setMessage(trackingNumber);
-    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+  const expectTrackingResponse = async (data: string) => {
     const request = {
       body: {
         message: {
@@ -165,13 +154,48 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     } as unknown as Response;
     const next = jest.fn();
     await post(request, response, next);
-    expectSuccessfulResponse(next, response);
+    expect(next).toBeCalledTimes(0);
+    expect(response.status).toBeCalledTimes(1);
+    expect(response.status).toBeCalledWith(204);
+    expect(response.send).toBeCalledTimes(1);
+    expect(response.send).toBeCalledWith();
+  };
+
+  const expectSuccessFullTracking = async (
+    data: string,
+    trackingNumber: string,
+    calledTimes: number,
+    trackerItems?: TrackerItem[]
+  ) => {
+    await expectTrackingResponse(data);
     expect(api.withId).toBeCalledWith({ ID: orderId });
-    expect(addDeliveryDataCallback).toBeCalledTimes(1);
+    expect(addDeliveryDataCallback).toBeCalledTimes(calledTimes);
     expect(addDeliveryDataCallback).toBeCalledWith(
       payPalOrderId,
-      trackerData(trackingNumber)
+      trackerData(trackingNumber, trackerItems)
     );
+  };
+
+  test('test parcel added with disabled set tracking', async () => {
+    const trackingNumber = 'noTrackingTrackingNumber';
+    const { validDeliveryItem, validLineItem } = setValidItems(
+      'validItem',
+      1,
+      true
+    );
+    api = setApiMock([validLineItem], [validDeliveryItem], false);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectTrackingResponse(data);
+    expect(addDeliveryDataCallback).toBeCalledTimes(0);
+  });
+
+  test('test parcel added with no items', async () => {
+    const trackingNumber = 'noItemsTrackingNumber';
+    api = setApiMock([]);
+    const message = setMessage(trackingNumber);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectSuccessFullTracking(data, trackingNumber, 1);
   });
 
   test('test parcel added with one item', async () => {
@@ -181,26 +205,9 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     api = setApiMock([validLineItem]);
     const message = setMessage(trackingNumber, [validDeliveryItem]);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
-    const request = {
-      body: {
-        message: {
-          data: data,
-        },
-      },
-    } as unknown as Request;
-    const response = {
-      status: jest.fn(() => response),
-      send: jest.fn(),
-    } as unknown as Response;
-    const next = jest.fn();
-    await post(request, response, next);
-    expectSuccessfulResponse(next, response);
-    expect(api.withId).toBeCalledWith({ ID: orderId });
-    expect(addDeliveryDataCallback).toBeCalledTimes(2);
-    expect(addDeliveryDataCallback).toBeCalledWith(
-      payPalOrderId,
-      trackerData(trackingNumber, [validTrackerItem])
-    );
+    await expectSuccessFullTracking(data, trackingNumber, 2, [
+      validTrackerItem,
+    ]);
   });
 
   test('test parcel added with wrong item', async () => {
@@ -210,55 +217,81 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     api = setApiMock([validLineItem]);
     const message = setMessage(trackingNumber, [validDeliveryItem]);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
-    const request = {
-      body: {
-        message: {
-          data: data,
-        },
-      },
-    } as unknown as Request;
-    const response = {
-      status: jest.fn(() => response),
-      send: jest.fn(),
-    } as unknown as Response;
-    const next = jest.fn();
-    await post(request, response, next);
-    expectSuccessfulResponse(next, response);
-    expect(api.withId).toBeCalledWith({ ID: orderId });
-    expect(addDeliveryDataCallback).toBeCalledTimes(3);
-    expect(addDeliveryDataCallback).toBeCalledWith(
-      payPalOrderId,
-      trackerData(trackingNumber, [])
-    );
+    await expectSuccessFullTracking(data, trackingNumber, 3, []);
   });
 
-  test('test parcel items from order deliveries', async () => {
+  test('test parcel item from order delivery', async () => {
     const trackingNumber = 'orderDeliveryItemTrackingNumber';
     const { validLineItem, validDeliveryItem, validTrackerItem } =
       setValidItems('orderDeliveryitem');
     api = setApiMock([validLineItem], [validDeliveryItem]);
     const message = setMessage(trackingNumber);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
-    const request = {
-      body: {
-        message: {
-          data: data,
-        },
-      },
-    } as unknown as Request;
-    const response = {
-      status: jest.fn(() => response),
-      send: jest.fn(),
-    } as unknown as Response;
-    const next = jest.fn();
-    await post(request, response, next);
-    expectSuccessfulResponse(next, response);
-    expect(api.withId).toBeCalledWith({ ID: orderId });
-    expect(addDeliveryDataCallback).toBeCalledTimes(4);
-    expect(addDeliveryDataCallback).toBeCalledWith(
-      payPalOrderId,
-      trackerData(trackingNumber, [validTrackerItem])
-    );
+    await expectSuccessFullTracking(data, trackingNumber, 4, [
+      validTrackerItem,
+    ]);
+  });
+
+  test('test empty parcel items, but existing order delivery item', async () => {
+    const trackingNumber = 'orderDeliveryItemTrackingNumber2';
+    const { validLineItem, validDeliveryItem, validTrackerItem } =
+      setValidItems('orderDeliveryitem');
+    api = setApiMock([validLineItem], [validDeliveryItem]);
+    const message = setMessage(trackingNumber, []);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectSuccessFullTracking(data, trackingNumber, 5, [
+      validTrackerItem,
+    ]);
+  });
+
+  test('test parcel added with multiple items', async () => {
+    const trackingNumber = 'oneValidItemTrackingNumber';
+    const itemsArray = itemsQuantity.map((quantity) => {
+      return setValidItems(`arrayItems${quantity}`, quantity);
+    });
+    const validLineItems = itemsArray.map((item) => item.validLineItem);
+    const validDeliveryItems = itemsArray.map((item) => item.validDeliveryItem);
+    const validTrackerItems = itemsArray.map((item) => item.validTrackerItem);
+    api = setApiMock(validLineItems);
+    const message = setMessage(trackingNumber, validDeliveryItems);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectSuccessFullTracking(data, trackingNumber, 6, validTrackerItems);
+  });
+
+  test('test parcel added with some of multiple items', async () => {
+    const trackingNumber = 'oneValidItemTrackingNumber';
+    const itemsArray = itemsQuantity.map((quantity) => {
+      return setValidItems(`arrayItems${quantity}`, quantity);
+    });
+    const validLineItems = itemsArray.map((item) => item.validLineItem);
+    const validDeliveryItems = itemsArray
+      .map((item) => item.validDeliveryItem)
+      .slice(0, 2);
+    const validTrackerItems = itemsArray
+      .map((item) => item.validTrackerItem)
+      .slice(0, 2);
+    api = setApiMock(validLineItems);
+    const message = setMessage(trackingNumber, validDeliveryItems);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectSuccessFullTracking(data, trackingNumber, 7, validTrackerItems);
+  });
+
+  test('test parcel added with some of multiple items from delivery', async () => {
+    const trackingNumber = 'oneValidItemTrackingNumber';
+    const itemsArray = itemsQuantity.map((quantity) => {
+      return setValidItems(`arrayItems${quantity}`, quantity);
+    });
+    const validLineItems = itemsArray.map((item) => item.validLineItem);
+    const validDeliveryItems = itemsArray
+      .map((item) => item.validDeliveryItem)
+      .slice(0, 2);
+    const validTrackerItems = itemsArray
+      .map((item) => item.validTrackerItem)
+      .slice(0, 2);
+    api = setApiMock(validLineItems, validDeliveryItems);
+    const message = setMessage(trackingNumber, []);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    await expectSuccessFullTracking(data, trackingNumber, 8, validTrackerItems);
   });
 });
 
