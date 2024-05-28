@@ -404,7 +404,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
         {
             "action" : "setCustomField",
             "name" : "createPayPalOrderRequest",
-            "value" : "{\"storeInVaultOnSuccess\": true, \"paymentSource\":{\"card\":{}}}"
+            "value" : "{\"storeInVaultOnSuccess\": true, \"paymentSource\":{\"card\":{\"experience_context\": {\"return_url\": \"https://example.com/returnUrl\",\"cancel_url\": \"https://example.com/cancelUrl\"}}}}"
           }
     ]
 }
@@ -482,7 +482,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
         {
             "action" : "setCustomField",
             "name" : "createPayPalOrderRequest",
-            "value" : "{\"payment_source\":{\"apple_pay\":{}}}"
+            "value" : "{\"payment_source\":{\"apple_pay\":{\"experience_context\": {\"return_url\": \"https://example.com/returnUrl\",\"cancel_url\": \"https://example.com/cancelUrl\"}}}}"
           }
     ]
 }
