@@ -38,7 +38,7 @@ describe('Testing PayPal-commercetools-events Controller', () => {
         .mockReturnValueOnce({
           body: {
             value: {
-              sendTrackingToPayPal: sendTrackingToPayPal,
+              sendTrackingToPayPal,
             },
           },
         })
