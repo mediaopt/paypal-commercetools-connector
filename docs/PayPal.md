@@ -809,7 +809,8 @@ Create Tracking Data for Payment.
 
 The order id will be read from the payment object and the capture_id will be used from the transactions.
 
-Please provide a tracking_number, carrier and optionally a carrier_name_other.
+Please provide a tracking_number, carrier and optionally a carrier_name_other.  
+Custom items can be submitted at your own responsibility.
 
 
 ***Endpoint:***
@@ -861,7 +862,7 @@ Update Tracking Data for Payment.
 
 The order id will be read from the payment object and the capture_id will be used from the transactions.
 
-Please provide a tracking_number, carrier and optionally a carrier_name_other.
+Please provide a tracking_number and patch variable, that lists all required update operations according to [PayPal format](https://developer.paypal.com/docs/api/orders/v2/#orders_trackers_patch).
 
 
 ***Endpoint:***

@@ -86290,7 +86290,7 @@
 								}
 							]
 						},
-						"description": "Update Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other."
+						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other. \n\nCustom items can be submitted at your own responsibility."
 					},
 					"response": []
 				},
@@ -86375,7 +86375,7 @@
 								}
 							]
 						},
-						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other. \n\n Custom items can be submitted at your own responsibility."
+						"description": "Update Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number and patch variable, that lists all required update operations according to [PayPal format](https://developer.paypal.com/docs/api/orders/v2/#orders_trackers_patch)."
 					},
 					"response": []
 				},
