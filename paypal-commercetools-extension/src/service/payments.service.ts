@@ -63,6 +63,7 @@ async function prepareCreateOrderRequest(
   let request = JSON.parse(payment?.custom?.fields?.createPayPalOrderRequest);
   if (!request?.payment_source && request.paymentSource) {
     request.payment_source = request.paymentSource;
+    delete request.paymentSource;
   }
   const cart = await getCart(payment.id);
   if (request?.payment_source?.pay_upon_invoice) {
@@ -150,6 +151,7 @@ async function prepareCreateOrderRequest(
     ...request,
   } as OrderRequest;
   if (request?.storeInVaultOnSuccess) {
+    delete request.storeInVaultOnSuccess;
     const customer = {
       id: await getPayPalUserId(cart),
     };
