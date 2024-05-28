@@ -85658,6 +85658,44 @@
 							"header": null,
 							"cookie": [],
 							"body": null
+						},
+						{
+							"name": "Apple Pay",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"paymentSource\\\":{\\\"apple_pay\\\":{}}}\"\n          }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+									"host": [
+										"{{host}}"
+									],
+									"path": [
+										"{{project-key}}",
+										"payments",
+										"{{payment-id}}"
+									],
+									"query": [
+										{
+											"key": "expand",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"_postman_previewlanguage": null,
+							"header": null,
+							"cookie": [],
+							"body": null
 						}
 					]
 				},
