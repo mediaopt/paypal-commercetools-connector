@@ -85620,6 +85620,82 @@
 							"header": null,
 							"cookie": [],
 							"body": null
+						},
+						{
+							"name": "Google Pay",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"paymentSource\\\":{\\\"google_pay\\\":{}}}\"\n          }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+									"host": [
+										"{{host}}"
+									],
+									"path": [
+										"{{project-key}}",
+										"payments",
+										"{{payment-id}}"
+									],
+									"query": [
+										{
+											"key": "expand",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"_postman_previewlanguage": null,
+							"header": null,
+							"cookie": [],
+							"body": null
+						},
+						{
+							"name": "Apple Pay",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"paymentSource\\\":{\\\"apple_pay\\\":{}}}\"\n          }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+									"host": [
+										"{{host}}"
+									],
+									"path": [
+										"{{project-key}}",
+										"payments",
+										"{{payment-id}}"
+									],
+									"query": [
+										{
+											"key": "expand",
+											"value": "",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"_postman_previewlanguage": null,
+							"header": null,
+							"cookie": [],
+							"body": null
 						}
 					]
 				},
@@ -86214,7 +86290,7 @@
 								}
 							]
 						},
-						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other."
+						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other. \n\nCustom items can be submitted at your own responsibility."
 					},
 					"response": []
 				},
@@ -86299,7 +86375,7 @@
 								}
 							]
 						},
-						"description": "Create Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number, carrier and optionally a carrier_name_other."
+						"description": "Update Tracking Data for Payment.\n\nThe order id will be read from the payment object and the capture_id will be used from the transactions.\n\nPlease provide a tracking_number and patch variable, that lists all required update operations according to [PayPal format](https://developer.paypal.com/docs/api/orders/v2/#orders_trackers_patch)."
 					},
 					"response": []
 				},
