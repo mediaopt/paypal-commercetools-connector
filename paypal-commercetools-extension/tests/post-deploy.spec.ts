@@ -39,11 +39,11 @@ describe('Testing post deploy', () => {
     }));
     require('../src/connector/post-deploy');
     await sleep(19000);
+    expect(webhooksApi.webhooksList).toBeCalledTimes(1);
+    expect(webhooksApi.webhooksPost).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(8);
     expect(apiRoot.delete).toBeCalledTimes(0);
     expect(apiRoot.get).toBeCalledTimes(8);
     expect(apiRequest.execute).toBeCalledTimes(16);
-    expect(webhooksApi.webhooksList).toBeCalledTimes(1);
-    expect(webhooksApi.webhooksPost).toBeCalledTimes(1);
   }, 20000);
 });
