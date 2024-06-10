@@ -15,15 +15,18 @@ import {
   createCustomPaymentType,
   createPaymentUpdateExtension,
 } from './actions';
+import { logger } from '../utils/logger.utils';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
 async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
+  logger.info(`Connection to ${applicationUrl}`);
 
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
   const apiRoot = createApiRoot();
+  logger.info('root created');
   await createPaymentUpdateExtension(apiRoot, applicationUrl);
   await createCustomerUpdateExtension(apiRoot, applicationUrl);
   await createCustomPaymentType(apiRoot);
@@ -33,6 +36,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
     applicationUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH)
   );
   await createAndSetCustomObject(apiRoot);
+  logger.info('all root procedures passed');
 }
 
 async function run(): Promise<void> {
