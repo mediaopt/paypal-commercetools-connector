@@ -38,7 +38,7 @@ describe('Testing post deploy', () => {
       WebhooksApi: jest.fn().mockImplementation(() => webhooksApi),
     }));
     require('../src/connector/post-deploy');
-    await sleep(10000);
+    await sleep(19000);
     expect(apiRoot.post).toBeCalledTimes(8);
     expect(apiRoot.delete).toBeCalledTimes(0);
     expect(apiRoot.get).toBeCalledTimes(8);
