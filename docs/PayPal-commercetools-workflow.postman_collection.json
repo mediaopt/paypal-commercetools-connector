@@ -1,0 +1,1188 @@
+{
+  "info": {
+    "_postman_id": "f8f040fe-eb50-4706-8242-ca45846a1c44",
+    "name": "PayPal commercetools workflow",
+    "description": "Here we present a brief summary on how to use the PayPal Connect app standalone in Postman, without PayPal client application for commercetools frontend. All the calls in this collection are duplicating already existing commercetools or PayPal connector API. They are just arranged in order to provide a smooth workflow.\n\nThe collection is separated to two parts. First - Initial - is non method-specific pre-requisites, that provide cart and payment objects, that contain all the necessary data for all further demonstrated specific payment methods. The second mentions the workflow starting from the point, where specific data or actions are necessary. If all the methods from first part were called with proper data (briefly desribed here and at the specific methods themselves) - all the necessary data for initializing the second part are provided.\n\nFor simplicity only the necessary request data are provided. All optional data, not requested for successfull payment process, are ignored.\n\nThe aim of this collection is to provide the ability to go through the whole process starting from valid product in merchant center and having necessary commercetools and PayPal credentials.\n\nThe workflow for any specific method is:\n\n1. Run initial methods:\n    \n    1. Obtain access tocken (can be done once in postman session)\n    2. Get some product from your merchant center by id, to verify that it has tax category - some of PayPal methods require tax data. For pay upon invoise you need the total price between 5 Euro and 2500 euro\n    3. Create the cart. The necessary cart data for PayPal payments are in the example request body\n    4. Add the target product to cart\n    5. In create payment body set the uniquie key and the amount that matches your cart total payment and run the call\n        \n    6. Set custom type for payment, to support further create PayPal order request\n    7. Add payment to cart\n2. In payment specific methods only createPayPal order is required for each of the described processes. Of course the body data are different for each method. Some of the methods require extra authorisation step, that should be run in browser. In summary the flow looks like\n    \n    1. createPayPal order, if there are no other methods in this method folder - you are done\n    2. if response contains link with rel \"approve\" - open this link in browser and approve the payment. For sadbox testing you can use your sanbdox customer credentials or sandbox testing cards provided in the PayPal documentation.\n        \n    3. If the previous step was successfull - the payment version in commercetools will be updated, please use the get payment by id call to verify it.\n        \n    4. Finally capturePayPal order can be run.\n        \n\nFirter actions that only affect commercetools checkout, such as delete the cart, are out of scope of this collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "28234291",
+    "_collection_link": "https://mediaopt.postman.co/workspace/Commercetools-Connect-Applicati~ddb241ca-9fed-4e2f-a4e4-7accef0a9b89/collection/28234291-f8f040fe-eb50-4706-8242-ca45846a1c44?action=share&source=collection_link&creator=28234291"
+  },
+  "item": [
+    {
+      "name": "Initial",
+      "item": [
+        {
+          "name": "Obtain access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "tests[\"Status code is 200\"] = responseCode.code === 200;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.access_token){",
+                  "    pm.environment.set(\"ctp_access_token\", data.access_token);",
+                  "}",
+                  "if (data.scope) {",
+                  "    parts = data.scope.split(\" \");",
+                  "    parts = parts.filter(scope => scope.includes(\":\")).map(scope => scope.split(\":\"))",
+                  "    if (parts.length > 0) {",
+                  "        scopeParts = parts[0];",
+                  "        pm.environment.set(\"project-key\", scopeParts[1]);",
+                  "        parts = parts.filter(scope => scope.length >= 3)",
+                  "        if (parts.length > 0) {",
+                  "            scopeParts = parts[0];",
+                  "            pm.environment.set(\"store-key\", scopeParts[2]);",
+                  "        }",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{client_id}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{client_secret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{auth_url}}/oauth/token?grant_type=client_credentials",
+              "host": ["{{auth_url}}"],
+              "path": ["oauth", "token"],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                }
+              ]
+            },
+            "description": "Use this request to obtain an access token for your commercetools platform project via Client Credentials Flow. As a prerequisite you must have filled out environment variables in Postman for projectKey, client_id and client_secret to use this."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"product-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"product-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"product-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"product-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"product-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"product-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/products/a4f7c281-35fe-4a83-9b11-b123b37538db",
+              "host": ["{{host}}"],
+              "path": [
+                "{{project-key}}",
+                "products",
+                "a4f7c281-35fe-4a83-9b11-b123b37538db"
+              ],
+              "query": [
+                {
+                  "key": "priceCurrency",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "priceCountry",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "priceCustomerGroup",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "priceChannel",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "localeProjection",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "storeProjection",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Gets the full representation of a product by ID.\n\nIn this call get sure that the target product has the tax category, because it is used to calculate tax data necessary for PayPal order API."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"cart-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"cart-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"cart-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"cart-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"cart-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"cart-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"currency\": \"EUR\",\n    \"customerEmail\": \"required.for@invoice.payment\",\n    \"billingAddress\": {\n        \"country\": \"DE\",\n        \"postalCode\": \"11111\",\n        \"city\": \"Berlin\",\n        \"firstName\":\"Required\",\n        \"lastName\":\"Forinvoice\"\n    },\n        \"shippingAddress\": {\n        \"country\": \"DE\",\n        \"postalCode\": \"11111\",\n        \"city\": \"Berlin\",\n        \"firstName\":\"Required\",\n        \"lastName\":\"Forinvoice\"\n    },\n    \"shippingMode\":\"Single\"\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/carts",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "carts"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Creating a cart can fail with an InvalidOperation if the referenced shipping method in the  \nCartDraft has a predicate which does not match the cart.\n\nAll the data, provided in the cart creation step are necessary for pay upon invoise (of course in a real shop they can be added just before initializing the payment)."
+          },
+          "response": []
+        },
+        {
+          "name": "AddLineItem",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"cart-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"cart-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"cart-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"cart-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"cart-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"cart-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"version\": {{cart-version}},\n    \"actions\": [\n        {\n            \"action\" : \"addLineItem\",\n            \"productId\" : \"{{product-id}}\",\n            \"variantId\" : 1,\n            \"quantity\" : 1\n          }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/carts/{{cart-id}}",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "carts", "{{cart-id}}"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "For simplicity here we create the cart with just one proper product, that is already verified."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"payment-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"payment-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"payment-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"key\": \"bag6\",\n    \"amountPlanned\": {\n        \"currencyCode\": \"EUR\",\n        \"centAmount\": 11875\n    },\n    \"paymentMethodInfo\": {\n        \"paymentInterface\": \"PayPal\",\n        \"method\": \"\"\n    },\n    \"paymentStatus\": {\n        \"interfaceCode\": \"init\"\n    }\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/payments",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "payments"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "To create a payment object a payment draft object has to be given with the request.\n\nIn this payment we set the centAmount matching our cart, other fields should stay intact."
+          },
+          "response": []
+        },
+        {
+          "name": "SetCustomType For Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"payment-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"payment-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"payment-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomType\",\n            \"type\" : {\n              \"key\" : \"paypal-payment-type\",\n              \"typeId\" : \"type\"\n            }\n          }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Set the custom type of a payment to paypal-payment-type so that custom fields like createOrderRequest can be set."
+          },
+          "response": []
+        },
+        {
+          "name": "AddPayment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"cart-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"cart-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"cart-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"cart-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"cart-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"cart-key\", data.key);",
+                  "}",
+                  ""
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"version\": {{cart-version}},\n    \"actions\": [\n        {\n            \"action\" : \"addPayment\",\n            \"payment\" : {\n              \"id\" : \"{{payment-id}}\",\n              \"typeId\" : \"payment\"\n            }\n          }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/carts/{{cart-id}}",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "carts", "{{cart-id}}"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The created payment is finally added to the cart."
+          },
+          "response": []
+        },
+        {
+          "name": "getClientToken",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                  "var data = JSON.parse(responseBody);",
+                  "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                  "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                  "}",
+                  "if(data.results && data.results[0] && data.results[0].key){",
+                  "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                  "}",
+                  "if(data.version){",
+                  "    pm.environment.set(\"payment-version\", data.version);",
+                  "}",
+                  "if(data.id){",
+                  "    pm.environment.set(\"payment-id\", data.id); ",
+                  "}",
+                  "if(data.key){",
+                  "    pm.environment.set(\"payment-key\", data.key);",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {
+                  "key": "accessToken",
+                  "value": "{{ctp_access_token}}",
+                  "type": "string"
+                },
+                {
+                  "key": "addTokenTo",
+                  "value": "header",
+                  "type": "string"
+                },
+                {
+                  "key": "tokenType",
+                  "value": "Bearer",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"getClientTokenRequest\",\n            \"value\" : \"{}\"\n          }\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+              "host": ["{{host}}"],
+              "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+              "query": [
+                {
+                  "key": "expand",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "This step can be omited if cached tocken is already available in a system."
+          },
+          "response": []
+        }
+      ],
+      "description": "In this folder all the necessary requests to obtain cart and commercetools payment for successfull transaction carried by PayPal are gathered together and all fields of high importance are mentioned."
+    },
+    {
+      "name": "Payment specific",
+      "item": [
+        {
+          "name": "PayUponInvoice payment",
+          "item": [
+            {
+              "name": "createPayPalOrder",
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\": \"setCustomField\",\n            \"name\": \"createPayPalOrderRequest\",\n            \"value\": \"{\\\"clientMetadataId\\\": \\\"7b1fedd4-1fb4-4c6d-aacc-1f3e5f3c\\\", \\\"payment_source\\\": {\\\"pay_upon_invoice\\\":{\\\"birth_date\\\": \\\"1990-01-01\\\", \\\"phone\\\": {\\\"national_number\\\": \\\"6912345678\\\", \\\"country_code\\\": \\\"49\\\"}}}}\"\n        }\n    ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Pay upon invoise payment is the simplest one, because it doesn't require immediate approval of the transaction and checkout (money could be transferred within 30 days according to the regulations).\n\nThis is why it only requires one call - to create the PayPal order."
+        },
+        {
+          "name": "Card payment",
+          "item": [
+            {
+              "name": "createPayPalOrder",
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"storeInVaultOnSuccess\\\": false, \\\"paymentSource\\\":{\\\"card\\\":{}}}\"\n          }\n    ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Payment by id",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                      "var data = JSON.parse(responseBody);",
+                      "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                      "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                      "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                      "}",
+                      "if(data.results && data.results[0] && data.results[0].key){",
+                      "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                      "}",
+                      "if(data.version){",
+                      "    pm.environment.set(\"payment-version\", data.version);",
+                      "}",
+                      "if(data.id){",
+                      "    pm.environment.set(\"payment-id\", data.id); ",
+                      "}",
+                      "if(data.key){",
+                      "    pm.environment.set(\"payment-key\", data.key);",
+                      "}",
+                      ""
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "After approval on a user side payment version at commersetools side will be updated. So it should also be updated for the next step - capture transaction."
+              },
+              "response": []
+            },
+            {
+              "name": "CaptureOrder",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                      "var data = JSON.parse(responseBody);",
+                      "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                      "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                      "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                      "}",
+                      "if(data.results && data.results[0] && data.results[0].key){",
+                      "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                      "}",
+                      "if(data.version){",
+                      "    pm.environment.set(\"payment-version\", data.version);",
+                      "}",
+                      "if(data.id){",
+                      "    pm.environment.set(\"payment-id\", data.id); ",
+                      "}",
+                      "if(data.key){",
+                      "    pm.environment.set(\"payment-key\", data.key);",
+                      "}",
+                      ""
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"capturePayPalOrderRequest\",\n            \"value\" : \"{}\"\n          }\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Capture an order. The order id will be read from the payment object."
+              },
+              "response": []
+            }
+          ],
+          "description": "Card payment requires approval, the link can be found in create order response, link rel is \"approve\"."
+        },
+        {
+          "name": "PayPal payment",
+          "item": [
+            {
+              "name": "createPayPalOrder",
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"createPayPalOrderRequest\",\n            \"value\" : \"{\\\"payment_source\\\":{\\\"paypal\\\":{\\\"experience_context\\\": {\\\"return_url\\\": \\\"https://example.com/returnUrl\\\",\\\"cancel_url\\\": \\\"https://example.com/cancelUrl\\\"}}}}\"\n          }\n    ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Payment by id",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                      "var data = JSON.parse(responseBody);",
+                      "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                      "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                      "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                      "}",
+                      "if(data.results && data.results[0] && data.results[0].key){",
+                      "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                      "}",
+                      "if(data.version){",
+                      "    pm.environment.set(\"payment-version\", data.version);",
+                      "}",
+                      "if(data.id){",
+                      "    pm.environment.set(\"payment-id\", data.id); ",
+                      "}",
+                      "if(data.key){",
+                      "    pm.environment.set(\"payment-key\", data.key);",
+                      "}",
+                      ""
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "After approval on a user side payment version at commersetools side will be updated. So it should also be updated for the next step - capture transaction."
+              },
+              "response": []
+            },
+            {
+              "name": "CaptureOrder",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
+                      "var data = JSON.parse(responseBody);",
+                      "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
+                      "    pm.environment.set(\"payment-id\", data.results[0].id); ",
+                      "    pm.environment.set(\"payment-version\", data.results[0].version);",
+                      "}",
+                      "if(data.results && data.results[0] && data.results[0].key){",
+                      "    pm.environment.set(\"payment-key\", data.results[0].key); ",
+                      "}",
+                      "if(data.version){",
+                      "    pm.environment.set(\"payment-version\", data.version);",
+                      "}",
+                      "if(data.id){",
+                      "    pm.environment.set(\"payment-id\", data.id); ",
+                      "}",
+                      "if(data.key){",
+                      "    pm.environment.set(\"payment-key\", data.key);",
+                      "}",
+                      ""
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "oauth2",
+                  "oauth2": [
+                    {
+                      "key": "accessToken",
+                      "value": "{{ctp_access_token}}",
+                      "type": "string"
+                    },
+                    {
+                      "key": "addTokenTo",
+                      "value": "header",
+                      "type": "string"
+                    },
+                    {
+                      "key": "tokenType",
+                      "value": "Bearer",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"version\": {{payment-version}},\n    \"actions\": [\n        {\n            \"action\" : \"setCustomField\",\n            \"name\" : \"capturePayPalOrderRequest\",\n            \"value\" : \"{}\"\n          }\n    ]\n}"
+                },
+                "url": {
+                  "raw": "{{host}}/{{project-key}}/payments/{{payment-id}}",
+                  "host": ["{{host}}"],
+                  "path": ["{{project-key}}", "payments", "{{payment-id}}"],
+                  "query": [
+                    {
+                      "key": "expand",
+                      "value": "",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "Capture an order. The order id will be read from the payment object."
+              },
+              "response": []
+            }
+          ],
+          "description": "PayPal payment requires approval, the link can be found in create order response, link rel is \"approve\"."
+        }
+      ],
+      "description": "PLEASE NOTE, THAT MOST OF THE METHODS REQUIRES USER APPROVAL AFTER CREATE PAYPAL ORDER. IT MEANS THAT THE USER SHOULD FOLLOW THE LINK, PROVIDED IN THE RESPONSE.\n\nIn case if this is applicable for a certain method - it is mentioned in the method description."
+    }
+  ],
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "accessToken",
+        "value": "{{ctp_access_token}}",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "tokenType",
+        "value": "Bearer",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [""]
+      }
+    }
+  ]
+}
