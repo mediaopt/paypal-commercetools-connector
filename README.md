@@ -56,4 +56,4 @@ In the docs folder you can find:
 - description of each application included (README.md)
 - architecture of the connector (Architecture.pdf)
 - documented PayPal Commercetools API Postman collection (PayPal.md, paypal.postman_collection.json)
-- postman collection that summarizes the workflows for different payment methods (PayPal-commercetools-workflows.postman_collection.json)
+- Postman collection that summarizes the workflows for different payment methods (PayPal-commercetools-workflows.postman_collection.json)
