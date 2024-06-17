@@ -11,7 +11,7 @@ This is a [connect application](https://marketplace.commercetools.com/) to integ
 
 [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
 
-The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/  and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
+The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/ and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
 ## Prerequisites
 
@@ -56,3 +56,4 @@ In the docs folder you can find:
 - description of each application included (README.md)
 - architecture of the connector (Architecture.pdf)
 - documented PayPal Commercetools API Postman collection (PayPal.md, paypal.postman_collection.json)
+- postman collection that summarizes the workflows for different payment methods (PayPal-commercetools-workflows.postman_collection.json)
