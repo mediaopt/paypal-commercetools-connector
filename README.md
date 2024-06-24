@@ -1,4 +1,4 @@
-<p align="center">
+<p style="text-align: center">
   <a href="https://commercetools.com/">
     <img alt="commercetools logo" src="https://unpkg.com/@commercetools-frontend/assets/logos/commercetools_primary-logo_horizontal_RGB.png">
   </a><br/>
@@ -10,6 +10,8 @@
 This is a [connect application](https://marketplace.commercetools.com/) to integrate PayPal payment methods and package tracking into Commercetools. It follows the folder structure to ensure certification & deployment from commercetools connect team as stated [here](https://github.com/commercetools/connect-application-kit#readme).
 
 [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
+
+The connector must be used together with [PayPal client api](https://www.npmjs.com/package/paypal-commercetools-client) for the frontend integration.
 
 The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/ and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
