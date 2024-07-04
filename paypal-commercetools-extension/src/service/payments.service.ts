@@ -131,11 +131,6 @@ async function prepareCreateOrderRequest(
                 country_code: cart.shippingAddress.country,
               },
             },
-        payee: settings?.merchantId
-          ? {
-              merchant_id: settings.merchantId,
-            }
-          : undefined,
         invoice_id: payment.id,
         description: paymentDescription,
         items: cart?.lineItems?.map((lineItem) =>
