@@ -1,0 +1,40 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        directory: [
+          'paypal-commercetools-events',
+          'paypal-commercetools-extension',
+          'paypal-commercetools-custom-application'
+        ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: ${{ matrix.directory }}/yarn.lock
+
+      - name: Install dependencies
+        run: yarn
+        working-directory: ${{ matrix.directory }}
+
+      - name: Run tests
+        run: yarn test
+        working-directory: ${{ matrix.directory }}

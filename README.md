@@ -1,3 +1,7 @@
+![build](https://github.com/mediaopt/paypal-commercetools-connector/actions/workflows/build.yml/badge.svg)
+![test](https://github.com/mediaopt/paypal-commercetools-connector/actions/workflows/test.yml/badge.svg)
+![audit](https://github.com/mediaopt/paypal-commercetools-connector/actions/workflows/audit.yml/badge.svg)
+
 <p style="text-align: center">
   <a href="https://commercetools.com/">
     <img alt="commercetools logo" src="https://unpkg.com/@commercetools-frontend/assets/logos/commercetools_primary-logo_horizontal_RGB.png">
