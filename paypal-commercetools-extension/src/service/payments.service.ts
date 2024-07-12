@@ -131,7 +131,7 @@ async function prepareCreateOrderRequest(
                 country_code: cart.shippingAddress.country,
               },
             },
-        invoice_id: payment.id,
+        invoice_id: request?.custom_invoice_id ?? payment.id,
         description: paymentDescription,
         items: cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
@@ -145,6 +145,7 @@ async function prepareCreateOrderRequest(
     ],
     ...request,
   } as OrderRequest;
+  delete request?.custom_invoice_id;
   if (request?.storeInVaultOnSuccess) {
     delete request.storeInVaultOnSuccess;
     const customer = {
