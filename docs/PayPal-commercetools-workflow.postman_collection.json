@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "f8f040fe-eb50-4706-8242-ca45846a1c44",
     "name": "PayPal commercetools workflow",
-    "description": "This collection is provided for backend testing purpose only. It is strongly recommended to use [PayPal client app](https://www.npmjs.com/package/paypal-commercetools-client) for proper frontend integration.\n\n Here we present a brief summary on how to use the PayPal Connect app standalone in Postman, without PayPal client application for commercetools frontend. All the calls in this collection are duplicating already existing commercetools or PayPal connector API. They are just arranged in order to provide a smooth workflow.\n\nThe collection is separated to two parts. First - Initial - is non method-specific pre-requisites, that provide cart and payment objects, that contain all the necessary data for all further demonstrated specific payment methods. The second mentions the workflow starting from the point, where specific data or actions are necessary. If all the methods from first part were called with proper data (briefly described here and at the specific methods themselves) - all the necessary data for initializing the second part are provided.\n\nFor simplicity only the necessary request data are provided. All optional data, not requested for successful payment process, are ignored.\n\nThe aim of this collection is to provide the ability to go through the whole process starting from valid product in merchant center and having necessary commercetools and PayPal credentials.\n\nThe workflow for any specific method is:\n\n1. Run initial methods:\n    \n    1. Obtain access tocken (can be done once in postman session)\n    2. Get some product from your merchant center by id, to verify that it has tax category - some of PayPal methods require tax data. For pay upon invoise you need the total price between 5 Euro and 2500 euro\n    3. Create the cart. The necessary cart data for PayPal payments are in the example request body\n    4. Add the target product to cart\n    5. In create payment body set the uniquie key and the amount that matches your cart total payment and run the call\n        \n    6. Set custom type for payment, to support further create PayPal order request\n    7. Add payment to cart\n2. In payment specific methods only createPayPal order is required for each of the described processes. Of course the body data are different for each method. Some of the methods require extra authorisation step, that should be run in browser. In summary the flow looks like\n    \n    1. createPayPal order, if there are no other methods in this method folder - you are done\n    2. if response contains link with rel \"approve\" - open this link in browser and approve the payment. For sadbox testing you can use your sanbdox customer credentials or sandbox testing cards provided in the PayPal documentation.\n        \n    3. If the previous step was successfull - the payment version in commercetools will be updated, please use the get payment by id call to verify it.\n        \n    4. Finally capturePayPal order can be run.\n        \n\nFirter actions that only affect commercetools checkout, such as delete the cart, are out of scope of this collection.",
+    "description": "**This collection is provided for backend testing purpose only. It is strongly recommended to use** [<b>PayPal client app</b>](https://www.npmjs.com/package/paypal-commercetools-client) **or at least own** [<b>PayPal JS SDK</b>](https://developer.paypal.com/sdk/js/) **based implementation for proper frontend integration.**\n\nHere we present a brief summary on how to use the PayPal Connect app standalone in Postman (without PayPal client application for commercetools frontend). All the calls in this collection are duplicating already existing commercetools or PayPal connector API callse. They are just arranged in order to provide a smooth workflow. Additionally to the valid PayPal and commercetools credential at least one valid product in the commercetools merchant center is required. For simplicity only the necessary request data are provided. All optional data, not requested for successfull payment process, are ignored.\n\nThe collection is separated to two parts. First - Initial - is non method-specific pre-requisites, that provide cart and payment objects with all the necessary data for further demonstrated specific payment methods. The second mentions the workflow starting from the point, where specific data or actions are necessary. If all the methods from first part were called with proper data (briefly desribed here and at the specific methods themselves) - all the necessary data for initializing the second part are provided.\n\nThe workflow for any specific method is:\n\n1. Run initial methods:\n    \n    1. Obtain access tocken (can be done once in postman session)\n        \n    2. Get some product from your merchant center, in here we use search for a product call, but it cand be, for example, get by id. Please note that some payment methods might require product tax category and for pay upon invoise you need the total price between 5 Euro and 2500 euro\n        \n    3. Create the cart. The cart data sufficient for all for PayPal payments are in the example request body\n        \n    4. Add the target product to cart\n        \n    5. In create payment body set the amount that matches your cart total payment and run the call\n        \n    6. Set custom type for payment, to support further create PayPal order request\n        \n    7. Add payment to cart\n        \n2. In payment specific methods only createPayPal order is required for each of the described processes. The body data are different for each method. Some of the methods require extra authorisation step, that should be run in browser (mentioned separately near the method). In summary the flow looks like:\n    \n    1. createPayPal order, if there are no other methods in this method folder - you are done\n        \n    2. if response contains link with rel \"approve\" - open this link in browser and approve the payment. For sandbox testing you can use your sanbdox customer credentials or [ sandbox testing cards provided in the PayPal documentation](https://developer.paypal.com/tools/sandbox/card-testing/).\n        \n    3. If the previous step was successfull - the payment version in commercetools will be updated, please use the get payment by id call to verify it.\n        \n    4. Finally capturePayPal order can be run.\n\n\n Further actions that only affect commercetools checkout and don't involve connector app, such as delete the cart, are out of scope of this collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "28234291",
     "_collection_link": "https://mediaopt.postman.co/workspace/Commercetools-Connect-Applicati~ddb241ca-9fed-4e2f-a4e4-7accef0a9b89/collection/28234291-f8f040fe-eb50-4706-8242-ca45846a1c44?action=share&source=collection_link&creator=28234291"
@@ -79,7 +79,7 @@
           "response": []
         },
         {
-          "name": "Get Product by id",
+          "name": "Search for a product",
           "event": [
             {
               "listen": "test",
@@ -88,20 +88,22 @@
                   "tests[\"Status code \" + responseCode.code] = responseCode.code === 200 || responseCode.code === 201;",
                   "var data = JSON.parse(responseBody);",
                   "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
-                  "    pm.environment.set(\"product-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"product-projection-id\", data.results[0].id); ",
+                  "    pm.environment.set(\"product-projection-version\", data.results[0].version);",
+                  "    pm.environment.set(\"product-id\", data.results[0].id);",
                   "    pm.environment.set(\"product-version\", data.results[0].version);",
                   "}",
                   "if(data.results && data.results[0] && data.results[0].key){",
-                  "    pm.environment.set(\"product-key\", data.results[0].key); ",
+                  "    pm.environment.set(\"product-projection-key\", data.results[0].key); ",
                   "}",
                   "if(data.version){",
-                  "    pm.environment.set(\"product-version\", data.version);",
+                  "    pm.environment.set(\"product-projection-version\", data.version);",
                   "}",
                   "if(data.id){",
-                  "    pm.environment.set(\"product-id\", data.id); ",
+                  "    pm.environment.set(\"product-projection-id\", data.id); ",
                   "}",
                   "if(data.key){",
-                  "    pm.environment.set(\"product-key\", data.key);",
+                  "    pm.environment.set(\"product-projection-key\", data.key);",
                   "}",
                   ""
                 ],
@@ -146,52 +148,17 @@
               "raw": ""
             },
             "url": {
-              "raw": "{{host}}/{{project-key}}/products/a4f7c281-35fe-4a83-9b11-b123b37538db",
+              "raw": "{{host}}/{{project-key}}/product-projections?limit=1",
               "host": ["{{host}}"],
-              "path": [
-                "{{project-key}}",
-                "products",
-                "a4f7c281-35fe-4a83-9b11-b123b37538db"
-              ],
+              "path": ["{{project-key}}", "product-projections"],
               "query": [
                 {
-                  "key": "priceCurrency",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "priceCountry",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "priceCustomerGroup",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "priceChannel",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "localeProjection",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "storeProjection",
-                  "value": "",
-                  "disabled": true
-                },
-                {
-                  "key": "expand",
-                  "value": "",
-                  "disabled": true
+                  "key": "limit",
+                  "value": "1"
                 }
               ]
             },
-            "description": "Gets the full representation of a product by ID.\n\nIn this call get sure that the target product has the tax category, because it is used to calculate tax data necessary for PayPal order API."
+            "description": "You can use the product projections query endpoint to get the current or staged representations of Products.  \nWhen used with an API client that has the view_published_products:{projectKey} scope,  \nthis endpoint only returns published (current) product projections."
           },
           "response": []
         },
@@ -416,7 +383,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"key\": \"bag6\",\n    \"amountPlanned\": {\n        \"currencyCode\": \"EUR\",\n        \"centAmount\": 11875\n    },\n    \"paymentMethodInfo\": {\n        \"paymentInterface\": \"PayPal\",\n        \"method\": \"\"\n    },\n    \"paymentStatus\": {\n        \"interfaceCode\": \"init\"\n    }\n}"
+              "raw": "{\n    \"amountPlanned\": {\n        \"currencyCode\": \"EUR\",\n        \"centAmount\": 11875\n    },\n    \"paymentMethodInfo\": {\n        \"paymentInterface\": \"PayPal\",\n        \"method\": \"\"\n    },\n    \"paymentStatus\": {\n        \"interfaceCode\": \"init\"\n    }\n}"
             },
             "url": {
               "raw": "{{host}}/{{project-key}}/payments",
