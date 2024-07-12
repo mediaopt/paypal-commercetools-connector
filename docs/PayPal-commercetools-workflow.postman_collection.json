@@ -90,6 +90,8 @@
                   "if(data.results && data.results[0] && data.results[0].id && data.results[0].version){",
                   "    pm.environment.set(\"product-projection-id\", data.results[0].id); ",
                   "    pm.environment.set(\"product-projection-version\", data.results[0].version);",
+                  "    pm.environment.set(\"product-id\", data.results[0].id);",
+                  "    pm.environment.set(\"product-version\", data.results[0].version);",
                   "}",
                   "if(data.results && data.results[0] && data.results[0].key){",
                   "    pm.environment.set(\"product-projection-key\", data.results[0].key); ",
