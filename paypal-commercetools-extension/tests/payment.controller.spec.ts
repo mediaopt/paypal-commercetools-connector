@@ -4,6 +4,7 @@ import { Capture, Order, Refund } from '../src/paypal/checkout_api';
 import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
 import validator from 'validator';
+import {randomUUID} from "crypto";
 
 let configMock: any;
 
@@ -161,10 +162,16 @@ function expectSuccessfulResponse(
 
 describe('Testing PayPal aftersales', () => {
   test('Settle an authorization', async () => {
+    const customInvoiceId = randomUUID();
     const paymentRequest = {
       obj: {
         amountPlanned,
-        ...customFieldCreateOrder,
+        custom: {
+          fields: {
+            createPayPalOrderRequest: JSON.stringify({custom_invoice_id: customInvoiceId}),
+          },
+        },
+        id: randomUUID(),
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -201,6 +208,7 @@ describe('Testing PayPal aftersales', () => {
     let authorization =
       payPalOrder.purchase_units[0]?.payments?.authorizations[0];
     expect(authorization?.amount?.value).toBe('82.00');
+    expect(authorization?.invoice_id).toBe(customInvoiceId);
     expect(authorization?.status).toBe('CREATED');
 
     // GET ORDER REQUEST
@@ -270,6 +278,7 @@ describe('Testing PayPal aftersales', () => {
       obj: {
         amountPlanned,
         ...customFieldCreateOrder,
+        id: randomUUID(),
       },
     } as any;
     let paymentResponse = await paymentController('Update', paymentRequest);
@@ -305,6 +314,7 @@ describe('Testing PayPal aftersales', () => {
     const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
     expect(capture?.amount?.value).toBe('82.00');
     expect(capture?.status).toBe('COMPLETED');
+    expect(capture?.invoice_id).toBe(paymentRequest.obj.id);
 
     // GET ORDER REQUEST
 
@@ -332,6 +342,7 @@ describe('Testing PayPal aftersales', () => {
     logger.info(JSON.stringify(payPalCapture));
     expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
     expect(payPalCapture.amount?.value).toBe('82.00');
+    expect(payPalCapture?.invoice_id).toBe(paymentRequest.obj.id);
 
     // REFUND
 
