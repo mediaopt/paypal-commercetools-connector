@@ -4,6 +4,7 @@ import Text from '@commercetools-uikit/text';
 import messages from './messages';
 import Link from '@commercetools-uikit/link';
 import Spacings from '@commercetools-uikit/spacings';
+import { entryPointUriPath } from '../../constants';
 
 type TWrapWithProps = {
   children: ReactNode;
@@ -14,8 +15,6 @@ const WrapWith = (props: TWrapWithProps) => (
   <>{props.condition ? props.wrapper(props.children) : props.children}</>
 );
 WrapWith.displayName = 'WrapWith';
-
-const entryPointUriPath = '${env:ENTRY_POINT_URI_PATH}';
 
 const Welcome = () => {
   return (
