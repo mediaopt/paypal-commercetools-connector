@@ -65,7 +65,9 @@ const handleParcelAddedToDelivery = async (
     )
   ).find((id) => id);
   logger.info(
-    `Payment, related to target parcel ${parcel.id}, ${JSON.stringify(payment)}`
+    `For the parcel with id ${parcel.id} the payment with id ${JSON.stringify(
+      payment?.id
+    )} was found`
   );
   if (!payment) {
     logger.info(
