@@ -15,7 +15,7 @@ This is a [connect application](https://marketplace.commercetools.com/) to integ
 
 [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
 
-The connector must be used together with [PayPal client api](https://www.npmjs.com/package/paypal-commercetools-client) for the frontend integration.
+The connector is designed be used together with [PayPal client api](https://www.npmjs.com/package/paypal-commercetools-client) for the frontend integration. If it is not possible for some reason you are obliged to use [PayPal JS SDK](https://developer.paypal.com/sdk/js/) instead.
 
 The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/ and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
