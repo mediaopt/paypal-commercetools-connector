@@ -52,19 +52,19 @@ The first two categories are covered in the Postman collection Initial part, the
 | 4    | Link the payment to the cart                                                                                                                           | AddPayment                                                                           |
 | 5    | If not yet - get client token for communication with PayPal                                                                                            | getClientToken                                                                       |
 
-#### Payment method specific flow
+### Payment method specific flow
 
 MOST OF THE METHODS REQUIRES USER APPROVAL AFTER CREATE PAYPAL ORDER. IT MEANS THAT THE USER SHOULD APPROVE THE ORDER VIA THE LINK, PROVIDED IN THE RESPONSE.
 In case if this is applicable for a certain method - it is mentioned in the method description. For sandbox testing sanbdox customer credentials or [sandbox testing cards provided in the PayPal documentation](https://developer.paypal.com/tools/sandbox/card-testing/) can be used to approve the order.
 
-##### Pay Upon Invoice
+#### Pay Upon Invoice
 Pay Upon invoice is the simplest as the payment is not processed immediately.
 
 | Step | Description                                    | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
 |------|------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | Create an order with Invoice as payment source | createPayPalOrder                                                                    |
 
-##### PayPal 
+#### PayPal 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
 |------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | Create an order with PayPal as payment source                                                       | createPayPalOrder                                                                    |
@@ -72,7 +72,7 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 | 3    | Get payment by id, to update the payment version, as the correct version is needed for next step    | Get Payment By Id                                                                    |
 | 4    | Capture the order                                                                                   | CaptureOrder                                                                         |
 
-##### Card payment
+#### Card payment
 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
 |------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
