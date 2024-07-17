@@ -32,9 +32,9 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
 
 * [Authorization](#authorization)
     1. [Obtain access token](#1-obtain-access-token)
-    1. [Obtain access token through password flow](#2-obtain-access-token-through-password-flow)
-    1. [Token for Anonymous Sessions](#3-token-for-anonymous-sessions)
-    1. [Token Introspection](#4-token-introspection)
+    2. [Obtain access token through password flow](#2-obtain-access-token-through-password-flow)
+    3. [Token for Anonymous Sessions](#3-token-for-anonymous-sessions)
+    4. [Token Introspection](#4-token-introspection)
 * [PayPal](#paypal)
     1. [CreateOrder](#1-createorder)
         * [PayUponInvoice](#i-example-request-payuponinvoice)
