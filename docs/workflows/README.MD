@@ -7,7 +7,7 @@
   </a><br>
 </p>
 
-In this folder you can find the use cases for the PayPal commercetools connector. Here we summarize the actual workflow and the expected results. The simplified workflow that only includes backend calls through postman is also provided as a [workflow Postman Collection](PayPal-commercetools-workflow.postman_collection.json).
+In this folder you can find the example workflows for the PayPal commercetools connector. Here we summarize the actual workflows for both using only the connector for the backend side implementation and using the [PayPal client](https://www.npmjs.com/package/paypal-commercetools-client) in commercetools Frontend (CoFe) [integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main) and the expected results. The workflow that only includes backend calls through Postman is also provided as a [workflow Postman Collection](PayPal-commercetools-workflow.postman_collection.json).
 
 # Table of Contents
 
@@ -48,7 +48,11 @@ The client can be directly installed to the shop frontend using npm:
 
 `npm i paypal-commercetools-client`
 
-and then the components imported directly from the package, see for example the [payment form in CoFe integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/frontend/components/commercetools-ui/checkout/checkout-form/fields/formPayment.tsx).
+The client is react-based, so for other frameworks it is needed to load the React script in project stack.
+
+And then the components are imported directly from the package, see for example the [payment form in CoFe integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/frontend/components/commercetools-ui/checkout/checkout-form/fields/formPayment.tsx).
+
+
 
 # Payment Process
 
@@ -67,7 +71,7 @@ The first two categories are covered in the Postman collection Initial part, the
 ## Initial flow
 
 | Step | Description                                                                                                                                            | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+|------|--------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | If not yet - [obtain commercetools access token](https://docs.commercetools.com/api/authorization).                                                    | getAccessToken                                                                       |
 | 2    | [Create a cart](https://docs.commercetools.com/api/projects/carts) with some products in it. Products can be added during creation or added separately | Search for a product -> Create Cart -> AddLineItem                                   |
 | 3    | [Create a payment](https://docs.commercetools.com/api/projects/payments) with the `paypal-payment-type`.                                               | SetCustomType For Payment                                                            |
@@ -107,7 +111,11 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 
 ## Standard flow
 
-In case of frontend flow the PayPal client components are imported at CoFe frontend and the API required for proper communication between the components and commercetools HTTP API is developed at the [CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/backend). The cart is created by CoFe and is out of scope of this documentation. To create the cart via only HTTP API please see the [official commercetools documentation](https://docs.commercetools.com/api/).
+In this section we describe the flow that is used at our the [demo website](https://poc-mediaopt2.frontend.site/) where the PayPal client is integrated into CoFe and the connector is installed at the merchant center. It is important to note that the CoFe project structure involves two separate parts - frontend and backend and [our integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc) involves both of them.
+
+In our integration the PayPal client components are imported at [CoFe frontend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/frontend) and the API required for proper communication between the components and commercetools HTTP API ((and therefore the PayPal commercetools connector) is developed at the [CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/backend).
+
+The cart creation before the payment with PayPal begins and the checkout procedure after the PayPal payment is complete are created by standard CoFe methods and are out of scope of this documentation. To create the cart via only HTTP API please see the [official commercetools documentation](https://docs.commercetools.com/api/).
 
 Here we will describe the [checkout payment](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/frontend/components/commercetools-ui/checkout/checkout-form/fields/formPayment.tsx).
 
@@ -127,15 +135,15 @@ the further steps are triggered by the user actions, like pressing the payment b
 
 ### Payment methods parameters
 
-For the parameters please see also the [PayPal client documentation](https://github.com/mediaopt/paypal-commercetools-client/blob/main/docs/CoFe-PayPal-client-integration.pdf). Here we will only describe the API parameters required for the demonstrated payment methods. In our implementation all mentioned urls trigger corresponding methods at the [PayPal controller CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/backend/payment-paypal/actionControllers/PayPalController.ts). Please follow the link for the code, here we only briefly mention the principle.
+For complete list of parameters please see the [PayPal client documentation](https://github.com/mediaopt/paypal-commercetools-client/blob/main/docs/CoFe-PayPal-client-integration.pdf). Here we will only describe the API parameters required for the demonstrated payment methods. In our implementation all mentioned urls trigger corresponding methods at the [PayPal controller CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/backend/payment-paypal/actionControllers/PayPalController.ts). Please follow the link for the code, here we only briefly mention the principle.
 
-| Parameter                   | Required for functioning             | Description                                                                                                                                                                                                                                                                                                                                                                                                         |
-|-----------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| 
-| createPaymentUrl            | all components                       | triggers **createPayment**. Within this method cart is fetched to check if a relevant PayPal payment already exists, if not the new PayPal type payment is created, returns [CreatePaymentResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts)                                                                                                                               |     
-| getClientTokenUrl           | except PayPal payment buttons        | triggers **getClientToken**. Within this method the client token is obtained from the PayPal side and returned.                                                                                                                                                                                                                                                                                                         |     
-| createPayPalOrder           | all payments                         | triggers **createPayPalOrder**. Within this methods cart is fetched to obtain payment details and line items, than payment [custom fields](https://docs.commercetools.com/api/projects/custom-fields) are updated to trigger the connector (see also createPayPalOrder in Postman collection). [CreateOrderResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts) is returned. |     
-| onApproveUrl                | all payments except Pay Upon Invoice | triggers **capturePayPalOrder**. Within this method if not provided in a call a relevant order id is obtained from card payment information and connector capturePayPalOrder is triggered (also by payment custom fields). Returns [OnApproveResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts)                                                                            |     
-| authenticateThreeDSOrderUrl | payments with 3D secure              | triggers **authenticateThreeDSOrder**. Within this method the data passed through the client are parsed to identify if the 3D secure passed successfully. Returns returns an object with the liability_shift, enrollment_status, and authentication_status.                                                                                                                                                             |     
+| Parameter                   | Required for functioning             | Description                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| createPaymentUrl            | all components                       | triggers **createPayment**. Within this method cart is fetched to check if a relevant PayPal payment already exists, if not the new PayPal type payment is created, returns [CreatePaymentResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts)                                                                                                                               |
+| getClientTokenUrl           | except PayPal payment buttons        | triggers **getClientToken**. Within this method the client token is obtained from the PayPal side and returned.                                                                                                                                                                                                                                                                                                         |
+| createPayPalOrder           | all payments                         | triggers **createPayPalOrder**. Within this methods cart is fetched to obtain payment details and line items, than payment [custom fields](https://docs.commercetools.com/api/projects/custom-fields) are updated to trigger the connector (see also createPayPalOrder in Postman collection). [CreateOrderResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts) is returned. |
+| onApproveUrl                | all payments except Pay Upon Invoice | triggers **capturePayPalOrder**. Within this method if not provided in a call a relevant order id is obtained from card payment information and connector capturePayPalOrder is triggered (also by payment custom fields). Returns [OnApproveResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts)                                                                            |
+| authenticateThreeDSOrderUrl | payments with 3D secure              | triggers **authenticateThreeDSOrder**. Within this method the data passed through the client are parsed to identify if the 3D secure passed successfully. Returns returns an object with the liability_shift, enrollment_status, and authentication_status.                                                                                                                                                             |
 
 ### Payment method dependent flow
 
@@ -148,15 +156,15 @@ In most of the payment cases the first three steps are the same:
 #### Pay Upon Invoice
 
 1. After user completes the additional data required only for Pay Upon Invoice payment and confirms, the createPayPalOrder is triggered
-2. as Pay Upon Invoice does not require immediate payment - we trigger a custom checkout process for pay upon invoice
-   after the user completes invoice payment on the RatePay side the webhook at the connector side is triggered to capture the order.
+2. as Pay Upon Invoice does not require immediate payment - we trigger a custom checkout process for pay upon invoice (with extra liability message)
+3. after the user completes invoice payment on the RatePay side the webhook at the connector side is triggered to capture the order.
 
 #### PayPal buy now
 
 1. On click on the target button createPayPalOrderUrl is called
 2. if createPayPalOrder call was successfully - the floating window with PayPal login or payment form is opened and the payment can proceed.
 3. the user completes the payment on PayPal side and on success onApproveUrl is addressed and capturePayPalOrder is triggered
-4. after successfully capture, we trigger the standard checkout process on the frontend side
+4. after successful capture, we trigger the standard checkout process on the frontend side
 
 #### Card
 
@@ -164,4 +172,4 @@ In most of the payment cases the first three steps are the same:
 2. if 3D secure is required - the floating window with 3D secure form is opened and user needs to confirm the payment
 3. if 3D secure is required - authenticateThreeDSOrderUrl is called to authenticate the payment
 4. if 3D secure is successful or not required - onApproveUrl is addressed and capturePayPalOrder is triggered
-5. after successfully capture, we trigger the standard checkout process on the frontend side
+5. after successful capture, we trigger the standard checkout process on the frontend side
