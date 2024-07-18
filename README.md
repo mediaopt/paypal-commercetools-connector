@@ -15,11 +15,10 @@ This is a [connect application](https://marketplace.commercetools.com/) to integ
 
 [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
 
-## Project Description
-The project demo website https://poc-mediaopt2.frontend.site/ is built using three parts:
-1. The connector itself, provided in this repository
-2. The PayPal client api for the frontend integration. The client is available at [npm](https://www.npmjs.com/package/paypal-commercetools-client) and [github](https://github.com/mediaopt/paypal-commercetools-client). If for some reason you can't use the client for your integration - you are obliged to use [PayPal JS SDK](https://developer.paypal.com/sdk/js/) instead.
-3. The client is integrated in commercetools frontend. Using commercetools frontend for storefront is optional. The integration details can be seen ad [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration). 
+The payments demo can be seen at https://poc-mediaopt2.frontend.site/.
+
+## Integration
+The connector is supposed to be used together with the PayPal client app. The client is available at [npm](https://www.npmjs.com/package/paypal-commercetools-client) and [github](https://github.com/mediaopt/paypal-commercetools-client). The connector is responsible for the backend integration with commercetools and PayPal, while the client is responsible for the frontend. If for some reasons the PayPal client app can't be used, the [PayPal JS SDK](https://developer.paypal.com/sdk/js/) should be used instead. The example of the integration with commercetools frontend is covered in [docs/usecases/README.md](docs/usecases/README.md) and the code can be seen in [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
 ## Prerequisites
 
@@ -35,7 +34,7 @@ To use the connector you need to have the following:
 | client secret | CTP_CLIENT_SECRET      | the secret of your commercetools API client           |
 | scope         | CTP_SCOPE              | the scope of your commercetools API client            |
 
-- [PayPal business customer account](https://www.google.com/aclk?sa=l&ai=DChcSEwjPz82wyK2GAxWSiVAGHUwzAVoYABABGgJkZw&gclid=Cj0KCQjw3tCyBhDBARIsAEY0XNnOcx462M0ej3RizrdN9a_6fl2O5_bfwVqOOzyHxz_9M7L10B8NfL0aAgA6EALw_wcB&sig=AOD64_0bOBSNaFhCg-wypewofyWkrpoBWg&q&adurl&ved=2ahUKEwiIqcewyK2GAxXlSkEAHejBBbQQqyQoAHoECAIQDA) and [API client](https://developer.paypal.com/api/rest/#link-getclientidandclientsecret) credentials,namely:
+- [PayPal business customer account](https://www.paypal.com/de/business/getting-started) and [API client](https://developer.paypal.com/api/rest/#link-getclientidandclientsecret) credentials,namely:
   
 | credential    | environmental variable | description                                                       |
 |---------------|------------------------|-------------------------------------------------------------------|

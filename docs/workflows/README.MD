@@ -31,16 +31,16 @@ In this folder you can find the example workflows for the PayPal commercetools c
 
 # Installation
 
-The connector itself is the backend part of the payment process, it is designed to be used together with the [PayPal client api](https://www.npmjs.com/package/paypal-commercetools-client) for the frontend integration. If it is not possible for some reason you are obliged to use [PayPal JS SDK](https://developer.paypal.com/sdk/js/) instead. We also use commercetools frontend (further referred as CoFe), but it is an optional part, shown here for illustration how to develop necessary API for the PayPal client.
+For installation of CoFe please refer to [commercetools official documentation](https://commercetools.com/products/frontend). If you prefer to use the PayPal JS SDK instead of the PayPal client app, please refer to [PayPal official documentation](https://developer.paypal.com/sdk/js/)
 
 ## Connector installation
 
-There are two possible ways to integrate the connector, both fully covered in the mentioned documentation.
+There are two possible ways to integrate the connector, both fully covered in the following documentation.
 
 1. Installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect).
 2. Create your own deployment using [commercetools connect API](https://docs.commercetools.com/connect/getting-started).
 
-The connector includes a merchant center application, which is automatically installed and deployed when installing the connector, but it might be needed to update the custom application link after the deployment, as described in [commercetools documentation](https://docs.commercetools.com/merchant-center-customizations/deployment-examples/commercetools-connect).
+The connector includes a merchant center application, which is automatically installed and deployed when installing the connector. If the custom application doesn't work correct after deployment please [check if its link is up-to-date](https://docs.commercetools.com/merchant-center-customizations/deployment-examples/commercetools-connect).
 
 ## Frontend installation
 
@@ -81,20 +81,21 @@ The first two categories are covered in the Postman collection Initial part, the
 ## Payment method specific flow
 
 MOST OF THE METHODS REQUIRES USER APPROVAL AFTER CREATE PAYPAL ORDER. IT MEANS THAT THE USER SHOULD APPROVE THE ORDER VIA THE LINK, PROVIDED IN THE RESPONSE.
-In case if this is applicable for a certain method - it is mentioned in the method description. For sandbox testing sanbdox customer credentials or [sandbox testing cards provided in the PayPal documentation](https://developer.paypal.com/tools/sandbox/card-testing/) can be used to approve the order.
+
+In case if this is applicable for a certain method - it is mentioned in the method description. For sandbox testing PayPal sandbox customer credentials or [sandbox testing cards provided by PayPal](https://developer.paypal.com/tools/sandbox/card-testing/) can be used to approve the order.
 
 ### Pay Upon Invoice
 
 Pay Upon invoice is the simplest as the payment is not processed immediately.
 
 | Step | Description                                    | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
-| ---- | ---------------------------------------------- | ------------------------------------------------------------------------------------ |
+|------|------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | Create an order with Invoice as payment source | createPayPalOrder                                                                    |
 
 ### PayPal
 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
-| ---- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+|------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | Create an order with PayPal as payment source                                                       | createPayPalOrder                                                                    |
 | 2    | In your browser open the link with the "rel" approve in create order response and approve the order | -                                                                                    |
 | 3    | Get payment by id, to update the payment version, as the correct version is needed for next step    | Get Payment By Id                                                                    |
@@ -103,7 +104,7 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 ### Card payment
 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
-| ---- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+|------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | 1    | Create an order with card as payment source                                                         | createPayPalOrder                                                                    |
 | 2    | In your browser open the link with the "rel" approve in create order response and approve the order | -                                                                                    |
 | 3    | Get payment by id, to update the payment version, as the correct version is needed for next step    | Get Payment By Id                                                                    |
@@ -111,11 +112,11 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 
 ## Standard flow
 
-In this section we describe the flow that is used at our the [demo website](https://poc-mediaopt2.frontend.site/) where the PayPal client is integrated into CoFe and the connector is installed at the merchant center. It is important to note that the CoFe project structure involves two separate parts - frontend and backend and [our integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc) involves both of them.
+In this section we describe the flow that is used at our [demo website](https://poc-mediaopt2.frontend.site/) where the PayPal client is integrated into CoFe and the connector is installed at the merchant center. It is important to note that the CoFe project structure involves two separate parts - frontend and backend and [our integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc) involves both of them.
 
 In our integration the PayPal client components are imported at [CoFe frontend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/frontend) and the API required for proper communication between the components and commercetools HTTP API ((and therefore the PayPal commercetools connector) is developed at the [CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/backend).
 
-The cart creation before the payment with PayPal begins and the checkout procedure after the PayPal payment is complete are created by standard CoFe methods and are out of scope of this documentation. To create the cart via only HTTP API please see the [official commercetools documentation](https://docs.commercetools.com/api/).
+The cart creation before the payment with PayPal begins and the checkout procedure after the PayPal payment is complete are created by standard CoFe methods and are out of scope of this documentation. To create the cart via HTTP API please see the [official commercetools documentation](https://docs.commercetools.com/api/).
 
 Here we will describe the [checkout payment](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/frontend/components/commercetools-ui/checkout/checkout-form/fields/formPayment.tsx).
 
@@ -138,7 +139,7 @@ the further steps are triggered by the user actions, like pressing the payment b
 For complete list of parameters please see the [PayPal client documentation](https://github.com/mediaopt/paypal-commercetools-client/blob/main/docs/CoFe-PayPal-client-integration.pdf). Here we will only describe the API parameters required for the demonstrated payment methods. In our implementation all mentioned urls trigger corresponding methods at the [PayPal controller CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/blob/main/packages/poc/backend/payment-paypal/actionControllers/PayPalController.ts). Please follow the link for the code, here we only briefly mention the principle.
 
 | Parameter                   | Required for functioning             | Description                                                                                                                                                                                                                                                                                                                                                                                                             |
-| --------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|-----------------------------|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | createPaymentUrl            | all components                       | triggers **createPayment**. Within this method cart is fetched to check if a relevant PayPal payment already exists, if not the new PayPal type payment is created, returns [CreatePaymentResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts)                                                                                                                               |
 | getClientTokenUrl           | except PayPal payment buttons        | triggers **getClientToken**. Within this method the client token is obtained from the PayPal side and returned.                                                                                                                                                                                                                                                                                                         |
 | createPayPalOrder           | all payments                         | triggers **createPayPalOrder**. Within this methods cart is fetched to obtain payment details and line items, than payment [custom fields](https://docs.commercetools.com/api/projects/custom-fields) are updated to trigger the connector (see also createPayPalOrder in Postman collection). [CreateOrderResponse](https://github.com/mediaopt/paypal-commercetools-client/blob/main/src/types/index.ts) is returned. |
@@ -151,7 +152,7 @@ In most of the payment cases the first three steps are the same:
 
 1. On rendering the button the createPaymentUrl is called to obtain/generate the relevant payment id.
 2. If relevant getClientToken is called to obtain the client token at the PayPal side.
-3. The button is than rendered by the client via PayPal JS SDK.
+3. The button is then rendered by the client via PayPal JS SDK.
 
 #### Pay Upon Invoice
 
