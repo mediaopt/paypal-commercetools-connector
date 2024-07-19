@@ -2,7 +2,7 @@ Here we present a simplified sequence diagram for payment process with PayPal bu
 
 In this diagram we focus on the interaction with the PayPal commercetools connector and PayPal client app required to complete the payment. 
 
-The communication between commercetools frontend (CoFe) and commercetools HTTP API (CoCo) that is not related directly to the payment with PayPal is not shown in this diagram. In brief CoFe has built in routines to update the cart and the payment whenever they might have being changed.
+The communication between commercetools frontend (CoFe) and commercetools HTTP API (CoCo) that is not related directly to the payment with PayPal is not explained in this diagram. In brief CoFe has built in routines to update the cart and the payment whenever they might have being changed.
 
 The official documentation for the API mentioned it the diagram can be found at [commercetools Frontend API's](https://docs.commercetools.com/frontend-api/action), [commercetools HTTP API](https://docs.commercetools.com/http-api), and [PayPal orders v2 API](https://developer.paypal.com/docs/api/orders/v2/).
 
@@ -17,6 +17,7 @@ sequenceDiagram
     Note over frontend,backend: commercetools Frontend API
     Note over backend, CoCo: commercetools HTTP API,<br/> connector: endpoint custom-objects <br/>or action custom fields
     Note over CoCo, PayPal: PayPal orders v2 API
+    Note over frontend, CoCo: Cart is created by built in CoFe methods and has products and user data in it
     frontend-->>backend: getSettings action
     backend-->>CoCo: getSetting request
     Note over backend, CoCo: endpoint >custom-objects/<br/>paypal-commercetools-connector
