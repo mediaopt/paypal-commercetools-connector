@@ -15,28 +15,36 @@ This is a [connect application](https://marketplace.commercetools.com/) to integ
 
 [PayPal commercetools connector](https://marketplace.commercetools.com/integration/paypal) is available in the commercetools marketplace.
 
-The connector must be used together with [PayPal client api](https://www.npmjs.com/package/paypal-commercetools-client) for the frontend integration.
+The payments demo can be seen at https://poc-mediaopt2.frontend.site/.
 
-The payments demo and integration to the commercetools frontend can be seen at https://poc-mediaopt2.frontend.site/ and [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
+## Integration
+The connector is supposed to be used together with the PayPal client app. The client is available at [npm](https://www.npmjs.com/package/paypal-commercetools-client) and [github](https://github.com/mediaopt/paypal-commercetools-client). The connector is responsible for the backend integration with commercetools and PayPal, while the client is responsible for the frontend. If for some reasons the PayPal client app can't be used, the [PayPal JS SDK](https://developer.paypal.com/sdk/js/) should be used instead. The example of the integration with commercetools frontend is covered in [docs/usecases/README.md](docs/workflows/README.md) and the code can be seen in [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
 ## Prerequisites
 
 To use the connector you need to have the following:
 
 - commercetools Composable Commerce account and [API client](https://docs.commercetools.com/api/projects/api-clients#apiclient) credentials, namely:
-  - region (CTP_REGION) - region, in which your commercetools project is hosted
-  - project key (CTP_PROJECT_KEY) - the key of your commercetools project
-  - client ID (CTP_CLIENT_ID) - the ID of your commercetools API client
-  - client secret (CTP_CLIENT_SECRET) - the secret of your commercetools API client
-  - scope (CTP_SCOPE) - the scope of your commercetools API client
-- [PayPal business customer account](https://www.google.com/aclk?sa=l&ai=DChcSEwjPz82wyK2GAxWSiVAGHUwzAVoYABABGgJkZw&gclid=Cj0KCQjw3tCyBhDBARIsAEY0XNnOcx462M0ej3RizrdN9a_6fl2O5_bfwVqOOzyHxz_9M7L10B8NfL0aAgA6EALw_wcB&sig=AOD64_0bOBSNaFhCg-wypewofyWkrpoBWg&q&adurl&ved=2ahUKEwiIqcewyK2GAxXlSkEAHejBBbQQqyQoAHoECAIQDA) and [API client](https://developer.paypal.com/api/rest/#link-getclientidandclientsecret) credentials,namely:
-  - client ID (PAYPAL_CLIENT_ID) - the ID of your PayPal API client
-  - client secret (PAYPAL_CLIENT_SECRET) - the secret of your PayPal API client
-  - environment (PAYPAL_ENVIRONMENT) - the environment of your PayPal API client (production or sandbox)
+
+| credential    | environmental variable | description                                           |
+|---------------|------------------------|-------------------------------------------------------|
+| region        | CTP_REGION             | region, in which your commercetools project is hosted |
+| project key   | CTP_PROJECT_KEY)       | the key of your commercetools project                 |
+| client ID     | CTP_CLIENT_ID)         | the ID of your commercetools API client               |
+| client secret | CTP_CLIENT_SECRET      | the secret of your commercetools API client           |
+| scope         | CTP_SCOPE              | the scope of your commercetools API client            |
+
+- [PayPal business customer account](https://www.paypal.com/de/business/getting-started) and [API client](https://developer.paypal.com/api/rest/#link-getclientidandclientsecret) credentials,namely:
+  
+| credential    | environmental variable | description                                                       |
+|---------------|------------------------|-------------------------------------------------------------------|
+| client ID     | PAYPAL_CLIENT_ID       | the ID of your PayPal API client                                  |
+| client secret | PAYPAL_CLIENT_SECRET   | the secret of your PayPal API client                              |
+| environment   | PAYPAL_ENVIRONMENT     | the environment of your PayPal API client (production or sandbox) |
 
 ## Instructions
 
-The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect).
+The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect) or deployed from github repository via [commercetools Connect API](https://docs.commercetools.com/connect/).
 
 To run the connector locally:
 
@@ -62,4 +70,4 @@ In the docs folder you can find:
 - description of each application included (README.md)
 - architecture of the connector (Architecture.pdf)
 - documented PayPal Commercetools API Postman collection (PayPal.md, paypal.postman_collection.json)
-- Postman collection for testing the backend workflows for different payment methods (PayPal-commercetools-workflows.postman_collection.json)
+- workflows folder with examples how to use the connector individually or together with PayPal client and commercetools frontend
