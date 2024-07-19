@@ -4,7 +4,7 @@ import { Capture, Order, Refund } from '../src/paypal/checkout_api';
 import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 import { logger } from '../src/utils/logger.utils';
 import validator from 'validator';
-import {randomUUID} from "crypto";
+import { randomUUID } from 'crypto';
 
 let configMock: any;
 
@@ -100,7 +100,7 @@ const amountPlanned = {
 
 const payment_source = {
   card: {
-    number: 4868719460707704,
+    number: 4012000033330026,
     expiry: '2030-12',
     security_code: '123',
   },
@@ -168,7 +168,9 @@ describe('Testing PayPal aftersales', () => {
         amountPlanned,
         custom: {
           fields: {
-            createPayPalOrderRequest: JSON.stringify({custom_invoice_id: customInvoiceId}),
+            createPayPalOrderRequest: JSON.stringify({
+              custom_invoice_id: customInvoiceId,
+            }),
           },
         },
         id: randomUUID(),
