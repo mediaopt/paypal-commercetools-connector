@@ -29,8 +29,8 @@ To use the connector you need to have the following:
 | credential    | environmental variable | description                                           |
 |---------------|------------------------|-------------------------------------------------------|
 | region        | CTP_REGION             | region, in which your commercetools project is hosted |
-| project key   | CTP_PROJECT_KEY)       | the key of your commercetools project                 |
-| client ID     | CTP_CLIENT_ID)         | the ID of your commercetools API client               |
+| project key   | CTP_PROJECT_KEY        | the key of your commercetools project                 |
+| client ID     | CTP_CLIENT_ID          | the ID of your commercetools API client               |
 | client secret | CTP_CLIENT_SECRET      | the secret of your commercetools API client           |
 | scope         | CTP_SCOPE              | the scope of your commercetools API client            |
 
