@@ -13,9 +13,9 @@ Here we summarize the actual workflows for:
 1. using only the connector for the backend side implementation 
 2. using the [PayPal client](https://www.npmjs.com/package/paypal-commercetools-client) in commercetools Frontend (CoFe) [integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main).
 
-The workflow that only includes backend calls through Postman is also provided as a [workflow Postman Collection](PayPal-commercetools-workflow.postman_collection.json).
+The workflow that only includes backend calls through Postman is provided as a [workflow Postman Collection](PayPal-commercetools-workflow.postman_collection.json).
 
-The sequence diagram that show a bit more details about the backend side of a payment process with PayPal buy now payment is also provided at [sequence_diagram_paypal_payment.md](sequence_diagram_paypal_payment.md).
+The sequence diagram that shows more details about the backend side of a payment process with PayPal Buy Now payment is also provided at [sequence_diagram_paypal_payment.md](sequence_diagram_paypal_payment.md).
 
 # Table of Contents
 
@@ -33,7 +33,7 @@ The sequence diagram that show a bit more details about the backend side of a pa
     - [Rendering payment buttons](#rendering-payment-buttons)
     - [Payment methods parameters](#payment-methods-parameters)
     - [Payment method dependent flow](#payment-method-dependent-flow)
-      - [PayPal buy now](#paypal-buy-now)
+      - [PayPal Buy Now](#paypal-buy-now)
       - [Card](#card)
       - [Pay Upon Invoice](#pay-upon-invoice-1)
 
@@ -122,7 +122,7 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 
 In this section we describe the flow that is used at our [demo website](https://poc-mediaopt2.frontend.site/) where the PayPal client is integrated into CoFe and the connector is installed at the merchant center. It is important to note that the CoFe project structure involves two separate parts - frontend and backend and [our integration](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc) involves both of them. Frontend is responsible for a client side and backend for the server (see also [Architecture.pdf](../Architecture.pdf)).
 
-In our integration the PayPal client components are imported at [CoFe frontend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/frontend) and the API required for proper communication between the components and commercetools HTTP API ((and therefore the PayPal commercetools connector) is developed at the [CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/backend).
+In our integration the PayPal client components are imported at [CoFe frontend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/frontend) and the API required for proper communication between the components and commercetools HTTP API (and therefore the PayPal commercetools connector) is developed at the [CoFe backend](https://github.com/mediaopt/paypal-commercetools-cofe-integration/tree/main/packages/poc/backend).
 
 The cart creation before the payment with PayPal begins and the checkout procedure after the PayPal payment is complete are created by standard CoFe methods and are out of scope of this documentation. To create the cart via HTTP API please see the [official commercetools documentation](https://docs.commercetools.com/api/).
 
@@ -168,7 +168,7 @@ In most of the payment cases the first three steps are the same:
 2. as Pay Upon Invoice does not require immediate payment - we trigger a custom checkout process for pay upon invoice (with extra liability message)
 3. after the user completes invoice payment on the RatePay side the webhook at the connector side is triggered to capture the order.
 
-#### PayPal buy now
+#### PayPal Buy Now
 
 1. On click on the target button createPayPalOrderUrl is called
 2. if createPayPalOrder call was successfully - the floating window with PayPal login or payment form is opened and the payment can proceed.
