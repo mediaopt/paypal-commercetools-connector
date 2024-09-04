@@ -236,8 +236,10 @@ export const handleCaptureOrderRequest = async (
   );
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
+    const { orderId } = request;
+    delete request.orderId;
     const response = await capturePayPalOrder(
-      request.orderId ?? payment.custom.fields?.PayPalOrderId,
+      orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderCaptureRequest
     );
     updateActions.push({
@@ -370,8 +372,10 @@ export const handleAuthorizeOrderRequest = async (
   );
   const updateActions = handleRequest('authorizePayPalOrder', request);
   try {
+    const { orderId } = request;
+    delete request.orderId;
     const response = await authorizePayPalOrder(
-      request.orderId ?? payment.custom.fields?.PayPalOrderId,
+      orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderAuthorizeRequest
     );
     updateActions.push({
