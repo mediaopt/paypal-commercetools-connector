@@ -7,7 +7,19 @@ import {
 describe('Testing actions', () => {
   test('add extension', async () => {
     const apiRequest: any = {
-      execute: jest.fn(() => ({ body: { results: [{}] } })),
+      execute: jest.fn(() => ({
+        body: {
+          results: [
+            {
+              destination: {
+                type: 'GoogleCloudPubSub',
+                topic: 'old lorem ipsum',
+                projectId: 'old lorem ipsum',
+              },
+            },
+          ],
+        },
+      })),
     };
     const apiRoot: any = {
       subscriptions: jest.fn(() => apiRoot),
@@ -29,7 +41,19 @@ describe('Testing actions', () => {
 
   test('delete extension', async () => {
     const apiRequest: any = {
-      execute: jest.fn(() => ({ body: { results: [{}] } })),
+      execute: jest.fn(() => ({
+        body: {
+          results: [
+            {
+              destination: {
+                type: 'GoogleCloudPubSub',
+                topic: 'topic',
+                projectId: 'projectId',
+              },
+            },
+          ],
+        },
+      })),
     };
     const apiRoot: any = {
       subscriptions: jest.fn(() => apiRoot),
@@ -37,7 +61,11 @@ describe('Testing actions', () => {
       delete: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteParcelAddedToDeliverySubscription(apiRoot);
+    await deleteParcelAddedToDeliverySubscription(
+      apiRoot,
+      'topic',
+      'projectId'
+    );
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);

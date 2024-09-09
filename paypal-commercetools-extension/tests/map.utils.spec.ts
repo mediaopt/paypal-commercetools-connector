@@ -1,5 +1,6 @@
 import { TypedMoney } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
+import { RefundStatusEnum } from '../src/paypal/payments_api';
 import {
   mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsMoneyToPayPalMoney,
@@ -7,7 +8,6 @@ import {
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
 } from '../src/utils/map.utils';
-import { RefundStatusEnum } from '../src/paypal/payments_api';
 
 const refundStatusEnum = (status: string) => {
   return status as RefundStatusEnum;
