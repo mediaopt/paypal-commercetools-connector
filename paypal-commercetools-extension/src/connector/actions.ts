@@ -10,6 +10,10 @@ import {
   GRAPHQL_CUSTOMOBJECT_KEY_NAME,
 } from '../constants';
 import { findMatchingExtension } from '../service/commercetools.service';
+import {
+  deleteAccessToken,
+  getCachedAccessToken,
+} from '../service/config.service';
 
 export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
@@ -416,3 +420,9 @@ export async function createAndSetCustomObject(
     })
     .execute();
 }
+
+export const deleteAccessTokenIfExists = async () => {
+  if (await getCachedAccessToken()) {
+    await deleteAccessToken();
+  }
+};
