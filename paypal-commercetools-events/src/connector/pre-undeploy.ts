@@ -3,7 +3,10 @@ dotenv.config();
 
 import { createApiRoot } from '../client/create.client';
 import { assertError, assertString } from '../utils/assert.utils';
-import { deleteParcelAddedToDeliverySubscription } from './actions';
+import {
+  deleteAccessTokenIfExists,
+  deleteParcelAddedToDeliverySubscription,
+} from './actions';
 import { readConfiguration } from '../utils/config.utils';
 
 const CONNECT_GCP_TOPIC_NAME_KEY = 'CONNECT_GCP_TOPIC_NAME';
@@ -16,6 +19,7 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(projectId, CONNECT_GCP_PROJECT_ID_KEY);
 
   const apiRoot = createApiRoot();
+  await deleteAccessTokenIfExists();
   await deleteParcelAddedToDeliverySubscription(apiRoot, topicName, projectId);
 }
 

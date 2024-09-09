@@ -14,6 +14,7 @@ import {
   createCustomPaymentInteractionType,
   createCustomPaymentType,
   createPaymentUpdateExtension,
+  deleteAccessTokenIfExists,
 } from './actions';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
@@ -24,6 +25,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
   const apiRoot = createApiRoot();
+  await deleteAccessTokenIfExists();
   await createPaymentUpdateExtension(apiRoot, applicationUrl);
   await createCustomerUpdateExtension(apiRoot, applicationUrl);
   await createCustomPaymentType(apiRoot);
