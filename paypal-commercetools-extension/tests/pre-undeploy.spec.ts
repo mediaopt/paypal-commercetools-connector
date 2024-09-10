@@ -18,6 +18,7 @@ const mockConfigModule = () => {
     })),
   };
   apiRoot = {
+    customObjects: jest.fn(() => apiRoot),
     extensions: jest.fn(() => apiRoot),
     withKey: jest.fn(() => apiRoot),
     delete: jest.fn(() => apiRequest),
