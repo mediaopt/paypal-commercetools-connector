@@ -8,6 +8,7 @@ import { assertError, assertString } from '../utils/assert.utils';
 import { readConfiguration } from '../utils/config.utils';
 import { logger } from '../utils/logger.utils';
 import {
+  deleteAccessTokenIfExists,
   deleteExtension,
   PAYPAL_CUSTOMER_EXTENSION_KEY,
   PAYPAL_PAYMENT_EXTENSION_KEY,
@@ -20,6 +21,7 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
+  await deleteAccessTokenIfExists();
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
   await deleteWebhook();

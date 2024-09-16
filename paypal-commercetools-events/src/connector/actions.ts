@@ -1,5 +1,9 @@
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import { findMatchingSubscription } from '../service/commercetools.service';
+import {
+  deleteAccessToken,
+  getCachedAccessToken,
+} from '../service/config.service';
 
 const PAYPAL_PARCEL_ADDED_TO_DELIVERY_KEY = 'paypal-parcelAddedToDelivery';
 
@@ -54,3 +58,9 @@ export async function deleteParcelAddedToDeliverySubscription(
       .execute();
   }
 }
+
+export const deleteAccessTokenIfExists = async () => {
+  if (await getCachedAccessToken()) {
+    await deleteAccessToken();
+  }
+};
