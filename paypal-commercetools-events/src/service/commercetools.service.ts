@@ -52,10 +52,10 @@ export const findMatchingSubscription = async (
     return subscriptions.length > 0 ? subscriptions[0] : undefined;
   }
   const fittingSubscriptions = subscriptions.filter(
-    (subscription) =>
-      subscription.destination.type === 'GoogleCloudPubSub' &&
-      subscription.destination.topic === topic &&
-      subscription.destination.projectId === projectId
+    ({ destination }) =>
+      destination.type === 'GoogleCloudPubSub' &&
+      destination.topic === topic &&
+      destination.projectId === projectId
   );
   return fittingSubscriptions.length > 0 ? fittingSubscriptions[0] : undefined;
 };
