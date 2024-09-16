@@ -167,7 +167,9 @@ export const handleGetPaymentTokensRequest = async (
   );
   try {
     const response = await getPaymentTokens(customerId);
-    response.payment_tokens = response.payment_tokens?.filter(({payment_source}) => payment_source && !('apple_pay' in payment_source));
+    response.payment_tokens = response.payment_tokens?.filter(
+      ({ payment_source }) => payment_source && !('apple_pay' in payment_source)
+    );
     logger.info(JSON.stringify(response));
     return updateActions.concat(
       handleCustomerResponse('getPaymentTokens', response)

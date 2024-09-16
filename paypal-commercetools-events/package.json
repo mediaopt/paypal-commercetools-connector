@@ -41,7 +41,7 @@
     "axios": "^1.5.1",
     "body-parser": "^1.20.2",
     "dotenv": "^16.3.1",
-    "express": "^4.19.2",
+    "express": "^4.21.0",
     "listr2": "^6.6.1",
     "validator": "^13.11.0"
   }

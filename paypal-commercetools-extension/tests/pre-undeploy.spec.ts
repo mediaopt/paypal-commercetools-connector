@@ -4,7 +4,18 @@ let apiRequest: any = undefined;
 let apiRoot: any = undefined;
 const mockConfigModule = () => {
   apiRequest = {
-    execute: jest.fn(() => ({ body: { results: [{}] } })),
+    execute: jest.fn(() => ({
+      body: {
+        results: [
+          {
+            destination: {
+              type: 'HTTP',
+              url: 'https://lorem.ipsum',
+            },
+          },
+        ],
+      },
+    })),
   };
   apiRoot = {
     extensions: jest.fn(() => apiRoot),

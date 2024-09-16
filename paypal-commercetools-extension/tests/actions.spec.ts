@@ -39,7 +39,19 @@ describe('Testing actions', () => {
 
   test('delete extension', async () => {
     const apiRequest: any = {
-      execute: jest.fn(() => ({ body: { results: [{}] } })),
+      execute: jest.fn(() => ({
+        body: {
+          results: [
+            {
+              key: PAYPAL_PAYMENT_EXTENSION_KEY,
+              destination: {
+                type: 'HTTP',
+                url: 'https://lorem.ipsum',
+              },
+            },
+          ],
+        },
+      })),
     };
     const apiRoot: any = {
       extensions: jest.fn(() => apiRoot),
@@ -47,7 +59,11 @@ describe('Testing actions', () => {
       delete: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY);
+    await deleteExtension(
+      apiRoot,
+      PAYPAL_PAYMENT_EXTENSION_KEY,
+      'https://lorem.ipsum'
+    );
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
