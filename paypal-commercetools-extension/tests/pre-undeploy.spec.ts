@@ -21,8 +21,10 @@ const mockConfigModule = () => {
     customObjects: jest.fn(() => apiRoot),
     extensions: jest.fn(() => apiRoot),
     withKey: jest.fn(() => apiRoot),
+    withContainerAndKey: jest.fn(() => apiRoot),
     delete: jest.fn(() => apiRequest),
     get: jest.fn(() => apiRequest),
+    post: jest.fn(() => apiRequest),
   };
   jest.mock('../src/client/create.client', () => {
     return {
@@ -40,8 +42,9 @@ describe('Testing pre undeploy', () => {
   test('Testing pre undeploy', async () => {
     require('../src/connector/pre-undeploy');
     await sleep(5000);
-    expect(apiRoot.delete).toBeCalledTimes(2);
-    expect(apiRoot.get).toBeCalledTimes(2);
-    expect(apiRequest.execute).toBeCalledTimes(4);
+    expect(apiRoot.delete).toBeCalledTimes(3);
+    expect(apiRoot.get).toBeCalledTimes(5);
+    expect(apiRoot.post).toBeCalledTimes(2);
+    expect(apiRequest.execute).toBeCalledTimes(10);
   }, 15000);
 });
