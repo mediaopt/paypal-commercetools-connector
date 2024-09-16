@@ -42,6 +42,14 @@ To use the connector you need to have the following:
 | client secret | PAYPAL_CLIENT_SECRET   | the secret of your PayPal API client                              |
 | environment   | PAYPAL_ENVIRONMENT     | the environment of your PayPal API client (production or sandbox) |
 
+Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP credentials:
+
+- SMTP_HOST
+- SMTP_PORT
+- SMTP_USERNAME
+- SMTP_SENDER
+- SMTP_PASSWORD
+
 ## Instructions
 
 The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect) or deployed from github repository via [commercetools Connect API](https://docs.commercetools.com/connect/).
