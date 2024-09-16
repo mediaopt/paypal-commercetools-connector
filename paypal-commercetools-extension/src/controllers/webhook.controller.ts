@@ -7,13 +7,12 @@ import {
   handleOrderWebhook,
   handlePaymentTokenWebhook,
 } from '../service/commercetools.service';
-import { getWebhookId } from '../service/config.service';
-import { validateSignature } from '../service/paypal.service';
+import { getWebhookId, validateSignature } from '../service/paypal.service';
 import { logger } from '../utils/logger.utils';
 
 async function verifyWebhookSignature(request: Request) {
-  const webhookIdField = await getWebhookId();
-  if (!webhookIdField?.value) {
+  const webhookId = await getWebhookId();
+  if (!webhookId) {
     throw new CustomError(500, 'WebhookId is missing');
   }
   const verificationRequest: VerifyWebhookSignature = {
@@ -23,7 +22,7 @@ async function verifyWebhookSignature(request: Request) {
     transmission_sig: request.header('paypal-transmission-sig') ?? '',
     transmission_time: request.header('paypal-transmission-time') ?? '',
     webhook_event: request.body,
-    webhook_id: webhookIdField.value,
+    webhook_id: webhookId,
   };
   const response = await validateSignature(verificationRequest);
   logger.info(JSON.stringify(response));

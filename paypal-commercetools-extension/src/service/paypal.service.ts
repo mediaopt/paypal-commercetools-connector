@@ -30,16 +30,11 @@ import {
   VerifyWebhookSignatureApi,
   WebhooksApi,
 } from '../paypal/webhooks_api';
+import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
-import {
-  cacheAccessToken,
-  deleteWebhookId,
-  getCachedAccessToken,
-  getWebhookId,
-  storeWebhookId,
-} from './config.service';
+import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -363,51 +358,22 @@ const getAPIEndpoint = () => {
     : PAYPAL_API_SANDBOX;
 };
 
-export const createOrUpdateWebhook = async (url: string) => {
+export const createWebhook = async () => {
   const gateway = await getPayPalWebhooksGateway();
-  const webhooks = await gateway.webhooksList('APPLICATION');
-  logger.info(JSON.stringify(webhooks.data.webhooks));
-  const oldWebhook = webhooks.data.webhooks?.find((webhook) =>
-    webhook.url.endsWith(PAYPAL_WEBHOOKS_PATH)
-  );
-  if (oldWebhook && oldWebhook?.id) {
-    const webhookIdField = await getWebhookId();
-    if (webhookIdField?.value !== oldWebhook?.id) {
-      await storeWebhookId(oldWebhook?.id, webhookIdField?.version ?? 0);
-    }
-    if (oldWebhook?.url === url) {
-      logger.info('Webhook URL did not change');
-      return oldWebhook;
-    }
-    const response = await gateway.webhooksUpdate(oldWebhook.id, [
-      {
-        op: 'replace',
-        path: '/url',
-        value: url,
-      },
-    ]);
-    logger.info(`Webhook url updated from ${oldWebhook.url} to ${url}`);
-    return response.data;
-  }
   const response = await gateway.webhooksPost({
-    url: url,
+    url: getWebhookUrl(),
     event_types: [
       {
         name: '*',
       } as EventType,
     ],
   });
-  if (response?.data?.id) {
-    const webhookIdField = await getWebhookId();
-    await storeWebhookId(response.data.id, webhookIdField?.version ?? 0);
-  }
   return response.data;
 };
 
 export const deleteWebhook = async () => {
   const gateway = await getPayPalWebhooksGateway();
-  const webhookIdField = await getWebhookId();
-  const webhookId = webhookIdField?.value;
+  const webhookId = await getWebhookId();
   if (!webhookId) {
     return;
   }
@@ -421,7 +387,25 @@ export const deleteWebhook = async () => {
       throw e;
     }
   }
-  await deleteWebhookId();
+};
+
+export const getWebhookId = async () => {
+  const webhookUrl = getWebhookUrl();
+  const gateway = await getPayPalWebhooksGateway();
+  const webhooks = await gateway.webhooksList('APPLICATION');
+  const webhook = webhooks.data.webhooks?.find(
+    (webhook) => webhook.url === webhookUrl
+  );
+  return webhook?.id;
+};
+
+export const getWebhookUrl = () => {
+  return (
+    process.env.CONNECT_SERVICE_URL?.replace(
+      PAYPAL_EXTENSION_PATH,
+      PAYPAL_WEBHOOKS_PATH
+    ) ?? ''
+  );
 };
 
 export const addDeliveryData = async (

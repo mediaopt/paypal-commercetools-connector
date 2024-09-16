@@ -2,9 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { createApiRoot } from '../client/create.client';
-import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
-import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
-import { createOrUpdateWebhook } from '../service/paypal.service';
+import { createWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
 import { readConfiguration } from '../utils/config.utils';
 import {
@@ -31,9 +29,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   await createCustomPaymentType(apiRoot);
   await createCustomCustomerType(apiRoot);
   await createCustomPaymentInteractionType(apiRoot);
-  await createOrUpdateWebhook(
-    applicationUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH)
-  );
+  await createWebhook();
   await createAndSetCustomObject(apiRoot);
 }
 
