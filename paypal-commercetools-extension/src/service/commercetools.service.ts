@@ -337,9 +337,8 @@ export async function findMatchingExtension(
     .execute();
 
   const matchingExtensions = extensions.filter(
-    (extension) =>
-      extension.destination.type === 'HTTP' &&
-      extension.destination.url === applicationUrl
+    ({ destination }) =>
+      destination.type === 'HTTP' && destination.url === applicationUrl
   );
   return matchingExtensions.length > 0 ? matchingExtensions[0] : undefined;
 }
