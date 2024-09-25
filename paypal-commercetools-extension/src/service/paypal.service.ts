@@ -174,6 +174,17 @@ export const capturePayPalAuthorization = async (
   return response.data;
 };
 
+export const voidPayPalAuthorization = async (authorizationId: string) => {
+  const gateway = await getPayPalAuhorizationsGateway();
+  const response = await gateway.authorizationsVoid(
+    authorizationId,
+    'application/json',
+    undefined,
+    'return=representation'
+  );
+  return response.data;
+};
+
 export const capturePayPalOrder = async (
   orderId: string,
   request: OrderCaptureRequest
