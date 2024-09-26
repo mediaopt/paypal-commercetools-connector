@@ -1,6 +1,7 @@
 import {
   Payment,
   PaymentAddTransactionAction,
+  PaymentChangeTransactionStateAction,
   PaymentUpdateAction,
   Transaction,
   TransactionState,
@@ -29,6 +30,7 @@ import {
   mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalOrderStatusToCommercetoolsTransactionState,
@@ -46,6 +48,7 @@ import {
   addDeliveryData,
   authorizePayPalOrder,
   capturePayPalAuthorization,
+  voidPayPalAuthorization,
   capturePayPalOrder,
   createPayPalOrder,
   getClientToken,
@@ -301,6 +304,38 @@ export const handleCaptureAuthorizationRequest = async (
   } catch (e) {
     logger.error('Call to capturePayPalAuthorization resulted in an error', e);
     return handleError('capturePayPalAuthorization', e);
+  }
+};
+
+export const handleVoidAuthorizationRequest = async (
+  payment: Payment
+): Promise<UpdateAction[]> => {
+  if (!payment?.custom?.fields?.voidPayPalAuthorizationRequest) {
+    return [];
+  }
+  const request = JSON.parse(
+    payment?.custom?.fields?.voidPayPalAuthorizationRequest
+  );
+  const updateActions = handleRequest('voidPayPalAuthorization', request);
+  const transactionId =
+    request.authorizationId ??
+    findSuitableTransactionId(payment, 'Authorization', 'Success');
+  try {
+    const response = await voidPayPalAuthorization(transactionId);
+
+    updateActions.push({
+      action: 'changeTransactionState',
+      transactionId: transactionId,
+      state: mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+        response.status
+      ),
+    } as PaymentChangeTransactionStateAction);
+    return updateActions.concat(
+      handlePaymentResponse('voidPayPalAuthorization', response)
+    );
+  } catch (e) {
+    logger.error('Call to voidPayPalAuthorization resulted in an error', e);
+    return handleError('voidPayPalAuthorization', e);
   }
 };
 
