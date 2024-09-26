@@ -1,7 +1,6 @@
 import {
   Payment,
   PaymentAddTransactionAction,
-  PaymentChangeTransactionStateAction,
   PaymentUpdateAction,
   Transaction,
   TransactionState,
@@ -324,12 +323,18 @@ export const handleVoidAuthorizationRequest = async (
     const response = await voidPayPalAuthorization(transactionId);
 
     updateActions.push({
-      action: 'changeTransactionState',
-      transactionId: transactionId,
-      state: mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
-        response.status
-      ),
-    } as PaymentChangeTransactionStateAction);
+      action: 'addTransaction',
+      transaction: {
+        type: 'CancelAuthorization',
+        amount: payment.amountPlanned,
+        interactionId: response?.id,
+        timestamp: response.update_time,
+        state: mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+          response.status
+        ),
+      },
+    } as PaymentAddTransactionAction);
+
     return updateActions.concat(
       handlePaymentResponse('voidPayPalAuthorization', response)
     );
