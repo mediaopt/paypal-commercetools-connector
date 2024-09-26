@@ -321,15 +321,13 @@ describe('Testing PayPal aftersales', () => {
     expect(authorization?.invoice_id).toBe(customInvoiceId);
     expect(authorization?.status).toBe('CREATED');
 
-    //VOID AUTHORIZATION REQUEST
-
     // GET ORDER REQUEST
 
     paymentRequest.obj = {
       ...paymentRequest.obj,
       custom: {
         fields: {
-          voidPayPalAuthorizationRequest: '{}',
+          getPayPalOrderRequest: '{}',
           PayPalOrderId: payPalOrder.id,
         },
       },
@@ -337,9 +335,9 @@ describe('Testing PayPal aftersales', () => {
     paymentResponse = await paymentController('Update', paymentRequest);
     payPalOrder = expectSuccessfulResponse(
       paymentResponse,
-      'voidPayPalAuthorizationRequest'
+      'getPayPalOrderResponse'
     ) as Order;
-    //expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
     expect(payPalOrder.purchase_units).toHaveLength(1);
     if (!payPalOrder.purchase_units) {
       return;
@@ -353,6 +351,30 @@ describe('Testing PayPal aftersales', () => {
     authorization = payPalOrder.purchase_units[0]?.payments?.authorizations[0];
     expect(authorization?.amount?.value).toBe('82.00');
     expect(authorization?.status).toBe('CREATED');
+
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      transactions: [
+        {
+          type: 'Authorization',
+          interactionId: authorization?.id,
+          state: 'Success',
+        },
+      ],
+      custom: {
+        fields: {
+          voidPayPalAuthorizationRequest: '{}',
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    const payPalCapture = expectSuccessfulResponse(
+      paymentResponse,
+      'voidPayPalAuthorizationResponse'
+    ) as Capture;
+    expect(payPalCapture).toHaveProperty('status', 'VOIDED');
+    expect(payPalCapture.amount?.value).toBe('82.00');
   }, 30000);
 
   test('Refund a settlement', async () => {
