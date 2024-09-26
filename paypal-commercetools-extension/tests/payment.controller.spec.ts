@@ -269,6 +269,92 @@ describe('Testing PayPal aftersales', () => {
     expect(payPalCapture.amount?.value).toBe('82.00');
   }, 30000);
 
+  test('Void an authorization', async () => {
+    const customInvoiceId = randomUUID();
+    const paymentRequest = {
+      obj: {
+        amountPlanned,
+        custom: {
+          fields: {
+            createPayPalOrderRequest: JSON.stringify({
+              custom_invoice_id: customInvoiceId,
+            }),
+          },
+        },
+        id: randomUUID(),
+      },
+    } as any;
+    let paymentResponse = await paymentController('Update', paymentRequest);
+    let payPalOrder = expectSuccessfulResponse(paymentResponse);
+    expect(payPalOrder).toHaveProperty('status', 'CREATED');
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      interfaceId: payPalOrder.id,
+      custom: {
+        fields: {
+          authorizePayPalOrderRequest: JSON.stringify({
+            payment_source,
+          }),
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'authorizePayPalOrderResponse'
+    ) as Order;
+    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+    expect(payPalOrder.purchase_units).toHaveLength(1);
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    expect(
+      payPalOrder.purchase_units[0]?.payments?.authorizations
+    ).toHaveLength(1);
+    if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
+      return;
+    }
+    let authorization =
+      payPalOrder.purchase_units[0]?.payments?.authorizations[0];
+    expect(authorization?.amount?.value).toBe('82.00');
+    expect(authorization?.invoice_id).toBe(customInvoiceId);
+    expect(authorization?.status).toBe('CREATED');
+
+    //VOID AUTHORIZATION REQUEST
+
+    // GET ORDER REQUEST
+
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          voidPayPalAuthorizationRequest: '{}',
+          PayPalOrderId: payPalOrder.id,
+        },
+      },
+    };
+    paymentResponse = await paymentController('Update', paymentRequest);
+    payPalOrder = expectSuccessfulResponse(
+      paymentResponse,
+      'voidPayPalAuthorizationRequest'
+    ) as Order;
+    //expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+    expect(payPalOrder.purchase_units).toHaveLength(1);
+    if (!payPalOrder.purchase_units) {
+      return;
+    }
+    expect(
+      payPalOrder.purchase_units[0]?.payments?.authorizations
+    ).toHaveLength(1);
+    if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
+      return;
+    }
+    authorization = payPalOrder.purchase_units[0]?.payments?.authorizations[0];
+    expect(authorization?.amount?.value).toBe('82.00');
+    expect(authorization?.status).toBe('CREATED');
+  }, 30000);
+
   test('Refund a settlement', async () => {
     configMock.getSettings = jest.fn(
       () =>
