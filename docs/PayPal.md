@@ -652,9 +652,11 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ### 5. VoidAuthorization
 
+
 Void an authorization.
 
 The authorization id will be read from the payment transactions.
+
 
 **_Endpoint:_**
 
@@ -664,11 +666,13 @@ Type: RAW
 URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 ```
 
+
 **_Headers:_**
 
 | Key          | Value            |
 | ------------ | ---------------- |
 | Content-Type | application/json |
+
 
 **_Body:_**
 
