@@ -30,42 +30,41 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
 
 ## Endpoints
 
-* [Authorization](#authorization)
-    1. [Obtain access token](#1-obtain-access-token)
-    2. [Obtain access token through password flow](#2-obtain-access-token-through-password-flow)
-    3. [Token for Anonymous Sessions](#3-token-for-anonymous-sessions)
-    4. [Token Introspection](#4-token-introspection)
-* [PayPal](#paypal)
-    1. [CreateOrder](#1-createorder)
-        * [PayUponInvoice](#i-example-request-payuponinvoice)
-        * [PayPal](#ii-example-request-paypal)
-        * [Venmo](#iii-example-request-venmo)
-        * [Card](#iv-example-request-card)
-        * [Google Pay](#v-example-request-google-pay)
-        * [Apple Pay](#vi-example-request-apple-pay)
-    2. [getClientToken](#2-getclienttoken)
-    3. [CaptureOrder](#3-captureorder)
-    4. [CaptureAuthorization](#4-captureauthorization)
-    5. [AuthorizeOrder](#5-authorizeorder)
-    6. [GetOrder](#6-getorder)
-    7. [GetCapture](#7-getcapture)
-    8. [createTrackingInformation](#8-createtrackinginformation)
-    9. [updateTrackingInformation](#9-updatetrackinginformation)
-    10. [UpdateOrder](#10-updateorder)
-    11. [SetCustomType For Payment](#11-setcustomtype-for-payment)
-    12. [SetCustomType For Customer](#12-setcustomtype-for-customer)
-    13. [GetSettings](#13-getsettings)
-    14. [Refund](#14-refund)
-    15. [Partial Refund](#15-partial-refund)
-    16. [CreateVaultSetupToken](#16-createvaultsetuptoken)
-         * [Card](#i-example-request-card)
-         * [PayPal](#ii-example-request-paypal-1)
-    17. [getUserIdToken](#17-getuseridtoken)
-    18. [createPaymentToken](#18-createpaymenttoken)
-    19. [getPaymentTokens](#19-getpaymenttokens)
-    20. [deletePaymentToken](#20-deletepaymenttoken)
-
---------
+- [Authorization](#authorization)
+  1. [Obtain access token](#1-obtain-access-token)
+  2. [Obtain access token through password flow](#2-obtain-access-token-through-password-flow)
+  3. [Token for Anonymous Sessions](#3-token-for-anonymous-sessions)
+  4. [Token Introspection](#4-token-introspection)
+- [PayPal](#paypal)
+  1. [CreateOrder](#1-createorder)
+     - [PayUponInvoice](#i-example-request-payuponinvoice)
+     - [PayPal](#ii-example-request-paypal)
+     - [Venmo](#iii-example-request-venmo)
+     - [Card](#iv-example-request-card)
+     - [Google Pay](#v-example-request-google-pay)
+     - [Apple Pay](#vi-example-request-apple-pay)
+  2. [getClientToken](#2-getclienttoken)
+  3. [CaptureOrder](#3-captureorder)
+  4. [CaptureAuthorization](#4-captureauthorization)
+  5. [VoidAuthorization](#5-voidauthorization)
+  6. [AuthorizeOrder](#5-authorizeorder)
+  7. [GetOrder](#6-getorder)
+  8. [GetCapture](#7-getcapture)
+  9. [createTrackingInformation](#8-createtrackinginformation)
+  10. [updateTrackingInformation](#9-updatetrackinginformation)
+  11. [UpdateOrder](#10-updateorder)
+  12. [SetCustomType For Payment](#11-setcustomtype-for-payment)
+  13. [SetCustomType For Customer](#12-setcustomtype-for-customer)
+  14. [GetSettings](#13-getsettings)
+  15. [Refund](#14-refund)
+  16. [Partial Refund](#15-partial-refund)
+  17. [CreateVaultSetupToken](#16-createvaultsetuptoken)
+      - [Card](#i-example-request-card)
+      - [PayPal](#ii-example-request-paypal-1)
+  18. [getUserIdToken](#17-getuseridtoken)
+  19. [createPaymentToken](#18-createpaymenttoken)
+  20. [getPaymentTokens](#19-getpaymenttokens)
+  21. [deletePaymentToken](#20-deletepaymenttoken)
 
 
 
@@ -651,9 +650,52 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
+### 5. VoidAuthorization
 
-### 5. AuthorizeOrder
+Void an authorization.
 
+The authorization id will be read from the payment transactions.
+
+**_Endpoint:_**
+
+```bash
+Method: POST
+Type: RAW
+URL: {{host}}/{{project-key}}/payments/{{payment-id}}
+```
+
+**_Headers:_**
+
+| Key          | Value            |
+| ------------ | ---------------- |
+| Content-Type | application/json |
+
+**_Body:_**
+
+```js
+{
+    "version": {{payment-version}},
+    "actions": [
+        {
+            "action" : "setCustomField",
+            "name" : "voidPayPalAuthorizationRequest",
+            "value" : "{}"
+          }
+    ]
+}
+```
+
+**_🔑 Authentication oauth2_**
+
+| Key         | Value                |
+| ----------- | -------------------- |
+| accessToken | {{ctp_access_token}} |
+| addTokenTo  | header               |
+| tokenType   | Bearer               |
+
+<br>
+
+### 6. AuthorizeOrder
 
 Authorize an order.
 
