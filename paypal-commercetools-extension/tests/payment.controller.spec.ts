@@ -160,112 +160,146 @@ function expectSuccessfulResponse(
   return JSON.parse(transactionSaleResponse?.value);
 }
 
+async function createValidTransaction() {
+  const customInvoiceId = randomUUID();
+  const paymentRequest = {
+    obj: {
+      amountPlanned,
+      custom: {
+        fields: {
+          createPayPalOrderRequest: JSON.stringify({
+            custom_invoice_id: customInvoiceId,
+          }),
+        },
+      },
+      id: randomUUID(),
+    },
+  } as any;
+  let paymentResponse = await paymentController('Update', paymentRequest);
+  let payPalOrder = expectSuccessfulResponse(paymentResponse);
+  expect(payPalOrder).toHaveProperty('status', 'CREATED');
+  paymentRequest.obj = {
+    ...paymentRequest.obj,
+    interfaceId: payPalOrder.id,
+    custom: {
+      fields: {
+        authorizePayPalOrderRequest: JSON.stringify({
+          payment_source,
+        }),
+        PayPalOrderId: payPalOrder.id,
+      },
+    },
+  };
+  paymentResponse = await paymentController('Update', paymentRequest);
+  payPalOrder = expectSuccessfulResponse(
+    paymentResponse,
+    'authorizePayPalOrderResponse'
+  ) as Order;
+  expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+  expect(payPalOrder.purchase_units).toHaveLength(1);
+  if (!payPalOrder.purchase_units) {
+    return;
+  }
+  expect(payPalOrder.purchase_units[0]?.payments?.authorizations).toHaveLength(
+    1
+  );
+  if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
+    return;
+  }
+  let authorization =
+    payPalOrder.purchase_units[0]?.payments?.authorizations[0];
+  expect(authorization?.amount?.value).toBe('82.00');
+  expect(authorization?.invoice_id).toBe(customInvoiceId);
+  expect(authorization?.status).toBe('CREATED');
+
+  // GET ORDER REQUEST
+
+  paymentRequest.obj = {
+    ...paymentRequest.obj,
+    custom: {
+      fields: {
+        getPayPalOrderRequest: '{}',
+        PayPalOrderId: payPalOrder.id,
+      },
+    },
+  };
+  paymentResponse = await paymentController('Update', paymentRequest);
+  payPalOrder = expectSuccessfulResponse(
+    paymentResponse,
+    'getPayPalOrderResponse'
+  ) as Order;
+  expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+  expect(payPalOrder.purchase_units).toHaveLength(1);
+  if (!payPalOrder.purchase_units) {
+    return;
+  }
+  expect(payPalOrder.purchase_units[0]?.payments?.authorizations).toHaveLength(
+    1
+  );
+  if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
+    return;
+  }
+  authorization = payPalOrder.purchase_units[0]?.payments?.authorizations[0];
+  expect(authorization?.amount?.value).toBe('82.00');
+  expect(authorization?.status).toBe('CREATED');
+
+  paymentRequest.obj = {
+    ...paymentRequest.obj,
+    transactions: [
+      {
+        type: 'Authorization',
+        interactionId: authorization?.id,
+        state: 'Success',
+      },
+    ],
+  };
+  return { paymentRequest, payPalOrderId: payPalOrder.id };
+}
+
 describe('Testing PayPal aftersales', () => {
   test('Settle an authorization', async () => {
-    const customInvoiceId = randomUUID();
-    const paymentRequest = {
-      obj: {
-        amountPlanned,
-        custom: {
-          fields: {
-            createPayPalOrderRequest: JSON.stringify({
-              custom_invoice_id: customInvoiceId,
-            }),
-          },
-        },
-        id: randomUUID(),
-      },
-    } as any;
-    let paymentResponse = await paymentController('Update', paymentRequest);
-    let payPalOrder = expectSuccessfulResponse(paymentResponse);
-    expect(payPalOrder).toHaveProperty('status', 'CREATED');
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      interfaceId: payPalOrder.id,
-      custom: {
-        fields: {
-          authorizePayPalOrderRequest: JSON.stringify({
-            payment_source,
-          }),
-          PayPalOrderId: payPalOrder.id,
-        },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'authorizePayPalOrderResponse'
-    ) as Order;
-    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
-    expect(payPalOrder.purchase_units).toHaveLength(1);
-    if (!payPalOrder.purchase_units) {
-      return;
-    }
-    expect(
-      payPalOrder.purchase_units[0]?.payments?.authorizations
-    ).toHaveLength(1);
-    if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
-      return;
-    }
-    let authorization =
-      payPalOrder.purchase_units[0]?.payments?.authorizations[0];
-    expect(authorization?.amount?.value).toBe('82.00');
-    expect(authorization?.invoice_id).toBe(customInvoiceId);
-    expect(authorization?.status).toBe('CREATED');
-
-    // GET ORDER REQUEST
+    const relevantTransactionData = await createValidTransaction();
+    if (!relevantTransactionData) return;
+    const { paymentRequest, payPalOrderId } = relevantTransactionData;
 
     paymentRequest.obj = {
       ...paymentRequest.obj,
-      custom: {
-        fields: {
-          getPayPalOrderRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
-        },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'getPayPalOrderResponse'
-    ) as Order;
-    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
-    expect(payPalOrder.purchase_units).toHaveLength(1);
-    if (!payPalOrder.purchase_units) {
-      return;
-    }
-    expect(
-      payPalOrder.purchase_units[0]?.payments?.authorizations
-    ).toHaveLength(1);
-    if (!payPalOrder.purchase_units[0]?.payments?.authorizations) {
-      return;
-    }
-    authorization = payPalOrder.purchase_units[0]?.payments?.authorizations[0];
-    expect(authorization?.amount?.value).toBe('82.00');
-    expect(authorization?.status).toBe('CREATED');
-
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      transactions: [
-        {
-          type: 'Authorization',
-          interactionId: authorization?.id,
-          state: 'Success',
-        },
-      ],
       custom: {
         fields: {
           capturePayPalAuthorizationRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
+          PayPalOrderId: payPalOrderId,
         },
       },
     };
-    paymentResponse = await paymentController('Update', paymentRequest);
+    const paymentResponse = await paymentController('Update', paymentRequest);
     const payPalCapture = expectSuccessfulResponse(
       paymentResponse,
       'capturePayPalAuthorizationResponse'
     ) as Capture;
     expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
+    expect(payPalCapture.amount?.value).toBe('82.00');
+  }, 30000);
+
+  test('Void an authorization', async () => {
+    const relevantTransactionData = await createValidTransaction();
+    if (!relevantTransactionData) return;
+    const { paymentRequest, payPalOrderId } = relevantTransactionData;
+
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          voidPayPalAuthorizationRequest: '{}',
+          PayPalOrderId: payPalOrderId,
+        },
+      },
+    };
+    const paymentResponse = await paymentController('Update', paymentRequest);
+    const payPalCapture = expectSuccessfulResponse(
+      paymentResponse,
+      'voidPayPalAuthorizationResponse'
+    ) as Capture;
+    expect(payPalCapture).toHaveProperty('status', 'VOIDED');
     expect(payPalCapture.amount?.value).toBe('82.00');
   }, 30000);
 

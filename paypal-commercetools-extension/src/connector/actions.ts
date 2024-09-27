@@ -28,6 +28,7 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'authorizePayPalOrder',
   'capturePayPalOrder',
   'capturePayPalAuthorization',
+  'voidPayPalAuthorization',
   'updatePayPalOrder',
   'getPayPalOrder',
   'getPayPalCapture',
