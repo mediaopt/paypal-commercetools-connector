@@ -212,8 +212,10 @@ export const handleCaptureWebhook = async (
 export const handleAuthorizeWebhook = async (resource: Authorization2) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payment = await getPaymentByPayPalOrderId(orderId);
+  const authorizationType =
+    resource.status === 'VOIDED' ? 'CancelAuthorization' : 'Authorization';
   const transaction = {
-    type: 'Authorization',
+    type: authorizationType,
     amount: {
       centAmount: mapPayPalMoneyToCommercetoolsMoney(
         resource?.amount?.value ?? '0',
