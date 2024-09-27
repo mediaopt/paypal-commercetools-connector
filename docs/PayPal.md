@@ -748,7 +748,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 6. GetOrder
+### 7. GetOrder
 
 
 Get Order details.
@@ -798,7 +798,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 7. GetCapture
+### 8. GetCapture
 
 
 Get Capture details.
@@ -848,7 +848,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 8. createTrackingInformation
+### 9. createTrackingInformation
 
 
 Create Tracking Data for Payment.
@@ -901,7 +901,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 9. updateTrackingInformation
+### 10. updateTrackingInformation
 
 
 Update Tracking Data for Payment.
@@ -953,7 +953,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 10. UpdateOrder
+### 11. UpdateOrder
 
 
 Update an order.
@@ -1005,7 +1005,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 11. SetCustomType For Payment
+### 12. SetCustomType For Payment
 
 
 Set the custom type of a payment to paypal-payment-type so that custom fields like createOrderRequest can be set.
@@ -1055,7 +1055,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 12. SetCustomType For Customer
+### 13. SetCustomType For Customer
 
 
 Set the custom type of a payment to paypal-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set.
@@ -1105,7 +1105,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 <br>
 
-### 13. GetSettings
+### 14. GetSettings
 
 
 Get CustomObject for the PayPal settings.
@@ -1136,7 +1136,7 @@ URL: {{host}}/{{project-key}}/custom-objects/paypal-commercetools-connector/sett
 
 <br>
 
-### 14. Refund
+### 15. Refund
 
 
 Refund a captured order.
@@ -1188,7 +1188,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 15. Partial Refund
+### 16. Partial Refund
 
 
 Refund a captured order.
@@ -1238,7 +1238,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### 16. CreateVaultSetupToken
+### 17. CreateVaultSetupToken
 
 
 Create a Vault Setup Toklen for the customer. This token is needed for vaulting payment methods.
@@ -1370,7 +1370,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 
 
-### 17. getUserIdToken
+### 18. getUserIdToken
 
 
 Get a User Id Token for the customer.
@@ -1421,7 +1421,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 <br>
 
 
-### 18. createPaymentToken
+### 19. createPaymentToken
 
 
 Create a payment token for the customer.
@@ -1473,7 +1473,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 <br>
 
-### 19. getPaymentTokens
+### 20. getPaymentTokens
 
 
 Get the current list of vaulted payment methods for the customer.
@@ -1523,7 +1523,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 <br>
 
-### 20. deletePaymentToken
+### 21. deletePaymentToken
 
 
 Delete a saved payment token.
