@@ -103,3 +103,15 @@ export const deleteWebhookId = async () => {
     .delete()
     .execute();
 };
+
+export const deleteAccessToken = async () => {
+  const apiRoot = createApiRoot();
+  return apiRoot
+    .customObjects()
+    .withContainerAndKey({
+      container: 'paypal-commercetools-connector',
+      key: 'accessToken',
+    })
+    .delete()
+    .execute();
+};

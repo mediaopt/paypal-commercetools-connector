@@ -1,6 +1,7 @@
 import {
   Cart,
   CustomerUpdateAction,
+  Extension,
   Payment,
   PaymentAddTransactionAction,
   PaymentChangeTransactionStateAction,
@@ -8,6 +9,7 @@ import {
   Transaction,
   TransactionDraft,
 } from '@commercetools/platform-sdk';
+import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import { createApiRoot } from '../client/create.client';
 import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
 import CustomError from '../errors/custom.error';
@@ -319,3 +321,26 @@ export const getPayPalUserId = async (
   const user = await getCustomerByCart(cart);
   return user?.custom?.fields?.PayPalUserId;
 };
+
+export async function findMatchingExtension(
+  apiRoot: ByProjectKeyRequestBuilder,
+  extensionKey: string,
+  applicationUrl: string
+): Promise<Extension | undefined> {
+  const {
+    body: { results: extensions },
+  } = await apiRoot
+    .extensions()
+    .get({
+      queryArgs: {
+        where: `key = "${extensionKey}"`,
+      },
+    })
+    .execute();
+
+  const matchingExtensions = extensions.filter(
+    ({ destination }) =>
+      destination.type === 'HTTP' && destination.url === applicationUrl
+  );
+  return matchingExtensions.length > 0 ? matchingExtensions[0] : undefined;
+}
