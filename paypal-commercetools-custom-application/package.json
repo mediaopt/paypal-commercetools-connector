@@ -35,7 +35,7 @@
     "@commercetools-frontend/jest-preset-mc-app": "^22.11.0",
     "@commercetools-frontend/l10n": "^22.11.0",
     "@commercetools-frontend/mc-dev-authentication": "^22.32.2",
-    "@commercetools-frontend/mc-scripts": "^22.32.2",
+    "@commercetools-frontend/mc-scripts": "^22.33.0",
     "@commercetools-frontend/permissions": "^22.11.0",
     "@commercetools-test-data/channel": "^4.11.1",
     "@commercetools-test-data/commons": "^4.11.1",
