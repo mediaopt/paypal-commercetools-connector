@@ -52,9 +52,11 @@ Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP
 
 ## Instructions
 
+### Deployment through commercetools
 The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect) or deployed from github repository via [commercetools Connect API](https://docs.commercetools.com/connect/).
 
-To run the connector locally:
+### Local running
+To run the connector locally for test purposes:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
 - run `yarn` to install the dependencies
@@ -62,6 +64,9 @@ To run the connector locally:
 - for paypal-commercetools-extension run `./bin/ngrok.sh` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
 - for paypal-commercetools-extension run `yarn connector:post-deploy` to register the extension with the public ngrok url
 - run `ỳarn start:dev` to build the application
+
+### Hosting externally
+Please set your application url (see the example in [ngrok.sh](./paypal-commercetools-extension/bin/ngrok.sh)) in the `.env` file and run post-deploy script. The url should be accessible externally.
 
 ## Technology Stack
 
