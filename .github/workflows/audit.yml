@@ -16,8 +16,7 @@ jobs:
       matrix:
         directory: [
           'paypal-commercetools-events',
-          'paypal-commercetools-extension',
-          'paypal-commercetools-custom-application'
+          'paypal-commercetools-extension'
         ]
 
     steps:

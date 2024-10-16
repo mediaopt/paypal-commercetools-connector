@@ -23,6 +23,7 @@ const mockConfigModule = () => {
   });
   jest.mock('../src/service/paypal.service', () => ({
     validateSignature: () => ({ verification_status: 'SUCCESS' }),
+    getWebhookId: () => 1,
     getPayPalOrder: () => ({
       status: 'COMPLETED',
     }),
@@ -37,7 +38,6 @@ beforeEach(() => {
   apiRequest = {
     execute: jest
       .fn()
-      .mockReturnValueOnce({ body: { value: 'VALUE' } })
       .mockReturnValueOnce({
         body: {
           total: 1,
@@ -86,7 +86,7 @@ describe('Testing webhook controller', () => {
       resource_type: 'capture',
       resource: { id: 1 },
       action: 'changeTransactionState',
-      executeCalls: 3,
+      executeCalls: 2,
       actionsCount: 3,
     },
     {
@@ -94,7 +94,7 @@ describe('Testing webhook controller', () => {
       resource_type: 'payment_token',
       resource: { id: 1, customer: { id: 123 }, metadata: { order_id: 2 } },
       action: 'setCustomType',
-      executeCalls: 5,
+      executeCalls: 4,
       actionsCount: 1,
     },
     {
@@ -102,7 +102,7 @@ describe('Testing webhook controller', () => {
       resource_type: 'checkout-order',
       resource: { id: 1, intent: CheckoutPaymentIntent.Authorize },
       action: 'setStatusInterfaceCode',
-      executeCalls: 3,
+      executeCalls: 2,
       actionsCount: 2,
     },
     {
@@ -110,7 +110,7 @@ describe('Testing webhook controller', () => {
       resource_type: 'authorization',
       resource: { id: 1 },
       action: 'addTransaction',
-      executeCalls: 3,
+      executeCalls: 2,
       actionsCount: 3,
     },
   ])(
