@@ -17,6 +17,10 @@ This is a [connect application](https://marketplace.commercetools.com/) to integ
 
 The payments demo can be seen at https://poc-mediaopt2.frontend.site/.
 
+## Latest release notes
+
+The latest version of the connector in commercetools Merchant Center is not publicly available due to vulnerability in [commercetools mc-scripts package](https://www.npmjs.com/package/@commercetools-frontend/mc-scripts). Access cen be provided on request.
+
 ## Integration
 The connector is supposed to be used together with the PayPal client app. The client is available at [npm](https://www.npmjs.com/package/paypal-commercetools-client) and [github](https://github.com/mediaopt/paypal-commercetools-client). The connector is responsible for the backend integration with commercetools and PayPal, while the client is responsible for the frontend. If for some reasons the PayPal client app can't be used, the [PayPal JS SDK](https://developer.paypal.com/sdk/js/) should be used instead. The example of the integration with commercetools frontend is covered in [docs/usecases/README.md](docs/workflows/README.md) and the code can be seen in [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
 
@@ -29,8 +33,8 @@ To use the connector you need to have the following:
 | credential    | environmental variable | description                                           |
 |---------------|------------------------|-------------------------------------------------------|
 | region        | CTP_REGION             | region, in which your commercetools project is hosted |
-| project key   | CTP_PROJECT_KEY)       | the key of your commercetools project                 |
-| client ID     | CTP_CLIENT_ID)         | the ID of your commercetools API client               |
+| project key   | CTP_PROJECT_KEY        | the key of your commercetools project                 |
+| client ID     | CTP_CLIENT_ID          | the ID of your commercetools API client               |
 | client secret | CTP_CLIENT_SECRET      | the secret of your commercetools API client           |
 | scope         | CTP_SCOPE              | the scope of your commercetools API client            |
 
@@ -42,11 +46,21 @@ To use the connector you need to have the following:
 | client secret | PAYPAL_CLIENT_SECRET   | the secret of your PayPal API client                              |
 | environment   | PAYPAL_ENVIRONMENT     | the environment of your PayPal API client (production or sandbox) |
 
+Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP credentials:
+
+- SMTP_HOST
+- SMTP_PORT
+- SMTP_USERNAME
+- SMTP_SENDER
+- SMTP_PASSWORD
+
 ## Instructions
 
+### Deployment through commercetools
 The connector can be installed [directly from the commercetools marketplace](https://docs.commercetools.com/merchant-center/connect) or deployed from github repository via [commercetools Connect API](https://docs.commercetools.com/connect/).
 
-To run the connector locally:
+### Local running
+To run the connector locally for test purposes:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
 - run `yarn` to install the dependencies
@@ -54,6 +68,9 @@ To run the connector locally:
 - for paypal-commercetools-extension run `./bin/ngrok.sh` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
 - for paypal-commercetools-extension run `yarn connector:post-deploy` to register the extension with the public ngrok url
 - run `ỳarn start:dev` to build the application
+
+### Hosting externally
+Please set your application url (see the example in [ngrok.sh](./paypal-commercetools-extension/bin/ngrok.sh)) in the `.env` file and run post-deploy script. The url should be accessible externally.
 
 ## Technology Stack
 

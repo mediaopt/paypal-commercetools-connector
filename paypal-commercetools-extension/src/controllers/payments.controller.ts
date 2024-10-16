@@ -13,6 +13,7 @@ import {
   handleRefundPayPalOrderRequest,
   handleUpdateOrderRequest,
   handleUpdateTrackingInformation,
+  handleVoidAuthorizationRequest,
 } from '../service/payments.service';
 import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
@@ -35,6 +36,7 @@ const update = async (resource: Resource) => {
       await handleCreateOrderRequest(payment.obj),
       await handleCaptureOrderRequest(payment.obj),
       await handleCaptureAuthorizationRequest(payment.obj),
+      await handleVoidAuthorizationRequest(payment.obj),
       await handleAuthorizeOrderRequest(payment.obj),
       await handleGetClientTokenRequest(payment.obj),
       await handleGetOrderRequest(payment.obj),
