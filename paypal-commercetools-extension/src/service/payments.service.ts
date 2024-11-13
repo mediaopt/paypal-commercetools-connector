@@ -109,6 +109,7 @@ async function prepareCreateOrderRequest(
         cart.locale ?? Object.keys(settings?.paymentDescription)[0]
       ]
     : undefined;
+  const matchingAmounts = amountPlanned.centAmount === cart.totalPrice.centAmount;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -117,7 +118,7 @@ async function prepareCreateOrderRequest(
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-          breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(cart),
+          breakdown: matchingAmounts ? mapCommercetoolsCartToPayPalPriceBreakdown(cart) : null,
         },
         shipping: !cart.shippingAddress
           ? undefined
@@ -135,14 +136,14 @@ async function prepareCreateOrderRequest(
             },
         invoice_id: request?.custom_invoice_id ?? payment.id,
         description: paymentDescription,
-        items: cart?.lineItems?.map((lineItem) =>
+        items: matchingAmounts ? cart?.lineItems?.map((lineItem) =>
           mapCommercetoolsLineItemsToPayPalItems(
             lineItem,
             paymentSource?.experience_context?.shipping_preference !==
               'NO_SHIPPING' || !!cart.shippingAddress,
             cart.locale
           )
-        ),
+        ) : null,
       },
     ],
     ...request,
