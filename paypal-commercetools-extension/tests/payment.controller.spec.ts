@@ -131,11 +131,17 @@ function expectSuccessfulResponse(
   return JSON.parse(transactionSaleResponse?.value);
 }
 
-async function createValidTransaction() {
+async function createValidTransaction(
+  customAmount?: number,
+  customStringAmount?: string
+) {
   const customInvoiceId = randomUUID();
   const paymentRequest = {
     obj: {
-      amountPlanned,
+      amountPlanned: {
+        ...amountPlanned,
+        centAmount: customAmount || amountPlanned.centAmount,
+      },
       custom: {
         fields: {
           createPayPalOrderRequest: JSON.stringify({
@@ -179,7 +185,7 @@ async function createValidTransaction() {
   }
   let authorization =
     payPalOrder.purchase_units[0]?.payments?.authorizations[0];
-  expect(authorization?.amount?.value).toBe('82.00');
+  expect(authorization?.amount?.value).toBe(customStringAmount ?? '82.00');
   expect(authorization?.invoice_id).toBe(customInvoiceId);
   expect(authorization?.status).toBe('CREATED');
 
@@ -211,7 +217,7 @@ async function createValidTransaction() {
     return;
   }
   authorization = payPalOrder.purchase_units[0]?.payments?.authorizations[0];
-  expect(authorization?.amount?.value).toBe('82.00');
+  expect(authorization?.amount?.value).toBe(customStringAmount ?? '82.00');
   expect(authorization?.status).toBe('CREATED');
 
   paymentRequest.obj = {
@@ -227,7 +233,42 @@ async function createValidTransaction() {
   return { paymentRequest, payPalOrderId: payPalOrder.id };
 }
 
+const amountPlannedCentsWithTestResult: [number, string, string][] = [
+  [19900, 'same as cart', '199.00'],
+  [200000, 'more than in cart', '2000.00'],
+  [4200, 'less than in cart', '42.00'],
+];
+
 describe('Testing PayPal aftersales', () => {
+  test.each(amountPlannedCentsWithTestResult)(
+    'Create a valid transaction with %s cents, which is %s , leads to processing transaction with %s amount',
+    async (amountPlannedCents, descrption, expectedAmount) => {
+      const relevantTransactionData = await createValidTransaction(
+        amountPlannedCents,
+        expectedAmount
+      );
+      if (!relevantTransactionData) return;
+      const { paymentRequest, payPalOrderId } = relevantTransactionData;
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        custom: {
+          fields: {
+            capturePayPalAuthorizationRequest: '{}',
+            PayPalOrderId: payPalOrderId,
+          },
+        },
+      };
+      const paymentResponse = await paymentController('Update', paymentRequest);
+      const payPalCapture = expectSuccessfulResponse(
+        paymentResponse,
+        'capturePayPalAuthorizationResponse'
+      ) as Capture;
+      expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
+      expect(payPalCapture.amount?.value).toBe(expectedAmount);
+    },
+    30000
+  );
+
   test('Settle an authorization', async () => {
     const relevantTransactionData = await createValidTransaction();
     if (!relevantTransactionData) return;
