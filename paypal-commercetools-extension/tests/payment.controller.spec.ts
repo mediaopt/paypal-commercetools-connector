@@ -17,22 +17,22 @@ const currencyData = {
 const taxedPrice = {
   totalNet: {
     ...currencyData,
-    centAmount: 6891,
+    centAmount: 16723,
   },
   totalGross: {
     ...currencyData,
-    centAmount: 8200,
+    centAmount: 19900,
   },
   totalTax: {
     ...currencyData,
-    centAmount: 1309,
+    centAmount: 3177,
   },
 };
 
 const prices = {
   totalPrice: {
     ...currencyData,
-    centAmount: 8200,
+    centAmount: 19900,
   },
   taxedPrice,
 };
@@ -41,37 +41,7 @@ const mockConfigModule = () => {
     getCart: jest.fn(() => {
       return {
         locale: 'en',
-        lineItems: [
-          {
-            name: {
-              en: 'T-Shirt Maison Scotch multi 2',
-              de: 'T-Shirt Maison Scotch multi',
-            },
-            variant: {
-              id: 1,
-              sku: 'M0E20000000EH4R',
-              key: 'M0E20000000EH4R',
-            },
-            price: {
-              id: 'fb35cb7a-44e8-4065-a1d0-60ff1e69420c',
-              value: {
-                ...currencyData,
-                centAmount: 8200,
-              },
-              country: 'DE',
-            },
-            quantity: 1,
-            taxRate: {
-              name: '19% incl.',
-              amount: 0.19,
-              includedInPrice: true,
-              country: 'DE',
-              id: 'ztfE6U8r',
-              subRates: [],
-            },
-            ...prices,
-          },
-        ],
+        lineItems: disconutedLineItems,
         ...prices,
       };
     }),
@@ -91,6 +61,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
+import { disconutedLineItems } from './constants';
 
 const amountPlanned = {
   centAmount: 8200,
