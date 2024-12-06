@@ -27,7 +27,7 @@ import { logger } from '../utils/logger.utils';
 import {
   mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsCartToPayPalPriceBreakdown,
-  mapCommercetoolsLineItemsToPayPalItems,
+  mapValidCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
@@ -109,7 +109,8 @@ async function prepareCreateOrderRequest(
         cart.locale ?? Object.keys(settings?.paymentDescription)[0]
       ]
     : undefined;
-  const matchingAmounts = amountPlanned.centAmount === cart.totalPrice.centAmount;
+  const matchingAmounts =
+    amountPlanned.centAmount === cart.totalPrice.centAmount;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -118,7 +119,9 @@ async function prepareCreateOrderRequest(
         amount: {
           currency_code: amountPlanned.currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-          breakdown: matchingAmounts ? mapCommercetoolsCartToPayPalPriceBreakdown(cart) : null,
+          breakdown: matchingAmounts
+            ? mapCommercetoolsCartToPayPalPriceBreakdown(cart)
+            : null,
         },
         shipping: !cart.shippingAddress
           ? undefined
@@ -136,14 +139,13 @@ async function prepareCreateOrderRequest(
             },
         invoice_id: request?.custom_invoice_id ?? payment.id,
         description: paymentDescription,
-        items: matchingAmounts ? cart?.lineItems?.map((lineItem) =>
-          mapCommercetoolsLineItemsToPayPalItems(
-            lineItem,
-            paymentSource?.experience_context?.shipping_preference !==
-              'NO_SHIPPING' || !!cart.shippingAddress,
-            cart.locale
-          )
-        ) : null,
+        items: mapValidCommercetoolsLineItemsToPayPalItems(
+          matchingAmounts,
+          paymentSource?.experience_context?.shipping_preference !==
+            'NO_SHIPPING' || !!cart.shippingAddress,
+          cart?.lineItems,
+          cart.locale
+        ),
       },
     ],
     ...request,
@@ -500,12 +502,11 @@ export const handleUpdateOrderRequest = async (
         {
           op: 'replace',
           path: "/purchase_units/@reference_id=='default'/items",
-          value: cart?.lineItems?.map((lineItem) =>
-            mapCommercetoolsLineItemsToPayPalItems(
-              lineItem,
-              !!cart.shippingAddress,
-              cart.locale
-            )
+          value: mapValidCommercetoolsLineItemsToPayPalItems(
+            true,
+            !!cart.shippingAddress,
+            cart?.lineItems,
+            cart.locale
           ),
         } as Patch,
       ],
