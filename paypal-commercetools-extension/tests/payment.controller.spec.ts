@@ -242,7 +242,7 @@ const amountPlannedCentsWithTestResult: [number, string, string][] = [
 describe('Testing PayPal aftersales', () => {
   test.each(amountPlannedCentsWithTestResult)(
     'Create a valid transaction with %s cents, which is %s , leads to processing transaction with %s amount',
-    async (amountPlannedCents, descrption, expectedAmount) => {
+    async (amountPlannedCents, description, expectedAmount) => {
       const relevantTransactionData = await createValidTransaction(
         amountPlannedCents,
         expectedAmount
