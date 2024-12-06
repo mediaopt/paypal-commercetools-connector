@@ -1,4 +1,4 @@
-export const disconutedLineItems = [
+export const discountedLineItems = [
   {
     id: '45e9ee9f-9d6b-4e01-934b-b794cc303995',
     productId: '47708631-7f05-4881-8d9b-9563c567f1e3',

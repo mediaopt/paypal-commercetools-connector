@@ -41,7 +41,7 @@ const mockConfigModule = () => {
     getCart: jest.fn(() => {
       return {
         locale: 'en',
-        lineItems: disconutedLineItems,
+        lineItems: discountedLineItems,
         ...prices,
       };
     }),
@@ -61,7 +61,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
-import { disconutedLineItems } from './constants';
+import { discountedLineItems } from './constants';
 
 const amountPlanned = {
   centAmount: 8200,
