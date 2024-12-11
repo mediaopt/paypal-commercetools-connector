@@ -144,7 +144,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   return {
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: taxedNetAmount
+        centAmount: taxedNetAmount != null
           ? taxedNetAmount / lineItem.quantity
           : lineItem.price.value.centAmount,
         fractionDigits,
