@@ -195,6 +195,7 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
+  discountOnTotalPrice,
   taxedShippingPrice,
 }: Cart) => {
   if (!lineItems || !lineItems[0]) {
@@ -237,6 +238,17 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
         type,
       } as TypedMoney),
     },
+    discount: discountOnTotalPrice
+      ? {
+          currency_code: currencyCode,
+          value: mapCommercetoolsMoneyToPayPalMoney({
+            centAmount: discountOnTotalPrice.discountedAmount.centAmount ?? 0,
+            fractionDigits,
+            currencyCode,
+            type,
+          } as TypedMoney),
+        }
+      : undefined,
   };
 };
 
