@@ -1361,3 +1361,38 @@ export const discountedLineItems = [
     taxedPricePortions: [],
   },
 ];
+
+export const discountOnTotalPrice = {
+  discountedAmount: {
+    type: 'centPrecision',
+    currencyCode: 'EUR',
+    centAmount: 500,
+    fractionDigits: 2,
+  },
+  includedDiscounts: [
+    {
+      discount: {
+        typeId: 'cart-discount',
+        id: 'c4b96843-e2ae-4c3c-987e-7c9819a13a40',
+      },
+      discountedAmount: {
+        type: 'centPrecision',
+        currencyCode: 'EUR',
+        centAmount: 500,
+        fractionDigits: 2,
+      },
+    },
+  ],
+  discountedNetAmount: {
+    type: 'centPrecision',
+    currencyCode: 'EUR',
+    centAmount: 420,
+    fractionDigits: 2,
+  },
+  discountedGrossAmount: {
+    type: 'centPrecision',
+    currencyCode: 'EUR',
+    centAmount: 500,
+    fractionDigits: 2,
+  },
+};

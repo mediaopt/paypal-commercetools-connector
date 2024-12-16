@@ -144,9 +144,10 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   return {
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: taxedNetAmount != null
-          ? taxedNetAmount / lineItem.quantity
-          : lineItem.price.value.centAmount,
+        centAmount:
+          taxedNetAmount != null
+            ? taxedNetAmount / lineItem.quantity
+            : lineItem.price.value.centAmount,
         fractionDigits,
         currencyCode,
         type: lineItem.price.value.type,
@@ -184,19 +185,17 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
   if (!matchingAmounts || !lineItems) {
     return null;
   }
-  const relevantLineItems = lineItems.filter(
-    ({ lineItemMode }) => lineItemMode !== 'GiftLineItem'
-  );
-  const payPalItems = relevantLineItems.map((lineItem) =>
+  const payPalItems = lineItems.map((lineItem) =>
     mapCommercetoolsLineItemsToPayPalItems(lineItem, isShipped, locale)
   );
-  return payPalItems.some((item) => parseFloat(item.unit_amount.value) <= 0)
+  return payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0)
     ? null
     : payPalItems;
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
+  discountOnTotalPrice,
   taxedShippingPrice,
 }: Cart) => {
   if (!lineItems || !lineItems[0]) {
@@ -239,6 +238,17 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
         type,
       } as TypedMoney),
     },
+    discount: discountOnTotalPrice
+      ? {
+          currency_code: currencyCode,
+          value: mapCommercetoolsMoneyToPayPalMoney({
+            centAmount: discountOnTotalPrice.discountedAmount.centAmount ?? 0,
+            fractionDigits,
+            currencyCode,
+            type,
+          } as TypedMoney),
+        }
+      : undefined,
   };
 };
 
