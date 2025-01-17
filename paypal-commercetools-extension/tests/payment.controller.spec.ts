@@ -17,22 +17,22 @@ const currencyData = {
 const taxedPrice = {
   totalNet: {
     ...currencyData,
-    centAmount: 16723,
+    centAmount: 16303,
   },
   totalGross: {
     ...currencyData,
-    centAmount: 19900,
+    centAmount: 19400,
   },
   totalTax: {
     ...currencyData,
-    centAmount: 3177,
+    centAmount: 3097,
   },
 };
 
 const prices = {
   totalPrice: {
     ...currencyData,
-    centAmount: 19900,
+    centAmount: 19400,
   },
   taxedPrice,
 };
@@ -43,6 +43,7 @@ const mockConfigModule = () => {
         locale: 'en',
         lineItems: discountedLineItems,
         ...prices,
+        discountOnTotalPrice,
       };
     }),
   }));
@@ -61,7 +62,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
-import { discountedLineItems } from './constants';
+import { discountedLineItems, discountOnTotalPrice } from './constants';
 
 const amountPlanned = {
   centAmount: 8200,
@@ -234,7 +235,7 @@ async function createValidTransaction(
 }
 
 const amountPlannedCentsWithTestResult: [number, string, string][] = [
-  [19900, 'same as cart', '199.00'],
+  [19400, 'same as cart', '194.00'],
   [200000, 'more than in cart', '2000.00'],
   [4200, 'less than in cart', '42.00'],
 ];
