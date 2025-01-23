@@ -86,6 +86,8 @@ The first two categories are covered in the Postman collection Initial part, the
 | 4    | Link the payment to the cart                                                                                                                           | AddPayment                                                                           |
 | 5    | If not yet - get client token for communication with PayPal                                                                                            | getClientToken                                                                       |
 
+We recommend to use commercetools taxCalculationMode **UnitPriceLevel** for the cart to ensure matching price mapping on both PayPal and Commercetool sites. See [commercetools documentation](https://docs.commercetools.com/api/projects/carts#taxcalculationmode) for details.
+
 ## Payment method specific flow
 
 MOST OF THE METHODS REQUIRES USER APPROVAL AFTER CREATE PAYPAL ORDER. IT MEANS THAT THE USER SHOULD APPROVE THE ORDER VIA THE LINK, PROVIDED IN THE RESPONSE.
