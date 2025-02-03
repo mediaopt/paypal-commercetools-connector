@@ -246,6 +246,20 @@ export const handleCaptureOrderRequest = async (
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderCaptureRequest
     );
+    logger.info(
+      'captured order',
+      JSON.stringify(response.status),
+      JSON.stringify(response.purchase_units)
+    );
+    logger.info(
+      'captured order payments',
+      JSON.stringify(
+        response.purchase_units?.length
+          ? response.purchase_units[0].payments
+          : ''
+      )
+    );
+
     updateActions.push({
       action: 'addTransaction',
       transaction: {
