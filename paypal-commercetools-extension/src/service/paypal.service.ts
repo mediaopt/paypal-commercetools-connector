@@ -370,6 +370,10 @@ const getAPIEndpoint = () => {
 };
 
 export const createWebhook = async () => {
+  const webhookId = await getWebhookId();
+  if (webhookId) {
+    return;
+  }
   const gateway = await getPayPalWebhooksGateway();
   const response = await gateway.webhooksPost({
     url: getWebhookUrl(),
