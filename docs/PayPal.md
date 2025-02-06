@@ -3,15 +3,21 @@
 
 # PayPal Commercetools API Postman collection
 
-This Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for Commercetools. For every command the smallest possible payload is given. Please find optional fields in the related official documentation.
+This Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for Commercetools. The extension provides communication to PayPal based on commercetools infrastructure, so if relevant the relation between PayPal and commercetools entities is mentioned.
+
+For every command the smallest possible payload is given. Please find optional fields in the related official documentation.
+
+If relevant mapping between commercetools entities and PayPal entities is mentioned.
 
 ## Disclaimer
 
-This is not the official PayPal documentation. Please see [here](https://developer.paypal.com/docs/online/) for a complete and approved documentation of PayPal.
+This is not the official PayPal or commercetools documentation. Please see [here](https://developer.paypal.com/docs/online/) for a complete and approved documentation of PayPal and [here](https://docs.commercetools.com/docs/) for commercetools.
 
 ## How to use
 
 **:warning: Be aware that postman automatically synchronizes environment variables (including your API client credentials) to your workspace if logged in.** **Use this collection only for development purposes and non-production projects.**
+A running connector instance is required to utilize the communication between commercetools and PayPal.
+
 
 To use this collection in Postman please perform the following steps:
 
@@ -69,6 +75,8 @@ Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for 
 
 
 ## Authorization
+
+All the calls in this section are only relevant for commercetools. Autentication for communication with PayPal is covered in the next section.
 
 ### 1. Obtain access token
 
@@ -212,10 +220,39 @@ URL: {{auth_url}}/oauth/introspect
 
 Create a PayPal Order.
 
-Provide the payment source in the request.
+This call addresses PayPal commercetools connector to request a PayPal order creation.
+
+Payment source is the only required parameter in the request. For each supported payment method the example call with a valid payment_source is provided.
 
 Additional fields might be relevant for certain payment methods (e.g. PayUponInvoice).
 
+If the request is correct - the PayPal endpoint [Create Order](https://developer.paypal.com/docs/api/orders/v2/#orders_create) will be called .
+
+#### Workflow
+
+1. commercetools endpoint "custom objects" is called with a request, that triggers create PayPal order call. The request includes:
+   - payment_source (mandatory) - the payment source object, it must contain the method name and the necessary data, that can't be retrieved from commercetools cart or payment.
+   - clientMetadataId (ony for PayUponInvoice) - see details in the [PayPal documentation](https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/fraudnet/)
+   - custom_invoice_id (optional) - will be passed to PayPal as purchase_units.invoice_id if sent
+   - storeInVaultOnSuccess (optional) - will trigger the connector to store the payment source in the vault if the payment source is "paypal", "venmo" or "card"
+   - any other data that match [PayPal Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_create). **In this case no mapping from commercetools will be available.**
+2. the connector creates a request to PayPal orders api, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
+   - purchase_units: will be set based on commercetools cart and commercetools payment unless other value is sent in the request. **Note**: the whole purchase_units array will be overwritten in this case. The following parameters are mapped by default:
+     - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
+     - invoice_id - custom_invoice_id if sent in the request, otherwise commercetools payment id
+     - items - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalPrice
+     - amount:
+         - currency_code
+         - value 
+         - breakdown - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalPrice
+     - shipping - only if commercetools cart shipping address is provided
+   - intent - "CAPTURE" for PayUponInvoice, for other methods the value specified in commercetools PayPal settings in the Merchant Center. If it is not specified - "CAPTURE"
+   - processing_instruction - only for PayUponInvoice, the value is "ORDER_COMPLETE_ON_PAYMENT_APPROVAL"
+   - payment_source - if relevant for the method the value will be updated to include the necessary fields, namely:
+     * for PayUponInvoice - birth_date and phone must be provided in the request, if other parameters are not provided - they will be defined based on commercetools cart and PayPal settings
+     * if commercetools shipping address is provided - experience_context.shipping_preference will be set to 'SET_PROVIDED_ADDRESS', unless different value is sent in the request
+3. if storeInVaultOnSuccess was requested and payment source is "paypal", "vemno" or "card" the connector will attempt to retrieve the commercetools user PayPalUserId and will add to the request body the fields necessary for vaulting the relevant method.
+4. the connector sends the request to PayPal and on success updates the commercetools payment.
 
 ***Endpoint:***
 
