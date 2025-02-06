@@ -615,7 +615,7 @@ Capture an order. If not provided the Order Id will be read from the payment obj
    - order_id(optional) - the order id to be captured. 
    - any other data that match [PayPal Capture Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_capture). 
 2. If not provided in the request the order_id will be read from the payment object and PayPal api Captrure Order will be triggered with the id and any other passed data.
-3. The connector adds a transaction the commercetools payment object. Transaction data depend on the PayPal response.
+3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 ***Endpoint:***
 
@@ -665,8 +665,14 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Capture an authorization.
 
-The authorization id will be read from the payment transactions.
+If not provided the authorization id will be read from the payment transactions.
 
+#### Connector Workflow
+1. The connector receives the request that includes:
+   - authorization_id(optional) - the authorization id to be captured.
+   - any other data that match [PayPal Capture authorized payment body specification](https://developer.paypal.com/docs/api/payments/v2/#authorizations_capture).
+2. If not provided in the request the authorization_id will be read from the payment transactions and PayPal api Capture Authorization will be triggered with the id and any other passed data.
+3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 ***Endpoint:***
 
@@ -713,7 +719,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Void an authorization.
 
-The authorization id will be read from the payment transactions.
+If not provided authorization id will be read from the payment transactions.
+
+#### Connector Workflow
+1. The connector receives the request that includes:
+    - authorization_id(optional) - the authorization id to be captured.
+2. If not provided in the request the authorization_id will be read from the payment transactions and [PayPal api](https://developer.paypal.com/docs/api/payments/v2/#authorizations_void) will be triggered with the id.
+3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 
 **_Endpoint:_**
