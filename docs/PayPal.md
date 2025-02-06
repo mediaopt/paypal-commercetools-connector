@@ -45,7 +45,7 @@ The connector is accessed through [commercetools custom fields](https://docs.com
 }
 ```
 
-The request is first sent to a commercetools relevant endpoint (e.g. payments) and the connector is triggered. The connector then processes the request and if relevant interacts with PayPal api based on request data and data available from commercetools. The response is then processed by the connector and relevant commercetools objects are updated accordingly.
+The request is first sent to a commercetools relevant endpoint (e.g. payments) and the connector is triggered. The connector then processes the request and if relevant interacts with PayPal api based on request data and data available from commercetools. The response is then processed by the connector and relevant commercetools objects are updated accordingly. By default, the update just stores relevant fields from PayPal response in the custom field of the related object.
 
 ## Endpoints
 
