@@ -233,23 +233,21 @@ URL: {{auth_url}}/oauth/introspect
 
 Create a PayPal Order.
 
-This call addresses PayPal commercetools connector to request a PayPal order creation.
-
 Payment source is the only required parameter in the request. For each supported payment method the example call with a valid payment_source is provided.
 
 Additional fields might be relevant for certain payment methods (e.g. PayUponInvoice).
 
 If the request is correct - the PayPal endpoint [Create Order](https://developer.paypal.com/docs/api/orders/v2/#orders_create) will be called .
 
-#### Workflow
+#### Connector workflow
 
-1. commercetools endpoint "custom objects" is called with a request, that triggers create PayPal order call. The request includes:
+1. The connector receives a request that includes:
    - payment_source (mandatory) - the payment source object, it must contain the method name and the necessary data, that can't be retrieved from commercetools cart or payment.
    - clientMetadataId (ony for PayUponInvoice) - see details in the [PayPal documentation](https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/fraudnet/)
    - custom_invoice_id (optional) - will be passed to PayPal as purchase_units.invoice_id if sent
    - storeInVaultOnSuccess (optional) - will trigger the connector to store the payment source in the vault if the payment source is "paypal", "venmo" or "card"
    - any other data that match [PayPal Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_create). **In this case no mapping from commercetools will be available.**
-2. the connector creates a request to PayPal orders api, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
+2. The connector creates a request to PayPal orders api, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
    - purchase_units: will be set based on commercetools cart and commercetools payment unless other value is sent in the request. **Note**: the whole purchase_units array will be overwritten in this case. The following parameters are mapped by default:
      - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
      - invoice_id - custom_invoice_id if sent in the request, otherwise commercetools payment id
@@ -264,8 +262,8 @@ If the request is correct - the PayPal endpoint [Create Order](https://developer
    - payment_source - if relevant for the method the value will be updated to include the necessary fields, namely:
      * for PayUponInvoice - birth_date and phone must be provided in the request, if other parameters are not provided - they will be defined based on commercetools cart and PayPal settings
      * if commercetools shipping address is provided - experience_context.shipping_preference will be set to 'SET_PROVIDED_ADDRESS', unless different value is sent in the request
-3. if storeInVaultOnSuccess was requested and payment source is "paypal", "vemno" or "card" the connector will attempt to retrieve the commercetools user PayPalUserId and will add to the request body the fields necessary for vaulting the relevant method.
-4. the connector sends the request to PayPal and on success updates the commercetools payment.
+3. If storeInVaultOnSuccess was requested and payment source is "paypal", "vemno" or "card" the connector will attempt to retrieve the commercetools user PayPalUserId and will add to the request body the fields necessary for vaulting the relevant method.
+4. The connector sends the request to PayPal and on success updates the commercetools payment.
 
 ***Endpoint:***
 
