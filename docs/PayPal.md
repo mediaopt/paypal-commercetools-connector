@@ -33,6 +33,19 @@ To automate frequent tasks the collection automatically manages commonly require
 
 Please see [http://docs.commercetools.com/](http://docs.commercetools.com/) for further information about the commercetools platform.
 
+## General Workflow
+
+The connector is accessed through [commercetools custom fields](https://docs.commercetools.com/api/projects/custom-fields#customfields). Therefore, all calls that trigger the connector include an object of the following structure:
+
+```json
+{
+  "action": "setCustomField",
+  "name": **connector method that will be triggered**,
+  "value": **actual body with which the connector will be triggered**
+}
+```
+
+The request is first sent to a commercetools relevant endpoint (e.g. payments) and the connector is triggered. The connector then processes the request and if relevant interacts with PayPal api based on request data and data available from commercetools. The response is then processed by the connector and relevant commercetools objects are updated accordingly.
 
 ## Endpoints
 
