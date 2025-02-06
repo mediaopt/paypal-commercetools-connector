@@ -773,7 +773,14 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Authorize an order.
 
-The order id will be read from the payment object.
+If not provided the order id will be read from the payment object.
+
+#### Connector Workflow
+1. The connector receives the request that includes:
+    - orderId(optional) - the order id to be captured.
+    - any other data that match [PayPal Authorize order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_authorize).
+2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 
 ***Endpoint:***
@@ -823,8 +830,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Get Order details.
 
-The order id will be read from the payment object.
+If not provided the order id will be read from the payment object.
 
+#### Connector Workflow
+1. The connector receives the request that includes:
+    - orderId(optional) - the order id to be retrieved.
+2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+3. The connector updates commercetools payment object.
 
 ***Endpoint:***
 
@@ -873,7 +885,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Get Capture details.
 
-The payment needs at least one capture transaction. If there are multiple transactions, the newest one will be refunded.
+The payment needs at least one capture transaction. If there are multiple transactions and no specific captureId is provided, the newest one will be refunded.
+
+#### Connector Workflow
+1. The connector receives the request that includes:
+    - captureId(optional) - the order id to be retrieved.
+2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+3. The connector updates commercetools payment object.
 
 
 ***Endpoint:***
