@@ -557,6 +557,11 @@ Returns a string which contains all authorization and configuration
 information that your client needs to initialize the client SDK to  
 communicate with PayPal.
 
+#### Connector workflow
+1. The connector attempts to retrieve cached commercetools PayPal access token.
+2. If the cached token is not available a new token is generated.
+3. [PayPal Authentication](https://developer.paypal.com/api/rest/authentication/) is triggered.
+4. On success updates the commercetools payment object.
 
 ***Endpoint:***
 
