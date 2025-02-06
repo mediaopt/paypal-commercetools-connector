@@ -608,9 +608,14 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ### 3. CaptureOrder
 
+Capture an order. If not provided the Order Id will be read from the payment object.
 
-Capture an order. The Order Id will be read from the payment object.
-
+#### Connector workflow
+1. The connector receives the request that includes:
+   - order_id(optional) - the order id to be captured. 
+   - any other data that match [PayPal Capture Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_capture). 
+2. If not provided in the request the order_id will be read from the payment object and PayPal api Captrure Order will be triggered with the id and any other passed data.
+3. The connector adds a transaction the commercetools payment object. Transaction data depend on the PayPal response.
 
 ***Endpoint:***
 
