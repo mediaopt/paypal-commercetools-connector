@@ -242,11 +242,11 @@ If the request is correct - the PayPal endpoint [Create Order](https://developer
 #### Connector workflow
 
 1. The connector receives a request that includes:
-   - payment_source (mandatory) - the payment source object, it must contain the method name and the necessary data, that can't be retrieved from commercetools cart or payment.
+   - payment_source - the payment source object, it must contain the method name and the necessary data, that can't be retrieved from commercetools cart or payment.
    - clientMetadataId (ony for PayUponInvoice) - see details in the [PayPal documentation](https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/fraudnet/)
    - custom_invoice_id (optional) - will be passed to PayPal as purchase_units.invoice_id if sent
    - storeInVaultOnSuccess (optional) - will trigger the connector to store the payment source in the vault if the payment source is "paypal", "venmo" or "card"
-   - any other data that match [PayPal Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_create). **In this case no mapping from commercetools will be available.**
+   - optional any other data that match [PayPal Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_create). **In this case no mapping from commercetools will be available.**
 2. The connector creates a request to PayPal orders api, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
    - purchase_units: will be set based on commercetools cart and commercetools payment unless other value is sent in the request. **Note**: the whole purchase_units array will be overwritten in this case. The following parameters are mapped by default:
      - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
@@ -613,7 +613,7 @@ Capture an order. If not provided the Order Id will be read from the payment obj
 #### Connector workflow
 1. The connector receives the request that includes:
    - orderId(optional) - the order id to be captured. 
-   - any other data that match [PayPal Capture Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_capture). 
+   - optional any other data that match [PayPal Capture Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_capture). 
 2. If not provided in the request the order_id will be read from the payment object and PayPal api Captrure Order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
@@ -670,7 +670,7 @@ If not provided the authorization id will be read from the payment transactions.
 #### Connector Workflow
 1. The connector receives the request that includes:
    - authorizationId(optional) - the authorization id to be captured.
-   - any other data that match [PayPal Capture authorized payment body specification](https://developer.paypal.com/docs/api/payments/v2/#authorizations_capture).
+   - optional any other data that match [PayPal Capture authorized payment body specification](https://developer.paypal.com/docs/api/payments/v2/#authorizations_capture).
 2. If not provided in the request the authorization_id will be read from the payment transactions and PayPal api Capture Authorization will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
@@ -778,7 +778,7 @@ If not provided the order id will be read from the payment object.
 #### Connector Workflow
 1. The connector receives the request that includes:
     - orderId(optional) - the order id to be captured.
-    - any other data that match [PayPal Authorize order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_authorize).
+    - optional any other data that match [PayPal Authorize order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_authorize).
 2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
@@ -941,10 +941,21 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Create Tracking Data for Payment.
 
-The order id will be read from the payment object and the capture_id will be used from the transactions.
+The order id will be read from the payment object and if not provided the capture_id will be used from the transactions.
 
 Please provide a tracking_number, carrier and optionally a carrier_name_other.  
 Custom items can be submitted at your own responsibility.
+
+#### Connector workflow
+1. The connector receives the request that includes:
+    - tracking_number - the tracking number of the shipment
+    - carrier - the carrier of the shipment
+    - capture_id(optional) - the capture id to be updated.
+    - optional any other fields matching the request body in [PayPal add tracking information to the order](https://developer.paypal.com/docs/api/orders/v2/#orders_track_create)
+2. The connector constructs and sends the request to PayPal. This includes the following additional fields:
+   - carrier_name_other - if the carrier in the request does not match the predefined list
+   - capture_id - if not provided in the request the capture_id will be read from the payment transactions
+3. The connector updates the commercetools payment object.
 
 
 ***Endpoint:***
@@ -994,10 +1005,15 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Update Tracking Data for Payment.
 
-The order id will be read from the payment object and the capture_id will be used from the transactions.
+If trackingId is not provided it will be retrieved through the commercetools payment object from commercetools order object.
+Patch variable that lists all required update operations according to [PayPal format](https://developer.paypal.com/docs/api/orders/v2/#orders_trackers_patch) is required.
 
-Please provide a tracking_number and patch variable, that lists all required update operations according to [PayPal format](https://developer.paypal.com/docs/api/orders/v2/#orders_trackers_patch).
-
+#### Connector workflow
+1. The connector receives the request that includes:
+    - path - the tracking number of the shipment
+    - trackingId (optional) - the tracking id of the shipment
+2. If necessary the connector retrieves the trackingId and sends the request to PayPal update or cancel tracking information for a PayPal order endpoint.
+3. The connector updates the commercetools payment object.
 
 ***Endpoint:***
 
@@ -1046,10 +1062,17 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Update an order.
 
-The order id will be read from the payment object.
+This endpoint is dedicated for the express checkout flow amount planned changes.
 
-This endpoint is needed in the express checkout flow if the amount planned changes.
+The order id will be read from the payment object and the path will be calculated based on cart and payment objects.
 
+
+#### Connector workflow
+1. The connector is triggered
+2. The connector creates request to PayPal update order endpoint, which includes
+    - orderId - retrieved from the payment object
+    - path - constructed from commercetools payment and cart objects, includes updating the amount and items.
+3. The connector updates the commercetools payment object.
 
 ***Endpoint:***
 
@@ -1098,6 +1121,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Set the custom type of a payment to paypal-payment-type so that custom fields like createOrderRequest can be set.
 
+This request does not trigger any PayPal API calls.
 
 ***Endpoint:***
 
@@ -1148,6 +1172,7 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Set the custom type of a payment to paypal-customer-type so that custom fields like CreateVaultSetupTokenRequest can be set.
 
+This request does not trigger any PayPal API calls.
 
 ***Endpoint:***
 
@@ -1198,6 +1223,7 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 Get CustomObject for the PayPal settings.
 
+This request does not trigger any PayPal API calls.
 
 ***Endpoint:***
 
@@ -1231,7 +1257,17 @@ Refund a captured order.
 
 If you do not specify an amount to refund, the remaining order amount will be refunded.
 
-The payment needs at least one capture transaction. If there are multiple transactions, the newest one will be refunded.
+The payment needs at least one capture transaction. If there are multiple transactions and the captureId is not provided in the request, the newest one will be refunded.
+
+
+#### Connector workflow
+1. The connector receives the request that includes:
+    - amount(optional) - PayPal [amount.value](https://developer.paypal.com/docs/api/payments/v2/#captures_refund) to be refunded
+    - captureId(optional) - the capture id to be refunded.
+2. The connector constructs and sends the request to PayPal refund captured payment endpoint(https://developer.paypal.com/docs/api/payments/v2/#captures_refund), including:
+    - capture_id - if not provided in the request the capture_id will be read from the payment transactions
+    - amount (only if received in the request) - if the value is provided in the request the currency code will be taken from the commercetools payment object
+3. The connector updates the commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 
 ***Endpoint:***
@@ -1278,10 +1314,11 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ### 16. Partial Refund
 
+This call operates same as Refund, the only difference is the amount field is already included in a body.
 
 Refund a captured order.
 
-The payment needs at least one capture transaction. If there are multiple transactions, the newest one will be refunded.
+The payment needs at least one capture transaction. If there are multiple transactions and the captureId is not provided in the request, the newest one will be refunded.
 
 
 ***Endpoint:***
@@ -1331,6 +1368,14 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 Create a Vault Setup Toklen for the customer. This token is needed for vaulting payment methods.
 
+#### Connector workflow
+1. The connector receives the request that includes:
+    - payment_source - the payment source object, see [PayPal Create a setup token body specification](https://developer.paypal.com/docs/api/payment-tokens/v3/#setup-tokens_create).
+    - customer(optional) - the customer object
+2. The connector creates a request to PayPal create a setup token endpoint, which includes
+   - the payment_source object from the previous step
+   - customer object if provided in the request, otherwise the customer id will be retrieved from commercetools customer
+3. The connector updates the commercetools customer object and if the customer.id is provided in PayPal response will update the customer PayPalUserId.
 
 ***Endpoint:***
 
@@ -1464,6 +1509,8 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 Get a User Id Token for the customer.
 
 This token is needed for vaulting payment methods.
+
+
 
 
 ***Endpoint:***
