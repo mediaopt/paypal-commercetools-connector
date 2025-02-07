@@ -1,9 +1,9 @@
 
-# Commercetools
+# commercetools
 
-# PayPal Commercetools API Postman collection
+# PayPal commercetools API Postman collection
 
-This Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for Commercetools. The extension provides communication to PayPal based on commercetools infrastructure, so if relevant the relation between PayPal and commercetools entities is mentioned.
+This Postman collection contains examples of requests and responses for most endpoints and commands of the PayPal extension for commercetools. The extension provides communication to PayPal based on commercetools infrastructure, so if relevant the relation between PayPal and commercetools entities is mentioned.
 
 For every command the smallest possible payload is given. Please find optional fields in the related official documentation.
 
@@ -43,12 +43,12 @@ The connector is accessed through [commercetools custom fields](https://docs.com
    - value: will be sent to the connector as a new request (req2) body
 2. The connector method req1.name is triggered by commercetools with the new request (req2).
 3. If necessary the connector acquires additional data from commercetools (d).
-4. The data from req2 and d are processed to create a new request (req3) to PayPal. The structure of the request to PayPal is based on the [PayPal api documentation](https://developer.paypal.com/api/rest/) and **is not identical to the commercetools request body value**. Some of the data may be passed as path or header parameters.
+4. The data from req2 and d are processed to create a new request (req3) to PayPal. The structure of the request to PayPal is based on the [PayPal API documentation](https://developer.paypal.com/api/rest/) and **is not identical to the commercetools request body value**. Some of the data may be passed as path or header parameters.
 5. The connector receives the response from PayPal (res1).
 6. The connector updates relevant commercetools objects (o). By default, relevant data from res1 are stored in the custom field of the related object. 
 
 
-For the methods that interact with PayPal api this documentation includes "Connector workflow" section. This section describes:
+For the methods that interact with PayPal API this documentation includes "Connector workflow" section. This section describes:
     
 - supported request parameters (res1.value)
 - collected commercetools data (d)
@@ -97,7 +97,7 @@ For the methods that interact with PayPal api this documentation includes "Conne
 
 ## Authorization
 
-All the calls in this section are only relevant for commercetools. Autentication for communication with PayPal is covered in the next section.
+All the calls in this section are only relevant for commercetools. Authentication for communication with PayPal is covered in the next section.
 
 ### 1. Obtain access token
 
@@ -245,7 +245,7 @@ Payment source is the only required parameter in the request. For each supported
 
 Additional fields might be relevant for certain payment methods (e.g. PayUponInvoice).
 
-If the request is correct - the PayPal endpoint [Create Order](https://developer.paypal.com/docs/api/orders/v2/#orders_create) will be called .
+If the request is correct - the PayPal endpoint [Create Order](https://developer.paypal.com/docs/api/orders/v2/#orders_create) will be called.
 
 #### Connector workflow
 
@@ -255,7 +255,7 @@ If the request is correct - the PayPal endpoint [Create Order](https://developer
    - custom_invoice_id (optional) - will be passed to PayPal as purchase_units.invoice_id if sent
    - storeInVaultOnSuccess (optional) - will trigger the connector to store the payment source in the vault if the payment source is "paypal", "venmo" or "card"
    - optional any other data that match [PayPal Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_create). **In this case no mapping from commercetools will be available.**
-2. The connector creates a request to PayPal orders api, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
+2. The connector creates a request to PayPal orders API, in which includes all relevant fields from the previous step and provides the mapping for other fields, namely:
    - purchase_units: will be set based on commercetools cart and commercetools payment unless other value is sent in the request. **Note**: the whole purchase_units array will be overwritten in this case. The following parameters are mapped by default:
      - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
      - invoice_id - custom_invoice_id if sent in the request, otherwise commercetools payment id
@@ -616,13 +616,13 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 ### 3. CaptureOrder
 
-Capture an order. If not provided the Order Id will be read from the payment object.
+Capture an order. If not provided the order Id will be read from the payment object.
 
 #### Connector workflow
 1. The connector receives the request that includes:
    - orderId(optional) - the order id to be captured. 
    - optional any other data that match [PayPal Capture Order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_capture). 
-2. If not provided in the request the order_id will be read from the payment object and PayPal api Captrure Order will be triggered with the id and any other passed data.
+2. If not provided in the request the order_id will be read from the payment object and PayPal API Captrure Order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 ***Endpoint:***
@@ -679,7 +679,7 @@ If not provided the authorization id will be read from the payment transactions.
 1. The connector receives the request that includes:
    - authorizationId(optional) - the authorization id to be captured.
    - optional any other data that match [PayPal Capture authorized payment body specification](https://developer.paypal.com/docs/api/payments/v2/#authorizations_capture).
-2. If not provided in the request the authorization_id will be read from the payment transactions and PayPal api Capture Authorization will be triggered with the id and any other passed data.
+2. If not provided in the request the authorization_id will be read from the payment transactions and PayPal API Capture Authorization will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 ***Endpoint:***
@@ -732,7 +732,7 @@ If not provided authorization id will be read from the payment transactions.
 #### Connector Workflow
 1. The connector receives the request that includes:
     - authorizationId(optional) - the authorization id to be captured.
-2. If not provided in the request the authorization_id will be read from the payment transactions and [PayPal api](https://developer.paypal.com/docs/api/payments/v2/#authorizations_void) will be triggered with the id.
+2. If not provided in the request the authorization_id will be read from the payment transactions and [PayPal API](https://developer.paypal.com/docs/api/payments/v2/#authorizations_void) will be triggered with the id.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 
@@ -787,7 +787,7 @@ If not provided the order id will be read from the payment object.
 1. The connector receives the request that includes:
     - orderId(optional) - the order id to be captured.
     - optional any other data that match [PayPal Authorize order body specification](https://developer.paypal.com/docs/api/orders/v2/#orders_authorize).
-2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+2. If not provided in the request the order_id will be read from the payment and PayPal API authorize order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
 
 
@@ -843,7 +843,7 @@ If not provided the order id will be read from the payment object.
 #### Connector Workflow
 1. The connector receives the request that includes:
     - orderId(optional) - the order id to be retrieved.
-2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+2. If not provided in the request the order_id will be read from the payment and PayPal API authorize order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object.
 
 ***Endpoint:***
@@ -898,7 +898,7 @@ The payment needs at least one capture transaction. If there are multiple transa
 #### Connector Workflow
 1. The connector receives the request that includes:
     - captureId(optional) - the order id to be retrieved.
-2. If not provided in the request the order_id will be read from the payment and PayPal api authorize order will be triggered with the id and any other passed data.
+2. If not provided in the request the order_id will be read from the payment and PayPal API authorize order will be triggered with the id and any other passed data.
 3. The connector updates commercetools payment object.
 
 
