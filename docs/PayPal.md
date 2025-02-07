@@ -1510,7 +1510,11 @@ Get a User Id Token for the customer.
 
 This token is needed for vaulting payment methods.
 
-
+#### Connector workflow
+1. The connector is triggered
+2. The connector creates a request to [PayPal authentication api](https://developer.paypal.com/api/rest/authentication/), which includes
+   - customerId - retrieved from the customer object
+3. The connector updates the commercetools customer object.
 
 
 ***Endpoint:***
@@ -1565,6 +1569,14 @@ The input is a token which was generated in the frontend.
 
 This endpoint is used for vaulting payment methods.
 
+#### Connector workflow
+1. The connector receives the request that includes:
+    - id - the id for a payment token
+2. The connector creates a request to  [PayPal payment token for a given payment source](https://developer.paypal.com/docs/api/payment-tokens/v3/#payment-tokens_create), which includes
+   - customer.id - retrieved from the commercetools customer object if available
+   - payment_source.token - including the id from the request
+3. The connector updates the commercetools customer object and if provided in the response updates the PayPalUserId.
+
 
 ***Endpoint:***
 
@@ -1615,6 +1627,11 @@ Get the current list of vaulted payment methods for the customer.
 
 The list can be displayed in the frontend to reuse those payment methods.
 
+#### Connector workflow
+1. The connector is triggered
+2. The connector creates a request to [PayPal list all payment tokens endpoint](https://developer.paypal.com/docs/api/payment-tokens/v3/#customer_payment-tokens_get), which includes
+   - customer.id - retrieved from the customer object
+3. The connector updates the commercetools customer object.
 
 ***Endpoint:***
 
@@ -1663,6 +1680,12 @@ URL: {{host}}/{{project-key}}/customers/{{customer-id}}
 
 Delete a saved payment token.
 
+#### Connector workflow
+1. The connector receives the request that includes:
+    - paymentToken - the token id to be deleted
+2. The connector creates a request to [PayPal delete payment token endpoint](https://developer.paypal.com/docs/api/payment-tokens/v3/#payment-tokens_delete), which includes
+    - id - the paymentToken from the request
+3. The connector updates the commercetools customer object.
 
 ***Endpoint:***
 
