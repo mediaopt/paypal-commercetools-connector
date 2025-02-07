@@ -1272,7 +1272,7 @@ The payment needs at least one capture transaction. If there are multiple transa
 1. The connector receives the request that includes:
     - amount(optional) - PayPal [amount.value](https://developer.paypal.com/docs/api/payments/v2/#captures_refund) to be refunded
     - captureId(optional) - the capture id to be refunded.
-2. The connector constructs and sends the request to PayPal refund captured payment endpoint(https://developer.paypal.com/docs/api/payments/v2/#captures_refund), including:
+2. The connector constructs and sends the request to [PayPal refund captured payment endpoint](https://developer.paypal.com/docs/api/payments/v2/#captures_refund), including:
     - capture_id - if not provided in the request the capture_id will be read from the payment transactions
     - amount (only if received in the request) - if the value is provided in the request the currency code will be taken from the commercetools payment object
 3. The connector updates the commercetools payment object and adds a transaction to it. Transaction data depend on the PayPal response.
