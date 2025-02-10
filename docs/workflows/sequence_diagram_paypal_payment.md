@@ -19,7 +19,7 @@ sequenceDiagram
     Note over CoCo, PayPal: PayPal orders v2 API
     Note over frontend, CoCo: Cart is created by built in CoFe methods and has products and user data in it
     frontend-->>backend: getSettings action
-    backend-->>CoCo: getSetting request
+    backend-->>CoCo: getSettings request
     Note over backend, CoCo: endpoint >custom-objects/<br/>paypal-commercetools-connector
     CoCo-->>backend: GetSettingsResponse
     backend-->>frontend: GetSettingsResponse, Session data
