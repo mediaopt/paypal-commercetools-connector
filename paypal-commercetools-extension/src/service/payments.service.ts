@@ -144,6 +144,7 @@ async function prepareCreateOrderRequest(
           matchingAmounts,
           paymentSource?.experience_context?.shipping_preference !==
             'NO_SHIPPING' || !!cart.shippingAddress,
+          cart.taxCalculationMode === 'LineItemLevel',
           cart?.lineItems,
           cart.locale
         ),
