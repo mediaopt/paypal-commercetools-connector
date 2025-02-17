@@ -159,20 +159,6 @@ const mapCommercetoolsLineItemsToPayPalItems = (
     quantity: `${lineItem.quantity}`,
     description: name,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
-    tax_rate: lineItem.taxRate?.amount ?? 0,
-    tax: !lineItem.taxedPrice?.totalTax
-      ? undefined
-      : {
-          value: mapCommercetoolsMoneyToPayPalMoney({
-            centAmount:
-              (lineItem.taxedPrice?.totalTax?.centAmount ?? 0) /
-              lineItem.quantity,
-            fractionDigits,
-            currencyCode,
-            type: lineItem.price.value.type,
-          } as TypedMoney),
-          currency_code: currencyCode,
-        },
   } as Item;
 };
 
