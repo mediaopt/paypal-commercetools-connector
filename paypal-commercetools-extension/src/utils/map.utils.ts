@@ -141,7 +141,6 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   const relevantPrice = isLineItemLevel
     ? lineItem.taxedPrice?.totalGross
     : lineItem.taxedPrice?.totalNet;
-  logger.info(JSON.stringify(relevantPrice));
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
 
