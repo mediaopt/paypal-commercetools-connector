@@ -506,6 +506,7 @@ export const handleUpdateOrderRequest = async (
           value: mapValidCommercetoolsLineItemsToPayPalItems(
             true,
             !!cart.shippingAddress,
+            cart.taxCalculationMode === 'LineItemLevel',
             cart?.lineItems,
             cart.locale
           ),
