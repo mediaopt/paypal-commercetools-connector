@@ -138,6 +138,7 @@ async function prepareCreateOrderRequest(
               },
             },
         invoice_id: request?.custom_invoice_id ?? payment.id,
+        custom_id: request?.custom_id,
         description: paymentDescription,
         items: mapValidCommercetoolsLineItemsToPayPalItems(
           matchingAmounts,
@@ -151,6 +152,7 @@ async function prepareCreateOrderRequest(
     ...request,
   } as OrderRequest;
   delete request?.custom_invoice_id;
+  delete request?.custom_id;
   if (request?.storeInVaultOnSuccess) {
     delete request.storeInVaultOnSuccess;
     const customer = {
@@ -204,7 +206,10 @@ export const handleCreateOrderRequest = async (
     return [];
   }
   const settings = await getSettings();
+
   const request = await prepareCreateOrderRequest(payment, settings);
+  const customId = request?.purchase_units[0]?.custom_id;
+
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(
@@ -225,6 +230,12 @@ export const handleCreateOrderRequest = async (
       name: 'PayPalOrderId',
       value: response.id,
     });
+    if (customId)
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'PayPalCustomId',
+        value: customId,
+      });
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
     return handleError('createPayPalOrder', e);
