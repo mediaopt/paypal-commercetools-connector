@@ -370,16 +370,26 @@ const getAPIEndpoint = () => {
 };
 
 export const createWebhook = async () => {
-  const gateway = await getPayPalWebhooksGateway();
-  const response = await gateway.webhooksPost({
-    url: getWebhookUrl(),
-    event_types: [
-      {
-        name: '*',
-      } as EventType,
-    ],
-  });
-  return response.data;
+  try {
+    const gateway = await getPayPalWebhooksGateway();
+    const response = await gateway.webhooksPost({
+      url: getWebhookUrl(),
+      event_types: [
+        {
+          name: '*',
+        } as EventType,
+      ],
+    });
+    return response.data;
+  } catch (error: any) {
+    const reason = error?.response?.data?.name;
+    if (reason === 'WEBHOOK_URL_ALREADY_EXISTS') {
+      logger.info('Webhook already exists');
+    } else {
+      throw error;
+    }
+  }
+
 };
 
 export const deleteWebhook = async () => {

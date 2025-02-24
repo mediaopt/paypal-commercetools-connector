@@ -14,6 +14,7 @@ import {
   deleteAccessToken,
   getCachedAccessToken,
 } from '../service/config.service';
+import { readConfiguration } from "../utils/config.utils";
 
 export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
@@ -49,13 +50,15 @@ export async function createPaymentUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string
 ): Promise<void> {
+  const store = readConfiguration().store;
+  const key = PAYPAL_PAYMENT_EXTENSION_KEY + (store ? `-${store}` : '');
   const {
     body: { results: extensions },
   } = await apiRoot
     .extensions()
     .get({
       queryArgs: {
-        where: `key = "${PAYPAL_PAYMENT_EXTENSION_KEY}"`,
+        where: `key = "${key}"`,
       },
     })
     .execute();
@@ -65,7 +68,7 @@ export async function createPaymentUpdateExtension(
 
     await apiRoot
       .extensions()
-      .withKey({ key: PAYPAL_PAYMENT_EXTENSION_KEY })
+      .withKey({ key: key })
       .delete({
         queryArgs: {
           version: extension.version,
@@ -78,7 +81,7 @@ export async function createPaymentUpdateExtension(
     .extensions()
     .post({
       body: {
-        key: PAYPAL_PAYMENT_EXTENSION_KEY,
+        key,
         timeoutInMs: 10000,
         destination: {
           type: 'HTTP',
@@ -100,13 +103,15 @@ export async function createCustomerUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string
 ): Promise<void> {
+  const store = readConfiguration().store;
+  const key = PAYPAL_CUSTOMER_EXTENSION_KEY + (store ? `-${store}` : '');
   const {
     body: { results: extensions },
   } = await apiRoot
     .extensions()
     .get({
       queryArgs: {
-        where: `key = "${PAYPAL_CUSTOMER_EXTENSION_KEY}"`,
+        where: `key = "${key}"`,
       },
     })
     .execute();
@@ -116,7 +121,7 @@ export async function createCustomerUpdateExtension(
 
     await apiRoot
       .extensions()
-      .withKey({ key: PAYPAL_CUSTOMER_EXTENSION_KEY })
+      .withKey({ key: key })
       .delete({
         queryArgs: {
           version: extension.version,
@@ -129,7 +134,7 @@ export async function createCustomerUpdateExtension(
     .extensions()
     .post({
       body: {
-        key: PAYPAL_CUSTOMER_EXTENSION_KEY,
+        key,
         timeoutInMs: 2000,
         destination: {
           type: 'HTTP',

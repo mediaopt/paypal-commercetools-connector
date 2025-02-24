@@ -22,8 +22,10 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
   await deleteAccessTokenIfExists();
-  await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
-  await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
+
+  const store = readConfiguration().store;
+  await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY + (store ? `-${store}` : ''), applicationUrl);
+  await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY + (store ? `-${store}` : ''), applicationUrl);
   await deleteWebhook();
 }
 

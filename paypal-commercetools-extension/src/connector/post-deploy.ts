@@ -14,6 +14,7 @@ import {
   createPaymentUpdateExtension,
   deleteAccessTokenIfExists,
 } from './actions';
+import { logger } from "../utils/logger.utils";
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
@@ -40,6 +41,7 @@ async function run(): Promise<void> {
     await postDeploy(properties);
   } catch (error) {
     assertError(error);
+    logger.error(`Post-deploy failed: ${error?.message}`, error, null);
     process.stderr.write(`Post-deploy failed: ${error.message}`);
     process.exitCode = 1;
   }

@@ -17,6 +17,8 @@ import {
 } from '../service/payments.service';
 import { UpdateActions } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
+import { getCart } from "../service/commercetools.service";
+import { readConfiguration } from "../utils/config.utils";
 
 /**
  * Handle the update action
@@ -32,6 +34,12 @@ const update = async (resource: Resource) => {
       return;
     }
     logger.info(`Update payment with id ${payment.obj.id}`);
+    const cart = await getCart(payment.obj.id);
+    const store = readConfiguration().store;
+    if (store && (!cart?.store || cart?.store.key !== store)) {
+      logger.info(`Payment ${payment.obj.id} is assigned to a different store.`);
+      return { statusCode: 200, actions: [] };
+    }
     updateActions = updateActions.concat(
       await handleCreateOrderRequest(payment.obj),
       await handleCaptureOrderRequest(payment.obj),

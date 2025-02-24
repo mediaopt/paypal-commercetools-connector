@@ -15,6 +15,7 @@ export const readConfiguration = (validate = false) => {
     projectKey: process.env.CTP_PROJECT_KEY as string,
     scope: process.env.CTP_SCOPE,
     region: process.env.CTP_REGION as string,
+    store: process.env.CTP_STORE as string,
   };
 
   if (validate) {

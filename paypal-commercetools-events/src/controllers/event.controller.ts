@@ -12,6 +12,7 @@ import {
 import { OrderTrackerRequest } from '../paypal/checkout_api';
 import { addDeliveryData } from '../service/paypal.service';
 import { getSettings } from '../service/config.service';
+import {readConfiguration} from "../utils/config.utils";
 
 function parseRequest(request: Request) {
   if (!request.body) {
@@ -46,6 +47,11 @@ const handleParcelAddedToDelivery = async (
     return;
   }
   logger.info(`Loaded order with id ${order.id}`);
+  const store = readConfiguration().store;
+  if (store && (!order?.store || order?.store.key !== store)) {
+    logger.info(`Order ${order.id} is assigned to a different store.`);
+    return;
+  }
   if (!order?.paymentInfo?.payments) {
     logger.info(`No payments assigned to order with id ${order.id}`);
     return;
@@ -80,7 +86,7 @@ const handleParcelAddedToDelivery = async (
     order.shippingAddress?.country
   );
   const deliveryItems: DeliveryItem[] =
-    parcel.items && parcel.items.length
+    parcel.items && parcel.items.length > 0
       ? parcel.items
       : order.shippingInfo?.deliveries?.find(
           (delivery) =>

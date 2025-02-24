@@ -1,5 +1,6 @@
 import { createApiRoot } from '../client/create.client';
 import { AccessTokenObject, PayPalSettings } from '../types/index.types';
+import {readConfiguration} from "../utils/config.utils";
 
 export const getSettings = async () => {
   try {
@@ -27,7 +28,7 @@ export const getCachedAccessToken = async () => {
         .customObjects()
         .withContainerAndKey({
           container: 'paypal-commercetools-connector',
-          key: 'accessToken',
+          key: getAccessTokenKey(),
         })
         .get()
         .execute()
@@ -47,7 +48,7 @@ export const cacheAccessToken = async (
     .post({
       body: {
         container: 'paypal-commercetools-connector',
-        key: 'accessToken',
+        key: getAccessTokenKey(),
         value: token,
         version: version,
       },
@@ -61,8 +62,13 @@ export const deleteAccessToken = async () => {
     .customObjects()
     .withContainerAndKey({
       container: 'paypal-commercetools-connector',
-      key: 'accessToken',
+      key: getAccessTokenKey(),
     })
     .delete()
     .execute();
 };
+
+const getAccessTokenKey = () => {
+    const store = readConfiguration().store;
+    return 'accessToken' + store ? `-${store}` : '';
+}
