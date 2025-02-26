@@ -16,6 +16,9 @@ import {
   RefundStatusEnum,
 } from '../paypal/payments_api';
 
+const isLineItemTaxLevel = (taxCalculationMode: string) =>
+  taxCalculationMode === 'LineItemLevel';
+
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
 ): string => {
@@ -168,7 +171,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
 export const mapValidCommercetoolsLineItemsToPayPalItems = (
   matchingAmounts: boolean,
   isShipped: boolean,
-  isLineItemLevel: boolean,
+  taxCalculationMode: string,
   lineItems?: LineItem[],
   locale?: string
 ) => {
@@ -179,7 +182,7 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
     mapCommercetoolsLineItemsToPayPalItems(
       lineItem,
       isShipped,
-      isLineItemLevel,
+      isLineItemTaxLevel(taxCalculationMode),
       locale
     )
   );
@@ -199,7 +202,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   }
   const { currencyCode, fractionDigits, type } = lineItems[0].price.value;
 
-  const isLineItemMode = taxCalculationMode === 'LineItemLevel';
+  const isLineItemMode = isLineItemTaxLevel(taxCalculationMode);
   const roundItemPrice = isLineItemMode ? 'totalGross' : 'totalNet';
   const relevantTax = isLineItemMode
     ? 0

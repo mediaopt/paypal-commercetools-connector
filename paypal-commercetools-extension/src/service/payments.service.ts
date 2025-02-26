@@ -145,7 +145,7 @@ async function prepareCreateOrderRequest(
           matchingAmounts,
           paymentSource?.experience_context?.shipping_preference !==
             'NO_SHIPPING' || !!cart.shippingAddress,
-          cart.taxCalculationMode === 'LineItemLevel',
+          cart.taxCalculationMode,
           cart?.lineItems,
           cart.locale
         ),
@@ -518,7 +518,7 @@ export const handleUpdateOrderRequest = async (
           value: mapValidCommercetoolsLineItemsToPayPalItems(
             true,
             !!cart.shippingAddress,
-            cart.taxCalculationMode === 'LineItemLevel',
+            cart.taxCalculationMode,
             cart?.lineItems,
             cart.locale
           ),

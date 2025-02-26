@@ -139,12 +139,12 @@ describe('Testing map utilities', () => {
 
 describe('Testing PayPal breakdown mapping', () => {
   test.each([
-    [false, true, discountedLineItems, null],
-    [true, true, undefined, null],
-    [true, true, [], []],
+    [false, 'LineItemLevel', discountedLineItems, null],
+    [true, 'LineItemLevel', undefined, null],
+    [true, 'LineItemLevel', [], []],
     [
       true,
-      true,
+      'LineItemLevel',
       discountedLineItems,
       [
         { quantity: '1', amount: '0.00' },
@@ -153,7 +153,7 @@ describe('Testing PayPal breakdown mapping', () => {
     ],
     [
       true,
-      false,
+      'UnitPriceLevel',
       discountedLineItems,
       [
         { quantity: '1', amount: '0.00' },
@@ -162,7 +162,7 @@ describe('Testing PayPal breakdown mapping', () => {
     ],
     [
       true,
-      true,
+      'LineItemLevel',
       cartWithExternalRate.lineItems,
       [
         { quantity: '1', amount: '185.99' },
@@ -171,7 +171,7 @@ describe('Testing PayPal breakdown mapping', () => {
     ],
     [
       true,
-      false,
+      'UnitPriceLevel',
       cartWithExternalRate.lineItems,
       [
         { quantity: '1', amount: '156.29' },
@@ -206,7 +206,7 @@ describe('Testing valid PayPal price breakdown mapping', () => {
     const payPalItems = mapValidCommercetoolsLineItemsToPayPalItems(
       true,
       true,
-      cart.taxCalculationMode === 'LineItemLevel',
+      cart.taxCalculationMode,
       cart.lineItems
     );
     expect(paypalPrice).toBeDefined();
