@@ -1,13 +1,16 @@
-import { TypedMoney } from '@commercetools/platform-sdk';
+import { Cart, TypedMoney } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import { RefundStatusEnum } from '../src/paypal/payments_api';
 import {
   mapCommercetoolsCarrierToPayPalCarrier,
+  mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsMoneyToPayPalMoney,
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
+  mapValidCommercetoolsLineItemsToPayPalItems,
 } from '../src/utils/map.utils';
+import { cartWithExternalRate, discountedLineItems } from './constants';
 
 const refundStatusEnum = (status: string) => {
   return status as RefundStatusEnum;
@@ -132,4 +135,102 @@ describe('Testing map utilities', () => {
       ).toBe(expectedCarrier);
     }
   );
+});
+
+describe('Testing PayPal breakdown mapping', () => {
+  test.each([
+    [false, 'LineItemLevel', discountedLineItems, null],
+    [true, 'LineItemLevel', undefined, null],
+    [true, 'LineItemLevel', [], []],
+    [
+      true,
+      'LineItemLevel',
+      discountedLineItems,
+      [
+        { quantity: '1', amount: '0.00' },
+        { quantity: '1', amount: '199.00' },
+      ],
+    ],
+    [
+      true,
+      'UnitPriceLevel',
+      discountedLineItems,
+      [
+        { quantity: '1', amount: '0.00' },
+        { quantity: '1', amount: '167.23' },
+      ],
+    ],
+    [
+      true,
+      'LineItemLevel',
+      cartWithExternalRate.lineItems,
+      [
+        { quantity: '1', amount: '185.99' },
+        { quantity: '1', amount: '221.33' },
+      ],
+    ],
+    [
+      true,
+      'UnitPriceLevel',
+      cartWithExternalRate.lineItems,
+      [
+        { quantity: '1', amount: '156.29' },
+        { quantity: '1', amount: '185.99' },
+      ],
+    ],
+  ])(
+    'if matching amounts is %p, tax is lineItemLevel %p, line items are %p, the expected quantities and amounts are %p',
+    (matchingAmounts, isLineItemLevel, lineItems, result) => {
+      const lineItemsMap = mapValidCommercetoolsLineItemsToPayPalItems(
+        matchingAmounts,
+        true,
+        isLineItemLevel,
+        lineItems
+      );
+      if (!result) expect(lineItemsMap).toBeNull();
+      else if (lineItemsMap)
+        lineItemsMap.forEach((item, index) => {
+          expect(item.quantity).toBe(result[index].quantity);
+          expect(item.unit_amount.value).toBe(result[index].amount);
+        });
+    }
+  );
+});
+
+const paypalToCTEur = (payPalMoneyValue: string) =>
+  parseFloat(payPalMoneyValue);
+
+describe('Testing valid PayPal price breakdown mapping', () => {
+  test.each([[cartWithExternalRate]])('breakdown mapping', (cart: Cart) => {
+    const paypalPrice = mapCommercetoolsCartToPayPalPriceBreakdown(cart);
+    const payPalItems = mapValidCommercetoolsLineItemsToPayPalItems(
+      true,
+      true,
+      cart.taxCalculationMode,
+      cart.lineItems
+    );
+    expect(paypalPrice).toBeDefined();
+    expect(payPalItems).toBeDefined();
+    if (paypalPrice) {
+      const discountValue = paypalPrice.discount?.value || '0.00';
+      expect(cart.taxedPrice?.totalGross.centAmount).toBe(
+        Math.round(
+          (paypalToCTEur(paypalPrice.item_total.value) +
+            paypalToCTEur(paypalPrice.tax_total.value) +
+            paypalToCTEur(paypalPrice.shipping.value) -
+            paypalToCTEur(discountValue)) *
+            100
+        )
+      );
+      if (payPalItems) {
+        const totalItems = payPalItems
+          .map(
+            ({ quantity, unit_amount }) =>
+              parseInt(quantity) * parseFloat(unit_amount.value)
+          )
+          .reduce((prev, current) => prev + current, 0);
+        expect(totalItems.toFixed(2)).toBe(paypalPrice.item_total.value);
+      }
+    }
+  });
 });

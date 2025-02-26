@@ -16,6 +16,9 @@ import {
   RefundStatusEnum,
 } from '../paypal/payments_api';
 
+const isLineItemTaxLevel = (taxCalculationMode: string) =>
+  taxCalculationMode === 'LineItemLevel';
+
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
 ): string => {
@@ -134,10 +137,13 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
 const mapCommercetoolsLineItemsToPayPalItems = (
   lineItem: LineItem,
   isShipped: boolean,
+  isLineItemLevel: boolean,
   locale?: string
 ): Item => {
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
-  const taxedNetAmount = lineItem.taxedPrice?.totalNet?.centAmount;
+  const relevantPrice = isLineItemLevel
+    ? lineItem.taxedPrice?.totalGross
+    : lineItem.taxedPrice?.totalNet;
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
 
@@ -145,8 +151,8 @@ const mapCommercetoolsLineItemsToPayPalItems = (
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney({
         centAmount:
-          taxedNetAmount != null
-            ? taxedNetAmount / lineItem.quantity
+          relevantPrice != null
+            ? relevantPrice.centAmount / lineItem.quantity
             : lineItem.price.value.centAmount,
         fractionDigits,
         currencyCode,
@@ -159,26 +165,13 @@ const mapCommercetoolsLineItemsToPayPalItems = (
     quantity: `${lineItem.quantity}`,
     description: name,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
-    tax_rate: lineItem.taxRate?.amount ?? 0,
-    tax: !lineItem.taxedPrice?.totalTax
-      ? undefined
-      : {
-          value: mapCommercetoolsMoneyToPayPalMoney({
-            centAmount:
-              (lineItem.taxedPrice?.totalTax?.centAmount ?? 0) /
-              lineItem.quantity,
-            fractionDigits,
-            currencyCode,
-            type: lineItem.price.value.type,
-          } as TypedMoney),
-          currency_code: currencyCode,
-        },
   } as Item;
 };
 
 export const mapValidCommercetoolsLineItemsToPayPalItems = (
   matchingAmounts: boolean,
   isShipped: boolean,
+  taxCalculationMode: string,
   lineItems?: LineItem[],
   locale?: string
 ) => {
@@ -186,7 +179,12 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
     return null;
   }
   const payPalItems = lineItems.map((lineItem) =>
-    mapCommercetoolsLineItemsToPayPalItems(lineItem, isShipped, locale)
+    mapCommercetoolsLineItemsToPayPalItems(
+      lineItem,
+      isShipped,
+      isLineItemTaxLevel(taxCalculationMode),
+      locale
+    )
   );
   return payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0)
     ? null
@@ -197,11 +195,21 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
   discountOnTotalPrice,
   taxedShippingPrice,
+  taxCalculationMode,
 }: Cart) => {
   if (!lineItems || !lineItems[0]) {
     return undefined;
   }
   const { currencyCode, fractionDigits, type } = lineItems[0].price.value;
+
+  const isLineItemMode = isLineItemTaxLevel(taxCalculationMode);
+  const roundItemPrice = isLineItemMode ? 'totalGross' : 'totalNet';
+  const relevantTax = isLineItemMode
+    ? 0
+    : lineItems
+        .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
+        .reduce((x, y) => x + y, 0);
+
   return {
     item_total: {
       currency_code: currencyCode,
@@ -209,7 +217,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
         centAmount: lineItems
           .map(
             (lineItem) =>
-              lineItem.taxedPrice?.totalNet?.centAmount ??
+              lineItem.taxedPrice?.[roundItemPrice]?.centAmount ??
               lineItem.price.value.centAmount * lineItem.quantity
           )
           .reduce((x, y) => x + y, 0),
@@ -221,9 +229,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
     tax_total: {
       currency_code: currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: lineItems
-          .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
-          .reduce((x, y) => x + y, 0),
+        centAmount: relevantTax,
         fractionDigits,
         currencyCode,
         type,
@@ -242,7 +248,10 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       ? {
           currency_code: currencyCode,
           value: mapCommercetoolsMoneyToPayPalMoney({
-            centAmount: discountOnTotalPrice.discountedAmount.centAmount ?? 0,
+            centAmount:
+              discountOnTotalPrice.discountedGrossAmount?.centAmount ??
+              discountOnTotalPrice.discountedAmount.centAmount ??
+              0,
             fractionDigits,
             currencyCode,
             type,

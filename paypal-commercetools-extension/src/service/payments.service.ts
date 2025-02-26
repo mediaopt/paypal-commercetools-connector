@@ -68,6 +68,8 @@ async function prepareCreateOrderRequest(
     delete request.paymentSource;
   }
   const cart = await getCart(payment.id);
+  const relevantCartCost =
+    cart.taxedPrice?.totalGross?.centAmount ?? cart.totalPrice.centAmount;
   if (request?.payment_source?.pay_upon_invoice) {
     request.payment_source.pay_upon_invoice = {
       email: cart.customerEmail,
@@ -109,8 +111,7 @@ async function prepareCreateOrderRequest(
         cart.locale ?? Object.keys(settings?.paymentDescription)[0]
       ]
     : undefined;
-  const matchingAmounts =
-    amountPlanned.centAmount === cart.totalPrice.centAmount;
+  const matchingAmounts = amountPlanned.centAmount === relevantCartCost;
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -144,6 +145,7 @@ async function prepareCreateOrderRequest(
           matchingAmounts,
           paymentSource?.experience_context?.shipping_preference !==
             'NO_SHIPPING' || !!cart.shippingAddress,
+          cart.taxCalculationMode,
           cart?.lineItems,
           cart.locale
         ),
@@ -516,6 +518,7 @@ export const handleUpdateOrderRequest = async (
           value: mapValidCommercetoolsLineItemsToPayPalItems(
             true,
             !!cart.shippingAddress,
+            cart.taxCalculationMode,
             cart?.lineItems,
             cart.locale
           ),

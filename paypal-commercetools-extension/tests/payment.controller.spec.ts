@@ -8,34 +8,6 @@ import { logger } from '../src/utils/logger.utils';
 
 let configMock: any;
 
-const currencyData = {
-  type: 'centPrecision',
-  currencyCode: 'EUR',
-  fractionDigits: 2,
-};
-
-const taxedPrice = {
-  totalNet: {
-    ...currencyData,
-    centAmount: 16303,
-  },
-  totalGross: {
-    ...currencyData,
-    centAmount: 19400,
-  },
-  totalTax: {
-    ...currencyData,
-    centAmount: 3097,
-  },
-};
-
-const prices = {
-  totalPrice: {
-    ...currencyData,
-    centAmount: 19400,
-  },
-  taxedPrice,
-};
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
     getCart: jest.fn(() => {
@@ -62,7 +34,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
-import { discountedLineItems, discountOnTotalPrice } from './constants';
+import { discountedLineItems, discountOnTotalPrice, prices } from './constants';
 
 const amountPlanned = {
   centAmount: 8200,
