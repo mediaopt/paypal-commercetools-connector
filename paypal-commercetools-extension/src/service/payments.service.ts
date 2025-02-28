@@ -63,6 +63,8 @@ import {
 } from './paypal.service';
 import customError from '../errors/custom.error';
 
+type PayPalTransaction = 'captures' | 'authorizations';
+
 async function prepareCreateOrderRequest(
   payment: Payment,
   settings?: PayPalSettings
@@ -206,21 +208,22 @@ async function prepareCreateOrderRequest(
   return request;
 }
 
-const actualTransactionStatus = (
-  paymentId: string,
-  relevantTransactionType: 'captures' | 'authorizations',
+const relevantTransaction = (
+  paymentType: PayPalTransaction,
   purchase_units?: PurchaseUnit[]
 ) => {
-  const relevantUnit = purchase_units?.find(({ payments }) =>
-    payments?.[relevantTransactionType]?.some(
-      ({ invoice_id }) => invoice_id === paymentId
-    )
-  );
-  const relevantPaymentData = relevantUnit?.payments?.[
-    relevantTransactionType
-  ]?.map(({ invoice_id, status }) => ({ invoice_id, status }));
-  const relevantPayPalPayment = relevantPaymentData?.find(
-    ({ invoice_id }) => invoice_id === paymentId
+  const relevantPayment =
+    purchase_units && purchase_units[0].payments?.[paymentType];
+  return relevantPayment?.length ? relevantPayment[0] : undefined;
+};
+
+const actualTransactionStatus = (
+  relevantTransactionType: PayPalTransaction,
+  purchase_units?: PurchaseUnit[]
+) => {
+  const relevantPayPalPayment = relevantTransaction(
+    relevantTransactionType,
+    purchase_units
   );
   if (!relevantPayPalPayment)
     throw new customError(500, 'No relevant PayPal payment found');
@@ -293,7 +296,6 @@ export const handleCaptureOrderRequest = async (
       request as OrderCaptureRequest
     );
     const transactionState = actualTransactionStatus(
-      payment.id,
       'captures',
       response?.purchase_units
     );
@@ -303,10 +305,8 @@ export const handleCaptureOrderRequest = async (
         type: 'Charge',
         amount: payment.amountPlanned,
         interactionId:
-          response?.purchase_units &&
-          response.purchase_units[0].payments?.captures
-            ? response.purchase_units[0].payments.captures[0].id
-            : response.id,
+          relevantTransaction('captures', response?.purchase_units)?.id ??
+          response.id,
         timestamp: response.update_time,
         state: transactionState,
       },
@@ -469,7 +469,6 @@ export const handleAuthorizeOrderRequest = async (
       request as OrderAuthorizeRequest
     );
     const transactionState = actualTransactionStatus(
-      payment.id,
       'authorizations',
       response?.purchase_units
     );
@@ -479,10 +478,8 @@ export const handleAuthorizeOrderRequest = async (
         type: 'Authorization',
         amount: payment.amountPlanned,
         interactionId:
-          response?.purchase_units &&
-          response.purchase_units[0].payments?.authorizations
-            ? response.purchase_units[0].payments.authorizations[0].id
-            : response.id,
+          relevantTransaction('authorizations', response?.purchase_units)?.id ??
+          response.id,
         timestamp: getCurrentTimestamp(),
         state: transactionState,
       },
