@@ -6,7 +6,6 @@ import {
 } from '@commercetools/platform-sdk';
 import {
   Item,
-  OrderStatus,
   PaymentSourceResponse,
   ShipmentCarrier,
 } from '../paypal/checkout_api';
@@ -81,25 +80,6 @@ export const mapPayPalAuthorizationStatusToCommercetoolsTransactionState = (
     case undefined:
       return 'Failure';
     case Authorization2StatusEnum.Pending:
-    default:
-      return 'Pending';
-  }
-};
-
-export const mapPayPalOrderStatusToCommercetoolsTransactionState = (
-  status?: OrderStatus
-): TransactionState => {
-  switch (status) {
-    case OrderStatus.Created:
-      return 'Initial';
-    case OrderStatus.Saved:
-    case OrderStatus.Approved:
-    case OrderStatus.Completed:
-    case OrderStatus.Voided:
-      return 'Success';
-    case undefined:
-      return 'Failure';
-    case OrderStatus.PayerActionRequired:
     default:
       return 'Pending';
   }
