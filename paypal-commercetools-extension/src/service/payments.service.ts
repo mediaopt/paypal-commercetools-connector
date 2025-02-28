@@ -15,8 +15,13 @@ import {
   OrderCaptureRequest,
   OrderRequest,
   Patch,
+  PurchaseUnit,
 } from '../paypal/checkout_api';
-import { CaptureRequest } from '../paypal/payments_api';
+import {
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
+  CaptureRequest,
+} from '../paypal/payments_api';
 import {
   ClientTokenRequest,
   PayPalSettings,
@@ -32,7 +37,6 @@ import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalOrderStatusToCommercetoolsTransactionState,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
 } from '../utils/map.utils';
@@ -202,6 +206,34 @@ async function prepareCreateOrderRequest(
   return request;
 }
 
+const actualTransactionStatus = (
+  paymentId: string,
+  relevantTransactionType: 'captures' | 'authorizations',
+  purchase_units?: PurchaseUnit[]
+) => {
+  const relevantUnit = purchase_units?.find(({ payments }) =>
+    payments?.[relevantTransactionType]?.some(
+      ({ invoice_id }) => invoice_id === paymentId
+    )
+  );
+  const relevantPaymentData = relevantUnit?.payments?.[
+    relevantTransactionType
+  ]?.map(({ invoice_id, status }) => ({ invoice_id, status }));
+  const relevantPayPalPayment = relevantPaymentData?.find(
+    ({ invoice_id }) => invoice_id === paymentId
+  );
+  if (!relevantPayPalPayment)
+    throw new customError(500, 'No relevant PayPal payment found');
+  else
+    return relevantTransactionType === 'authorizations'
+      ? mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+          relevantPayPalPayment.status as Authorization2StatusEnum
+        )
+      : mapPayPalCaptureStatusToCommercetoolsTransactionState(
+          relevantPayPalPayment.status as Capture2StatusEnum
+        );
+};
+
 export const handleCreateOrderRequest = async (
   payment: Payment
 ): Promise<UpdateAction[]> => {
@@ -260,6 +292,11 @@ export const handleCaptureOrderRequest = async (
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderCaptureRequest
     );
+    const transactionState = actualTransactionStatus(
+      payment.id,
+      'captures',
+      response?.purchase_units
+    );
     updateActions.push({
       action: 'addTransaction',
       transaction: {
@@ -271,11 +308,10 @@ export const handleCaptureOrderRequest = async (
             ? response.purchase_units[0].payments.captures[0].id
             : response.id,
         timestamp: response.update_time,
-        state: mapPayPalOrderStatusToCommercetoolsTransactionState(
-          response.status
-        ),
+        state: transactionState,
       },
     } as PaymentAddTransactionAction);
+    if (transactionState !== 'Success') response.status = undefined;
     return updateActions.concat(
       updatePaymentFields(response),
       handlePaymentResponse('capturePayPalOrder', response)
@@ -432,43 +468,30 @@ export const handleAuthorizeOrderRequest = async (
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderAuthorizeRequest
     );
-    const relevantUnit = response?.purchase_units?.find(({ payments }) =>
-      payments?.authorizations?.some(
-        ({ invoice_id }) => invoice_id === payment.id
-      )
+    const transactionState = actualTransactionStatus(
+      payment.id,
+      'authorizations',
+      response?.purchase_units
     );
-    const relevantAuthorization = relevantUnit?.payments?.authorizations?.find(
-      ({ invoice_id }) => invoice_id === payment.id
+    updateActions.push({
+      action: 'addTransaction',
+      transaction: {
+        type: 'Authorization',
+        amount: payment.amountPlanned,
+        interactionId:
+          response?.purchase_units &&
+          response.purchase_units[0].payments?.authorizations
+            ? response.purchase_units[0].payments.authorizations[0].id
+            : response.id,
+        timestamp: getCurrentTimestamp(),
+        state: transactionState,
+      },
+    } as PaymentAddTransactionAction);
+    if (transactionState !== 'Success') response.status = undefined;
+    return updateActions.concat(
+      updatePaymentFields(response),
+      handlePaymentResponse('authorizePayPalOrder', response)
     );
-    if (relevantAuthorization) {
-      const transactionState =
-        mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
-          relevantAuthorization.status
-        );
-      updateActions.push({
-        action: 'addTransaction',
-        transaction: {
-          type: 'Authorization',
-          amount: payment.amountPlanned,
-          interactionId:
-            response?.purchase_units &&
-            response.purchase_units[0].payments?.authorizations
-              ? response.purchase_units[0].payments.authorizations[0].id
-              : response.id,
-          timestamp: getCurrentTimestamp(),
-          state: transactionState,
-        },
-      } as PaymentAddTransactionAction);
-      if (transactionState !== 'Success') response.status = undefined;
-      return updateActions.concat(
-        updatePaymentFields(response),
-        handlePaymentResponse('authorizePayPalOrder', response)
-      );
-    } else
-      throw new customError(
-        400,
-        'No relevant authorization received from PayPal '
-      );
   } catch (e) {
     logger.error('Call to authorizePayPalOrder resulted in an error', e);
     return handleError('authorizePayPalOrder', e);
