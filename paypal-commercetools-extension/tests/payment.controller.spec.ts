@@ -43,6 +43,7 @@ mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
 import { discountedLineItems, discountOnTotalPrice, prices } from './constants';
+import { getCart } from '../src/service/commercetools.service';
 
 const amountPlanned = {
   centAmount: 8200,
@@ -206,10 +207,7 @@ test('create Pay Upon Invoice order is not possible without device data', async 
   }
 });
 
-async function createValidTransaction(
-  customAmount?: number,
-  customStringAmount?: string
-) {
+async function createValidTransaction(customAmount?: number) {
   const customInvoiceId = randomUUID();
   const paymentRequest = {
     obj: {
@@ -230,6 +228,15 @@ async function createValidTransaction(
   let paymentResponse = await paymentController('Update', paymentRequest);
   let payPalOrder = expectSuccessfulResponse(paymentResponse);
   expect(payPalOrder).toHaveProperty('status', 'CREATED');
+  return { paymentRequest, payPalOrder, customInvoiceId };
+}
+
+async function completeValidOrder(
+  customAmount?: number,
+  customStringAmount?: string
+) {
+  let { paymentRequest, payPalOrder, customInvoiceId } =
+    await createValidTransaction(customAmount);
   paymentRequest.obj = {
     ...paymentRequest.obj,
     interfaceId: payPalOrder.id,
@@ -242,7 +249,8 @@ async function createValidTransaction(
       },
     },
   };
-  paymentResponse = await paymentController('Update', paymentRequest);
+
+  let paymentResponse = await paymentController('Update', paymentRequest);
   payPalOrder = expectSuccessfulResponse(
     paymentResponse,
     'authorizePayPalOrderResponse'
@@ -318,7 +326,7 @@ describe('Testing PayPal aftersales', () => {
   test.each(amountPlannedCentsWithTestResult)(
     'Create a valid transaction with %s cents, which is %s , leads to processing transaction with %s amount',
     async (amountPlannedCents, description, expectedAmount) => {
-      const relevantTransactionData = await createValidTransaction(
+      const relevantTransactionData = await completeValidOrder(
         amountPlannedCents,
         expectedAmount
       );
@@ -344,8 +352,38 @@ describe('Testing PayPal aftersales', () => {
     30000
   );
 
+  test('update PayPal order', async () => {
+    const { paymentRequest, payPalOrder, customInvoiceId } =
+      await createValidTransaction(19400);
+    (getCart as jest.Mock).mockReturnValueOnce({
+      lineItems: [discountedLineItems[1]],
+    });
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          updatePayPalOrderRequest: '{}',
+          PayPalOrderId: payPalOrder.id,
+          patch: [
+            {
+              op: 'replace',
+              path: "/purchase_units/@reference_id=='default'/amount",
+              value: { currency_code: 'EUR', value: '130.00' },
+            },
+          ],
+        },
+      },
+    };
+    const paymentResponse = await paymentController('Update', paymentRequest);
+    const response = expectSuccessfulResponse(
+      paymentResponse,
+      'updatePayPalOrderRequest'
+    );
+    expect(response).toBe(null);
+  }, 30000);
+
   test('Settle an authorization', async () => {
-    const relevantTransactionData = await createValidTransaction();
+    const relevantTransactionData = await completeValidOrder();
     if (!relevantTransactionData) return;
     const { paymentRequest, payPalOrderId } = relevantTransactionData;
 
@@ -368,7 +406,7 @@ describe('Testing PayPal aftersales', () => {
   }, 30000);
 
   test('Void an authorization', async () => {
-    const relevantTransactionData = await createValidTransaction();
+    const relevantTransactionData = await completeValidOrder();
     if (!relevantTransactionData) return;
     const { paymentRequest, payPalOrderId } = relevantTransactionData;
 
