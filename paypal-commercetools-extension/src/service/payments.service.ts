@@ -528,12 +528,18 @@ export const handleUpdateOrderRequest = async (
     const cart = await getCart(payment.id);
     let amountPlanned = payment.amountPlanned;
     let updateActions: UpdateActions = [];
-    if (cart && cart.totalPrice.centAmount !== amountPlanned.centAmount) {
+    const relevantCartPrice = cart.taxedPrice?.totalGross?.centAmount
+      ? cart.taxedPrice?.totalGross
+      : cart.totalPrice;
+    if (
+      relevantCartPrice?.centAmount &&
+      relevantCartPrice.centAmount !== amountPlanned.centAmount
+    ) {
       updateActions.push({
         action: 'changeAmountPlanned',
-        amount: cart.totalPrice,
+        amount: relevantCartPrice.centAmount,
       });
-      amountPlanned = cart.totalPrice;
+      amountPlanned = relevantCartPrice;
     }
     request = {
       ...request,
