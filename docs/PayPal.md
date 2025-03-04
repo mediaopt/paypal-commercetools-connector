@@ -261,7 +261,7 @@ If the request is correct - the PayPal endpoint [Create Order](https://developer
      - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
      - invoice_id - custom_invoice_id if sent in the request, otherwise commercetools payment id
      - custom_id - custom_id if sent in the request, otherwise undefined
-     - items - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalPrice
+     - items - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalGross if available and totalPrice if totalGross is not provided
      - amount:
          - currency_code
          - value 
