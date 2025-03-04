@@ -42,7 +42,12 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
-import { discountedLineItems, discountOnTotalPrice, prices } from './constants';
+import {
+  discountedLineItems,
+  discountedLineitemWithTaxIncluded,
+  discountOnTotalPrice,
+  prices,
+} from './constants';
 import { getCart } from '../src/service/commercetools.service';
 
 const amountPlanned = {
@@ -353,10 +358,9 @@ describe('Testing PayPal aftersales', () => {
   );
 
   test('update PayPal order', async () => {
-    const { paymentRequest, payPalOrder, customInvoiceId } =
-      await createValidTransaction(19400);
+    const { paymentRequest, payPalOrder } = await createValidTransaction(19400);
     (getCart as jest.Mock).mockReturnValueOnce({
-      lineItems: [discountedLineItems[1]],
+      lineItems: [discountedLineitemWithTaxIncluded],
     });
     paymentRequest.obj = {
       ...paymentRequest.obj,
