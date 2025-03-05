@@ -16,8 +16,16 @@ const mockConfigModule = () => {
         lineItems: discountedLineItems,
         ...prices,
         discountOnTotalPrice,
+        billingAddress: {
+          postalCode: '12345',
+          country: 'DE',
+          firstName: 'First',
+          lastName: 'Last',
+        },
+        customerEmail: 'email@for.invoice',
       };
     }),
+    getPayPalUserId: jest.fn(),
   }));
   configMock = {
     getSettings: jest.fn(
@@ -103,6 +111,100 @@ function expectSuccessfulResponse(
   expect(transactionSaleResponse).toBeDefined();
   return JSON.parse(transactionSaleResponse?.value);
 }
+
+describe('create order with various configurations', () =>
+  test.each([
+    [
+      {
+        storeInVaultOnSuccess: false,
+        intent: 'AUTHORIZE',
+        custom_invoice_id: 'custom_invoice_id',
+        paymentSource: { card: {} },
+      },
+      'card with authorize and custom invoice id',
+    ],
+    [
+      {
+        storeInVaultOnSuccess: true,
+        intent: 'CAPTURE',
+        paymentSource: { card: {} },
+      },
+      'card with capture and store in vault',
+    ],
+    [
+      {
+        storeInVaultOnSuccess: true,
+        intent: 'CAPTURE',
+        paymentSource: {
+          paypal: {
+            experience_context: {
+              return_url: 'https://example.com/returnUrl',
+              cancel_url: 'https://example.com/cancelUrl',
+            },
+          },
+        },
+      },
+      'PayPal',
+    ],
+  ])(
+    'given valid create order data %p, which is %p, results in order creation',
+    async (createOrderData: any, description) => {
+      const paymentRequest = {
+        obj: {
+          amountPlanned: {
+            ...amountPlanned,
+            centAmount: amountPlanned.centAmount,
+          },
+          custom: {
+            fields: {
+              createPayPalOrderRequest: JSON.stringify(createOrderData),
+            },
+          },
+          id: randomUUID(),
+        },
+      } as any;
+      let paymentResponse = await paymentController('Update', paymentRequest);
+      let payPalOrder = expectSuccessfulResponse(paymentResponse);
+      if (createOrderData.paymentSource.card)
+        expect(payPalOrder).toHaveProperty('status', 'CREATED');
+      else
+        expect(payPalOrder).toHaveProperty('status', 'PAYER_ACTION_REQUIRED');
+      if (createOrderData.intent === 'CAPTURE')
+        expect(payPalOrder.links?.some((link) => link.rel === 'capture'));
+      else expect(payPalOrder.links?.some((link) => link.rel === 'authorize'));
+    }
+  ));
+
+test('create Pay Upon Invoice order is not possible without device data', async () => {
+  const paymentRequest = {
+    obj: {
+      amountPlanned: {
+        ...amountPlanned,
+        centAmount: amountPlanned.centAmount,
+      },
+      custom: {
+        fields: {
+          createPayPalOrderRequest: JSON.stringify({
+            clientMetadataId: '7b1fedd4-1fb4-4c6d-aacc-1f3e5f3c',
+            paymentSource: {
+              pay_upon_invoice: {
+                birth_date: '1990-01-01',
+                phone: { national_number: '6912345678', country_code: '49' },
+              },
+            },
+          }),
+        },
+      },
+      id: randomUUID(),
+    },
+  };
+  try {
+    await paymentController('Update', paymentRequest);
+  } catch (error) {
+    if (error instanceof Error)
+      expect(error.message).toContain('DEVICE_DATA_NOT_AVAILABLE');
+  }
+});
 
 async function createValidTransaction(
   customAmount?: number,
