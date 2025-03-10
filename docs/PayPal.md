@@ -74,24 +74,24 @@ For the methods that interact with PayPal API this documentation includes "Conne
   3. [CaptureOrder](#3-captureorder)
   4. [CaptureAuthorization](#4-captureauthorization)
   5. [VoidAuthorization](#5-voidauthorization)
-  6. [AuthorizeOrder](#5-authorizeorder)
-  7. [GetOrder](#6-getorder)
-  8. [GetCapture](#7-getcapture)
-  9. [createTrackingInformation](#8-createtrackinginformation)
-  10. [updateTrackingInformation](#9-updatetrackinginformation)
-  11. [UpdateOrder](#10-updateorder)
-  12. [SetCustomType For Payment](#11-setcustomtype-for-payment)
-  13. [SetCustomType For Customer](#12-setcustomtype-for-customer)
-  14. [GetSettings](#13-getsettings)
-  15. [Refund](#14-refund)
-  16. [Partial Refund](#15-partial-refund)
-  17. [CreateVaultSetupToken](#16-createvaultsetuptoken)
+  6. [AuthorizeOrder](#6-authorizeorder)
+  7. [GetOrder](#7-getorder)
+  8. [GetCapture](#8-getcapture)
+  9. [createTrackingInformation](#9-createtrackinginformation)
+  10. [updateTrackingInformation](#10-updatetrackinginformation)
+  11. [UpdateOrder](#11-updateorder)
+  12. [SetCustomType For Payment](#12-setcustomtype-for-payment)
+  13. [SetCustomType For Customer](#13-setcustomtype-for-customer)
+  14. [GetSettings](#14-getsettings)
+  15. [Refund](#15-refund)
+  16. [Partial Refund](#16-partial-refund)
+  17. [CreateVaultSetupToken](#17-createvaultsetuptoken)
       - [Card](#i-example-request-card)
       - [PayPal](#ii-example-request-paypal-1)
-  18. [getUserIdToken](#17-getuseridtoken)
-  19. [createPaymentToken](#18-createpaymenttoken)
-  20. [getPaymentTokens](#19-getpaymenttokens)
-  21. [deletePaymentToken](#20-deletepaymenttoken)
+  18. [getUserIdToken](#19-getuseridtoken)
+  19. [createPaymentToken](#19-createpaymenttoken)
+  20. [getPaymentTokens](#20-getpaymenttokens)
+  21. [deletePaymentToken](#21-deletepaymenttoken)
 
 
 
@@ -261,7 +261,7 @@ If the request is correct - the PayPal endpoint [Create Order](https://developer
      - description - if possible will be retrieved from commercetools PayPal settings, if not based on cart
      - invoice_id - custom_invoice_id if sent in the request, otherwise commercetools payment id
      - custom_id - custom_id if sent in the request, otherwise undefined
-     - items - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalPrice
+     - items - will be sent only if the commercetools payment amountPlanned matches the commercetools cart totalGross if available and totalPrice if totalGross is not provided
      - amount:
          - currency_code
          - value 
