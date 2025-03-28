@@ -9,9 +9,10 @@ deployAs:
       standardConfiguration:
         - key: CTP_REGION
           description: commercetools Composable Commerce API region
+        - key: PAYPAL_MULTI_TENANT_CLIENT_IDS
+          description: PayPal Client Ids for each store in the format of "storeKey1:clientId1,storeKey2:clientId2", if not provided PAYPAL_CLIENT_ID must be provided instead
         - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
+          description: PayPal Client Id if single id is used for the whole project, if PAYPAL_MULTI_TENANT_CLIENT_IDS is provided, this value will be ignored
         - key: PAYPAL_ENVIRONMENT
           description: PayPal environment (Sandbox or Production)
         - key: SMTP_HOST
@@ -31,9 +32,10 @@ deployAs:
           description: commercetools Composable Commerce client secret
         - key: CTP_SCOPE
           description: commercetools Composable Commerce client scope
+        - key: PAYPAL_MULTI_TENANT_CLIENT_SECRETS
+          description: PayPal Client Secrets for each store in the format of "storeKey1:clientSecret1,storeKey2:clientSecret2", if not provided PAYPAL_CLIENT_SECRET must be provided instead
         - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
+          description: PayPal Client Secret if single secret is used for the whole project
         - key: SMTP_PASSWORD
           description: SMTP Password for sending pay upon invoice mail
   - name: paypal-commercetools-custom-application
@@ -60,9 +62,10 @@ deployAs:
       standardConfiguration:
         - key: CTP_REGION
           description: commercetools Composable Commerce API region
+        - key: PAYPAL_MULTI_TENANT_CLIENT_IDS
+          description: PayPal Client Ids for each store in the format of "storeKey1:clientId1,storeKey2:clientId2", if not provided PAYPAL_CLIENT_ID must be provided instead
         - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
+          description: PayPal Client Id if single id is used for the whole project, if PAYPAL_MULTI_TENANT_CLIENT_IDS is provided, this value will be ignored
         - key: PAYPAL_ENVIRONMENT
           description: PayPal environment (Sandbox or Production)
       securedConfiguration:
@@ -74,6 +77,7 @@ deployAs:
           description: commercetools Composable Commerce client secret
         - key: CTP_SCOPE
           description: commercetools Composable Commerce client scope
+        - key: PAYPAL_MULTI_TENANT_CLIENT_SECRETS
+          description: PayPal Client Secrets for each store in the format of "storeKey1:clientSecret1,storeKey2:clientSecret2", if not provided PAYPAL_CLIENT_SECRET must be provided instead
         - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
+          description: PayPal Client Secret if single secret is used for the whole project
