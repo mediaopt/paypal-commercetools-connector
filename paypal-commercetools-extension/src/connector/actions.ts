@@ -422,8 +422,17 @@ export async function createAndSetCustomObject(
     .execute();
 }
 
-export const deleteAccessTokenIfExists = async () => {
-  if (await getCachedAccessToken()) {
-    await deleteAccessToken();
+export const deleteAccessTokenIfExists = async (
+  lastTenantType?: 'single' | 'multi'
+) => {
+  if (lastTenantType === 'single' || !lastTenantType) {
+    if (await getCachedAccessToken()) {
+      await deleteAccessToken();
+    }
+  }
+  if (lastTenantType === 'multi' || !lastTenantType) {
+    if (await getCachedAccessToken(true)) {
+      await deleteAccessToken(true);
+    }
   }
 };

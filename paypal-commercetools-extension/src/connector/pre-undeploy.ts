@@ -15,13 +15,15 @@ import {
 } from './actions';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
+const MULTI_TENANT_IDS = 'PAYPAL_MULTI_TENANT_CLIENT_IDS';
 
 async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   const apiRoot = createApiRoot();
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
+  const isMultiTenant = !!properties.get(MULTI_TENANT_IDS);
 
-  await deleteAccessTokenIfExists();
+  await deleteAccessTokenIfExists(isMultiTenant ? 'multi' : 'single');
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
   await deleteWebhook();
