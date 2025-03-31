@@ -231,27 +231,73 @@ export async function getClientToken() {
   }
 }
 
-const generateAccessToken = async (): Promise<string> => {
+const multiTenantCredentials = () => {
+  const multiTenantIDs =
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS &&
+    JSON.parse(process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS);
+  const multiTenantSecrets =
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_SECRETS &&
+    JSON.parse(process.env.PAYPAL_MULTI_TENANT_CLIENT_SECRETS);
+  if (
+    !multiTenantIDs ||
+    !multiTenantSecrets ||
+    Object.keys(multiTenantIDs).length === 0 ||
+    Object.keys(multiTenantSecrets).length === 0 ||
+    Object.keys(multiTenantIDs).length !==
+      Object.keys(multiTenantSecrets).length
+  )
+    throw new CustomError(
+      500,
+      'Internal Server Error - PayPal multi tenant config is invalid'
+    );
+  else return { multiTenantIDs, multiTenantSecrets };
+};
+
+const identifyPayPalCredentials = (storeKey?: string) => {
+  if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS) {
+    const { multiTenantIDs, multiTenantSecrets } = multiTenantCredentials();
+    if (storeKey) {
+      const clientId = multiTenantIDs[storeKey];
+      const clientSecret = multiTenantSecrets[storeKey];
+      if (!clientId || !clientSecret) {
+        throw new CustomError(
+          500,
+          'Internal Server Error - PayPal multi tenant config for the store is invalid'
+        );
+      } else {
+        return { clientId, clientSecret };
+      }
+    } else
+      throw new CustomError(
+        '500',
+        'Internal Server Error - PayPal store key is missing'
+      );
+  }
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
       'Internal Server Error - PayPal config is missing'
     );
+  } else {
+    return {
+      clientId: process.env.PAYPAL_CLIENT_ID,
+      clientSecret: process.env.PAYPAL_CLIENT_SECRET,
+    };
   }
-  const cachedToken = await getCachedAccessToken();
-  if (
-    cachedToken?.value &&
-    cachedToken.value.validUntil > new Date().toISOString()
-  ) {
-    logger.info('Using cached token');
-    return cachedToken.value.accessToken;
-  }
-  const credentials = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
-  ).toString('base64');
+};
+
+const createAccessTokenFromCredentials = async (
+  clientId: string,
+  clientSecret: string,
+  endpoint: string
+) => {
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
+    'base64'
+  );
+
   const options = {
     method: 'POST',
-    url: `${getAPIEndpoint()}/v1/oauth2/token`,
+    url: `${endpoint}/v1/oauth2/token`,
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${credentials}`,
@@ -265,19 +311,38 @@ const generateAccessToken = async (): Promise<string> => {
   const response = await axios.request(options);
 
   if (response.status && response.status >= 200 && response.status <= 299) {
-    const body = response.data;
-    await cacheAccessToken(
-      {
-        accessToken: body.access_token,
-        validUntil: new Date(new Date().getTime() + body.expires_in * 1000),
-      },
-      cachedToken?.version ?? 0
-    );
-    logger.info(body.access_token);
-    return body.access_token;
-  } else {
-    throw new CustomError(response.status, response.statusText);
+    return response.data;
+  } else throw new CustomError(response.status, response.statusText);
+};
+
+const generateAccessToken = async (storeKey?: string): Promise<string> => {
+  const { clientId, clientSecret } = identifyPayPalCredentials(storeKey);
+  const cachedToken = await getCachedAccessToken();
+  if (
+    cachedToken?.value &&
+    cachedToken.value.validUntil > new Date().toISOString()
+  ) {
+    logger.info('Using cached token');
+    return cachedToken.value.accessToken;
   }
+
+  const tokenResponseBody = await createAccessTokenFromCredentials(
+    clientId,
+    clientSecret,
+    getAPIEndpoint()
+  );
+
+  await cacheAccessToken(
+    {
+      accessToken: tokenResponseBody.access_token,
+      validUntil: new Date(
+        new Date().getTime() + tokenResponseBody.expires_in * 1000
+      ),
+    },
+    cachedToken?.version ?? 0
+  );
+  logger.info(tokenResponseBody.access_token);
+  return tokenResponseBody.access_token;
 };
 
 export const generateUserIdToken = async (
