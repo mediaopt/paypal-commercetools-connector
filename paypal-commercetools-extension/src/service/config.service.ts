@@ -21,7 +21,7 @@ export const getSettings = async () => {
     return undefined;
   }
 };
-export const getCachedAccessToken = async () => {
+export const getCachedAccessToken = async (isMultitenant = false) => {
   try {
     const apiRoot = createApiRoot();
     return (
@@ -29,13 +29,16 @@ export const getCachedAccessToken = async () => {
         .customObjects()
         .withContainerAndKey({
           container: 'paypal-commercetools-connector',
-          key: 'accessToken',
+          key: isMultitenant ? 'assessTokens' : 'accessToken',
         })
         .get()
         .execute()
     ).body;
   } catch (e) {
-    logger.warn('Failed to load cached access token', e);
+    logger.warn(
+      `Failed to load cached access token${isMultitenant ? 's' : ''}`,
+      e
+    );
     return undefined;
   }
 };
@@ -58,13 +61,31 @@ export const cacheAccessToken = async (
     .execute();
 };
 
-export const deleteAccessToken = async () => {
+export const cacheAccessTokens = async (
+  tokens: AccessTokenObject[],
+  version: number
+) => {
+  const apiRoot = createApiRoot();
+  return apiRoot
+    .customObjects()
+    .post({
+      body: {
+        container: 'paypal-commercetools-connector',
+        key: 'accessTokens',
+        value: tokens,
+        version: version,
+      },
+    })
+    .execute();
+};
+
+export const deleteAccessToken = async (isMultiTenant = false) => {
   const apiRoot = createApiRoot();
   return apiRoot
     .customObjects()
     .withContainerAndKey({
       container: 'paypal-commercetools-connector',
-      key: 'accessToken',
+      key: isMultiTenant ? 'accessTokens' : 'accessToken',
     })
     .delete()
     .execute();

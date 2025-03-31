@@ -21,11 +21,21 @@ const mockConfigModule = () => {
 };
 mockConfigModule();
 
+const dummyDate = new Date();
+
+const dummyToken: AccessTokenObject = {
+  accessToken:
+    'A21AAKRK-ACvRmtR9xofN-KiTpprBzvE4x8V0lcVAylYv1KKglxbWrg8jOVSkrwflEg_61ZgeoCU-AliYAfMlzcyB72h3vXDg',
+  validUntil: dummyDate,
+};
+
 import {
   cacheAccessToken,
+  cacheAccessTokens,
   getCachedAccessToken,
   getSettings,
 } from '../src/service/config.service';
+import { AccessTokenObject } from '../src/types/index.types';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -42,11 +52,7 @@ describe('Testing config service', () => {
   test('test get cached access token', async () => {
     apiRequest.execute = jest.fn(() => ({
       body: {
-        value: {
-          accessToken:
-            'A21AAKRK-ACvRmtR9xofN-KiTpprBzvE4x8V0lcVAylYv1KKglxbWrg8jOVSkrwflEg_61ZgeoCU-AliYAfMlzcyB72h3vXDg',
-          validUntil: '2023-11-29T04:14:29.323Z',
-        },
+        value: dummyToken,
       },
     }));
     const cachedToken = await getCachedAccessToken();
@@ -57,6 +63,26 @@ describe('Testing config service', () => {
   });
   test('test cacheAccessToken', async () => {
     await cacheAccessToken({ accessToken: '123', validUntil: new Date() }, 1);
+    expect(apiRoot.post).toBeCalledTimes(1);
+    expect(apiRequest.execute).toBeCalledTimes(1);
+  });
+  test('test get cached access tokens for multitenant', async () => {
+    apiRequest.execute = jest.fn(() => ({
+      body: {
+        value: [dummyToken, dummyToken],
+      },
+    }));
+    const cachedTokens = await getCachedAccessToken(true);
+    expect(cachedTokens).toBeDefined();
+    expect(cachedTokens?.value.length).toBe(2);
+    const tokens = cachedTokens?.value as AccessTokenObject[];
+    expect(tokens[0]).toHaveProperty('accessToken');
+    expect(tokens[1]).toHaveProperty('accessToken');
+    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRequest.execute).toBeCalledTimes(1);
+  });
+  test('test cacheAccessTokens for multitenant', async () => {
+    await cacheAccessTokens([dummyToken, dummyToken], 1);
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
