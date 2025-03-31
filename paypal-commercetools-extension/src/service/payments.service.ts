@@ -194,7 +194,7 @@ async function prepareCreateOrderRequest(
       };
     }
   }
-  return request;
+  return { request, store: cart.store?.key };
 }
 
 export const handleCreateOrderRequest = async (
@@ -204,11 +204,12 @@ export const handleCreateOrderRequest = async (
     return [];
   }
   const settings = await getSettings();
-  const request = await prepareCreateOrderRequest(payment, settings);
+  const { request, store } = await prepareCreateOrderRequest(payment, settings);
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(
       request,
+      store,
       request?.clientMetadataId
     );
     updateActions = updateActions.concat(

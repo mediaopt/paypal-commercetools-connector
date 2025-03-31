@@ -32,7 +32,7 @@ import {
 } from '../paypal/webhooks_api';
 import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
-import { Order } from '../types/index.types';
+import { AccessTokenInStoreObject, Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
   cacheAccessToken,
@@ -63,8 +63,11 @@ async function buildConfiguration(timeout: number, token?: string) {
   });
 }
 
-const getPayPalOrdersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return new OrdersApi(await buildConfiguration(timeout));
+const getPayPalOrdersGateway = async (
+  timeout: number = TIMEOUT_PAYMENT,
+  token?: string
+) => {
+  return new OrdersApi(await buildConfiguration(timeout, token));
 };
 
 const getPayPalTrackersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
@@ -104,9 +107,13 @@ const getPayPalPaymentTokenGateway = async (
 
 export const createPayPalOrder = async (
   request: OrderRequest,
+  storeKey?: string,
   clientMetadataId?: string
 ) => {
-  const gateway = await getPayPalOrdersGateway();
+  const customToken = storeKey
+    ? await generateAccessToken(storeKey)
+    : undefined;
+  const gateway = await getPayPalOrdersGateway(TIMEOUT_PAYMENT, customToken);
   const response = await gateway.ordersCreate(
     request,
     randomUUID(),
@@ -269,7 +276,7 @@ const identifyPayPalCredentials = (storeKey?: string) => {
           'Internal Server Error - PayPal multi tenant config for the store is invalid'
         );
       } else {
-        return { clientId, clientSecret };
+        return { clientId, clientSecret, isMultiTenant: true };
       }
     } else
       throw new CustomError(
@@ -286,6 +293,7 @@ const identifyPayPalCredentials = (storeKey?: string) => {
     return {
       clientId: process.env.PAYPAL_CLIENT_ID,
       clientSecret: process.env.PAYPAL_CLIENT_SECRET,
+      isMultiTenant: false,
     };
   }
 };
@@ -320,9 +328,21 @@ const createAccessTokenFromCredentials = async (
 };
 
 const generateAccessToken = async (storeKey?: string): Promise<string> => {
-  const { clientId, clientSecret } = identifyPayPalCredentials(storeKey);
+  const { clientId, clientSecret, isMultiTenant } =
+    identifyPayPalCredentials(storeKey);
   const cachedToken = await getCachedAccessToken();
-  if (
+  const apiEndpoint = getAPIEndpoint();
+
+  if (isMultiTenant) {
+    const relevantToken = cachedToken?.value?.find(
+      (item: AccessTokenInStoreObject) => item.storeKey === storeKey
+    );
+    if (!relevantToken) throw new CustomError('404', 'no valid store token');
+    else if (relevantToken.validUntil > new Date().toISOString()) {
+      logger.info('Using cached token');
+      return relevantToken.accessToken;
+    }
+  } else if (
     cachedToken?.value &&
     cachedToken.value.validUntil > new Date().toISOString()
   ) {
@@ -333,19 +353,32 @@ const generateAccessToken = async (storeKey?: string): Promise<string> => {
   const tokenResponseBody = await createAccessTokenFromCredentials(
     clientId,
     clientSecret,
-    getAPIEndpoint()
+    apiEndpoint
   );
 
-  await cacheAccessToken(
-    {
-      accessToken: tokenResponseBody.access_token,
-      validUntil: new Date(
-        new Date().getTime() + tokenResponseBody.expires_in * 1000
-      ),
-    },
-    cachedToken?.version ?? 0
-  );
-  logger.info(tokenResponseBody.access_token);
+  const newToken = {
+    accessToken: tokenResponseBody.access_token,
+    validUntil: new Date(
+      new Date().getTime() + tokenResponseBody.expires_in * 1000
+    ),
+  };
+
+  if (isMultiTenant) {
+    const refreshedTokens = cachedToken?.value.map(
+      (item: AccessTokenInStoreObject) =>
+        item.storeKey === storeKey ? { storeKey, ...newToken } : item
+    );
+    await cacheAccessTokens(refreshedTokens, cachedToken?.version ?? 0);
+  } else
+    await cacheAccessToken(
+      {
+        accessToken: tokenResponseBody.access_token,
+        validUntil: new Date(
+          new Date().getTime() + tokenResponseBody.expires_in * 1000
+        ),
+      },
+      cachedToken?.version ?? 0
+    );
   return tokenResponseBody.access_token;
 };
 

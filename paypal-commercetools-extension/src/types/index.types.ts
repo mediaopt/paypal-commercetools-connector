@@ -68,6 +68,10 @@ export type AccessTokenObject = {
   validUntil: Date;
 };
 
+export type AccessTokenInStoreObject = {
+  storeKey: string;
+} & AccessTokenObject;
+
 export type PayPalSettings = {
   email: string;
   acceptPayPal: boolean;
