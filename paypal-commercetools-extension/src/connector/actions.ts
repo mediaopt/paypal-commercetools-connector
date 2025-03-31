@@ -14,6 +14,7 @@ import {
   deleteAccessToken,
   getCachedAccessToken,
 } from '../service/config.service';
+import { logger } from '../utils/logger.utils';
 
 export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
 export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
@@ -425,6 +426,11 @@ export async function createAndSetCustomObject(
 export const deleteAccessTokenIfExists = async (
   lastTenantType?: 'single' | 'multi'
 ) => {
+  logger.info(
+    `Deleting access token(s) for ${
+      lastTenantType ?? 'any kind of'
+    } tenant store if exists`
+  );
   if (lastTenantType === 'single' || !lastTenantType) {
     if (await getCachedAccessToken()) {
       await deleteAccessToken();
