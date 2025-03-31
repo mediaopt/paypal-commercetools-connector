@@ -29,7 +29,7 @@ export const getCachedAccessToken = async (isMultitenant = false) => {
         .customObjects()
         .withContainerAndKey({
           container: 'paypal-commercetools-connector',
-          key: isMultitenant ? 'assessTokens' : 'accessToken',
+          key: isMultitenant ? 'accessTokens' : 'accessToken',
         })
         .get()
         .execute()
@@ -62,8 +62,8 @@ export const cacheAccessToken = async (
 };
 
 export const cacheAccessTokens = async (
-  tokens: AccessTokenObject[],
-  version: number
+  tokens: { storeKey: string; accessToken: string; validUntil: Date }[],
+  version = 0
 ) => {
   const apiRoot = createApiRoot();
   return apiRoot

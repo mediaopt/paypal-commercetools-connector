@@ -14,6 +14,7 @@ import {
   createPaymentUpdateExtension,
   deleteAccessTokenIfExists,
 } from './actions';
+import { logger } from '../utils/logger.utils';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 const MULTI_TENANT_IDS = 'PAYPAL_MULTI_TENANT_CLIENT_IDS';
@@ -21,18 +22,25 @@ const MULTI_TENANT_IDS = 'PAYPAL_MULTI_TENANT_CLIENT_IDS';
 async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   const isMultiTenant = !!properties.get(MULTI_TENANT_IDS);
+  logger.info(`is multi tenant store: ${isMultiTenant}`);
 
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
-  const apiRoot = createApiRoot(); //doesn't involve multi tenant, is commercetools global
-  await deleteAccessTokenIfExists(); //already accounts for multi tenant
-  await createPaymentUpdateExtension(apiRoot, applicationUrl); //doesn't involve multi tenant directly, only need to pass store key if relevant
-  await createCustomerUpdateExtension(apiRoot, applicationUrl); //doesn't involve multi tenant directly, only need to pass store key if relevant
-  await createCustomPaymentType(apiRoot); //doesn't involve multi tenant directly, only need to pass store key if relevant
-  await createCustomCustomerType(apiRoot); //doesn't involve multi tenant directly, only need to pass store key if relevant
-  await createCustomPaymentInteractionType(apiRoot); //doesn't involve multi tenant directly, only need to pass store key if relevant
-  if (isMultiTenant) await createWebhooks();
-  else await createWebhook();
+  const apiRoot = createApiRoot();
+  await deleteAccessTokenIfExists();
+  logger.info('previous access token(s) deleted');
+  await createPaymentUpdateExtension(apiRoot, applicationUrl);
+  await createCustomerUpdateExtension(apiRoot, applicationUrl);
+  await createCustomPaymentType(apiRoot);
+  await createCustomCustomerType(apiRoot);
+  await createCustomPaymentInteractionType(apiRoot);
+  logger.info('commercetools custom objects set');
+  if (isMultiTenant) {
+    await createWebhooks();
+  } else {
+    await createWebhook();
+  }
+  logger.info('PayPal webhooks created');
   await createAndSetCustomObject(apiRoot);
 }
 

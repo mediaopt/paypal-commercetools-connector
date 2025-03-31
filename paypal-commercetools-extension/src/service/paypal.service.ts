@@ -34,7 +34,11 @@ import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
-import { cacheAccessToken, getCachedAccessToken } from './config.service';
+import {
+  cacheAccessToken,
+  cacheAccessTokens,
+  getCachedAccessToken,
+} from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -48,14 +52,14 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function buildConfiguration(timeout: number) {
+async function buildConfiguration(timeout: number, token?: string) {
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
       timeout: timeout,
       headers: getPayPalPartnerAttributionHeader(),
     },
-    accessToken: await generateAccessToken(),
+    accessToken: token ?? (await generateAccessToken()),
   });
 }
 
@@ -72,8 +76,8 @@ const getPayPalVerifyWebhookSignatureGateway = async (
 ) => {
   return new VerifyWebhookSignatureApi(await buildConfiguration(timeout));
 };
-const getPayPalWebhooksGateway = async (timeout = 0) => {
-  return new WebhooksApi(await buildConfiguration(timeout));
+const getPayPalWebhooksGateway = async (timeout = 0, token?: string) => {
+  return new WebhooksApi(await buildConfiguration(timeout, token));
 };
 
 const getPayPalAuhorizationsGateway = async (
@@ -447,9 +451,60 @@ export const createWebhook = async () => {
   return response.data;
 };
 
-export const deleteWebhook = async () => {
-  const gateway = await getPayPalWebhooksGateway();
-  const webhookId = await getWebhookId();
+export const createWebhooks = async () => {
+  const { multiTenantIDs, multiTenantSecrets } = multiTenantCredentials();
+  const endpoint = getAPIEndpoint();
+  const storeKeys = Object.keys(multiTenantIDs);
+  logger.info(
+    `Creating webhooks for each store, stores available: ${storeKeys} `
+  );
+  const accessTokens = await Promise.all(
+    storeKeys.map(async (storeKey) => {
+      const clientId = multiTenantIDs[storeKey];
+      const clientSecret = multiTenantSecrets[storeKey];
+
+      const storeToken = await createAccessTokenFromCredentials(
+        clientId,
+        clientSecret,
+        endpoint
+      );
+
+      const gateway = await getPayPalWebhooksGateway(
+        0,
+        storeToken.access_token
+      );
+      try {
+        const response = await gateway.webhooksPost({
+          url: getWebhookUrl(),
+          event_types: [
+            {
+              name: '*',
+            } as EventType,
+          ],
+        });
+      } catch (e) {
+        if (e instanceof AxiosError) {
+          logger.info(
+            `could not create webhook for store ${storeKey}, please check PayPal credentials and limits for PayPal webhooks amount`
+          );
+        }
+      }
+
+      return {
+        storeKey,
+        accessToken: storeToken.access_token,
+        validUntil: new Date(
+          new Date().getTime() + storeToken.expires_in * 1000
+        ),
+      };
+    })
+  );
+  cacheAccessTokens(accessTokens);
+};
+
+export const deleteWebhook = async (token?: string) => {
+  const gateway = await getPayPalWebhooksGateway(0, token);
+  const webhookId = await getWebhookId(token);
   if (!webhookId) {
     return;
   }
@@ -465,9 +520,22 @@ export const deleteWebhook = async () => {
   }
 };
 
-export const getWebhookId = async () => {
+export const deleteWebhooks = async () => {
+  const accessTokens = await getCachedAccessToken(true);
+  logger.info(`Deleting webhooks for each store`);
+  if (!accessTokens?.value) {
+    logger.info('No access tokens available, please delete webhooks manually');
+  } else
+    await Promise.all(
+      accessTokens.value.map(({ accessToken }: any) =>
+        deleteWebhook(accessToken)
+      )
+    );
+};
+
+export const getWebhookId = async (token?: string) => {
   const webhookUrl = getWebhookUrl();
-  const gateway = await getPayPalWebhooksGateway();
+  const gateway = await getPayPalWebhooksGateway(0, token);
   const webhooks = await gateway.webhooksList('APPLICATION');
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl
