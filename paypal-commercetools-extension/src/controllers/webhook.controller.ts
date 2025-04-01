@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import CustomError from '../errors/custom.error';
 import { VerifyWebhookSignature } from '../paypal/webhooks_api';
 import {
+  getPaymentByPayPalOrderId,
   handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
@@ -10,8 +11,8 @@ import {
 import { getWebhookId, validateSignature } from '../service/paypal.service';
 import { logger } from '../utils/logger.utils';
 
-async function verifyWebhookSignature(request: Request) {
-  const webhookId = await getWebhookId();
+async function verifyWebhookSignature(request: Request, storeKey?: string) {
+  const webhookId = await getWebhookId({ storeKey });
   if (!webhookId) {
     throw new CustomError(500, 'WebhookId is missing');
   }
@@ -24,7 +25,7 @@ async function verifyWebhookSignature(request: Request) {
     webhook_event: request.body,
     webhook_id: webhookId,
   };
-  const response = await validateSignature(verificationRequest);
+  const response = await validateSignature(verificationRequest, storeKey);
   logger.info(JSON.stringify(response));
   if (response.verification_status !== 'SUCCESS') {
     throw new CustomError(400, 'Verification failed');
@@ -48,14 +49,38 @@ export const post = async (request: Request, response: Response) => {
       `Got ${event_type} for ${resource_type} with id ${resource.id}`
     );
     logger.info(summary);
-    await verifyWebhookSignature(request);
+    let orderId: string;
+
+    switch (resource_type) {
+      case 'capture':
+      case 'authorization': {
+        orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
+        break;
+      }
+      case 'checkout-order': {
+        orderId = resource.id ?? '';
+        break;
+      }
+      case 'payment_token': {
+        orderId = resource.metadata.order_id;
+        break;
+      }
+      default:
+        orderId = '';
+    }
+
+    const payment = await getPaymentByPayPalOrderId(orderId);
+    const storeKey = payment?.custom?.fields?.storeKey;
+
+    await verifyWebhookSignature(request, storeKey);
+
     logger.info(JSON.stringify(resource));
     if (!resource_type) {
       throw new CustomError(400, 'Bad request - Missing body parameters.');
     }
     switch (resource_type) {
       case 'capture':
-        await handleCaptureWebhook(resource, event_type);
+        await handleCaptureWebhook(resource, payment, event_type);
         response.status(200).json({});
         return;
       case 'refund':
@@ -63,15 +88,15 @@ export const post = async (request: Request, response: Response) => {
         response.status(200).json({});
         return;
       case 'authorization':
-        await handleAuthorizeWebhook(resource);
+        await handleAuthorizeWebhook(resource, payment);
         response.status(200).json({});
         return;
       case 'checkout-order':
-        await handleOrderWebhook(resource);
+        await handleOrderWebhook(resource, payment);
         response.status(200).json({});
         return;
       case 'payment_token':
-        await handlePaymentTokenWebhook(resource);
+        await handlePaymentTokenWebhook(resource, payment);
         response.status(200).json({});
         return;
       default:

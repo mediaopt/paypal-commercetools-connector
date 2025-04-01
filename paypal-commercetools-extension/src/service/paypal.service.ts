@@ -570,7 +570,7 @@ export const createWebhooks = async () => {
 
 export const deleteWebhook = async (token?: string) => {
   const gateway = await getPayPalWebhooksGateway({ token });
-  const webhookId = await getWebhookId(token);
+  const webhookId = await getWebhookId({ token });
   if (!webhookId) {
     return;
   }
@@ -599,9 +599,9 @@ export const deleteWebhooks = async () => {
     );
 };
 
-export const getWebhookId = async (token?: string) => {
+export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {
   const webhookUrl = getWebhookUrl();
-  const gateway = await getPayPalWebhooksGateway({ token });
+  const gateway = await getPayPalWebhooksGateway(multiTenantConfig);
   const webhooks = await gateway.webhooksList('APPLICATION');
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl

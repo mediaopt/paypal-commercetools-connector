@@ -26,7 +26,9 @@ import { sendEmail } from './mail.service';
 import { updatePaymentFields } from './payments.service';
 import { getPayPalOrder } from './paypal.service';
 
-const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
+export const getPaymentByPayPalOrderId = async (
+  orderId: string
+): Promise<Payment> => {
   const payments = await createApiRoot()
     .payments()
     .get({
@@ -83,13 +85,12 @@ function prepareCreateOrUpdateTransactionAction(
 }
 
 export const handlePaymentTokenWebhook = async (
-  resource: PayPalVaultPaymentTokenResource
+  resource: PayPalVaultPaymentTokenResource,
+  payment: Payment
 ) => {
   if (!resource?.customer?.id) {
     return;
   }
-  const orderId = resource.metadata.order_id;
-  const payment = await getPaymentByPayPalOrderId(orderId);
   const cart = await getCart(payment.id);
   const customer = await getCustomerByCart(cart);
   if (!customer) {
@@ -130,20 +131,21 @@ export const handlePaymentTokenWebhook = async (
   }
 };
 
-export const handleOrderWebhook = async (resource: Order) => {
+export const handleOrderWebhook = async (resource: Order, payment: Payment) => {
   const orderId = resource.id ?? '';
   const order = await getPayPalOrder(orderId);
-  const payment = await getPaymentByPayPalOrderId(orderId);
+
   const updateActions = updatePaymentFields(order);
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
 export const handleCaptureWebhook = async (
   resource: Capture2,
+  payment: Payment,
   eventType: string
 ) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
-  const payment = await getPaymentByPayPalOrderId(orderId);
+
   const payPalOrder = await getPayPalOrder(orderId);
   const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
   if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
@@ -211,9 +213,12 @@ export const handleCaptureWebhook = async (
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
 
-export const handleAuthorizeWebhook = async (resource: Authorization2) => {
+export const handleAuthorizeWebhook = async (
+  resource: Authorization2,
+  payment: Payment
+) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
-  const payment = await getPaymentByPayPalOrderId(orderId);
+
   const authorizationType =
     resource.status === 'VOIDED' ? 'CancelAuthorization' : 'Authorization';
   const transaction = {
