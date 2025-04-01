@@ -44,7 +44,16 @@ const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
 const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
 
-const TIMEOUT_PAYMENT = 9500;
+const timeouts = {
+  payment: 9500,
+  extension: 2000,
+  payPal: 0,
+};
+
+type timeoutType = keyof typeof timeouts;
+
+const setTimeout = (specialTimeout?: timeoutType) =>
+  specialTimeout ? timeouts[specialTimeout] : timeouts.payment;
 
 function getPayPalPartnerAttributionHeader() {
   return {
@@ -54,11 +63,14 @@ function getPayPalPartnerAttributionHeader() {
 
 type MultiTenantConfig = { storeKey?: string; token?: string };
 
-async function buildConfiguration(multiTenantConfig?: MultiTenantConfig) {
+async function buildConfiguration(
+  multiTenantConfig?: MultiTenantConfig,
+  timeout?: timeoutType
+) {
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
-      timeout: TIMEOUT_PAYMENT,
+      timeout: setTimeout(timeout),
       headers: getPayPalPartnerAttributionHeader(),
     },
     accessToken:
@@ -81,7 +93,7 @@ const getPayPalVerifyWebhookSignatureGateway = async (storeKey?: string) => {
 const getPayPalWebhooksGateway = async (
   multiTenantConfig?: MultiTenantConfig
 ) => {
-  return new WebhooksApi(await buildConfiguration(multiTenantConfig));
+  return new WebhooksApi(await buildConfiguration(multiTenantConfig, 'payPal'));
 };
 
 const getPayPalAuhorizationsGateway = async (storeKey?: string) => {
@@ -93,11 +105,15 @@ const getPayPalCapturesGateway = async (storeKey?: string) => {
 };
 
 const getPayPalSetupTokenGateway = async (storeKey?: string) => {
-  return new SetupTokensApi(await buildConfiguration({ storeKey }));
+  return new SetupTokensApi(
+    await buildConfiguration({ storeKey }, 'extension')
+  );
 };
 
 const getPayPalPaymentTokenGateway = async (storeKey?: string) => {
-  return new PaymentTokensApi(await buildConfiguration({ storeKey }));
+  return new PaymentTokensApi(
+    await buildConfiguration({ storeKey }, 'extension')
+  );
 };
 
 export const createPayPalOrder = async (
@@ -422,7 +438,7 @@ export const generateUserIdToken = async (
 
 export const createVaultSetupToken = async (
   request: SetupTokenRequest,
-  storeKey: string
+  storeKey?: string
 ) => {
   const gateway = await getPayPalSetupTokenGateway(storeKey);
   const response = await gateway.setupTokensCreate(
@@ -435,7 +451,7 @@ export const createVaultSetupToken = async (
 
 export const createPaymentToken = async (
   request: PaymentTokenRequest,
-  storeKey: string
+  storeKey?: string
 ) => {
   const gateway = await getPayPalPaymentTokenGateway(storeKey);
   const response = await gateway.paymentTokensCreate(
