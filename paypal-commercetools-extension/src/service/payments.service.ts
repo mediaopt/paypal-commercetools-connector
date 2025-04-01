@@ -194,7 +194,7 @@ async function prepareCreateOrderRequest(
       };
     }
   }
-  return { request, store: cart.store?.key };
+  return { request, storeKey: cart.store?.key };
 }
 
 export const handleCreateOrderRequest = async (
@@ -204,12 +204,15 @@ export const handleCreateOrderRequest = async (
     return [];
   }
   const settings = await getSettings();
-  const { request, store } = await prepareCreateOrderRequest(payment, settings);
+  const { request, storeKey } = await prepareCreateOrderRequest(
+    payment,
+    settings
+  );
   let updateActions = handleRequest('createPayPalOrder', request);
   try {
     const response = await createPayPalOrder(
       request,
-      store,
+      storeKey,
       request?.clientMetadataId
     );
     updateActions = updateActions.concat(
@@ -226,11 +229,11 @@ export const handleCreateOrderRequest = async (
       name: 'PayPalOrderId',
       value: response.id,
     });
-    if (store)
+    if (storeKey)
       updateActions.push({
         action: 'setCustomField',
         name: 'storeKey',
-        value: store,
+        value: storeKey,
       });
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
@@ -244,6 +247,7 @@ export const handleCaptureOrderRequest = async (
   if (!payment?.custom?.fields?.capturePayPalOrderRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields?.storeKey;
   const request = JSON.parse(
     payment?.custom?.fields?.capturePayPalOrderRequest
   );
@@ -251,7 +255,8 @@ export const handleCaptureOrderRequest = async (
   try {
     const response = await capturePayPalOrder(
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
-      request as OrderCaptureRequest
+      request as OrderCaptureRequest,
+      storeKey
     );
     updateActions.push({
       action: 'addTransaction',
@@ -285,6 +290,7 @@ export const handleCaptureAuthorizationRequest = async (
   if (!payment?.custom?.fields?.capturePayPalAuthorizationRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields?.storeKey;
   const request = JSON.parse(
     payment?.custom?.fields?.capturePayPalAuthorizationRequest
   );
@@ -293,7 +299,8 @@ export const handleCaptureAuthorizationRequest = async (
     const response = await capturePayPalAuthorization(
       request.authorizationId ??
         findSuitableTransactionId(payment, 'Authorization', 'Success'),
-      request as CaptureRequest
+      request as CaptureRequest,
+      storeKey
     );
     updateActions.push({
       action: 'addTransaction',
@@ -322,6 +329,7 @@ export const handleVoidAuthorizationRequest = async (
   if (!payment?.custom?.fields?.voidPayPalAuthorizationRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields?.storeKey;
   const request = JSON.parse(
     payment?.custom?.fields?.voidPayPalAuthorizationRequest
   );
@@ -330,7 +338,7 @@ export const handleVoidAuthorizationRequest = async (
     request.authorizationId ??
     findSuitableTransactionId(payment, 'Authorization', 'Success');
   try {
-    const response = await voidPayPalAuthorization(transactionId);
+    const response = await voidPayPalAuthorization(transactionId, storeKey);
 
     updateActions.push({
       action: 'addTransaction',
@@ -360,6 +368,7 @@ export const handleRefundPayPalOrderRequest = async (
   if (!payment?.custom?.fields?.refundPayPalOrderRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields?.storeKey;
   const request = JSON.parse(payment?.custom?.fields?.refundPayPalOrderRequest);
   const updateActions: UpdateActions = handleRequest(
     'refundPayPalOrder',
@@ -378,7 +387,8 @@ export const handleRefundPayPalOrderRequest = async (
       : undefined;
     const response = await refundPayPalOrder(
       captureId ?? findSuitableTransactionId(payment, 'Charge', 'Success'),
-      request
+      request,
+      storeKey
     );
     const refundedAmount = response?.amount?.value ?? amount ?? 0;
     updateActions.push({
@@ -416,6 +426,7 @@ export const handleAuthorizeOrderRequest = async (
   if (!payment?.custom?.fields?.authorizePayPalOrderRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields?.storeKey;
   const request = JSON.parse(
     payment?.custom?.fields?.authorizePayPalOrderRequest
   );
@@ -423,7 +434,8 @@ export const handleAuthorizeOrderRequest = async (
   try {
     const response = await authorizePayPalOrder(
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
-      request as OrderAuthorizeRequest
+      request as OrderAuthorizeRequest,
+      storeKey
     );
     updateActions.push({
       action: 'addTransaction',
@@ -480,6 +492,7 @@ export const handleUpdateOrderRequest = async (
   if (!payment?.custom?.fields?.updatePayPalOrderRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields.storeKey;
   try {
     let request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
     const cart = await getCart(payment.id);
@@ -524,7 +537,7 @@ export const handleUpdateOrderRequest = async (
     updateActions = updateActions.concat(
       handleRequest('updatePayPalOrder', request)
     );
-    const response = await updatePayPalOrder(orderId, patch);
+    const response = await updatePayPalOrder(orderId, patch, storeKey);
     return updateActions.concat(
       handlePaymentResponse('updatePayPalOrder', response ?? '')
     );
@@ -539,12 +552,14 @@ export const handleGetOrderRequest = async (
   if (!payment?.custom?.fields?.getPayPalOrderRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields.storeKey;
   const request = JSON.parse(payment?.custom?.fields?.getPayPalOrderRequest);
   const { orderId } = request;
   const updateActions = handleRequest('getPayPalOrder', request);
   try {
     const response = await getPayPalOrder(
-      orderId ?? payment.custom.fields?.PayPalOrderId
+      orderId ?? payment.custom.fields?.PayPalOrderId,
+      storeKey
     );
     return updateActions.concat(
       updatePaymentFields(response),
@@ -561,12 +576,14 @@ export const handleGetCaptureRequest = async (
   if (!payment?.custom?.fields?.getPayPalCaptureRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields.storeKey;
   const request = JSON.parse(payment?.custom?.fields?.getPayPalCaptureRequest);
   const { captureId } = request;
   const updateActions = handleRequest('getPayPalCapture', request);
   try {
     const response = await getPayPalCapture(
-      captureId ?? findSuitableTransactionId(payment, 'Charge')
+      captureId ?? findSuitableTransactionId(payment, 'Charge'),
+      storeKey
     );
     return updateActions.concat(
       handlePaymentResponse('getPayPalCapture', response)
@@ -616,6 +633,7 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
   if (!payment?.custom?.fields?.createTrackingInformationRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields.storeKey;
   let request = JSON.parse(
     payment?.custom?.fields?.createTrackingInformationRequest
   );
@@ -639,7 +657,8 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
   try {
     const response = await addDeliveryData(
       payment.custom.fields?.PayPalOrderId,
-      request
+      request,
+      storeKey
     );
     return updateActions.concat(
       handlePaymentResponse('createTrackingInformation', response)
@@ -655,6 +674,8 @@ export const handleUpdateTrackingInformation = async (
   if (!payment?.custom?.fields?.updateTrackingInformationRequest) {
     return [];
   }
+  const storeKey = payment?.custom?.fields.storeKey;
+
   const request = JSON.parse(
     payment?.custom?.fields?.updateTrackingInformationRequest
   );
@@ -675,7 +696,8 @@ export const handleUpdateTrackingInformation = async (
     const response = await updateDeliveryData(
       payment.custom.fields?.PayPalOrderId,
       trackingId,
-      patch
+      patch,
+      storeKey
     );
     return updateActions.concat(
       handlePaymentResponse('updateTrackingInformation', response ?? '')

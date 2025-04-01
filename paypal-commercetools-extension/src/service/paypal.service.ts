@@ -52,57 +52,52 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-async function buildConfiguration(timeout: number, token?: string) {
+type MultiTenantConfig = { storeKey?: string; token?: string };
+
+async function buildConfiguration(multiTenantConfig?: MultiTenantConfig) {
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
-      timeout: timeout,
+      timeout: TIMEOUT_PAYMENT,
       headers: getPayPalPartnerAttributionHeader(),
     },
-    accessToken: token ?? (await generateAccessToken()),
+    accessToken:
+      multiTenantConfig?.token ??
+      (await generateAccessToken(multiTenantConfig?.storeKey)),
   });
 }
 
-const getPayPalOrdersGateway = async (
-  timeout: number = TIMEOUT_PAYMENT,
-  token?: string
+const getPayPalOrdersGateway = async (storeKey?: string) => {
+  return new OrdersApi(await buildConfiguration({ storeKey }));
+};
+
+const getPayPalTrackersGateway = async (storeKey?: string) => {
+  return new TrackersApi(await buildConfiguration({ storeKey }));
+};
+
+const getPayPalVerifyWebhookSignatureGateway = async (storeKey?: string) => {
+  return new VerifyWebhookSignatureApi(await buildConfiguration({ storeKey }));
+};
+const getPayPalWebhooksGateway = async (
+  multiTenantConfig?: MultiTenantConfig
 ) => {
-  return new OrdersApi(await buildConfiguration(timeout, token));
+  return new WebhooksApi(await buildConfiguration(multiTenantConfig));
 };
 
-const getPayPalTrackersGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return new TrackersApi(await buildConfiguration(timeout));
+const getPayPalAuhorizationsGateway = async (storeKey?: string) => {
+  return new AuthorizationsApi(await buildConfiguration({ storeKey }));
 };
 
-const getPayPalVerifyWebhookSignatureGateway = async (
-  timeout: number = TIMEOUT_PAYMENT
-) => {
-  return new VerifyWebhookSignatureApi(await buildConfiguration(timeout));
-};
-const getPayPalWebhooksGateway = async (timeout = 0, token?: string) => {
-  return new WebhooksApi(await buildConfiguration(timeout, token));
+const getPayPalCapturesGateway = async (storeKey?: string) => {
+  return new CapturesApi(await buildConfiguration({ storeKey }));
 };
 
-const getPayPalAuhorizationsGateway = async (
-  timeout: number = TIMEOUT_PAYMENT
-) => {
-  return new AuthorizationsApi(await buildConfiguration(timeout));
+const getPayPalSetupTokenGateway = async (storeKey?: string) => {
+  return new SetupTokensApi(await buildConfiguration({ storeKey }));
 };
 
-const getPayPalCapturesGateway = async (timeout: number = TIMEOUT_PAYMENT) => {
-  return new CapturesApi(await buildConfiguration(timeout));
-};
-
-const getPayPalSetupTokenGateway = async (
-  timeout: number = TIMEOUT_PAYMENT
-) => {
-  return new SetupTokensApi(await buildConfiguration(timeout));
-};
-
-const getPayPalPaymentTokenGateway = async (
-  timeout: number = TIMEOUT_PAYMENT
-) => {
-  return new PaymentTokensApi(await buildConfiguration(timeout));
+const getPayPalPaymentTokenGateway = async (storeKey?: string) => {
+  return new PaymentTokensApi(await buildConfiguration({ storeKey }));
 };
 
 export const createPayPalOrder = async (
@@ -110,10 +105,7 @@ export const createPayPalOrder = async (
   storeKey?: string,
   clientMetadataId?: string
 ) => {
-  const customToken = storeKey
-    ? await generateAccessToken(storeKey)
-    : undefined;
-  const gateway = await getPayPalOrdersGateway(TIMEOUT_PAYMENT, customToken);
+  const gateway = await getPayPalOrdersGateway(storeKey);
   const response = await gateway.ordersCreate(
     request,
     randomUUID(),
@@ -125,9 +117,10 @@ export const createPayPalOrder = async (
 
 export const authorizePayPalOrder = async (
   orderId: string,
-  request: OrderAuthorizeRequest
+  request: OrderAuthorizeRequest,
+  storeKey?: string
 ) => {
-  const gateway = await getPayPalOrdersGateway();
+  const gateway = await getPayPalOrdersGateway(storeKey);
   const response = await gateway.ordersAuthorize(
     orderId,
     randomUUID(),
@@ -141,9 +134,10 @@ export const authorizePayPalOrder = async (
 
 export const updatePayPalOrder = async (
   orderId: string,
-  request: Array<Patch>
+  request: Array<Patch>,
+  storeKey?: string
 ) => {
-  const gateway = await getPayPalOrdersGateway();
+  const gateway = await getPayPalOrdersGateway(storeKey);
   const response = await gateway.ordersPatch(orderId, request);
   if (response.status === 204) {
     return {
@@ -153,23 +147,27 @@ export const updatePayPalOrder = async (
   return response.data;
 };
 
-export const getPayPalOrder = async (orderId: string) => {
-  const gateway = await getPayPalOrdersGateway();
+export const getPayPalOrder = async (orderId: string, storeKey?: string) => {
+  const gateway = await getPayPalOrdersGateway(storeKey);
   const response = await gateway.ordersGet(orderId);
   return response.data as Order;
 };
 
-export const getPayPalCapture = async (captureId: string) => {
-  const gateway = await getPayPalCapturesGateway();
+export const getPayPalCapture = async (
+  captureId: string,
+  storeKey?: string
+) => {
+  const gateway = await getPayPalCapturesGateway(storeKey);
   const response = await gateway.capturesGet(captureId, 'application/json');
   return response.data;
 };
 
 export const capturePayPalAuthorization = async (
   authorizationId: string,
-  request: CaptureRequest
+  request: CaptureRequest,
+  storeKey?: string
 ) => {
-  const gateway = await getPayPalAuhorizationsGateway();
+  const gateway = await getPayPalAuhorizationsGateway(storeKey);
   const response = await gateway.authorizationsCapture(
     authorizationId,
     randomUUID(),
@@ -180,8 +178,11 @@ export const capturePayPalAuthorization = async (
   return response.data;
 };
 
-export const voidPayPalAuthorization = async (authorizationId: string) => {
-  const gateway = await getPayPalAuhorizationsGateway();
+export const voidPayPalAuthorization = async (
+  authorizationId: string,
+  storeKey?: string
+) => {
+  const gateway = await getPayPalAuhorizationsGateway(storeKey);
   const response = await gateway.authorizationsVoid(
     authorizationId,
     'application/json',
@@ -193,9 +194,10 @@ export const voidPayPalAuthorization = async (authorizationId: string) => {
 
 export const capturePayPalOrder = async (
   orderId: string,
-  request: OrderCaptureRequest
+  request: OrderCaptureRequest,
+  storeKey?: string
 ) => {
-  const gateway = await getPayPalOrdersGateway();
+  const gateway = await getPayPalOrdersGateway(storeKey);
   const response = await gateway.ordersCapture(
     orderId,
     randomUUID(),
@@ -209,9 +211,10 @@ export const capturePayPalOrder = async (
 
 export const refundPayPalOrder = async (
   captureId: string,
-  request?: RefundRequest
+  request?: RefundRequest,
+  storeKey?: string
 ) => {
-  const gateway = await getPayPalCapturesGateway();
+  const gateway = await getPayPalCapturesGateway(storeKey);
   const response = await gateway.capturesRefund(
     captureId,
     randomUUID(),
@@ -330,7 +333,7 @@ const createAccessTokenFromCredentials = async (
 const generateAccessToken = async (storeKey?: string): Promise<string> => {
   const { clientId, clientSecret, isMultiTenant } =
     identifyPayPalCredentials(storeKey);
-  const cachedToken = await getCachedAccessToken();
+  const cachedToken = await getCachedAccessToken(isMultiTenant);
   const apiEndpoint = getAPIEndpoint();
 
   if (isMultiTenant) {
@@ -417,8 +420,11 @@ export const generateUserIdToken = async (
   }
 };
 
-export const createVaultSetupToken = async (request: SetupTokenRequest) => {
-  const gateway = await getPayPalSetupTokenGateway(2000);
+export const createVaultSetupToken = async (
+  request: SetupTokenRequest,
+  storeKey: string
+) => {
+  const gateway = await getPayPalSetupTokenGateway(storeKey);
   const response = await gateway.setupTokensCreate(
     'application/json',
     randomUUID(),
@@ -427,8 +433,11 @@ export const createVaultSetupToken = async (request: SetupTokenRequest) => {
   return response.data;
 };
 
-export const createPaymentToken = async (request: PaymentTokenRequest) => {
-  const gateway = await getPayPalPaymentTokenGateway(2000);
+export const createPaymentToken = async (
+  request: PaymentTokenRequest,
+  storeKey: string
+) => {
+  const gateway = await getPayPalPaymentTokenGateway(storeKey);
   const response = await gateway.paymentTokensCreate(
     'application/json',
     randomUUID(),
@@ -437,8 +446,11 @@ export const createPaymentToken = async (request: PaymentTokenRequest) => {
   return response.data;
 };
 
-export const deletePaymentToken = async (paymentTokenId: string) => {
-  const gateway = await getPayPalPaymentTokenGateway(2000);
+export const deletePaymentToken = async (
+  paymentTokenId: string,
+  storeKey?: string
+) => {
+  const gateway = await getPayPalPaymentTokenGateway(storeKey);
   const response = await gateway.paymentTokensDelete(
     paymentTokenId,
     'application/json'
@@ -451,16 +463,22 @@ export const deletePaymentToken = async (paymentTokenId: string) => {
   return response.data;
 };
 
-export const getPaymentTokens = async (customerId: string) => {
-  const gateway = await getPayPalPaymentTokenGateway(2000);
+export const getPaymentTokens = async (
+  customerId: string,
+  storeKey?: string
+) => {
+  const gateway = await getPayPalPaymentTokenGateway(storeKey);
   const response = await gateway.customerPaymentTokensGet(
     'application/json',
     customerId
   );
   return response.data;
 };
-export const validateSignature = async (signature: VerifyWebhookSignature) => {
-  const gateway = await getPayPalVerifyWebhookSignatureGateway(0);
+export const validateSignature = async (
+  signature: VerifyWebhookSignature,
+  storeKey?: string
+) => {
+  const gateway = await getPayPalVerifyWebhookSignatureGateway(storeKey);
   const response = await gateway.verifyWebhookSignaturePost(signature);
   return response.data;
 };
@@ -502,10 +520,9 @@ export const createWebhooks = async () => {
         endpoint
       );
 
-      const gateway = await getPayPalWebhooksGateway(
-        0,
-        storeToken.access_token
-      );
+      const gateway = await getPayPalWebhooksGateway({
+        token: storeToken.access_token,
+      });
       try {
         const response = await gateway.webhooksPost({
           url: getWebhookUrl(),
@@ -536,7 +553,7 @@ export const createWebhooks = async () => {
 };
 
 export const deleteWebhook = async (token?: string) => {
-  const gateway = await getPayPalWebhooksGateway(0, token);
+  const gateway = await getPayPalWebhooksGateway({ token });
   const webhookId = await getWebhookId(token);
   if (!webhookId) {
     return;
@@ -568,7 +585,7 @@ export const deleteWebhooks = async () => {
 
 export const getWebhookId = async (token?: string) => {
   const webhookUrl = getWebhookUrl();
-  const gateway = await getPayPalWebhooksGateway(0, token);
+  const gateway = await getPayPalWebhooksGateway({ token });
   const webhooks = await gateway.webhooksList('APPLICATION');
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl
@@ -587,9 +604,10 @@ export const getWebhookUrl = () => {
 
 export const addDeliveryData = async (
   orderId: string,
-  request: OrderTrackerRequest
+  request: OrderTrackerRequest,
+  storeKey?: string
 ) => {
-  const endpoint = await getPayPalOrdersGateway(TIMEOUT_PAYMENT);
+  const endpoint = await getPayPalOrdersGateway(storeKey);
   const response = await endpoint.ordersTrackCreate(orderId, request);
   return response.data;
 };
@@ -597,9 +615,10 @@ export const addDeliveryData = async (
 export const updateDeliveryData = async (
   orderId: string,
   trackerId: string,
-  request: Patch[]
+  request: Patch[],
+  storeKey?: string
 ) => {
-  const endpoint = await getPayPalTrackersGateway(TIMEOUT_PAYMENT);
+  const endpoint = await getPayPalTrackersGateway(storeKey);
   const response = await endpoint.ordersTrackersPatch(
     orderId,
     trackerId,
