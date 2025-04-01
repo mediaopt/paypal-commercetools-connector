@@ -226,6 +226,12 @@ export const handleCreateOrderRequest = async (
       name: 'PayPalOrderId',
       value: response.id,
     });
+    if (store)
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'storeKey',
+        value: store,
+      });
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
     return handleError('createPayPalOrder', e);
@@ -447,6 +453,7 @@ export const handleAuthorizeOrderRequest = async (
 
 export async function handleGetClientTokenRequest(payment?: Payment) {
   const clientTokenRequest = payment?.custom?.fields?.getClientTokenRequest;
+  const storeKey = payment?.custom?.fields.storeKey;
   if (!clientTokenRequest) {
     return [];
   }
@@ -457,7 +464,7 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
   };
   const updateActions = handleRequest('getClientToken', request);
   try {
-    const response = await getClientToken();
+    const response = await getClientToken(storeKey);
     return updateActions.concat(
       handlePaymentResponse('getClientToken', response)
     );
