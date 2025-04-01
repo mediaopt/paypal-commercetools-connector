@@ -223,8 +223,8 @@ export const refundPayPalOrder = async (
   return response.data;
 };
 
-export async function getClientToken() {
-  const token = await generateAccessToken();
+export async function getClientToken(storeKey?: string) {
+  const token = await generateAccessToken(storeKey);
   const options = {
     method: 'POST',
     url: `${getAPIEndpoint()}/v1/identity/generate-token`,
