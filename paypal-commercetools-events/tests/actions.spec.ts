@@ -1,8 +1,13 @@
 import { describe, expect } from '@jest/globals';
 import {
   createParcelAddedToDeliverySubscription,
+  deleteAccessTokenIfExists,
   deleteParcelAddedToDeliverySubscription,
 } from '../src/connector/actions';
+import {
+  getCachedAccessToken,
+  deleteAccessToken,
+} from '../src/service/config.service';
 
 describe('Testing actions', () => {
   test('add extension', async () => {
@@ -70,4 +75,33 @@ describe('Testing actions', () => {
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
   });
+});
+
+const mockDeleteTokentTests: [
+  'single' | 'multi' | undefined,
+  number,
+  number
+][] = [
+  [undefined, 2, 2],
+  ['single', 1, 1],
+  ['multi', 1, 1],
+];
+
+jest.mock('../src/service/config.service', () => ({
+  getCachedAccessToken: jest.fn(() => Promise.resolve(true)),
+  deleteAccessToken: jest.fn(),
+}));
+describe('testing delete token', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+  test.each(mockDeleteTokentTests)(
+    'delete token if last tenant type is %s, getCachedAccessToken returns truthy, results in calls to getCachedToken %s times and delete assess token %s times ',
+    async (lastTenantType, timesGetToken, timesDeleteToken) => {
+      await deleteAccessTokenIfExists(lastTenantType);
+      expect(getCachedAccessToken).toBeCalledTimes(timesGetToken);
+      expect(deleteAccessToken).toBeCalledTimes(timesDeleteToken);
+    }
+  );
 });

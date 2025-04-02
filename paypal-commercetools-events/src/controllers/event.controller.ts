@@ -36,6 +36,8 @@ function parseRequest(request: Request) {
 const handleParcelAddedToDelivery = async (
   message: ParcelAddedToDeliveryMessagePayload
 ) => {
+  if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS)
+    throw new CustomError(501, 'Tracking not supported for multi-tenant');
   const settings = await getSettings();
   if (!settings?.sendTrackingToPayPal) {
     return;

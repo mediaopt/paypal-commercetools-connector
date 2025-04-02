@@ -19,7 +19,7 @@ export const getSettings = async () => {
     return undefined;
   }
 };
-export const getCachedAccessToken = async () => {
+export const getCachedAccessToken = async (isMultitenant = false) => {
   try {
     const apiRoot = createApiRoot();
     return (
@@ -27,7 +27,7 @@ export const getCachedAccessToken = async () => {
         .customObjects()
         .withContainerAndKey({
           container: 'paypal-commercetools-connector',
-          key: 'accessToken',
+          key: isMultitenant ? 'accessTokens' : 'accessToken',
         })
         .get()
         .execute()
@@ -55,13 +55,13 @@ export const cacheAccessToken = async (
     .execute();
 };
 
-export const deleteAccessToken = async () => {
+export const deleteAccessToken = async (isMultiTenant = false) => {
   const apiRoot = createApiRoot();
   return apiRoot
     .customObjects()
     .withContainerAndKey({
       container: 'paypal-commercetools-connector',
-      key: 'accessToken',
+      key: isMultiTenant ? 'accessTokens' : 'accessToken',
     })
     .delete()
     .execute();
