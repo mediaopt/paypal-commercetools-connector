@@ -402,17 +402,19 @@ const generateAccessToken = async (storeKey?: string): Promise<string> => {
 };
 
 export const generateUserIdToken = async (
-  customerId?: string
+  customerId?: string,
+  storeKey?: string
 ): Promise<string> => {
-  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+  const { clientId, clientSecret, isMultiTenant } =
+    identifyPayPalCredentials(storeKey);
+  if (isMultiTenant)
     throw new CustomError(
-      500,
-      'Internal Server Error - PayPal config is missing'
+      '501',
+      'Multi tenant vaulting methods are not supported'
     );
-  }
-  const credentials = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
-  ).toString('base64');
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
+    'base64'
+  );
   const options = {
     method: 'POST',
     url: `${getAPIEndpoint()}/v1/oauth2/token`,
