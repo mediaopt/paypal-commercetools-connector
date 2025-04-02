@@ -293,6 +293,34 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     await expectSuccessFullTracking(data, trackingNumber, 8, validTrackerItems);
   });
+
+  test('tracking is not supported for multi-tenant', async () => {
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = 'true';
+    const trackingNumber = 'mutliTenantTrackingNumber';
+    const { validDeliveryItem, validLineItem } = setValidItems(
+      'validItem',
+      1,
+      true
+    );
+    api = setApiMock([validLineItem], [validDeliveryItem], false);
+    const message = setMessage(trackingNumber, [validDeliveryItem]);
+    const data = Buffer.from(JSON.stringify(message)).toString('base64');
+    const request = {
+      body: {
+        message: {
+          data: data,
+        },
+      },
+    } as unknown as Request;
+    const response = {} as unknown as Response;
+    const next = jest.fn();
+    await post(request as Request, response, next);
+    expect(next).toBeCalledTimes(1);
+    expect(next).toBeCalledWith(
+      new Error('Tracking is not supported for multi-tenant')
+    );
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = undefined;
+  });
 });
 
 describe('Testing missing data', () => {
