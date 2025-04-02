@@ -32,13 +32,9 @@ import {
 } from '../paypal/webhooks_api';
 import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
 import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
-import { AccessTokenInStoreObject, Order } from '../types/index.types';
+import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
-import {
-  cacheAccessToken,
-  cacheAccessTokens,
-  getCachedAccessToken,
-} from './config.service';
+import { cacheAccessToken, getCachedAccessToken } from './config.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -284,24 +280,21 @@ const multiTenantCredentials = () => {
 };
 
 const identifyPayPalCredentials = (storeKey?: string) => {
-  if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS) {
+  if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS && storeKey) {
     const { multiTenantIDs, multiTenantSecrets } = multiTenantCredentials();
     if (storeKey) {
       const clientId = multiTenantIDs[storeKey];
       const clientSecret = multiTenantSecrets[storeKey];
-      if (!clientId || !clientSecret) {
+
+      if ((!clientId && clientSecret) || (clientId && !clientSecret)) {
         throw new CustomError(
           500,
           'Internal Server Error - PayPal multi tenant config for the store is invalid'
         );
-      } else {
-        return { clientId, clientSecret, isMultiTenant: true };
       }
-    } else
-      throw new CustomError(
-        '500',
-        'Internal Server Error - PayPal store key is missing'
-      );
+      if (clientId && clientSecret)
+        return { clientId, clientSecret, isMultiTenant: true };
+    }
   }
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
@@ -325,7 +318,6 @@ const createAccessTokenFromCredentials = async (
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     'base64'
   );
-
   const options = {
     method: 'POST',
     url: `${endpoint}/v1/oauth2/token`,
@@ -349,19 +341,9 @@ const createAccessTokenFromCredentials = async (
 const generateAccessToken = async (storeKey?: string): Promise<string> => {
   const { clientId, clientSecret, isMultiTenant } =
     identifyPayPalCredentials(storeKey);
-  const cachedToken = await getCachedAccessToken(isMultiTenant);
-  const apiEndpoint = getAPIEndpoint();
+  const cachedToken = await getCachedAccessToken(storeKey);
 
-  if (isMultiTenant) {
-    const relevantToken = cachedToken?.value?.find(
-      (item: AccessTokenInStoreObject) => item.storeKey === storeKey
-    );
-    if (!relevantToken) throw new CustomError('404', 'no valid store token');
-    else if (relevantToken.validUntil > new Date().toISOString()) {
-      logger.info('Using cached token');
-      return relevantToken.accessToken;
-    }
-  } else if (
+  if (
     cachedToken?.value &&
     cachedToken.value.validUntil > new Date().toISOString()
   ) {
@@ -369,35 +351,29 @@ const generateAccessToken = async (storeKey?: string): Promise<string> => {
     return cachedToken.value.accessToken;
   }
 
+  const apiEndpoint = getAPIEndpoint();
+
   const tokenResponseBody = await createAccessTokenFromCredentials(
     clientId,
     clientSecret,
     apiEndpoint
   );
 
-  const newToken = {
-    accessToken: tokenResponseBody.access_token,
-    validUntil: new Date(
-      new Date().getTime() + tokenResponseBody.expires_in * 1000
-    ),
-  };
-
-  if (isMultiTenant) {
-    const refreshedTokens = cachedToken?.value.map(
-      (item: AccessTokenInStoreObject) =>
-        item.storeKey === storeKey ? { storeKey, ...newToken } : item
-    );
-    await cacheAccessTokens(refreshedTokens, cachedToken?.version ?? 0);
-  } else
-    await cacheAccessToken(
-      {
-        accessToken: tokenResponseBody.access_token,
-        validUntil: new Date(
-          new Date().getTime() + tokenResponseBody.expires_in * 1000
-        ),
-      },
-      cachedToken?.version ?? 0
-    );
+  await cacheAccessToken(
+    {
+      accessToken: tokenResponseBody.access_token,
+      validUntil: new Date(
+        new Date().getTime() + tokenResponseBody.expires_in * 1000
+      ),
+    },
+    cachedToken?.version ?? 0,
+    isMultiTenant ? storeKey : undefined
+  );
+  logger.info(
+    `new client token is generated for ${
+      storeKey ?? 'default PayPal credentials'
+    }`
+  );
   return tokenResponseBody.access_token;
 };
 
@@ -405,13 +381,12 @@ export const generateUserIdToken = async (
   customerId?: string,
   storeKey?: string
 ): Promise<string> => {
-  const { clientId, clientSecret, isMultiTenant } =
-    identifyPayPalCredentials(storeKey);
-  if (isMultiTenant)
+  if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS)
     throw new CustomError(
       '501',
       'Multi tenant vaulting methods are not supported'
     );
+  const { clientId, clientSecret } = identifyPayPalCredentials(storeKey);
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     'base64'
   );
@@ -507,8 +482,8 @@ const getAPIEndpoint = () => {
     : PAYPAL_API_SANDBOX;
 };
 
-export const createWebhook = async () => {
-  const gateway = await getPayPalWebhooksGateway();
+export const createWebhook = async (storeKey?: string) => {
+  const gateway = await getPayPalWebhooksGateway({ storeKey });
   const response = await gateway.webhooksPost({
     url: getWebhookUrl(),
     event_types: [
@@ -520,60 +495,15 @@ export const createWebhook = async () => {
   return response.data;
 };
 
-export const createWebhooks = async () => {
-  const { multiTenantIDs, multiTenantSecrets } = multiTenantCredentials();
-  const endpoint = getAPIEndpoint();
-  const storeKeys = Object.keys(multiTenantIDs);
-  logger.info(
-    `Creating webhooks for each store, stores available: ${storeKeys} `
-  );
-  const accessTokens = await Promise.all(
-    storeKeys.map(async (storeKey) => {
-      const clientId = multiTenantIDs[storeKey];
-      const clientSecret = multiTenantSecrets[storeKey];
-
-      const storeToken = await createAccessTokenFromCredentials(
-        clientId,
-        clientSecret,
-        endpoint
-      );
-
-      const gateway = await getPayPalWebhooksGateway({
-        token: storeToken.access_token,
-      });
-      try {
-        const response = await gateway.webhooksPost({
-          url: getWebhookUrl(),
-          event_types: [
-            {
-              name: '*',
-            } as EventType,
-          ],
-        });
-      } catch (e) {
-        if (e instanceof AxiosError) {
-          logger.info(
-            `could not create webhook for store ${storeKey}, please check PayPal credentials and limits for PayPal webhooks amount`
-          );
-        }
-      }
-
-      return {
-        storeKey,
-        accessToken: storeToken.access_token,
-        validUntil: new Date(
-          new Date().getTime() + storeToken.expires_in * 1000
-        ),
-      };
-    })
-  );
-  cacheAccessTokens(accessTokens);
-};
-
-export const deleteWebhook = async (token?: string) => {
-  const gateway = await getPayPalWebhooksGateway({ token });
-  const webhookId = await getWebhookId({ token });
+export const deleteWebhook = async (storeKey?: string) => {
+  const gateway = await getPayPalWebhooksGateway({ storeKey });
+  const webhookId = await getWebhookId({ storeKey });
   if (!webhookId) {
+    logger.info(
+      `no webhookId found for storeKey ${
+        storeKey ?? 'default PayPal credentials'
+      }`
+    );
     return;
   }
   logger.info(`Deleting webhook with WebhookId ${webhookId}`);
@@ -586,19 +516,6 @@ export const deleteWebhook = async (token?: string) => {
       throw e;
     }
   }
-};
-
-export const deleteWebhooks = async () => {
-  const accessTokens = await getCachedAccessToken(true);
-  logger.info(`Deleting webhooks for each store`);
-  if (!accessTokens?.value) {
-    logger.info('No access tokens available, please delete webhooks manually');
-  } else
-    await Promise.all(
-      accessTokens.value.map(({ accessToken }: any) =>
-        deleteWebhook(accessToken)
-      )
-    );
 };
 
 export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {

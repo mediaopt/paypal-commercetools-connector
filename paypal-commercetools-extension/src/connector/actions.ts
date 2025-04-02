@@ -423,22 +423,13 @@ export async function createAndSetCustomObject(
     .execute();
 }
 
-export const deleteAccessTokenIfExists = async (
-  lastTenantType?: 'single' | 'multi'
-) => {
-  logger.info(
-    `Deleting access token(s) for ${
-      lastTenantType ?? 'any kind of'
-    } tenant store if exists`
-  );
-  if (lastTenantType === 'single' || !lastTenantType) {
-    if (await getCachedAccessToken()) {
-      await deleteAccessToken();
-    }
-  }
-  if (lastTenantType === 'multi' || !lastTenantType) {
-    if (await getCachedAccessToken(true)) {
-      await deleteAccessToken(true);
-    }
+export const deleteAccessTokenIfExists = async (shopKey?: string) => {
+  if (await getCachedAccessToken(shopKey)) {
+    logger.info(
+      `Deleting access token for shopKey: ${
+        shopKey ?? 'default PayPal account'
+      }`
+    );
+    await deleteAccessToken(shopKey);
   }
 };

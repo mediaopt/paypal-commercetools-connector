@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { createApiRoot } from '../client/create.client';
-import { deleteWebhook, deleteWebhooks } from '../service/paypal.service';
+import { deleteWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
 import { readConfiguration } from '../utils/config.utils';
 import { logger } from '../utils/logger.utils';
@@ -16,20 +16,31 @@ import {
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 const MULTI_TENANT_IDS = 'PAYPAL_MULTI_TENANT_CLIENT_IDS';
+const PAYPAL_DEFAULT_ID = 'PAYPAL_CLIENT_ID';
 
 async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   const apiRoot = createApiRoot();
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
-  const isMultiTenant = properties.get(MULTI_TENANT_IDS);
-  logger.info(`reseting ${isMultiTenant ? 'multi' : 'singe'} tenant store`);
+  const multiTenant = properties.get(MULTI_TENANT_IDS);
+  const paypalDefaultId = properties.get(PAYPAL_DEFAULT_ID);
+  logger.info(`resetting ${!!multiTenant ? 'multi' : 'singe'} tenant store`);
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
   logger.info('commercetools extensions deleted');
-  await (isMultiTenant ? deleteWebhooks() : deleteWebhook());
-  logger.info('webhook(s) removed');
-  await deleteAccessTokenIfExists(isMultiTenant ? 'multi' : 'single');
-  logger.info('access token(s) removed');
+
+  if (typeof multiTenant === 'string') {
+    await Promise.all(
+      Object.keys(JSON.parse(multiTenant)).map((shopKey) => {
+        deleteWebhook(shopKey);
+        deleteAccessTokenIfExists(shopKey);
+      })
+    );
+  }
+  if (paypalDefaultId) {
+    await deleteWebhook();
+    await deleteAccessTokenIfExists();
+  }
 }
 
 async function run(): Promise<void> {
