@@ -8,6 +8,8 @@ import { logger } from '../src/utils/logger.utils';
 
 let configMock: any;
 
+const paymentInStoreTestId = 'store1Key';
+
 const currencyData = {
   type: 'centPrecision',
   currencyCode: 'EUR',
@@ -38,12 +40,19 @@ const prices = {
 };
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
-    getCart: jest.fn(() => {
-      return {
-        locale: 'en',
-        lineItems: discountedLineItems,
-        ...prices,
-      };
+    getCart: jest.fn((mockPaymentId: string) => {
+      return mockPaymentId === paymentInStoreTestId
+        ? {
+            locale: 'en',
+            lineItems: discountedLineItems,
+            ...prices,
+            store: { key: paymentInStoreTestId },
+          }
+        : {
+            locale: 'en',
+            lineItems: discountedLineItems,
+            ...prices,
+          };
     }),
   }));
   configMock = {
@@ -62,6 +71,7 @@ mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
 import { discountedLineItems } from './constants';
+import { Resource } from '../src/interfaces/resource.interface';
 
 const amountPlanned = {
   centAmount: 8200,
@@ -85,8 +95,25 @@ const customFieldCreateOrder = {
   },
 };
 
+const expectClientTokenRequest = async (paymentRequest: Resource) => {
+  const paymentResponse = await paymentController('Update', paymentRequest);
+  expect(paymentResponse).toBeDefined();
+  expect(paymentResponse).toHaveProperty('statusCode', 200);
+  const getClientTokenResponse = paymentResponse?.actions.find(
+    (action) => action.name === 'getClientTokenResponse'
+  );
+  expect(getClientTokenResponse).toBeDefined();
+  expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
+  const token = getClientTokenResponse?.value;
+  expect(validator.isBase64(token)).toBeTruthy();
+  const data = JSON.parse(Buffer.from(token, 'base64').toString());
+  expect(data).toBeDefined();
+  expect(data).toHaveProperty('braintree');
+  expect(data).toHaveProperty('paypal');
+};
+
 describe('Testing Braintree GetClient Token', () => {
-  test('create client token', async () => {
+  test('create client token for default PayPal credentials', async () => {
     const paymentRequest = {
       obj: {
         custom: {
@@ -96,20 +123,20 @@ describe('Testing Braintree GetClient Token', () => {
         },
       },
     } as unknown as PaymentReference;
-    const paymentResponse = await paymentController('Update', paymentRequest);
-    expect(paymentResponse).toBeDefined();
-    expect(paymentResponse).toHaveProperty('statusCode', 200);
-    const getClientTokenResponse = paymentResponse?.actions.find(
-      (action) => action.name === 'getClientTokenResponse'
-    );
-    expect(getClientTokenResponse).toBeDefined();
-    expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
-    const token = getClientTokenResponse?.value;
-    expect(validator.isBase64(token)).toBeTruthy();
-    const data = JSON.parse(Buffer.from(token, 'base64').toString());
-    expect(data).toBeDefined();
-    expect(data).toHaveProperty('braintree');
-    expect(data).toHaveProperty('paypal');
+    await expectClientTokenRequest(paymentRequest);
+  }, 20000);
+  test('create client token for custom store', async () => {
+    const paymentRequest = {
+      obj: {
+        custom: {
+          fields: {
+            getClientTokenRequest: '{}',
+            storeKey: paymentInStoreTestId,
+          },
+        },
+      },
+    } as unknown as PaymentReference;
+    await expectClientTokenRequest(paymentRequest);
   }, 20000);
 });
 
