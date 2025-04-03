@@ -35,10 +35,13 @@ import {
   getSettings,
 } from '../src/service/config.service';
 import { AccessTokenObject } from '../src/types/index.types';
+import { logger } from '../src/utils/logger.utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
+
+const spy = jest.spyOn(logger, 'warn');
 
 describe('Testing config service', () => {
   test('test get settings', async () => {
@@ -79,6 +82,26 @@ describe('Testing config service', () => {
   test('test cacheAccessTokens for defined store', async () => {
     await cacheAccessToken(dummyToken, 1, 'storeKey');
     expect(apiRoot.post).toBeCalledTimes(1);
+    expect(apiRequest.execute).toBeCalledTimes(1);
+  });
+  test('cached access token for defined store missing', async () => {
+    apiRequest.execute = jest.fn(() => {
+      throw new Error('settings not loaded');
+    });
+    await expect(getCachedAccessToken('storeKey')).resolves.toBe(undefined);
+    expect(spy).toBeCalledTimes(1);
+
+    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRequest.execute).toBeCalledTimes(1);
+  });
+  test('cached access token for default PayPal account missing', async () => {
+    apiRequest.execute = jest.fn(() => {
+      throw new Error('settings not loaded');
+    });
+    await expect(getCachedAccessToken()).resolves.toBe(undefined);
+    expect(spy).toBeCalledTimes(1);
+
+    expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
 });
