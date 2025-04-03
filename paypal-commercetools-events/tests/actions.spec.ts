@@ -77,18 +77,16 @@ describe('Testing actions', () => {
   });
 });
 
-const mockDeleteTokentTests: [
-  'single' | 'multi' | undefined,
-  number,
-  number
-][] = [
-  [undefined, 2, 2],
-  ['single', 1, 1],
-  ['multi', 1, 1],
+const mockDeleteTokentTests: [string | undefined, number, number][] = [
+  [undefined, 1, 1],
+  ['store1', 1, 1],
+  ['store2', 1, 0],
 ];
 
 jest.mock('../src/service/config.service', () => ({
-  getCachedAccessToken: jest.fn(() => Promise.resolve(true)),
+  getCachedAccessToken: jest.fn((storeKey?: string) =>
+    Promise.resolve(storeKey !== 'store2')
+  ),
   deleteAccessToken: jest.fn(),
 }));
 describe('testing delete token', () => {
@@ -97,9 +95,10 @@ describe('testing delete token', () => {
     jest.restoreAllMocks();
   });
   test.each(mockDeleteTokentTests)(
-    'delete token if last tenant type is %s, getCachedAccessToken returns truthy, results in calls to getCachedToken %s times and delete assess token %s times ',
-    async (lastTenantType, timesGetToken, timesDeleteToken) => {
-      await deleteAccessTokenIfExists(lastTenantType);
+    'delete token for a store key %s, getCachedAccessToken return is truthy if the key is not store2 , results in calls to getCachedToken %s times and delete assess token %s times ',
+    async (storeKey, timesGetToken, timesDeleteToken) => {
+      await deleteAccessTokenIfExists(storeKey);
+      if (storeKey) expect(getCachedAccessToken).toBeCalledWith(storeKey);
       expect(getCachedAccessToken).toBeCalledTimes(timesGetToken);
       expect(deleteAccessToken).toBeCalledTimes(timesDeleteToken);
     }

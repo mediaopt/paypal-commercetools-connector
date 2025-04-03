@@ -4,6 +4,7 @@ import {
   deleteAccessToken,
   getCachedAccessToken,
 } from '../service/config.service';
+import { logger } from '../utils/logger.utils';
 
 const PAYPAL_PARCEL_ADDED_TO_DELIVERY_KEY = 'paypal-parcelAddedToDelivery';
 
@@ -59,17 +60,13 @@ export async function deleteParcelAddedToDeliverySubscription(
   }
 }
 
-export const deleteAccessTokenIfExists = async (
-  lastTenantType?: 'single' | 'multi'
-) => {
-  if (lastTenantType === 'single' || !lastTenantType) {
-    if (await getCachedAccessToken()) {
-      await deleteAccessToken();
-    }
-  }
-  if (lastTenantType === 'multi' || !lastTenantType) {
-    if (await getCachedAccessToken(true)) {
-      await deleteAccessToken(true);
-    }
+export const deleteAccessTokenIfExists = async (storeKey?: string) => {
+  if (await getCachedAccessToken(storeKey)) {
+    logger.info(
+      `Deleting access token for storeKey: ${
+        storeKey ?? 'default PayPal account'
+      }`
+    );
+    await deleteAccessToken(storeKey);
   }
 };
