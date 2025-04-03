@@ -43,8 +43,10 @@ function expectSuccessfulResponse(
   return transactionSaleResponse?.value;
 }
 
+const multiTenantIds = process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS;
 describe('Testing PayPal customer Requests', () => {
-  test('create client token', async () => {
+  test('create client token in single tenant mode', async () => {
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = '';
     const customerRequest = {
       obj: {
         custom: {
@@ -104,6 +106,7 @@ describe('Testing PayPal customer Requests', () => {
     const payments = JSON.parse(
       expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
     );
+    console.log(payments);
     expect(payments.success).toBe(false);
     expect(payments.details).toContain('CUSTOMER_ID_NOT_FOUND');
   }, 20000);
@@ -134,4 +137,29 @@ describe('Testing PayPal customer Requests', () => {
     expect(setupToken.id).toBeDefined();
     expect(setupToken.status).toBe('CREATED');
   });
+
+  test('create client token in multi tenant mode results in an error', async () => {
+    process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = multiTenantIds;
+    const customerRequest = {
+      obj: {
+        custom: {
+          fields: {
+            getUserIDTokenRequest: '{}',
+          },
+        },
+      },
+    } as unknown as PaymentReference;
+    const customerResponse = await customerController(
+      'Update',
+      customerRequest
+    );
+    const userToken = JSON.parse(
+      expectSuccessfulResponse(customerResponse, 'getUserIDTokenResponse')
+    );
+    console.log(userToken);
+    expect(userToken.success).toBe(false);
+    expect(userToken.message).toBe(
+      'Multi tenant vaulting methods are not supported'
+    );
+  }, 20000);
 });

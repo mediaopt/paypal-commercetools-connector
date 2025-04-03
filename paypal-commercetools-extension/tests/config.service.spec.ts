@@ -31,7 +31,6 @@ const dummyToken: AccessTokenObject = {
 
 import {
   cacheAccessToken,
-  cacheAccessTokens,
   getCachedAccessToken,
   getSettings,
 } from '../src/service/config.service';
@@ -66,23 +65,19 @@ describe('Testing config service', () => {
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
-  test('test get cached access tokens for multitenant', async () => {
+  test('test get cached access token for defined store', async () => {
     apiRequest.execute = jest.fn(() => ({
       body: {
-        value: [dummyToken, dummyToken],
+        value: dummyToken,
       },
     }));
-    const cachedTokens = await getCachedAccessToken(true);
-    expect(cachedTokens).toBeDefined();
-    expect(cachedTokens?.value.length).toBe(2);
-    const tokens = cachedTokens?.value as AccessTokenObject[];
-    expect(tokens[0]).toHaveProperty('accessToken');
-    expect(tokens[1]).toHaveProperty('accessToken');
+    const cachedToken = await getCachedAccessToken('storeKey');
+    expect(cachedToken?.value).toHaveProperty('accessToken');
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
-  test('test cacheAccessTokens for multitenant', async () => {
-    await cacheAccessTokens([dummyToken, dummyToken], 1);
+  test('test cacheAccessTokens for defined store', async () => {
+    await cacheAccessToken(dummyToken, 1, 'storeKey');
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
