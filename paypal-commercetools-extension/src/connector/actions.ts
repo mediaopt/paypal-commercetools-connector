@@ -423,13 +423,13 @@ export async function createAndSetCustomObject(
     .execute();
 }
 
-export const deleteAccessTokenIfExists = async (shopKey?: string) => {
-  if (await getCachedAccessToken(shopKey)) {
+export const deleteAccessTokenIfExists = async (storeKey?: string) => {
+  if (await getCachedAccessToken(storeKey)) {
     logger.info(
-      `Deleting access token for shopKey: ${
-        shopKey ?? 'default PayPal account'
+      `Deleting access token for storeKey: ${
+        storeKey ?? 'default PayPal account'
       }`
     );
-    await deleteAccessToken(shopKey);
+    await deleteAccessToken(storeKey);
   }
 };

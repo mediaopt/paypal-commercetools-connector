@@ -24,7 +24,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   const multiTenant = properties.get(MULTI_TENANT_IDS);
   logger.info(`is multi tenant store: ${!!multiTenant}`);
-  const multiTenantShopKeys =
+  const multiTenantStoreKeys =
     typeof multiTenant === 'string'
       ? Object.keys(JSON.parse(multiTenant))
       : undefined;
@@ -32,9 +32,11 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
 
   const apiRoot = createApiRoot();
-  if (multiTenantShopKeys)
+  if (multiTenantStoreKeys)
     await Promise.all(
-      multiTenantShopKeys.map((shopKey) => deleteAccessTokenIfExists(shopKey))
+      multiTenantStoreKeys.map((storeKey) =>
+        deleteAccessTokenIfExists(storeKey)
+      )
     );
   await deleteAccessTokenIfExists();
   logger.info('previous access token(s) deleted');
@@ -46,8 +48,8 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   logger.info('commercetools custom objects set successfully');
   if (typeof multiTenant === 'string') {
     await Promise.all(
-      Object.keys(JSON.parse(multiTenant)).map((shopKey) =>
-        createWebhook(shopKey)
+      Object.keys(JSON.parse(multiTenant)).map((storeKey) =>
+        createWebhook(storeKey)
       )
     );
   }

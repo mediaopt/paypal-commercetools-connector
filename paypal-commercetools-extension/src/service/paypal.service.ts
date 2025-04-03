@@ -500,9 +500,7 @@ export const deleteWebhook = async (storeKey?: string) => {
   const webhookId = await getWebhookId({ storeKey });
   if (!webhookId) {
     logger.info(
-      `no webhookId found for storeKey ${
-        storeKey ?? 'default PayPal credentials'
-      }`
+      `no webhook found for ${storeKey ?? 'default PayPal credentials'}`
     );
     return;
   }
@@ -520,8 +518,10 @@ export const deleteWebhook = async (storeKey?: string) => {
 
 export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {
   const webhookUrl = getWebhookUrl();
+  console.log('webhookUrl', webhookUrl);
   const gateway = await getPayPalWebhooksGateway(multiTenantConfig);
   const webhooks = await gateway.webhooksList('APPLICATION');
+  console.log(webhooks.data.webhooks, 'webhooks');
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl
   );

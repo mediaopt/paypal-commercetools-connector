@@ -31,9 +31,9 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
 
   if (typeof multiTenant === 'string') {
     await Promise.all(
-      Object.keys(JSON.parse(multiTenant)).map((shopKey) => {
-        deleteWebhook(shopKey);
-        deleteAccessTokenIfExists(shopKey);
+      Object.keys(JSON.parse(multiTenant)).map((storeKey) => {
+        deleteWebhook(storeKey);
+        deleteAccessTokenIfExists(storeKey);
       })
     );
   }

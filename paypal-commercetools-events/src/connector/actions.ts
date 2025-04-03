@@ -4,7 +4,6 @@ import {
   deleteAccessToken,
   getCachedAccessToken,
 } from '../service/config.service';
-import { logger } from '../utils/logger.utils';
 
 const PAYPAL_PARCEL_ADDED_TO_DELIVERY_KEY = 'paypal-parcelAddedToDelivery';
 
