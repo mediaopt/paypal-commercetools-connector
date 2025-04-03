@@ -32,6 +32,11 @@ async function verifyWebhookSignature(request: Request, storeKey?: string) {
   }
 }
 
+const unrecognizedResourceError = new CustomError(
+  500,
+  `Internal Server Error - Resource not recognized. Allowed resource_types are 'capture', 'authorization', 'payment_token' and 'checkout-order'.`
+);
+
 /**
  * Exposed service endpoint.
  * - Receives a POST request, parses the action and the controller
@@ -49,6 +54,12 @@ export const post = async (request: Request, response: Response) => {
       `Got ${event_type} for ${resource_type} with id ${resource.id}`
     );
     logger.info(summary);
+
+    logger.info(JSON.stringify(resource));
+    if (!resource_type) {
+      throw new CustomError(400, 'Bad request - Missing body parameters.');
+    }
+
     let orderId: string;
 
     switch (resource_type) {
@@ -66,7 +77,7 @@ export const post = async (request: Request, response: Response) => {
         break;
       }
       default:
-        orderId = '';
+        throw unrecognizedResourceError;
     }
 
     const payment = await getPaymentByPayPalOrderId(orderId);
@@ -74,10 +85,6 @@ export const post = async (request: Request, response: Response) => {
 
     await verifyWebhookSignature(request, storeKey);
 
-    logger.info(JSON.stringify(resource));
-    if (!resource_type) {
-      throw new CustomError(400, 'Bad request - Missing body parameters.');
-    }
     switch (resource_type) {
       case 'capture':
         await handleCaptureWebhook(resource, payment, event_type);
@@ -100,10 +107,7 @@ export const post = async (request: Request, response: Response) => {
         response.status(200).json({});
         return;
       default:
-        throw new CustomError(
-          500,
-          `Internal Server Error - Resource not recognized. Allowed resource_types are 'capture' and 'checkout-order'.`
-        );
+        throw unrecognizedResourceError;
     }
   } catch (error) {
     logger.info('Error occured', error);

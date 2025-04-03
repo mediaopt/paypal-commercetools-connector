@@ -33,6 +33,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { post } from '../src/controllers/webhook.controller';
+import { logger } from '../src/utils/logger.utils';
 
 beforeEach(() => {
   apiRequest = {
@@ -78,6 +79,8 @@ beforeEach(() => {
   };
   jest.clearAllMocks();
 });
+
+const spy = jest.spyOn(logger, 'info');
 
 describe('Testing webhook controller', () => {
   test.each([
@@ -139,4 +142,41 @@ describe('Testing webhook controller', () => {
       expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
     }
   );
+});
+
+describe('test invalid webhooks scenario', () => {
+  test('no resource type provided', async () => {
+    const request = {
+      header: jest.fn(),
+      body: {
+        event_type: 'Captured',
+        summary: 'Capture is done.',
+        resource: { id: '1' },
+      },
+    } as any;
+    const response = {
+      status: jest.fn(() => response),
+      json: jest.fn(),
+    } as unknown as Response;
+    await post(request, response);
+    expect(spy).toBeCalledTimes(5);
+  });
+
+  test('invalid resource type provided', async () => {
+    const request = {
+      header: jest.fn(),
+      body: {
+        event_type: 'Captured',
+        summary: 'Capture is done.',
+        resource: { id: '1' },
+        resource_type: 'charcoal',
+      },
+    } as any;
+    const response = {
+      status: jest.fn(() => response),
+      json: jest.fn(),
+    } as unknown as Response;
+    await post(request, response);
+    expect(spy).toBeCalledTimes(5);
+  });
 });
