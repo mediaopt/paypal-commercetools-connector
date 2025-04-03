@@ -38,7 +38,12 @@ export const getCachedAccessToken = async (storeKey?: string) => {
         .execute()
     ).body;
   } catch (e) {
-    logger.warn(`Failed to load cached access token ${storeKey ?? ''}`, e);
+    logger.warn(
+      `Failed to load cached access token for ${
+        storeKey ?? 'default PayPal credentials'
+      }`,
+      e
+    );
     return undefined;
   }
 };

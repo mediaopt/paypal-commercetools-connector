@@ -45,7 +45,7 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
   await createCustomPaymentType(apiRoot);
   await createCustomCustomerType(apiRoot);
   await createCustomPaymentInteractionType(apiRoot);
-  logger.info('commercetools custom objects set successfully');
+  logger.info('commercetools custom types and extensions set successfully');
   if (typeof multiTenant === 'string') {
     await Promise.all(
       Object.keys(JSON.parse(multiTenant)).map((storeKey) =>
