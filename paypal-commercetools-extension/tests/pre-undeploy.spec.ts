@@ -40,6 +40,7 @@ function sleep(milliseconds: number) {
 
 describe('Testing pre undeploy', () => {
   test('Testing pre undeploy', async () => {
+    process.env.CONNECT_SERVICE_UR = 'https://lorem.ipsum';
     require('../src/connector/pre-undeploy');
     await sleep(5000);
     expect(apiRoot.delete).toBeCalledTimes(3);

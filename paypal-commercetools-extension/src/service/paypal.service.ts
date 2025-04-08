@@ -416,9 +416,14 @@ export const getWebhookId = async () => {
 };
 
 export const getWebhookUrl = async () => {
-  const extensionUrl =
-    process.env.CONNECT_SERVICE_UR ?? (await getPayPalExtensionUrl());
-  return extensionUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH);
+  try {
+    const extensionUrl =
+      process.env.CONNECT_SERVICE_UR ?? (await getPayPalExtensionUrl());
+    return extensionUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH);
+  } catch (e) {
+    logger.info('no webhook url identified');
+    return '';
+  }
 };
 
 export const addDeliveryData = async (
