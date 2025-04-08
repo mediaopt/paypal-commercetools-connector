@@ -28,7 +28,6 @@ import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
 import { updatePaymentFields } from './payments.service';
 import { getPayPalOrder } from './paypal.service';
-import customError from '../errors/custom.error';
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
   const payments = await createApiRoot()
@@ -365,7 +364,7 @@ export const getPayPalExtensionUrl = async () => {
     const destination = extensions.body.results[0].destination;
     if ('url' in destination) return destination.url;
     else
-      throw new customError(
+      throw new CustomError(
         500,
         `Extension is of ${destination.type} instead of expected HTTP type`
       );
