@@ -30,7 +30,6 @@ function sleep(milliseconds: number) {
 
 describe('Testing post deploy', () => {
   test('Testing post deploy with no registered webhook', async () => {
-    process.env.CONNECT_SERVICE_UR = 'https://lorem.ipsum';
     const webhooksApi = {
       webhooksList: jest.fn(() => ({ data: { webhooks: [] } })),
       webhooksPost: jest.fn(() => ({ data: { id: 1 } })),

@@ -418,7 +418,7 @@ export const getWebhookId = async () => {
 export const getWebhookUrl = async () => {
   try {
     const extensionUrl =
-      process.env.CONNECT_SERVICE_UR ?? (await getPayPalExtensionUrl());
+      process.env.CONNECT_SERVICE_URL ?? (await getPayPalExtensionUrl());
     return extensionUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH);
   } catch (e) {
     logger.info('no webhook url identified');
