@@ -20,11 +20,10 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   const apiRoot = createApiRoot();
   const applicationUrl = properties.get(CONNECT_APPLICATION_URL_KEY);
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
-
   await deleteAccessTokenIfExists();
+  await deleteWebhook();
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
-  await deleteWebhook();
 }
 
 async function run(): Promise<void> {
