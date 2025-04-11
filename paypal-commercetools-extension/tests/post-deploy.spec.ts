@@ -29,7 +29,7 @@ function sleep(milliseconds: number) {
 }
 
 describe('Testing post deploy', () => {
-  test('Testing post deploy', async () => {
+  test('Testing post deploy with no registered webhook', async () => {
     const webhooksApi = {
       webhooksList: jest.fn(() => ({ data: { webhooks: [] } })),
       webhooksPost: jest.fn(() => ({ data: { id: 1 } })),

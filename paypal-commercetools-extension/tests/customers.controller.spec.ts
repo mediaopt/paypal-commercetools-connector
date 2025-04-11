@@ -2,6 +2,7 @@ import { PaymentReference } from '@commercetools/platform-sdk';
 import { describe, expect, test } from '@jest/globals';
 import { PayPalSettings, UpdateActions } from '../src/types/index.types';
 
+const dummyPayPalUserId = '12345';
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => {
     return {
@@ -106,7 +107,6 @@ describe('Testing PayPal customer Requests', () => {
     const payments = JSON.parse(
       expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
     );
-    console.log(payments);
     expect(payments.success).toBe(false);
     expect(payments.details).toContain('CUSTOMER_ID_NOT_FOUND');
   }, 20000);
@@ -119,7 +119,7 @@ describe('Testing PayPal customer Requests', () => {
             createVaultSetupTokenRequest: JSON.stringify({
               payment_source: { card: {} },
             }),
-            PayPalUserId: '12345',
+            PayPalUserId: dummyPayPalUserId,
           },
         },
       },
@@ -136,7 +136,29 @@ describe('Testing PayPal customer Requests', () => {
     );
     expect(setupToken.id).toBeDefined();
     expect(setupToken.status).toBe('CREATED');
-  });
+  }, 20000);
+
+  test('create payment token', async () => {
+    const customerRequest = {
+      obj: {
+        custom: {
+          fields: {
+            createPaymentTokenRequest: '4G4976650J0948357',
+          },
+        },
+      },
+    };
+    const customerResponse = await customerController(
+      'Update',
+      customerRequest
+    );
+    expectSuccessfulResponse(customerResponse, 'createPaymentTokenRequest');
+    const paymentResponse = customerResponse?.actions?.find(
+      (item) => (item.name = 'createPaymentTokenResponse')
+    );
+    expect(paymentResponse).toBeDefined();
+    expect(paymentResponse?.value).toContain('TOKEN_NOT_FOUND');
+  }, 20000);
 
   test('create client token in multi tenant mode results in an error', async () => {
     process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = multiTenantIds;

@@ -35,6 +35,7 @@ import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
 import { Order } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import { cacheAccessToken, getCachedAccessToken } from './config.service';
+import { getPayPalExtensionUrl } from './commercetools.service';
 
 const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
 const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
@@ -489,7 +490,7 @@ export const createWebhook = async (storeKey?: string) => {
   }
   const gateway = await getPayPalWebhooksGateway({ storeKey });
   const response = await gateway.webhooksPost({
-    url: getWebhookUrl(),
+    url: await getWebhookUrl(),
     event_types: [
       {
         name: '*',
@@ -521,7 +522,7 @@ export const deleteWebhook = async (storeKey?: string) => {
 };
 
 export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {
-  const webhookUrl = getWebhookUrl();
+  const webhookUrl = await getWebhookUrl();
   const gateway = await getPayPalWebhooksGateway(multiTenantConfig);
   const webhooks = await gateway.webhooksList('APPLICATION');
   const webhook = webhooks.data.webhooks?.find(
@@ -530,13 +531,15 @@ export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {
   return webhook?.id;
 };
 
-export const getWebhookUrl = () => {
-  return (
-    process.env.CONNECT_SERVICE_URL?.replace(
-      PAYPAL_EXTENSION_PATH,
-      PAYPAL_WEBHOOKS_PATH
-    ) ?? ''
-  );
+export const getWebhookUrl = async () => {
+  try {
+    const extensionUrl =
+      process.env.CONNECT_SERVICE_URL ?? (await getPayPalExtensionUrl());
+    return extensionUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH);
+  } catch (e) {
+    logger.info('no webhook url identified');
+    return '';
+  }
 };
 
 export const addDeliveryData = async (

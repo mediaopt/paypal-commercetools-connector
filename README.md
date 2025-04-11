@@ -84,7 +84,7 @@ To run the connector locally for test purposes:
 - insert commercetools and PayPal credentials to `.env` file
 - for paypal-commercetools-extension run `./bin/ngrok.sh` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
 - for paypal-commercetools-extension run `yarn connector:post-deploy` to register the extension with the public ngrok url
-- run `ỳarn start:dev` to build the application
+- run `yarn start:dev` to build the application
 
 ### Hosting externally
 

@@ -11,7 +11,10 @@ import {
 } from '@commercetools/platform-sdk';
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import { createApiRoot } from '../client/create.client';
-import { PAYPAL_CUSTOMER_TYPE_KEY } from '../connector/actions';
+import {
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+} from '../connector/actions';
 import CustomError from '../errors/custom.error';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
 import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
@@ -349,3 +352,26 @@ export async function findMatchingExtension(
   );
   return matchingExtensions.length > 0 ? matchingExtensions[0] : undefined;
 }
+
+export const getPayPalExtensionUrl = async () => {
+  const apiRoot = createApiRoot();
+  const extensions = await apiRoot
+    .extensions()
+    .get({
+      queryArgs: {
+        where: `key = "${PAYPAL_PAYMENT_EXTENSION_KEY}"`,
+      },
+    })
+    .execute();
+  if (extensions.body.total !== 1)
+    throw new CustomError(500, 'Matching PayPal extension not found.');
+  else {
+    const destination = extensions.body.results[0].destination;
+    if ('url' in destination) return destination.url;
+    else
+      throw new CustomError(
+        500,
+        `Extension is of ${destination.type} instead of expected HTTP type`
+      );
+  }
+};

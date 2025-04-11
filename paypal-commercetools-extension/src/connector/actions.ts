@@ -186,6 +186,14 @@ export async function createCustomPaymentType(
       },
       required: false,
     },
+    {
+      name: 'PayPalCustomId',
+      label: {
+        en: 'PayPal custom id',
+      },
+      type: { name: 'String' },
+      required: false,
+    },
   ];
   PAYPAL_API_PAYMENT_ENDPOINTS.forEach((element) =>
     fieldDefinitions.push(

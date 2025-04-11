@@ -6,7 +6,6 @@ import {
 } from '@commercetools/platform-sdk';
 import {
   Item,
-  OrderStatus,
   PaymentSourceResponse,
   ShipmentCarrier,
 } from '../paypal/checkout_api';
@@ -15,6 +14,9 @@ import {
   Capture2StatusEnum,
   RefundStatusEnum,
 } from '../paypal/payments_api';
+
+const isLineItemTaxLevel = (taxCalculationMode: string) =>
+  taxCalculationMode === 'LineItemLevel';
 
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
@@ -83,25 +85,6 @@ export const mapPayPalAuthorizationStatusToCommercetoolsTransactionState = (
   }
 };
 
-export const mapPayPalOrderStatusToCommercetoolsTransactionState = (
-  status?: OrderStatus
-): TransactionState => {
-  switch (status) {
-    case OrderStatus.Created:
-      return 'Initial';
-    case OrderStatus.Saved:
-    case OrderStatus.Approved:
-    case OrderStatus.Completed:
-    case OrderStatus.Voided:
-      return 'Success';
-    case undefined:
-      return 'Failure';
-    case OrderStatus.PayerActionRequired:
-    default:
-      return 'Pending';
-  }
-};
-
 export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
   source: PaymentSourceResponse
 ): string => {
@@ -134,19 +117,23 @@ export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
 const mapCommercetoolsLineItemsToPayPalItems = (
   lineItem: LineItem,
   isShipped: boolean,
+  isLineItemLevel: boolean,
   locale?: string
 ): Item => {
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
-  const taxedNetAmount = lineItem.taxedPrice?.totalNet?.centAmount;
+  const relevantPrice = isLineItemLevel
+    ? lineItem.taxedPrice?.totalGross
+    : lineItem.taxedPrice?.totalNet;
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
 
   return {
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: taxedNetAmount != null
-          ? taxedNetAmount / lineItem.quantity
-          : lineItem.price.value.centAmount,
+        centAmount:
+          relevantPrice != null
+            ? relevantPrice.centAmount / lineItem.quantity
+            : lineItem.price.value.centAmount,
         fractionDigits,
         currencyCode,
         type: lineItem.price.value.type,
@@ -158,51 +145,51 @@ const mapCommercetoolsLineItemsToPayPalItems = (
     quantity: `${lineItem.quantity}`,
     description: name,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
-    tax_rate: lineItem.taxRate?.amount ?? 0,
-    tax: !lineItem.taxedPrice?.totalTax
-      ? undefined
-      : {
-          value: mapCommercetoolsMoneyToPayPalMoney({
-            centAmount:
-              (lineItem.taxedPrice?.totalTax?.centAmount ?? 0) /
-              lineItem.quantity,
-            fractionDigits,
-            currencyCode,
-            type: lineItem.price.value.type,
-          } as TypedMoney),
-          currency_code: currencyCode,
-        },
   } as Item;
 };
 
 export const mapValidCommercetoolsLineItemsToPayPalItems = (
   matchingAmounts: boolean,
   isShipped: boolean,
+  taxCalculationMode: string,
   lineItems?: LineItem[],
   locale?: string
 ) => {
   if (!matchingAmounts || !lineItems) {
     return null;
   }
-  const relevantLineItems = lineItems.filter(
-    ({ lineItemMode }) => lineItemMode !== 'GiftLineItem'
+  const payPalItems = lineItems.map((lineItem) =>
+    mapCommercetoolsLineItemsToPayPalItems(
+      lineItem,
+      isShipped,
+      isLineItemTaxLevel(taxCalculationMode),
+      locale
+    )
   );
-  const payPalItems = relevantLineItems.map((lineItem) =>
-    mapCommercetoolsLineItemsToPayPalItems(lineItem, isShipped, locale)
-  );
-  return payPalItems.some((item) => parseFloat(item.unit_amount.value) <= 0)
+  return payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0)
     ? null
     : payPalItems;
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
+  discountOnTotalPrice,
   taxedShippingPrice,
+  taxCalculationMode,
 }: Cart) => {
   if (!lineItems || !lineItems[0]) {
     return undefined;
   }
   const { currencyCode, fractionDigits, type } = lineItems[0].price.value;
+
+  const isLineItemMode = isLineItemTaxLevel(taxCalculationMode);
+  const roundItemPrice = isLineItemMode ? 'totalGross' : 'totalNet';
+  const relevantTax = isLineItemMode
+    ? 0
+    : lineItems
+        .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
+        .reduce((x, y) => x + y, 0);
+
   return {
     item_total: {
       currency_code: currencyCode,
@@ -210,7 +197,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
         centAmount: lineItems
           .map(
             (lineItem) =>
-              lineItem.taxedPrice?.totalNet?.centAmount ??
+              lineItem.taxedPrice?.[roundItemPrice]?.centAmount ??
               lineItem.price.value.centAmount * lineItem.quantity
           )
           .reduce((x, y) => x + y, 0),
@@ -222,9 +209,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
     tax_total: {
       currency_code: currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: lineItems
-          .map((lineItem) => lineItem.taxedPrice?.totalTax?.centAmount ?? 0)
-          .reduce((x, y) => x + y, 0),
+        centAmount: relevantTax,
         fractionDigits,
         currencyCode,
         type,
@@ -239,6 +224,20 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
         type,
       } as TypedMoney),
     },
+    discount: discountOnTotalPrice
+      ? {
+          currency_code: currencyCode,
+          value: mapCommercetoolsMoneyToPayPalMoney({
+            centAmount:
+              discountOnTotalPrice.discountedGrossAmount?.centAmount ??
+              discountOnTotalPrice.discountedAmount.centAmount ??
+              0,
+            fractionDigits,
+            currencyCode,
+            type,
+          } as TypedMoney),
+        }
+      : undefined,
   };
 };
 
