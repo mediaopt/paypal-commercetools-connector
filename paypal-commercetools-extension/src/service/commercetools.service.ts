@@ -136,7 +136,7 @@ export const handlePaymentTokenWebhook = async (
 
 export const handleOrderWebhook = async (resource: Order, payment: Payment) => {
   const orderId = resource.id ?? '';
-  const order = await getPayPalOrder(orderId);
+  const order = await getPayPalOrder(orderId, payment.custom?.fields.storeKey);
 
   const updateActions = updatePaymentFields(order);
   await handleUpdatePayment(payment.id, payment.version, updateActions);
@@ -149,7 +149,10 @@ export const handleCaptureWebhook = async (
 ) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
 
-  const payPalOrder = await getPayPalOrder(orderId);
+  const payPalOrder = await getPayPalOrder(
+    orderId,
+    payment.custom?.fields.storeKey
+  );
   const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
   if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
     const settings = await getSettings();
@@ -210,7 +213,9 @@ export const handleCaptureWebhook = async (
     transaction
   );
   updateActions = updateActions.concat(
-    updatePaymentFields(await getPayPalOrder(orderId))
+    updatePaymentFields(
+      await getPayPalOrder(orderId, payment.custom?.fields.storeKey)
+    )
   );
 
   await handleUpdatePayment(payment.id, payment.version, updateActions);
@@ -244,7 +249,9 @@ export const handleAuthorizeWebhook = async (
     transaction
   );
   updateActions = updateActions.concat(
-    updatePaymentFields(await getPayPalOrder(orderId))
+    updatePaymentFields(
+      await getPayPalOrder(orderId, payment.custom?.fields.storeKey)
+    )
   );
   await handleUpdatePayment(payment.id, payment.version, updateActions);
 };
