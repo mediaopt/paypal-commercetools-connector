@@ -18,10 +18,9 @@ const mockConfigModule = () => {
         lineItems: discountedLineItems,
         ...prices,
         discountOnTotalPrice,
-        store:
-          mockPaymentId === paymentInStoreTestId
-            ? { key: paymentInStoreTestId }
-            : undefined,
+        store: mockPaymentId.startsWith(paymentInStoreTestId)
+          ? { key: paymentInStoreTestId }
+          : undefined,
         billingAddress: {
           postalCode: '12345',
           country: 'DE',
@@ -56,6 +55,11 @@ import {
 } from './constants';
 import { getCart } from '../src/service/commercetools.service';
 import { Resource } from '../src/interfaces/resource.interface';
+
+const setPaymentStoreKey = (paymentRequestObj: any) =>
+  (paymentRequestObj.id = `${paymentInStoreTestId}${paymentRequestObj.id.slice(
+    paymentInStoreTestId.length
+  )}`);
 
 const amountPlanned = {
   centAmount: 8200,
@@ -143,42 +147,49 @@ function expectSuccessfulResponse(
 }
 
 describe('create order with various configurations', () =>
-  test.each([
+  test.each(
     [
-      {
-        storeInVaultOnSuccess: false,
-        intent: 'AUTHORIZE',
-        custom_invoice_id: 'custom_invoice_id',
-        paymentSource: { card: {} },
-      },
-      'card with authorize and custom invoice id',
-    ],
-    [
-      {
-        storeInVaultOnSuccess: true,
-        intent: 'CAPTURE',
-        paymentSource: { card: {} },
-      },
-      'card with capture and store in vault',
-    ],
-    [
-      {
-        storeInVaultOnSuccess: true,
-        intent: 'CAPTURE',
-        paymentSource: {
-          paypal: {
-            experience_context: {
-              return_url: 'https://example.com/returnUrl',
-              cancel_url: 'https://example.com/cancelUrl',
+      [
+        {
+          storeInVaultOnSuccess: false,
+          intent: 'AUTHORIZE',
+          custom_invoice_id: 'custom_invoice_id',
+          paymentSource: { card: {} },
+        },
+        'card with authorize and custom invoice id',
+      ],
+      [
+        {
+          storeInVaultOnSuccess: true,
+          intent: 'CAPTURE',
+          paymentSource: { card: {} },
+        },
+        'card with capture and store in vault',
+      ],
+      [
+        {
+          storeInVaultOnSuccess: true,
+          intent: 'CAPTURE',
+          paymentSource: {
+            paypal: {
+              experience_context: {
+                return_url: 'https://example.com/returnUrl',
+                cancel_url: 'https://example.com/cancelUrl',
+              },
             },
           },
         },
-      },
-      'PayPal',
-    ],
-  ])(
-    'given valid create order data %p, which is %p, results in order creation',
-    async (createOrderData: any, description) => {
+        'PayPal',
+      ],
+    ]
+      .map((payment) => [
+        [...payment, false],
+        [...payment, true],
+      ])
+      .flat()
+  )(
+    'given valid create order data %p, which is %p, and related to store %p results in order creation',
+    async (createOrderData: any, description, inStore = false) => {
       const paymentRequest = {
         obj: {
           amountPlanned: {
@@ -193,6 +204,8 @@ describe('create order with various configurations', () =>
           id: randomUUID(),
         },
       } as any;
+      inStore && setPaymentStoreKey(paymentRequest.obj);
+
       let paymentResponse = await paymentController('Update', paymentRequest);
       let payPalOrder = expectSuccessfulResponse(paymentResponse);
       if (createOrderData.paymentSource.card)
@@ -236,7 +249,7 @@ test('create Pay Upon Invoice order is not possible without device data', async 
   }
 });
 
-async function createValidTransaction(customAmount?: number) {
+async function createValidTransaction(customAmount?: number, inStore = false) {
   const customInvoiceId = randomUUID();
   const paymentRequest = {
     obj: {
@@ -254,6 +267,8 @@ async function createValidTransaction(customAmount?: number) {
       id: randomUUID(),
     },
   } as any;
+  inStore && setPaymentStoreKey(paymentRequest.obj);
+
   let paymentResponse = await paymentController('Update', paymentRequest);
   let payPalOrder = expectSuccessfulResponse(paymentResponse);
   expect(payPalOrder).toHaveProperty('status', 'CREATED');
@@ -262,10 +277,12 @@ async function createValidTransaction(customAmount?: number) {
 
 async function completeValidOrder(
   customAmount?: number,
-  customStringAmount?: string
+  customStringAmount?: string,
+  inStore?: boolean
 ) {
   let { paymentRequest, payPalOrder, customInvoiceId } =
-    await createValidTransaction(customAmount);
+    await createValidTransaction(customAmount, inStore);
+
   paymentRequest.obj = {
     ...paymentRequest.obj,
     interfaceId: payPalOrder.id,
@@ -275,6 +292,7 @@ async function completeValidOrder(
           payment_source,
         }),
         PayPalOrderId: payPalOrder.id,
+        storeKey: inStore ? paymentInStoreTestId : undefined,
       },
     },
   };
@@ -309,6 +327,7 @@ async function completeValidOrder(
       fields: {
         getPayPalOrderRequest: '{}',
         PayPalOrderId: payPalOrder.id,
+        storeKey: inStore ? paymentInStoreTestId : undefined,
       },
     },
   };
@@ -345,19 +364,42 @@ async function completeValidOrder(
   return { paymentRequest, payPalOrderId: payPalOrder.id };
 }
 
-const amountPlannedCentsWithTestResult: [number, string, string][] = [
-  [19400, 'same as cart', '194.00'],
-  [200000, 'more than in cart', '2000.00'],
-  [4200, 'less than in cart', '42.00'],
+const cartPaymentAmount = prices.totalPrice.centAmount;
+const paymentAmounts = [
+  cartPaymentAmount,
+  cartPaymentAmount * 2,
+  cartPaymentAmount - 1,
 ];
+
+const ctAmountString = (amount: number) => {
+  const stringAmount = amount.toString();
+  return `${stringAmount.slice(0, -2)}.${stringAmount.slice(-2)}`;
+};
+
+const amountPlannedCentsWithTestResult = paymentAmounts
+  .map((item) => [
+    item,
+    item === paymentAmounts[0]
+      ? 'same as'
+      : item > paymentAmounts[0]
+      ? 'more than'
+      : 'less than',
+    ctAmountString(item),
+  ])
+  .map((item) => [
+    // [...item, false],
+    [...item, true],
+  ])
+  .flat() as [number, string, string, boolean][];
 
 describe('Testing PayPal aftersales', () => {
   test.each(amountPlannedCentsWithTestResult)(
-    'Create a valid transaction with %s cents, which is %s , leads to processing transaction with %s amount',
-    async (amountPlannedCents, description, expectedAmount) => {
+    'Create a valid transaction with %p cents, which is %p cart , leads to processing transaction with %p amount',
+    async (amountPlannedCents, description, expectedAmount, inStore) => {
       const relevantTransactionData = await completeValidOrder(
         amountPlannedCents,
-        expectedAmount
+        expectedAmount,
+        inStore
       );
       if (!relevantTransactionData) return;
       const { paymentRequest, payPalOrderId } = relevantTransactionData;
@@ -367,6 +409,7 @@ describe('Testing PayPal aftersales', () => {
           fields: {
             capturePayPalAuthorizationRequest: '{}',
             PayPalOrderId: payPalOrderId,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
           },
         },
       };
@@ -381,292 +424,339 @@ describe('Testing PayPal aftersales', () => {
     30000
   );
 
-  test('update PayPal order', async () => {
-    const { paymentRequest, payPalOrder } = await createValidTransaction(19400);
-    (getCart as jest.Mock).mockReturnValueOnce({
-      lineItems: [discountedLineitemWithTaxIncluded],
-    });
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      custom: {
-        fields: {
-          updatePayPalOrderRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
-          patch: [
-            {
-              op: 'replace',
-              path: "/purchase_units/@reference_id=='default'/amount",
-              value: { currency_code: 'EUR', value: '130.00' },
-            },
-          ],
+  test.each([false, true])(
+    `update paypal order, which is in store %p`,
+    async (inStore) => {
+      const { paymentRequest, payPalOrder } = await createValidTransaction(
+        19400,
+        inStore
+      );
+      (getCart as jest.Mock).mockReturnValueOnce({
+        lineItems: [discountedLineitemWithTaxIncluded],
+      });
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        custom: {
+          fields: {
+            updatePayPalOrderRequest: '{}',
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+            patch: [
+              {
+                op: 'replace',
+                path: "/purchase_units/@reference_id=='default'/amount",
+                value: { currency_code: 'EUR', value: '130.00' },
+              },
+            ],
+          },
         },
-      },
-    };
-    const paymentResponse = await paymentController('Update', paymentRequest);
-    const response = expectSuccessfulResponse(
-      paymentResponse,
-      'updatePayPalOrderRequest'
-    );
-    expect(response).toBe(null);
-  }, 30000);
+      };
+      const paymentResponse = await paymentController('Update', paymentRequest);
+      const response = expectSuccessfulResponse(
+        paymentResponse,
+        'updatePayPalOrderRequest'
+      );
+      expect(response).toBe(null);
+    },
+    30000
+  );
 
-  test('Settle an authorization', async () => {
-    const relevantTransactionData = await completeValidOrder();
-    if (!relevantTransactionData) return;
-    const { paymentRequest, payPalOrderId } = relevantTransactionData;
+  test.each([false, true])(
+    'Settle an authorization, which is in store %p',
+    async (inStore) => {
+      const relevantTransactionData = await completeValidOrder(
+        undefined,
+        undefined,
+        inStore
+      );
+      if (!relevantTransactionData) return;
+      const { paymentRequest, payPalOrderId } = relevantTransactionData;
 
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      custom: {
-        fields: {
-          capturePayPalAuthorizationRequest: '{}',
-          PayPalOrderId: payPalOrderId,
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        custom: {
+          fields: {
+            capturePayPalAuthorizationRequest: '{}',
+            PayPalOrderId: payPalOrderId,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      },
-    };
-    const paymentResponse = await paymentController('Update', paymentRequest);
-    const payPalCapture = expectSuccessfulResponse(
-      paymentResponse,
-      'capturePayPalAuthorizationResponse'
-    ) as Capture;
-    expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
-    expect(payPalCapture.amount?.value).toBe('82.00');
-  }, 30000);
+      };
+      const paymentResponse = await paymentController('Update', paymentRequest);
+      const payPalCapture = expectSuccessfulResponse(
+        paymentResponse,
+        'capturePayPalAuthorizationResponse'
+      ) as Capture;
+      expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
+      expect(payPalCapture.amount?.value).toBe('82.00');
+    },
+    30000
+  );
 
-  test('Void an authorization', async () => {
-    const relevantTransactionData = await completeValidOrder();
-    if (!relevantTransactionData) return;
-    const { paymentRequest, payPalOrderId } = relevantTransactionData;
+  test.each([false, true])(
+    'Void an authorization, which is in store %p',
+    async (inStore) => {
+      const relevantTransactionData = await completeValidOrder(
+        undefined,
+        undefined,
+        inStore
+      );
+      if (!relevantTransactionData) return;
+      const { paymentRequest, payPalOrderId } = relevantTransactionData;
 
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      custom: {
-        fields: {
-          voidPayPalAuthorizationRequest: '{}',
-          PayPalOrderId: payPalOrderId,
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        custom: {
+          fields: {
+            voidPayPalAuthorizationRequest: '{}',
+            PayPalOrderId: payPalOrderId,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      },
-    };
-    const paymentResponse = await paymentController('Update', paymentRequest);
-    const payPalCapture = expectSuccessfulResponse(
-      paymentResponse,
-      'voidPayPalAuthorizationResponse'
-    ) as Capture;
-    expect(payPalCapture).toHaveProperty('status', 'VOIDED');
-    expect(payPalCapture.amount?.value).toBe('82.00');
-  }, 30000);
+      };
+      const paymentResponse = await paymentController('Update', paymentRequest);
+      const payPalCapture = expectSuccessfulResponse(
+        paymentResponse,
+        'voidPayPalAuthorizationResponse'
+      ) as Capture;
+      expect(payPalCapture).toHaveProperty('status', 'VOIDED');
+      expect(payPalCapture.amount?.value).toBe('82.00');
+    },
+    30000
+  );
 
-  test('Refund a settlement', async () => {
-    configMock.getSettings = jest.fn(
-      () =>
-        ({
-          payPalIntent: 'Capture',
-        } as PayPalSettings)
-    );
-    const paymentRequest = {
-      obj: {
-        amountPlanned,
-        ...customFieldCreateOrder,
-        id: randomUUID(),
-      },
-    } as any;
-    let paymentResponse = await paymentController('Update', paymentRequest);
-    let payPalOrder = expectSuccessfulResponse(paymentResponse);
-    expect(payPalOrder).toHaveProperty('status', 'CREATED');
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      interfaceId: payPalOrder.id,
-      custom: {
-        fields: {
-          capturePayPalOrderRequest: JSON.stringify({
-            payment_source,
-          }),
-          PayPalOrderId: payPalOrder.id,
+  test.each([false, true])(
+    'Refund a settlement, which is in store %p',
+    async (inStore) => {
+      configMock.getSettings = jest.fn(
+        () =>
+          ({
+            payPalIntent: 'Capture',
+          } as PayPalSettings)
+      );
+      const paymentRequest = {
+        obj: {
+          amountPlanned,
+          ...customFieldCreateOrder,
+          id: randomUUID(),
         },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'capturePayPalOrderResponse'
-    ) as Order;
-    logger.info(JSON.stringify(payPalOrder));
-    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
-    expect(payPalOrder.purchase_units).toHaveLength(1);
-    if (!payPalOrder.purchase_units) {
-      return;
-    }
-    expect(payPalOrder.purchase_units[0]?.payments?.captures).toHaveLength(1);
-    if (!payPalOrder.purchase_units[0]?.payments?.captures) {
-      return;
-    }
-    const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
-    expect(capture?.amount?.value).toBe('82.00');
-    expect(capture?.status).toBe('COMPLETED');
-    expect(capture?.invoice_id).toBe(paymentRequest.obj.id);
+      } as any;
+      inStore && setPaymentStoreKey(paymentRequest.obj);
 
-    // GET ORDER REQUEST
-
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      transactions: [
-        {
-          type: 'Charge',
-          interactionId: capture?.id,
-          state: 'Success',
+      let paymentResponse = await paymentController('Update', paymentRequest);
+      let payPalOrder = expectSuccessfulResponse(paymentResponse);
+      expect(payPalOrder).toHaveProperty('status', 'CREATED');
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        interfaceId: payPalOrder.id,
+        custom: {
+          fields: {
+            capturePayPalOrderRequest: JSON.stringify({
+              payment_source,
+            }),
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      ],
-      custom: {
-        fields: {
-          getPayPalCaptureRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
+      };
+      paymentResponse = await paymentController('Update', paymentRequest);
+      payPalOrder = expectSuccessfulResponse(
+        paymentResponse,
+        'capturePayPalOrderResponse'
+      ) as Order;
+      logger.info(JSON.stringify(payPalOrder));
+      expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+      expect(payPalOrder.purchase_units).toHaveLength(1);
+      if (!payPalOrder.purchase_units) {
+        return;
+      }
+      expect(payPalOrder.purchase_units[0]?.payments?.captures).toHaveLength(1);
+      if (!payPalOrder.purchase_units[0]?.payments?.captures) {
+        return;
+      }
+      const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
+      expect(capture?.amount?.value).toBe('82.00');
+      expect(capture?.status).toBe('COMPLETED');
+      expect(capture?.invoice_id).toBe(paymentRequest.obj.id);
+
+      // GET ORDER REQUEST
+
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        transactions: [
+          {
+            type: 'Charge',
+            interactionId: capture?.id,
+            state: 'Success',
+          },
+        ],
+        custom: {
+          fields: {
+            getPayPalCaptureRequest: '{}',
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    const payPalCapture = expectSuccessfulResponse(
-      paymentResponse,
-      'getPayPalCaptureResponse'
-    ) as Capture;
-    logger.info(JSON.stringify(payPalCapture));
-    expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
-    expect(payPalCapture.amount?.value).toBe('82.00');
-    expect(payPalCapture?.invoice_id).toBe(paymentRequest.obj.id);
+      };
+      paymentResponse = await paymentController('Update', paymentRequest);
+      const payPalCapture = expectSuccessfulResponse(
+        paymentResponse,
+        'getPayPalCaptureResponse'
+      ) as Capture;
+      logger.info(JSON.stringify(payPalCapture));
+      expect(payPalCapture).toHaveProperty('status', 'COMPLETED');
+      expect(payPalCapture.amount?.value).toBe('82.00');
+      expect(payPalCapture?.invoice_id).toBe(paymentRequest.obj.id);
 
-    // REFUND
+      // REFUND
 
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      transactions: [
-        {
-          type: 'Charge',
-          interactionId: payPalCapture.id,
-          state: 'Success',
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        transactions: [
+          {
+            type: 'Charge',
+            interactionId: payPalCapture.id,
+            state: 'Success',
+          },
+        ],
+        custom: {
+          fields: {
+            refundPayPalOrderRequest: '{"amount": 2}',
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      ],
-      custom: {
-        fields: {
-          refundPayPalOrderRequest: '{"amount": 2}',
-          PayPalOrderId: payPalOrder.id,
+      };
+      paymentResponse = await paymentController('Update', paymentRequest);
+      payPalOrder = expectSuccessfulResponse(
+        paymentResponse,
+        'refundPayPalOrderResponse'
+      ) as Refund;
+      logger.info(JSON.stringify(payPalOrder));
+      expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+      expect(payPalOrder?.amount?.value).toBe('2.00');
+    },
+    30000
+  );
+
+  test.each([false, true])(
+    'tracking information, which is in store %p',
+    async (inStore) => {
+      configMock.getSettings = jest.fn(
+        () =>
+          ({
+            payPalIntent: 'Capture',
+          } as PayPalSettings)
+      );
+      const paymentRequest = {
+        obj: {
+          amountPlanned,
+          ...customFieldCreateOrder,
+          id: randomUUID(),
         },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'refundPayPalOrderResponse'
-    ) as Refund;
-    logger.info(JSON.stringify(payPalOrder));
-    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
-    expect(payPalOrder?.amount?.value).toBe('2.00');
-  }, 30000);
+      } as any;
+      inStore && setPaymentStoreKey(paymentRequest.obj);
 
-  test('tracking information', async () => {
-    configMock.getSettings = jest.fn(
-      () =>
-        ({
-          payPalIntent: 'Capture',
-        } as PayPalSettings)
-    );
-    const paymentRequest = {
-      obj: {
-        amountPlanned,
-        ...customFieldCreateOrder,
-      },
-    } as any;
-    let paymentResponse = await paymentController('Update', paymentRequest);
-    let payPalOrder = expectSuccessfulResponse(paymentResponse);
-    expect(payPalOrder).toHaveProperty('status', 'CREATED');
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      interfaceId: payPalOrder.id,
-      custom: {
-        fields: {
-          capturePayPalOrderRequest: JSON.stringify({
-            payment_source,
-          }),
-          PayPalOrderId: payPalOrder.id,
+      let paymentResponse = await paymentController('Update', paymentRequest);
+      let payPalOrder = expectSuccessfulResponse(paymentResponse);
+      expect(payPalOrder).toHaveProperty('status', 'CREATED');
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        interfaceId: payPalOrder.id,
+        custom: {
+          fields: {
+            capturePayPalOrderRequest: JSON.stringify({
+              payment_source,
+            }),
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'capturePayPalOrderResponse'
-    ) as Order;
-    expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
-    if (!payPalOrder.purchase_units) {
-      return;
-    }
-    if (!payPalOrder.purchase_units[0]?.payments?.captures) {
-      return;
-    }
-    const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
+      };
+      paymentResponse = await paymentController('Update', paymentRequest);
+      payPalOrder = expectSuccessfulResponse(
+        paymentResponse,
+        'capturePayPalOrderResponse'
+      ) as Order;
+      expect(payPalOrder).toHaveProperty('status', 'COMPLETED');
+      if (!payPalOrder.purchase_units) {
+        return;
+      }
+      if (!payPalOrder.purchase_units[0]?.payments?.captures) {
+        return;
+      }
+      const capture = payPalOrder.purchase_units[0]?.payments?.captures[0];
 
-    // CREATE TRACKING INFORMATION
+      // CREATE TRACKING INFORMATION
 
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      transactions: [
-        {
-          type: 'Charge',
-          interactionId: capture?.id,
-          state: 'Success',
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        transactions: [
+          {
+            type: 'Charge',
+            interactionId: capture?.id,
+            state: 'Success',
+          },
+        ],
+        custom: {
+          fields: {
+            createTrackingInformationRequest: JSON.stringify({
+              tracking_number: 'ABCDE',
+              carrier: 'OTHER',
+              carrier_name_other: 'New Carrier',
+            }),
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      ],
-      custom: {
-        fields: {
-          createTrackingInformationRequest: JSON.stringify({
-            tracking_number: 'ABCDE',
-            carrier: 'OTHER',
-            carrier_name_other: 'New Carrier',
-          }),
-          PayPalOrderId: payPalOrder.id,
+      };
+
+      paymentResponse = await paymentController('Update', paymentRequest);
+      payPalOrder = expectSuccessfulResponse(
+        paymentResponse,
+        'createTrackingInformationResponse'
+      ) as Order;
+      logger.info(JSON.stringify(payPalOrder));
+      if (!payPalOrder.purchase_units) {
+        return;
+      }
+      if (!payPalOrder.purchase_units[0].shipping?.trackers) {
+        return;
+      }
+      expect(payPalOrder.purchase_units[0].shipping.trackers).toHaveLength(1);
+
+      expect(
+        payPalOrder.purchase_units[0].shipping.trackers[0].id
+      ).toBeDefined();
+
+      expect(
+        payPalOrder.purchase_units[0].shipping.trackers[0].update_time
+      ).not.toBeDefined();
+
+      // UPDATE TRACKING INFORMATION
+
+      const trackerId = payPalOrder?.purchase_units[0].shipping.trackers[0].id;
+      paymentRequest.obj = {
+        ...paymentRequest.obj,
+        custom: {
+          fields: {
+            updateTrackingInformationRequest: JSON.stringify({
+              trackingId: trackerId,
+              patch: [{ op: 'replace', path: '/notify_payer', value: true }],
+            }),
+            PayPalOrderId: payPalOrder.id,
+            storeKey: inStore ? paymentInStoreTestId : undefined,
+          },
         },
-      },
-    };
-
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'createTrackingInformationResponse'
-    ) as Order;
-    logger.info(JSON.stringify(payPalOrder));
-    if (!payPalOrder.purchase_units) {
-      return;
-    }
-    if (!payPalOrder.purchase_units[0].shipping?.trackers) {
-      return;
-    }
-    expect(payPalOrder.purchase_units[0].shipping.trackers).toHaveLength(1);
-
-    expect(payPalOrder.purchase_units[0].shipping.trackers[0].id).toBeDefined();
-
-    expect(
-      payPalOrder.purchase_units[0].shipping.trackers[0].update_time
-    ).not.toBeDefined();
-
-    // UPDATE TRACKING INFORMATION
-
-    const trackerId = payPalOrder?.purchase_units[0].shipping.trackers[0].id;
-    paymentRequest.obj = {
-      ...paymentRequest.obj,
-      custom: {
-        fields: {
-          updateTrackingInformationRequest: JSON.stringify({
-            trackingId: trackerId,
-            patch: [{ op: 'replace', path: '/notify_payer', value: true }],
-          }),
-          PayPalOrderId: payPalOrder.id,
-        },
-      },
-    };
-    paymentResponse = await paymentController('Update', paymentRequest);
-    payPalOrder = expectSuccessfulResponse(
-      paymentResponse,
-      'updateTrackingInformationResponse'
-    ) as Order;
-    logger.info(JSON.stringify(payPalOrder));
-    expect(payPalOrder.status).toBe('success');
-  }, 30000);
+      };
+      paymentResponse = await paymentController('Update', paymentRequest);
+      payPalOrder = expectSuccessfulResponse(
+        paymentResponse,
+        'updateTrackingInformationResponse'
+      ) as Order;
+      logger.info(JSON.stringify(payPalOrder));
+      expect(payPalOrder.status).toBe('success');
+    },
+    30000
+  );
 });
