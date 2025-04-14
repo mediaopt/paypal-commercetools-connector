@@ -31,13 +31,6 @@ const taxedPrice = {
   },
 };
 
-const prices = {
-  totalPrice: {
-    ...currencyData,
-    centAmount: 19900,
-  },
-  taxedPrice,
-};
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
     getCart: jest.fn((mockPaymentId: string) => {
@@ -46,7 +39,10 @@ const mockConfigModule = () => {
         lineItems: discountedLineItems,
         ...prices,
         discountOnTotalPrice,
-          store: mockPaymentId === paymentInStoreTestId?{ key: paymentInStoreTestId }:undefined,
+        store:
+          mockPaymentId === paymentInStoreTestId
+            ? { key: paymentInStoreTestId }
+            : undefined,
         billingAddress: {
           postalCode: '12345',
           country: 'DE',
