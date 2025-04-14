@@ -194,6 +194,14 @@ export async function createCustomPaymentType(
       type: { name: 'String' },
       required: false,
     },
+    {
+      name: 'storeKey',
+      label: {
+        en: 'Store key for the payment',
+      },
+      type: { name: 'String' },
+      required: false,
+    },
   ];
   PAYPAL_API_PAYMENT_ENDPOINTS.forEach((element) =>
     fieldDefinitions.push(
