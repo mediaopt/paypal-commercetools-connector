@@ -10,27 +10,6 @@ let configMock: any;
 
 const paymentInStoreTestId = 'store1Key';
 
-const currencyData = {
-  type: 'centPrecision',
-  currencyCode: 'EUR',
-  fractionDigits: 2,
-};
-
-const taxedPrice = {
-  totalNet: {
-    ...currencyData,
-    centAmount: 16723,
-  },
-  totalGross: {
-    ...currencyData,
-    centAmount: 19900,
-  },
-  totalTax: {
-    ...currencyData,
-    centAmount: 3177,
-  },
-};
-
 const mockConfigModule = () => {
   jest.mock('../src/service/commercetools.service', () => ({
     getCart: jest.fn((mockPaymentId: string) => {
