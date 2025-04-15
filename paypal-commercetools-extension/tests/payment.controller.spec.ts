@@ -387,7 +387,7 @@ const amountPlannedCentsWithTestResult = paymentAmounts
     ctAmountString(item),
   ])
   .map((item) => [
-    // [...item, false],
+    [...item, false],
     [...item, true],
   ])
   .flat() as [number, string, string, boolean][];
