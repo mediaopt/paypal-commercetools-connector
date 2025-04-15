@@ -73,7 +73,7 @@ describe('Testing actions', () => {
     {
       method: createCustomPaymentType,
       key: 'paypal-payment-type',
-      expectedLength: PAYPAL_API_PAYMENT_ENDPOINTS.length * 2 + 2,
+      expectedLength: PAYPAL_API_PAYMENT_ENDPOINTS.length * 2 + 3,
     },
     {
       method: createCustomCustomerType,
