@@ -342,7 +342,8 @@ const createAccessTokenFromCredentials = async (
 const generateAccessToken = async (storeKey?: string): Promise<string> => {
   const { clientId, clientSecret, isMultiTenant } =
     identifyPayPalCredentials(storeKey);
-  const cachedToken = await getCachedAccessToken(storeKey);
+  const relevantStore = isMultiTenant ? storeKey : undefined;
+  const cachedToken = await getCachedAccessToken(relevantStore);
 
   if (
     cachedToken?.value &&
@@ -368,11 +369,11 @@ const generateAccessToken = async (storeKey?: string): Promise<string> => {
       ),
     },
     cachedToken?.version ?? 0,
-    isMultiTenant ? storeKey : undefined
+    relevantStore
   );
   logger.info(
     `new client token is generated for ${
-      storeKey ?? 'default PayPal credentials'
+      relevantStore ?? 'default PayPal credentials'
     }`
   );
   return tokenResponseBody.access_token;
