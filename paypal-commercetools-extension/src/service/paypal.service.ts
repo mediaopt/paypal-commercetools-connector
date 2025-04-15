@@ -58,59 +58,46 @@ function getPayPalPartnerAttributionHeader() {
   };
 }
 
-type MultiTenantConfig = { storeKey?: string; token?: string };
-
-async function buildConfiguration(
-  multiTenantConfig?: MultiTenantConfig,
-  timeout?: timeoutType
-) {
+async function buildConfiguration(storeKey?: string, timeout?: timeoutType) {
   return new Configuration({
     basePath: getAPIEndpoint(),
     baseOptions: {
       timeout: setTimeout(timeout),
       headers: getPayPalPartnerAttributionHeader(),
     },
-    accessToken:
-      multiTenantConfig?.token ??
-      (await generateAccessToken(multiTenantConfig?.storeKey)),
+    accessToken: await generateAccessToken(storeKey),
   });
 }
 
 const getPayPalOrdersGateway = async (storeKey?: string) => {
-  return new OrdersApi(await buildConfiguration({ storeKey }));
+  return new OrdersApi(await buildConfiguration(storeKey));
 };
 
 const getPayPalTrackersGateway = async (storeKey?: string) => {
-  return new TrackersApi(await buildConfiguration({ storeKey }));
+  return new TrackersApi(await buildConfiguration(storeKey));
 };
 
 const getPayPalVerifyWebhookSignatureGateway = async (storeKey?: string) => {
-  return new VerifyWebhookSignatureApi(await buildConfiguration({ storeKey }));
+  return new VerifyWebhookSignatureApi(await buildConfiguration(storeKey));
 };
-const getPayPalWebhooksGateway = async (
-  multiTenantConfig?: MultiTenantConfig
-) => {
-  return new WebhooksApi(await buildConfiguration(multiTenantConfig, 'payPal'));
+const getPayPalWebhooksGateway = async (storeKey?: string) => {
+  return new WebhooksApi(await buildConfiguration(storeKey, 'payPal'));
 };
 
 const getPayPalAuhorizationsGateway = async (storeKey?: string) => {
-  return new AuthorizationsApi(await buildConfiguration({ storeKey }));
+  return new AuthorizationsApi(await buildConfiguration(storeKey));
 };
 
 const getPayPalCapturesGateway = async (storeKey?: string) => {
-  return new CapturesApi(await buildConfiguration({ storeKey }));
+  return new CapturesApi(await buildConfiguration(storeKey));
 };
 
 const getPayPalSetupTokenGateway = async (storeKey?: string) => {
-  return new SetupTokensApi(
-    await buildConfiguration({ storeKey }, 'extension')
-  );
+  return new SetupTokensApi(await buildConfiguration(storeKey, 'extension'));
 };
 
 const getPayPalPaymentTokenGateway = async (storeKey?: string) => {
-  return new PaymentTokensApi(
-    await buildConfiguration({ storeKey }, 'extension')
-  );
+  return new PaymentTokensApi(await buildConfiguration(storeKey, 'extension'));
 };
 
 export const createPayPalOrder = async (
@@ -485,11 +472,11 @@ const getAPIEndpoint = () => {
 };
 
 export const createWebhook = async (storeKey?: string) => {
-  const webhookId = await getWebhookId({ storeKey });
+  const webhookId = await getWebhookId(storeKey);
   if (webhookId) {
     return;
   }
-  const gateway = await getPayPalWebhooksGateway({ storeKey });
+  const gateway = await getPayPalWebhooksGateway(storeKey);
   const response = await gateway.webhooksPost({
     url: await getWebhookUrl(),
     event_types: [
@@ -502,8 +489,8 @@ export const createWebhook = async (storeKey?: string) => {
 };
 
 export const deleteWebhook = async (storeKey?: string) => {
-  const gateway = await getPayPalWebhooksGateway({ storeKey });
-  const webhookId = await getWebhookId({ storeKey });
+  const gateway = await getPayPalWebhooksGateway(storeKey);
+  const webhookId = await getWebhookId(storeKey);
   if (!webhookId) {
     logger.info(
       `no webhook found for ${storeKey ?? 'default PayPal credentials'}`
@@ -522,9 +509,9 @@ export const deleteWebhook = async (storeKey?: string) => {
   }
 };
 
-export const getWebhookId = async (multiTenantConfig?: MultiTenantConfig) => {
+export const getWebhookId = async (storeKey?: string) => {
   const webhookUrl = await getWebhookUrl();
-  const gateway = await getPayPalWebhooksGateway(multiTenantConfig);
+  const gateway = await getPayPalWebhooksGateway(storeKey);
   const webhooks = await gateway.webhooksList('APPLICATION');
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl

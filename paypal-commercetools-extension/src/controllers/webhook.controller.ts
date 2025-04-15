@@ -12,7 +12,7 @@ import { getWebhookId, validateSignature } from '../service/paypal.service';
 import { logger } from '../utils/logger.utils';
 
 async function verifyWebhookSignature(request: Request, storeKey?: string) {
-  const webhookId = await getWebhookId({ storeKey });
+  const webhookId = await getWebhookId(storeKey);
   if (!webhookId) {
     throw new CustomError(500, 'WebhookId is missing');
   }
