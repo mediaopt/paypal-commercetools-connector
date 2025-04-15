@@ -178,7 +178,6 @@ describe('Testing PayPal customer Requests', () => {
     const userToken = JSON.parse(
       expectSuccessfulResponse(customerResponse, 'getUserIDTokenResponse')
     );
-    console.log(userToken);
     expect(userToken.success).toBe(false);
     expect(userToken.message).toBe(
       'Multi tenant vaulting methods are not supported'
