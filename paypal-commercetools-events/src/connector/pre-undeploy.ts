@@ -22,13 +22,14 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(projectId, CONNECT_GCP_PROJECT_ID_KEY);
 
   const apiRoot = createApiRoot();
-  await deleteAccessTokenIfExists(isMultiTenant ? 'multi' : 'single');
-  if (!isMultiTenant)
+  if (!isMultiTenant) {
+    await deleteAccessTokenIfExists();
     await deleteParcelAddedToDeliverySubscription(
       apiRoot,
       topicName,
       projectId
     );
+  }
 }
 
 async function run(): Promise<void> {

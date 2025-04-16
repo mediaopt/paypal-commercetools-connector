@@ -77,7 +77,7 @@ describe('Testing actions', () => {
   });
 });
 
-const mockDeleteTokentTests: [string | undefined, number, number][] = [
+const mockDeleteTokenTests: [string | undefined, number, number][] = [
   [undefined, 1, 1],
   ['store1', 1, 1],
   ['store2', 1, 0],
@@ -94,7 +94,7 @@ describe('testing delete token', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
-  test.each(mockDeleteTokentTests)(
+  test.each(mockDeleteTokenTests)(
     'delete token for a store key %s, getCachedAccessToken return is truthy if the key is not store2 , results in calls to getCachedToken %s times and delete assess token %s times ',
     async (storeKey, timesGetToken, timesDeleteToken) => {
       await deleteAccessTokenIfExists(storeKey);

@@ -2,7 +2,7 @@
 ![test](https://github.com/mediaopt/paypal-commercetools-connector/actions/workflows/test.yml/badge.svg)
 ![audit](https://github.com/mediaopt/paypal-commercetools-connector/actions/workflows/audit.yml/badge.svg)
 
-## Waring: This branch is a feature dedicated for specific customer.
+## Warning: This branch is a feature dedicated for specific customer.
 
 Only the methods relevant for the customer are tested and maintained. Other methods may be influenced by breaking changes, and **we don't provide any public support for the issues related to this brunch**.
 If you want a feature branch for you or your customer, please contact us.
@@ -17,7 +17,7 @@ If PayPal multitenant credentials are not provided the connector will operate as
    PAYPAL_MULTI_TENANT_CLIENT_IDS:{"storeKey1":"clientId1","storeKey2":"clientId2",..."storeKeyN":"clientIdN"}
    PAYPAL_MULTI_TENANT_CLIENT_SECRETS:{"storeKey1":"clientSecret1","storeKey2":"clientSecret2",..."storeKeyN":"clientSecretN"}
 2. If multi tenant credentials are provided PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET can be skipped. If they are provided they will be used as fallback for the payments that are not in store or are in the store, that is not covered in both multi tenant ids and secrets.
-3. Each commercetools cart that should use custom PatPal credentials should be linked to a store. Payments will retrieve store key from cart automatically and save it as custom field if available. No further changes in payment process are required.
+3. Each commercetools cart that should use custom PayPal credentials should be linked to a store. Payments will retrieve store key from cart automatically and save it as custom field if available. No further changes in payment process are required.
 4. Vaulting and tracking in multi tenant mode are not supported, all changes to these methods are only for maintainability and are tested within the single tenant scope
 
 <p style="text-align: center">

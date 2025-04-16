@@ -270,19 +270,17 @@ const multiTenantCredentials = () => {
 const identifyPayPalCredentials = (storeKey?: string) => {
   if (process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS && storeKey) {
     const { multiTenantIDs, multiTenantSecrets } = multiTenantCredentials();
-    if (storeKey) {
-      const clientId = multiTenantIDs[storeKey];
-      const clientSecret = multiTenantSecrets[storeKey];
+    const clientId = multiTenantIDs[storeKey];
+    const clientSecret = multiTenantSecrets[storeKey];
 
-      if ((!clientId && clientSecret) || (clientId && !clientSecret)) {
-        throw new CustomError(
-          500,
-          'Internal Server Error - PayPal multi tenant config for the store is invalid'
-        );
-      }
-      if (clientId && clientSecret)
-        return { clientId, clientSecret, isMultiTenant: true };
+    if ((!clientId && clientSecret) || (clientId && !clientSecret)) {
+      throw new CustomError(
+        500,
+        'Internal Server Error - PayPal multi tenant config for the store is invalid'
+      );
     }
+    if (clientId && clientSecret)
+      return { clientId, clientSecret, isMultiTenant: true };
   }
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(

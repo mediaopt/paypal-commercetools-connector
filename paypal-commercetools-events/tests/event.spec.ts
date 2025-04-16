@@ -296,7 +296,7 @@ describe('Testing PayPal-commercetools-events Controller', () => {
 
   test('tracking is not supported for multi-tenant', async () => {
     process.env.PAYPAL_MULTI_TENANT_CLIENT_IDS = 'true';
-    const trackingNumber = 'mutliTenantTrackingNumber';
+    const trackingNumber = 'multiTenantTrackingNumber';
     const { validDeliveryItem, validLineItem } = setValidItems(
       'validItem',
       1,
