@@ -277,7 +277,7 @@ export const handleCreateOrderRequest = async (
         name: 'PayPalCustomId',
         value: customId,
       });
-    if (storeKey)
+    if (storeKey && !payment.custom.fields.storeKey)
       updateActions.push({
         action: 'setCustomField',
         name: 'storeKey',
@@ -514,17 +514,33 @@ export const handleAuthorizeOrderRequest = async (
 };
 
 export async function handleGetClientTokenRequest(payment?: Payment) {
-  const clientTokenRequest = payment?.custom?.fields?.getClientTokenRequest;
-  const storeKey = payment?.custom?.fields.storeKey;
+  if (!payment) return [];
+  const clientTokenRequest = payment.custom?.fields?.getClientTokenRequest;
   if (!clientTokenRequest) {
     return [];
+  }
+  let updateActions: UpdateActions = [];
+  let storeKey = payment?.custom?.fields.storeKey;
+  if (!storeKey) {
+    const cart = await getCart(payment.id);
+    if (!storeKey && cart.store?.key) {
+      storeKey = cart.store.key;
+      updateActions.push({
+        action: 'setCustomField',
+        name: 'storeKey',
+        value: storeKey,
+      });
+    }
   }
   let request: ClientTokenRequest = JSON.parse(clientTokenRequest);
   request = {
     merchantAccountId: process.env.BRAINTREE_MERCHANT_ACCOUNT || undefined,
     ...request,
   };
-  const updateActions = handleRequest('getClientToken', request);
+  updateActions = [
+    ...updateActions,
+    ...handleRequest('getClientToken', request),
+  ];
   try {
     const response = await getClientToken(storeKey);
     return updateActions.concat(
