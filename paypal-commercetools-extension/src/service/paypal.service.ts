@@ -227,7 +227,7 @@ export const refundPayPalOrder = async (
 };
 
 export async function getClientToken(storeKey?: string) {
-  logger.info(`requested token for ${storeKey ? storeKey : 'default'} store `);
+  logger.info(`requested token for ${storeKey ? storeKey : 'default'} store`);
   const token = await generateAccessToken(storeKey);
   const options = {
     method: 'POST',

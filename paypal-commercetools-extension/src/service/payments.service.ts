@@ -277,7 +277,7 @@ export const handleCreateOrderRequest = async (
         name: 'PayPalCustomId',
         value: customId,
       });
-    if (storeKey && !payment.custom.fields.storeKey)
+    if (storeKey && !payment?.custom?.fields?.storeKey)
       updateActions.push({
         action: 'setCustomField',
         name: 'storeKey',
@@ -520,10 +520,10 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
     return [];
   }
   let updateActions: UpdateActions = [];
-  let storeKey = payment?.custom?.fields.storeKey;
+  let storeKey = payment.custom?.fields?.storeKey;
   if (!storeKey) {
     const cart = await getCart(payment.id);
-    if (!storeKey && cart.store?.key) {
+    if (cart?.store?.key) {
       storeKey = cart.store.key;
       updateActions.push({
         action: 'setCustomField',
