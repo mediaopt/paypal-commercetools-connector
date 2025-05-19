@@ -104,6 +104,7 @@ describe('Testing Braintree GetClient Token', () => {
   test('create client token for default PayPal credentials', async () => {
     const paymentRequest = {
       obj: {
+        id: 'paymentOutOfStore',
         custom: {
           fields: {
             getClientTokenRequest: '{}',
@@ -113,13 +114,26 @@ describe('Testing Braintree GetClient Token', () => {
     } as unknown as PaymentReference;
     await expectClientTokenRequest(paymentRequest);
   }, 20000);
-  test('create client token for custom store', async () => {
+  test('create client token for custom store already assigned to payment', async () => {
     const paymentRequest = {
       obj: {
         custom: {
           fields: {
             getClientTokenRequest: '{}',
             storeKey: paymentInStoreTestId,
+          },
+        },
+      },
+    } as unknown as PaymentReference;
+    await expectClientTokenRequest(paymentRequest);
+  }, 20000);
+  test('create client token for custom store that should be retrieved from the cart first', async () => {
+    const paymentRequest = {
+      obj: {
+        id: `${paymentInStoreTestId}-payment`,
+        custom: {
+          fields: {
+            getClientTokenRequest: '{}',
           },
         },
       },
