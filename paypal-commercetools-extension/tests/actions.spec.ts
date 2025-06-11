@@ -11,6 +11,22 @@ import {
   PAYPAL_PAYMENT_EXTENSION_KEY,
 } from '../src/connector/actions';
 
+const dummyApplicationUrl = 'https://lorem.ipsum';
+
+const dummyExistingExtensionResponse = {
+  body: {
+    results: [
+      {
+        key: PAYPAL_PAYMENT_EXTENSION_KEY,
+        destination: {
+          type: 'HTTP',
+          url: dummyApplicationUrl,
+        },
+      },
+    ],
+  },
+};
+
 describe('Testing actions', () => {
   test.each([
     {
@@ -21,7 +37,7 @@ describe('Testing actions', () => {
     },
   ])('$method', async ({ method }) => {
     const apiRequest: any = {
-      execute: jest.fn(() => ({ body: { results: [{}] } })),
+      execute: jest.fn(() => dummyExistingExtensionResponse),
     };
     const apiRoot: any = {
       extensions: jest.fn(() => apiRoot),
@@ -30,7 +46,7 @@ describe('Testing actions', () => {
       get: jest.fn(() => apiRequest),
       post: jest.fn(() => apiRequest),
     };
-    await method(apiRoot, 'https://lorem.ipsum');
+    await method(apiRoot, dummyApplicationUrl);
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(1);
@@ -39,19 +55,7 @@ describe('Testing actions', () => {
 
   test('delete extension', async () => {
     const apiRequest: any = {
-      execute: jest.fn(() => ({
-        body: {
-          results: [
-            {
-              key: PAYPAL_PAYMENT_EXTENSION_KEY,
-              destination: {
-                type: 'HTTP',
-                url: 'https://lorem.ipsum',
-              },
-            },
-          ],
-        },
-      })),
+      execute: jest.fn(() => dummyExistingExtensionResponse),
     };
     const apiRoot: any = {
       extensions: jest.fn(() => apiRoot),
@@ -62,7 +66,7 @@ describe('Testing actions', () => {
     await deleteExtension(
       apiRoot,
       PAYPAL_PAYMENT_EXTENSION_KEY,
-      'https://lorem.ipsum'
+      dummyApplicationUrl
     );
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);

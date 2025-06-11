@@ -1,4 +1,5 @@
 import {
+  ExtensionDraft,
   FieldDefinition,
   TypeAddFieldDefinitionAction,
   TypeDraft,
@@ -45,54 +46,52 @@ export const PAYPAL_API_CUSTOMER_ENDPOINTS = [
   'deletePaymentToken',
 ];
 
+type EndpointData = {
+  extensionKey: string;
+  resourceTypeId: string;
+  condition: string;
+};
+
+const paymentExtensionBody = {
+  extensionKey: PAYPAL_PAYMENT_EXTENSION_KEY,
+  resourceTypeId: 'payment',
+  condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
+};
+
+const customerExtensionBody = {
+  extensionKey: PAYPAL_CUSTOMER_EXTENSION_KEY,
+  resourceTypeId: 'customer',
+  condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
+};
+
+const newExtensionBody = (
+  { extensionKey, resourceTypeId, condition }: EndpointData,
+  applicationUrl: string
+): ExtensionDraft => ({
+  key: extensionKey,
+  timeoutInMs: 10000,
+  destination: {
+    type: 'HTTP',
+    url: applicationUrl,
+  },
+  triggers: [
+    {
+      resourceTypeId,
+      actions: ['Update'],
+      condition,
+    },
+  ],
+});
+
 export async function createPaymentUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string
 ): Promise<void> {
-  const {
-    body: { results: extensions },
-  } = await apiRoot
-    .extensions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_PAYMENT_EXTENSION_KEY}"`,
-      },
-    })
-    .execute();
-
-  if (extensions.length > 0) {
-    const extension = extensions[0];
-
-    await apiRoot
-      .extensions()
-      .withKey({ key: PAYPAL_PAYMENT_EXTENSION_KEY })
-      .delete({
-        queryArgs: {
-          version: extension.version,
-        },
-      })
-      .execute();
-  }
+  await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
 
   await apiRoot
     .extensions()
-    .post({
-      body: {
-        key: PAYPAL_PAYMENT_EXTENSION_KEY,
-        timeoutInMs: 10000,
-        destination: {
-          type: 'HTTP',
-          url: applicationUrl,
-        },
-        triggers: [
-          {
-            resourceTypeId: 'payment',
-            actions: ['Update'],
-            condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
-          },
-        ],
-      },
-    })
+    .post({ body: newExtensionBody(paymentExtensionBody, applicationUrl) })
     .execute();
 }
 
@@ -100,50 +99,11 @@ export async function createCustomerUpdateExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string
 ): Promise<void> {
-  const {
-    body: { results: extensions },
-  } = await apiRoot
-    .extensions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_CUSTOMER_EXTENSION_KEY}"`,
-      },
-    })
-    .execute();
-
-  if (extensions.length > 0) {
-    const extension = extensions[0];
-
-    await apiRoot
-      .extensions()
-      .withKey({ key: PAYPAL_CUSTOMER_EXTENSION_KEY })
-      .delete({
-        queryArgs: {
-          version: extension.version,
-        },
-      })
-      .execute();
-  }
+  await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
 
   await apiRoot
     .extensions()
-    .post({
-      body: {
-        key: PAYPAL_CUSTOMER_EXTENSION_KEY,
-        timeoutInMs: 2000,
-        destination: {
-          type: 'HTTP',
-          url: applicationUrl,
-        },
-        triggers: [
-          {
-            resourceTypeId: 'customer',
-            actions: ['Update'],
-            condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
-          },
-        ],
-      },
-    })
+    .post({ body: newExtensionBody(customerExtensionBody, applicationUrl) })
     .execute();
 }
 
@@ -170,6 +130,26 @@ export async function deleteExtension(
   }
 }
 
+const fieldToDefinition = (
+  element: string,
+  type: 'Request' | 'Response'
+): FieldDefinition => ({
+  name: `${element}${type}`,
+  label: {
+    en: `${element}${type}`,
+  },
+  type: {
+    name: 'String',
+  },
+  inputHint: 'MultiLine',
+  required: false,
+});
+
+const fieldToNetwork = (element: string) => [
+  fieldToDefinition(element, 'Request'),
+  fieldToDefinition(element, 'Response'),
+];
+
 export async function createCustomPaymentType(
   apiRoot: ByProjectKeyRequestBuilder
 ): Promise<void> {
@@ -194,31 +174,9 @@ export async function createCustomPaymentType(
       required: false,
     },
   ];
+
   PAYPAL_API_PAYMENT_ENDPOINTS.forEach((element) =>
-    fieldDefinitions.push(
-      {
-        name: `${element}Request`,
-        label: {
-          en: `${element}Request`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      },
-      {
-        name: `${element}Response`,
-        label: {
-          en: `${element}Response`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      }
-    )
+    fieldDefinitions.push(...fieldToNetwork(element))
   );
   const customType = {
     key: PAYPAL_PAYMENT_TYPE_KEY,
@@ -247,31 +205,9 @@ export async function createCustomCustomerType(
       required: false,
     },
   ];
+
   PAYPAL_API_CUSTOMER_ENDPOINTS.forEach((element) =>
-    fieldDefinitions.push(
-      {
-        name: `${element}Request`,
-        label: {
-          en: `${element}Request`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      },
-      {
-        name: `${element}Response`,
-        label: {
-          en: `${element}Response`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      }
-    )
+    fieldDefinitions.push(...fieldToNetwork(element))
   );
   const customType = {
     key: PAYPAL_CUSTOMER_TYPE_KEY,
