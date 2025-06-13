@@ -10,9 +10,12 @@ import { logger } from '../utils/logger.utils';
 import {
   deleteAccessTokenIfExists,
   deleteExtension,
+  deleteOrUpdateCustomType,
+} from './actions';
+import {
   PAYPAL_CUSTOMER_EXTENSION_KEY,
   PAYPAL_PAYMENT_EXTENSION_KEY,
-} from './actions';
+} from '../constants';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
@@ -22,6 +25,9 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
   await deleteAccessTokenIfExists();
   await deleteWebhook();
+  await deleteOrUpdateCustomType(apiRoot, 'payment');
+  await deleteOrUpdateCustomType(apiRoot, 'customer');
+  await deleteOrUpdateCustomType(apiRoot, 'payment-interface-interaction');
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
 }

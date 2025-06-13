@@ -1,3 +1,11 @@
+export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
+export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
+
+export const PAYPAL_PAYMENT_TYPE_KEY = 'paypal-payment-type';
+export const PAYPAL_CUSTOMER_TYPE_KEY = 'paypal-customer-type';
+export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
+  'paypal-payment-interaction-type';
+
 export const GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME =
   'paypal-commercetools-connector';
 

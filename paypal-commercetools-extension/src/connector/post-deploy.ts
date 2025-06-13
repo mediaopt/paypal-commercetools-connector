@@ -7,11 +7,8 @@ import { assertError, assertString } from '../utils/assert.utils';
 import { readConfiguration } from '../utils/config.utils';
 import {
   createAndSetCustomObject,
-  createCustomCustomerType,
-  createCustomerUpdateExtension,
-  createCustomPaymentInteractionType,
-  createCustomPaymentType,
-  createPaymentUpdateExtension,
+  addOrUpdateCustomType,
+  createExtension,
   deleteAccessTokenIfExists,
 } from './actions';
 
@@ -24,11 +21,11 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
 
   const apiRoot = createApiRoot();
   await deleteAccessTokenIfExists();
-  await createPaymentUpdateExtension(apiRoot, applicationUrl);
-  await createCustomerUpdateExtension(apiRoot, applicationUrl);
-  await createCustomPaymentType(apiRoot);
-  await createCustomCustomerType(apiRoot);
-  await createCustomPaymentInteractionType(apiRoot);
+  await createExtension(apiRoot, applicationUrl, 'payment');
+  await createExtension(apiRoot, applicationUrl, 'customer');
+  await addOrUpdateCustomType(apiRoot, 'payment');
+  await addOrUpdateCustomType(apiRoot, 'customer');
+  await addOrUpdateCustomType(apiRoot, 'payment-interface-interaction');
   await createWebhook();
   await createAndSetCustomObject(apiRoot);
 }
