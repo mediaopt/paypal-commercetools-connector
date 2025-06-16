@@ -103,6 +103,7 @@ export async function createExtension(
     .extensions()
     .post({ body: newExtensionBody(extensionKey, applicationUrl) })
     .execute();
+  logger.info(`extension with key ${extensionKey} is created`);
 }
 
 export async function deleteExtension(
@@ -213,29 +214,31 @@ const fieldCredentialsToDefinition = ({
 
 const customTypesNames: Record<
   PayPalCustomTypeKeys,
-  { name: LocalizedString }
+  { name: LocalizedString; resourceTypeIds: string[] }
 > = {
   [PAYPAL_PAYMENT_TYPE_KEY]: {
     name: {
       en: 'Custom payment type to PayPal fields',
     },
+    resourceTypeIds: ['payment'],
   },
   [PAYPAL_CUSTOMER_TYPE_KEY]: {
     name: {
       en: 'Custom customer type for PayPal fields',
     },
+    resourceTypeIds: ['customer'],
   },
   [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
     name: {
       en: 'Custom payment interaction type to PayPal fields',
     },
+    resourceTypeIds: ['payment-interface-interaction'],
   },
 };
 
 const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
   ...customTypesNames[key],
   key,
-  resourceTypeIds: [key],
   fieldDefinitions: customFieldsDefinitionData[key].map(
     fieldCredentialsToDefinition
   ),
@@ -281,18 +284,17 @@ async function updateType(
   version: number,
   actions: TypeUpdateAction[]
 ) {
-  {
-    await apiRoot
-      .types()
-      .withKey({ key })
-      .post({
-        body: {
-          version,
-          actions,
-        },
-      })
-      .execute();
-  }
+  await apiRoot
+    .types()
+    .withKey({ key })
+    .post({
+      body: {
+        version,
+        actions,
+      },
+    })
+    .execute();
+  logger.info(`existing type ${key} is updated`);
 }
 
 export async function addOrUpdateCustomType(
@@ -318,13 +320,14 @@ export async function addOrUpdateCustomType(
     if (updates.length > 0)
       await updateType(apiRoot, type.key, type.version, updates);
   }
-  if (!types.find((type) => type.key === customTypeDraft.key)) {
+  if (!types.find((type) => type.key === customTypeKey)) {
     await apiRoot
       .types()
       .post({
         body: customTypeDraft,
       })
       .execute();
+    logger.info(`type ${customTypeKey} is created`);
   }
 }
 
