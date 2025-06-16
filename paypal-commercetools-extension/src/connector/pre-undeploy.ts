@@ -1,4 +1,7 @@
 import dotenv from 'dotenv';
+
+dotenv.config();
+
 import { createApiRoot } from '../client/create.client';
 import { deleteWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
@@ -16,8 +19,6 @@ import {
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   PAYPAL_PAYMENT_TYPE_KEY,
 } from '../constants';
-
-dotenv.config();
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
