@@ -119,7 +119,7 @@ describe('Testing actions', () => {
         body: {
           results: [
             {
-              key: 'noMathcingFieldsType',
+              key: 'noMatchingFieldsType',
               fieldDefinitions: [{ name: 'notExistingYetDefinition' }],
             },
           ],
@@ -138,7 +138,7 @@ describe('Testing actions', () => {
     expect(apiRequest.execute).toBeCalledTimes(1);
   });
 
-  test('if only some fields match the type draft - delete this fields, but not the type', async () => {
+  test('if only some fields match the type draft - delete these fields, but not the type', async () => {
     const apiRequest: any = {
       execute: jest.fn(() => ({
         body: {
