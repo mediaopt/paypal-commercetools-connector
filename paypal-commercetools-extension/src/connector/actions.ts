@@ -72,7 +72,6 @@ const newExtensionBody = (
   extensionKey: ExtensionKey,
   applicationUrl: string
 ): ExtensionDraft => {
-  const { resourceTypeId, condition } = extensionData[extensionKey];
   return {
     key: extensionKey,
     timeoutInMs: 10000,
@@ -82,9 +81,8 @@ const newExtensionBody = (
     },
     triggers: [
       {
-        resourceTypeId,
         actions: ['Update'],
-        condition,
+        ...extensionData[extensionKey],
       },
     ],
   };
