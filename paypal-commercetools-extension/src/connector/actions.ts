@@ -317,8 +317,10 @@ export async function addOrUpdateCustomType(
         fieldDefinition: fieldDefinition,
       };
     });
-    if (updates.length > 0)
+    if (updates.length > 0) {
       await updateType(apiRoot, type.key, type.version, updates);
+      logger.info(`existing type ${type.key} is updated`);
+    }
   }
   if (!types.find((type) => type.key === customTypeKey)) {
     await apiRoot
@@ -353,16 +355,24 @@ export async function deleteOrUpdateCustomType(
       })
     );
     if (type.fieldDefinitions?.length === updates.length) {
-      await apiRoot
-        .types()
-        .withKey({ key })
-        .delete({
-          queryArgs: {
-            version,
-          },
-        })
-        .execute();
-      logger.info(`custom type with key ${key} is deleted`);
+      try {
+        await apiRoot
+          .types()
+          .withKey({ key })
+          .delete({
+            queryArgs: {
+              version,
+            },
+          })
+          .execute();
+        logger.info(`custom type with key ${key} is deleted`);
+      } catch (e) {
+        logger.warn(
+          `could not delete custom type ${key}: error "${
+            (e as Error).message
+          }" received`
+        );
+      }
     } else {
       if (updates.length) {
         await updateType(apiRoot, key, version, updates);
