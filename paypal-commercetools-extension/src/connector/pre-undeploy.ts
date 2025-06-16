@@ -1,7 +1,4 @@
 import dotenv from 'dotenv';
-
-dotenv.config();
-
 import { createApiRoot } from '../client/create.client';
 import { deleteWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
@@ -14,8 +11,13 @@ import {
 } from './actions';
 import {
   PAYPAL_CUSTOMER_EXTENSION_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
   PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  PAYPAL_PAYMENT_TYPE_KEY,
 } from '../constants';
+
+dotenv.config();
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
@@ -25,9 +27,9 @@ async function preUndeploy(properties: Map<string, unknown>): Promise<void> {
   assertString(applicationUrl, CONNECT_APPLICATION_URL_KEY);
   await deleteAccessTokenIfExists();
   await deleteWebhook();
-  await deleteOrUpdateCustomType(apiRoot, 'payment');
-  await deleteOrUpdateCustomType(apiRoot, 'customer');
-  await deleteOrUpdateCustomType(apiRoot, 'payment-interface-interaction');
+  await deleteOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_TYPE_KEY);
+  await deleteOrUpdateCustomType(apiRoot, PAYPAL_CUSTOMER_TYPE_KEY);
+  await deleteOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_INTERACTION_TYPE_KEY);
   await deleteExtension(apiRoot, PAYPAL_PAYMENT_EXTENSION_KEY, applicationUrl);
   await deleteExtension(apiRoot, PAYPAL_CUSTOMER_EXTENSION_KEY, applicationUrl);
 }

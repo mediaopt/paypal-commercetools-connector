@@ -49,58 +49,56 @@ const PAYPAL_API_CUSTOMER_ENDPOINTS = [
 ];
 
 type EndpointData = {
-  extensionKey: string;
   resourceTypeId: string;
   condition: string;
 };
 
-export type ExtensionResource = 'payment' | 'customer';
+export type ExtensionKey =
+  | typeof PAYPAL_PAYMENT_EXTENSION_KEY
+  | typeof PAYPAL_CUSTOMER_EXTENSION_KEY;
 
-const extensionData: Record<ExtensionResource, EndpointData> = {
-  payment: {
-    extensionKey: PAYPAL_PAYMENT_EXTENSION_KEY,
+const extensionData: Record<ExtensionKey, EndpointData> = {
+  [PAYPAL_PAYMENT_EXTENSION_KEY]: {
     resourceTypeId: 'payment',
     condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
   },
-  customer: {
-    extensionKey: PAYPAL_CUSTOMER_EXTENSION_KEY,
+  [PAYPAL_CUSTOMER_EXTENSION_KEY]: {
     resourceTypeId: 'customer',
     condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
   },
 };
 
 const newExtensionBody = (
-  { extensionKey, resourceTypeId, condition }: EndpointData,
+  extensionKey: ExtensionKey,
   applicationUrl: string
-): ExtensionDraft => ({
-  key: extensionKey,
-  timeoutInMs: 10000,
-  destination: {
-    type: 'HTTP',
-    url: applicationUrl,
-  },
-  triggers: [
-    {
-      resourceTypeId,
-      actions: ['Update'],
-      condition,
+): ExtensionDraft => {
+  const { resourceTypeId, condition } = extensionData[extensionKey];
+  return {
+    key: extensionKey,
+    timeoutInMs: 10000,
+    destination: {
+      type: 'HTTP',
+      url: applicationUrl,
     },
-  ],
-});
+    triggers: [
+      {
+        resourceTypeId,
+        actions: ['Update'],
+        condition,
+      },
+    ],
+  };
+};
 
 export async function createExtension(
   apiRoot: ByProjectKeyRequestBuilder,
   applicationUrl: string,
-  resource: ExtensionResource
+  extensionKey: ExtensionKey
 ) {
-  await deleteExtension(
-    apiRoot,
-    extensionData[resource].extensionKey,
-    applicationUrl
-  );
+  await deleteExtension(apiRoot, extensionKey, applicationUrl);
   await apiRoot
     .extensions()
-    .post({ body: newExtensionBody(extensionData[resource], applicationUrl) })
+    .post({ body: newExtensionBody(extensionKey, applicationUrl) })
     .execute();
 }
 
@@ -127,9 +125,16 @@ export async function deleteExtension(
   }
 }
 
-export type ConnectorCustomTypes =
-  | ExtensionResource
-  | 'payment-interface-interaction';
+export type PayPalCustomTypeKeys =
+  | typeof PAYPAL_PAYMENT_TYPE_KEY
+  | typeof PAYPAL_CUSTOMER_TYPE_KEY
+  | typeof PAYPAL_PAYMENT_INTERACTION_TYPE_KEY;
+
+const payPalCustomTypeKeys: PayPalCustomTypeKeys[] = [
+  PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+];
 
 type FieldDefinitionData = {
   name: string;
@@ -150,10 +155,10 @@ const apiCallNameToFieldData = (apiCallName: string): FieldDefinitionData[] => [
 ];
 
 const customFieldsDefinitionData: Record<
-  ConnectorCustomTypes,
+  PayPalCustomTypeKeys,
   FieldDefinitionData[]
 > = {
-  payment: [
+  [PAYPAL_PAYMENT_TYPE_KEY]: [
     {
       name: 'PayPalOrderId',
       label: {
@@ -171,7 +176,7 @@ const customFieldsDefinitionData: Record<
       apiCallNameToFieldData(endpoint)
     ).flat(),
   ],
-  customer: [
+  [PAYPAL_CUSTOMER_TYPE_KEY]: [
     {
       name: 'PayPalUserId',
       label: {
@@ -183,7 +188,7 @@ const customFieldsDefinitionData: Record<
       apiCallNameToFieldData(endpoint)
     ).flat(),
   ],
-  'payment-interface-interaction': [
+  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: [
     { name: 'type', inputHint: 'SingleLine' },
     { name: 'data', inputHint: 'MultiLine' },
     { name: 'timestamp', typeName: 'DateTime' },
@@ -203,47 +208,39 @@ const fieldCredentialsToDefinition = ({
   required: false,
 });
 
-const customTypesData: Record<
-  ConnectorCustomTypes,
-  { key: string; name: LocalizedString }
+const customTypesNames: Record<
+  PayPalCustomTypeKeys,
+  { name: LocalizedString }
 > = {
-  payment: {
-    key: PAYPAL_PAYMENT_TYPE_KEY,
+  [PAYPAL_PAYMENT_TYPE_KEY]: {
     name: {
       en: 'Custom payment type to PayPal fields',
     },
   },
-  customer: {
-    key: PAYPAL_CUSTOMER_TYPE_KEY,
+  [PAYPAL_CUSTOMER_TYPE_KEY]: {
     name: {
       en: 'Custom customer type for PayPal fields',
     },
   },
-  'payment-interface-interaction': {
-    key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
     name: {
       en: 'Custom payment interaction type to PayPal fields',
     },
   },
 };
 
-const customTypeDataToCustomType = (
-  customType: ConnectorCustomTypes
-): TypeDraft => ({
-  ...customTypesData[customType],
-  resourceTypeIds: [customType],
-  fieldDefinitions: customFieldsDefinitionData[customType].map(
+const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
+  ...customTypesNames[key],
+  key,
+  resourceTypeIds: [key],
+  fieldDefinitions: customFieldsDefinitionData[key].map(
     fieldCredentialsToDefinition
   ),
 });
 
-const customTypesDrafts: Record<ConnectorCustomTypes, TypeDraft> = {
-  payment: customTypeDataToCustomType('payment'),
-  customer: customTypeDataToCustomType('customer'),
-  'payment-interface-interaction': customTypeDataToCustomType(
-    'payment-interface-interaction'
-  ),
-};
+const customTypesDrafts = Object.fromEntries(
+  payPalCustomTypeKeys.map((key) => [key, customTypeDataToCustomType(key)])
+);
 
 async function queryTypesByResourceId(
   apiRoot: ByProjectKeyRequestBuilder,
@@ -297,9 +294,9 @@ async function updateType(
 
 export async function addOrUpdateCustomType(
   apiRoot: ByProjectKeyRequestBuilder,
-  customType: ConnectorCustomTypes
+  customTypeKey: PayPalCustomTypeKeys
 ): Promise<void> {
-  const customTypeDraft = customTypesDrafts[customType];
+  const customTypeDraft = customTypesDrafts[customTypeKey];
   const types = await queryTypesByResourceId(
     apiRoot,
     customTypeDraft.resourceTypeIds[0]
@@ -330,7 +327,7 @@ export async function addOrUpdateCustomType(
 
 export async function deleteOrUpdateCustomType(
   apiRoot: ByProjectKeyRequestBuilder,
-  customType: ConnectorCustomTypes
+  customType: PayPalCustomTypeKeys
 ) {
   const customTypeDraft = customTypesDrafts[customType];
   const types = await queryTypesByResourceId(

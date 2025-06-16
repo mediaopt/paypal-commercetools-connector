@@ -1,12 +1,19 @@
 import { describe, expect } from '@jest/globals';
 import {
-  createExtension,
   addOrUpdateCustomType,
-  deleteOrUpdateCustomType,
+  createExtension,
   deleteExtension,
-  ExtensionResource,
-  ConnectorCustomTypes,
+  deleteOrUpdateCustomType,
+  ExtensionKey,
+  PayPalCustomTypeKeys,
 } from '../src/connector/actions';
+import {
+  PAYPAL_CUSTOMER_EXTENSION_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  PAYPAL_PAYMENT_TYPE_KEY,
+} from '../src/constants';
 
 const dummyApplicationUrl = 'https://lorem.ipsum';
 
@@ -24,26 +31,25 @@ const dummyExistingExtensionResponse = {
   },
 };
 
-const extensionResources: ExtensionResource[] = ['payment', 'customer'];
+const extensionResources: ExtensionKey[] = [
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_CUSTOMER_EXTENSION_KEY,
+];
 
 const typesWithExpectedResults: {
-  type: ConnectorCustomTypes;
-  key: string;
+  key: PayPalCustomTypeKeys;
   expectedLength: number;
 }[] = [
   {
-    type: 'payment',
-    key: 'paypal-payment-type',
+    key: PAYPAL_PAYMENT_TYPE_KEY,
     expectedLength: 26, //PAYPAL_API_PAYMENT_ENDPOINTSx2+2
   },
   {
-    type: 'customer',
-    key: 'paypal-customer-type',
+    key: PAYPAL_CUSTOMER_TYPE_KEY,
     expectedLength: 11, //PAYPAL_API_CUSTOMER_ENDPOINTSx2+1
   },
   {
-    type: 'payment-interface-interaction',
-    key: 'paypal-payment-interaction-type',
+    key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
     expectedLength: 3,
   },
 ];
@@ -85,7 +91,7 @@ describe('Testing actions', () => {
 
   test.each(typesWithExpectedResults)(
     'create custom type for $type',
-    async ({ type, key, expectedLength }) => {
+    async ({ key, expectedLength }) => {
       const apiRequest: any = {
         execute: jest.fn(() => ({
           body: { results: [{ key, fieldDefinitions: [] }] },
@@ -97,7 +103,7 @@ describe('Testing actions', () => {
         post: jest.fn(() => apiRequest),
         get: jest.fn(() => apiRequest),
       };
-      await addOrUpdateCustomType(apiRoot, type);
+      await addOrUpdateCustomType(apiRoot, key);
       expect(apiRoot.get).toBeCalledTimes(1);
       expect(apiRoot.post).toBeCalledTimes(1);
       expect(apiRequest.execute).toBeCalledTimes(2);
@@ -126,7 +132,7 @@ describe('Testing actions', () => {
       post: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(apiRoot, 'payment');
+    await deleteOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_TYPE_KEY);
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(0);
     expect(apiRequest.execute).toBeCalledTimes(1);
@@ -154,7 +160,10 @@ describe('Testing actions', () => {
       post: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(apiRoot, 'payment-interface-interaction');
+    await deleteOrUpdateCustomType(
+      apiRoot,
+      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY
+    );
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
@@ -184,7 +193,10 @@ describe('Testing actions', () => {
       get: jest.fn(() => apiRequest),
       delete: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(apiRoot, 'payment-interface-interaction');
+    await deleteOrUpdateCustomType(
+      apiRoot,
+      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY
+    );
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
