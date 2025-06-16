@@ -51,6 +51,7 @@ const PAYPAL_API_CUSTOMER_ENDPOINTS = [
 type EndpointData = {
   resourceTypeId: string;
   condition: string;
+  timeoutInMs: number;
 };
 
 export type ExtensionKey =
@@ -61,20 +62,23 @@ const extensionData: Record<ExtensionKey, EndpointData> = {
   [PAYPAL_PAYMENT_EXTENSION_KEY]: {
     resourceTypeId: 'payment',
     condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
+    timeoutInMs: 10000,
   },
   [PAYPAL_CUSTOMER_EXTENSION_KEY]: {
     resourceTypeId: 'customer',
     condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
+    timeoutInMs: 2000,
   },
 };
 
 const newExtensionBody = (
-  extensionKey: ExtensionKey,
+  key: ExtensionKey,
   applicationUrl: string
 ): ExtensionDraft => {
+  const { resourceTypeId, condition, timeoutInMs } = extensionData[key];
   return {
-    key: extensionKey,
-    timeoutInMs: 10000,
+    key: key,
+    timeoutInMs,
     destination: {
       type: 'HTTP',
       url: applicationUrl,
@@ -82,7 +86,8 @@ const newExtensionBody = (
     triggers: [
       {
         actions: ['Update'],
-        ...extensionData[extensionKey],
+        resourceTypeId,
+        condition,
       },
     ],
   };
