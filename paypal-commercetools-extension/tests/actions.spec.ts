@@ -7,13 +7,6 @@ import {
   ExtensionKey,
   PayPalCustomTypeKeys,
 } from '../src/connector/actions';
-import {
-  PAYPAL_CUSTOMER_EXTENSION_KEY,
-  PAYPAL_CUSTOMER_TYPE_KEY,
-  PAYPAL_PAYMENT_EXTENSION_KEY,
-  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
-  PAYPAL_PAYMENT_TYPE_KEY,
-} from '../src/constants';
 
 const dummyApplicationUrl = 'https://lorem.ipsum';
 
@@ -32,8 +25,8 @@ const dummyExistingExtensionResponse = {
 };
 
 const extensionResources: ExtensionKey[] = [
-  PAYPAL_PAYMENT_EXTENSION_KEY,
-  PAYPAL_CUSTOMER_EXTENSION_KEY,
+  'paypal-payment-extension',
+  'paypal-customer-extension',
 ];
 
 const typesWithExpectedResults: {
@@ -41,37 +34,40 @@ const typesWithExpectedResults: {
   expectedLength: number;
 }[] = [
   {
-    key: PAYPAL_PAYMENT_TYPE_KEY,
+    key: 'paypal-payment-type',
     expectedLength: 26, //PAYPAL_API_PAYMENT_ENDPOINTSx2+2
   },
   {
-    key: PAYPAL_CUSTOMER_TYPE_KEY,
+    key: 'paypal-customer-type',
     expectedLength: 11, //PAYPAL_API_CUSTOMER_ENDPOINTSx2+1
   },
   {
-    key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+    key: 'paypal-payment-interaction-type',
     expectedLength: 3,
   },
 ];
 
-describe('Testing actions', () => {
-  test.each(extensionResources)('createExtension for %p', async (resource) => {
-    const apiRequest: any = {
-      execute: jest.fn(() => dummyExistingExtensionResponse),
-    };
-    const apiRoot: any = {
-      extensions: jest.fn(() => apiRoot),
-      withKey: jest.fn(() => apiRoot),
-      delete: jest.fn(() => apiRequest),
-      get: jest.fn(() => apiRequest),
-      post: jest.fn(() => apiRequest),
-    };
-    await createExtension(apiRoot, dummyApplicationUrl, resource);
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.delete).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(3);
-  });
+describe('Extension related actions', () => {
+  test.each(extensionResources)(
+    'createExtension for key %p',
+    async (resource) => {
+      const apiRequest: any = {
+        execute: jest.fn(() => dummyExistingExtensionResponse),
+      };
+      const apiRoot: any = {
+        extensions: jest.fn(() => apiRoot),
+        withKey: jest.fn(() => apiRoot),
+        delete: jest.fn(() => apiRequest),
+        get: jest.fn(() => apiRequest),
+        post: jest.fn(() => apiRequest),
+      };
+      await createExtension(apiRoot, dummyApplicationUrl, resource);
+      expect(apiRoot.get).toBeCalledTimes(1);
+      expect(apiRoot.delete).toBeCalledTimes(1);
+      expect(apiRoot.post).toBeCalledTimes(1);
+      expect(apiRequest.execute).toBeCalledTimes(3);
+    }
+  );
 
   test('delete extension', async () => {
     const apiRequest: any = {
@@ -88,9 +84,11 @@ describe('Testing actions', () => {
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
   });
+});
 
+describe('create custom type actions', () => {
   test.each(typesWithExpectedResults)(
-    'create custom type for $type',
+    'if type with $key already exists on the target resource, but the fields do not match - actions are sent to update field definitions',
     async ({ key, expectedLength }) => {
       const apiRequest: any = {
         execute: jest.fn(() => ({
@@ -113,6 +111,85 @@ describe('Testing actions', () => {
     }
   );
 
+  test('if there are multiple types on the target resource - all are updated to include missing fields, if none of the types has the same key - an extra type is created', async () => {
+    const apiRequest: any = {
+      execute: jest.fn(() => ({
+        body: {
+          results: [
+            { key: 'some-other-key1', fieldDefinitions: [] },
+            {
+              key: 'some-other-key2',
+              fieldDefinitions: [{ name: 'timestamp' }],
+            },
+          ],
+        },
+      })),
+    };
+    const apiRoot: any = {
+      types: jest.fn(() => apiRoot),
+      withKey: jest.fn(() => apiRoot),
+      post: jest.fn(() => apiRequest),
+      get: jest.fn(() => apiRequest),
+    };
+    await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
+    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRoot.post).toBeCalledTimes(3);
+    expect(apiRequest.execute).toBeCalledTimes(4);
+    expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(3);
+    expect(apiRoot.post.mock.calls[1][0].body.actions).toHaveLength(2);
+  });
+
+  test('if there are multiple types on the target resource - all are updated to include missing fields, if one of the types has the same key - an extra type is not created', async () => {
+    const apiRequest: any = {
+      execute: jest.fn(() => ({
+        body: {
+          results: [
+            { key: 'some-other-key1', fieldDefinitions: [] },
+            {
+              key: 'paypal-payment-interaction-type',
+              fieldDefinitions: [{ name: 'timestamp' }],
+            },
+          ],
+        },
+      })),
+    };
+    const apiRoot: any = {
+      types: jest.fn(() => apiRoot),
+      withKey: jest.fn(() => apiRoot),
+      post: jest.fn(() => apiRequest),
+      get: jest.fn(() => apiRequest),
+    };
+    await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
+    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRoot.post).toBeCalledTimes(2);
+    expect(apiRequest.execute).toBeCalledTimes(3);
+    expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(3);
+    expect(apiRoot.post.mock.calls[1][0].body.actions).toHaveLength(2);
+  });
+
+  test('if there are no types on the target resource - an extra type is created', async () => {
+    const apiRequest: any = {
+      execute: jest.fn(() => ({
+        body: {
+          results: [],
+        },
+      })),
+    };
+    const apiRoot: any = {
+      types: jest.fn(() => apiRoot),
+      withKey: jest.fn(() => apiRoot),
+      post: jest.fn(() => apiRequest),
+      get: jest.fn(() => apiRequest),
+    };
+    await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
+    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRoot.post).toBeCalledTimes(1);
+    expect(apiRequest.execute).toBeCalledTimes(2);
+    expect(apiRoot.post.mock.calls[0][0].body).not.toHaveProperty('actions');
+  });
+});
+
+describe('delete custom type', () => {
   test('do not affect custom type if it has no fields matching the draft', async () => {
     const apiRequest: any = {
       execute: jest.fn(() => ({
@@ -132,7 +209,7 @@ describe('Testing actions', () => {
       post: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_TYPE_KEY);
+    await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-type');
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(0);
     expect(apiRequest.execute).toBeCalledTimes(1);
@@ -160,10 +237,7 @@ describe('Testing actions', () => {
       post: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(
-      apiRoot,
-      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY
-    );
+    await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
@@ -193,10 +267,7 @@ describe('Testing actions', () => {
       get: jest.fn(() => apiRequest),
       delete: jest.fn(() => apiRequest),
     };
-    await deleteOrUpdateCustomType(
-      apiRoot,
-      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY
-    );
+    await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
