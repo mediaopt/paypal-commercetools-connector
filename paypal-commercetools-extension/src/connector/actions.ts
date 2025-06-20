@@ -294,7 +294,6 @@ async function updateType(
       },
     })
     .execute();
-  logger.info(`existing type ${key} is updated`);
 }
 
 export async function addOrUpdateCustomType(
