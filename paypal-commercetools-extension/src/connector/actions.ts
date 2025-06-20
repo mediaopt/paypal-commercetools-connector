@@ -1,28 +1,31 @@
 import {
+  ExtensionDraft,
   FieldDefinition,
   TypeAddFieldDefinitionAction,
   TypeDraft,
+  TypeRemoveFieldDefinitionAction,
+  TypeUpdateAction,
 } from '@commercetools/platform-sdk';
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import {
   CUSTOM_OBJECT_DEFAULT_VALUES,
   GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
   GRAPHQL_CUSTOMOBJECT_KEY_NAME,
+  PAYPAL_CUSTOMER_EXTENSION_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  PAYPAL_PAYMENT_TYPE_KEY,
 } from '../constants';
 import { findMatchingExtension } from '../service/commercetools.service';
 import {
   deleteAccessToken,
   getCachedAccessToken,
 } from '../service/config.service';
+import { logger } from '../utils/logger.utils';
+import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 
-export const PAYPAL_PAYMENT_EXTENSION_KEY = 'paypal-payment-extension';
-export const PAYPAL_CUSTOMER_EXTENSION_KEY = 'paypal-customer-extension';
-
-const PAYPAL_PAYMENT_TYPE_KEY = 'paypal-payment-type';
-export const PAYPAL_CUSTOMER_TYPE_KEY = 'paypal-customer-type';
-export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
-  'paypal-payment-interaction-type';
-export const PAYPAL_API_PAYMENT_ENDPOINTS = [
+const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'createPayPalOrder',
   'getClientToken',
   'authorizePayPalOrder',
@@ -37,7 +40,7 @@ export const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'updateTrackingInformation',
 ];
 
-export const PAYPAL_API_CUSTOMER_ENDPOINTS = [
+const PAYPAL_API_CUSTOMER_ENDPOINTS = [
   'createVaultSetupToken',
   'getUserIDToken',
   'createPaymentToken',
@@ -45,106 +48,62 @@ export const PAYPAL_API_CUSTOMER_ENDPOINTS = [
   'deletePaymentToken',
 ];
 
-export async function createPaymentUpdateExtension(
-  apiRoot: ByProjectKeyRequestBuilder,
+type EndpointData = {
+  resourceTypeId: string;
+  condition: string;
+  timeoutInMs: number;
+};
+
+export type ExtensionKey =
+  | typeof PAYPAL_PAYMENT_EXTENSION_KEY
+  | typeof PAYPAL_CUSTOMER_EXTENSION_KEY;
+
+const extensionData: Record<ExtensionKey, EndpointData> = {
+  [PAYPAL_PAYMENT_EXTENSION_KEY]: {
+    resourceTypeId: 'payment',
+    condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
+    timeoutInMs: 10000,
+  },
+  [PAYPAL_CUSTOMER_EXTENSION_KEY]: {
+    resourceTypeId: 'customer',
+    condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
+    timeoutInMs: 2000,
+  },
+};
+
+const newExtensionBody = (
+  key: ExtensionKey,
   applicationUrl: string
-): Promise<void> {
-  const {
-    body: { results: extensions },
-  } = await apiRoot
-    .extensions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_PAYMENT_EXTENSION_KEY}"`,
+): ExtensionDraft => {
+  const { resourceTypeId, condition, timeoutInMs } = extensionData[key];
+  return {
+    key: key,
+    timeoutInMs,
+    destination: {
+      type: 'HTTP',
+      url: applicationUrl,
+    },
+    triggers: [
+      {
+        actions: ['Update'],
+        resourceTypeId,
+        condition,
       },
-    })
-    .execute();
+    ],
+  };
+};
 
-  if (extensions.length > 0) {
-    const extension = extensions[0];
-
-    await apiRoot
-      .extensions()
-      .withKey({ key: PAYPAL_PAYMENT_EXTENSION_KEY })
-      .delete({
-        queryArgs: {
-          version: extension.version,
-        },
-      })
-      .execute();
-  }
-
+export async function createExtension(
+  apiRoot: ByProjectKeyRequestBuilder,
+  applicationUrl: string,
+  extensionKey: ExtensionKey
+) {
+  await deleteExtension(apiRoot, extensionKey, applicationUrl);
   await apiRoot
     .extensions()
-    .post({
-      body: {
-        key: PAYPAL_PAYMENT_EXTENSION_KEY,
-        timeoutInMs: 10000,
-        destination: {
-          type: 'HTTP',
-          url: applicationUrl,
-        },
-        triggers: [
-          {
-            resourceTypeId: 'payment',
-            actions: ['Update'],
-            condition: mapEndpointsToCondition(PAYPAL_API_PAYMENT_ENDPOINTS),
-          },
-        ],
-      },
-    })
+    .post({ body: newExtensionBody(extensionKey, applicationUrl) })
     .execute();
-}
-
-export async function createCustomerUpdateExtension(
-  apiRoot: ByProjectKeyRequestBuilder,
-  applicationUrl: string
-): Promise<void> {
-  const {
-    body: { results: extensions },
-  } = await apiRoot
-    .extensions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_CUSTOMER_EXTENSION_KEY}"`,
-      },
-    })
-    .execute();
-
-  if (extensions.length > 0) {
-    const extension = extensions[0];
-
-    await apiRoot
-      .extensions()
-      .withKey({ key: PAYPAL_CUSTOMER_EXTENSION_KEY })
-      .delete({
-        queryArgs: {
-          version: extension.version,
-        },
-      })
-      .execute();
-  }
-
-  await apiRoot
-    .extensions()
-    .post({
-      body: {
-        key: PAYPAL_CUSTOMER_EXTENSION_KEY,
-        timeoutInMs: 2000,
-        destination: {
-          type: 'HTTP',
-          url: applicationUrl,
-        },
-        triggers: [
-          {
-            resourceTypeId: 'customer',
-            actions: ['Update'],
-            condition: mapEndpointsToCondition(PAYPAL_API_CUSTOMER_ENDPOINTS),
-          },
-        ],
-      },
-    })
-    .execute();
+  logger.info(`extension with key ${extensionKey} is created`);
 }
 
 export async function deleteExtension(
@@ -170,170 +129,260 @@ export async function deleteExtension(
   }
 }
 
-export async function createCustomPaymentType(
-  apiRoot: ByProjectKeyRequestBuilder
-): Promise<void> {
-  const fieldDefinitions: FieldDefinition[] = [
+export type PayPalCustomTypeKeys =
+  | typeof PAYPAL_PAYMENT_TYPE_KEY
+  | typeof PAYPAL_CUSTOMER_TYPE_KEY
+  | typeof PAYPAL_PAYMENT_INTERACTION_TYPE_KEY;
+
+const payPalCustomTypeKeys: PayPalCustomTypeKeys[] = [
+  PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+];
+
+type FieldDefinitionData = {
+  name: string;
+  label?: LocalizedString;
+  typeName?: 'String' | 'DateTime';
+  inputHint?: 'SingleLine' | 'MultiLine';
+};
+
+const apiCallNameToFieldData = (apiCallName: string): FieldDefinitionData[] => [
+  {
+    name: `${apiCallName}Request`,
+    inputHint: 'MultiLine',
+  },
+  {
+    name: `${apiCallName}Response`,
+    inputHint: 'MultiLine',
+  },
+];
+
+const customFieldsDefinitionData: Record<
+  PayPalCustomTypeKeys,
+  FieldDefinitionData[]
+> = {
+  [PAYPAL_PAYMENT_TYPE_KEY]: [
     {
-      name: `PayPalOrderId`,
+      name: 'PayPalOrderId',
       label: {
         en: `PayPal Order Id`,
         de: 'PayPal Bestellnummer',
       },
-      type: {
-        name: 'String',
-      },
-      required: false,
     },
     {
       name: 'PayPalCustomId',
       label: {
         en: 'PayPal custom id',
       },
-      type: { name: 'String' },
-      required: false,
     },
-  ];
-  PAYPAL_API_PAYMENT_ENDPOINTS.forEach((element) =>
-    fieldDefinitions.push(
-      {
-        name: `${element}Request`,
-        label: {
-          en: `${element}Request`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      },
-      {
-        name: `${element}Response`,
-        label: {
-          en: `${element}Response`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      }
-    )
-  );
-  const customType = {
-    key: PAYPAL_PAYMENT_TYPE_KEY,
-    name: {
-      en: 'Custom payment type to PayPal fields',
-    },
-    resourceTypeIds: ['payment'],
-    fieldDefinitions: fieldDefinitions,
-  };
-  await addOrUpdateCustomType(apiRoot, customType);
-}
-
-export async function createCustomCustomerType(
-  apiRoot: ByProjectKeyRequestBuilder
-): Promise<void> {
-  const fieldDefinitions: FieldDefinition[] = [
+    ...PAYPAL_API_PAYMENT_ENDPOINTS.map((endpoint) =>
+      apiCallNameToFieldData(endpoint)
+    ).flat(),
+  ],
+  [PAYPAL_CUSTOMER_TYPE_KEY]: [
     {
-      name: `PayPalUserId`,
+      name: 'PayPalUserId',
       label: {
         en: `PayPal User Id`,
         de: 'PayPal Kundernummer',
       },
-      type: {
-        name: 'String',
-      },
-      required: false,
     },
-  ];
-  PAYPAL_API_CUSTOMER_ENDPOINTS.forEach((element) =>
-    fieldDefinitions.push(
-      {
-        name: `${element}Request`,
-        label: {
-          en: `${element}Request`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      },
-      {
-        name: `${element}Response`,
-        label: {
-          en: `${element}Response`,
-        },
-        type: {
-          name: 'String',
-        },
-        inputHint: 'MultiLine',
-        required: false,
-      }
-    )
-  );
-  const customType = {
-    key: PAYPAL_CUSTOMER_TYPE_KEY,
+    ...PAYPAL_API_CUSTOMER_ENDPOINTS.map((endpoint) =>
+      apiCallNameToFieldData(endpoint)
+    ).flat(),
+  ],
+  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: [
+    { name: 'type', inputHint: 'SingleLine' },
+    { name: 'data', inputHint: 'MultiLine' },
+    { name: 'timestamp', typeName: 'DateTime' },
+  ],
+};
+
+const fieldCredentialsToDefinition = ({
+  name,
+  label,
+  typeName,
+  inputHint,
+}: FieldDefinitionData): FieldDefinition => ({
+  name,
+  label: label ?? { en: name },
+  type: { name: typeName ?? 'String' },
+  inputHint,
+  required: false,
+});
+
+const customTypesNames: Record<
+  PayPalCustomTypeKeys,
+  { name: LocalizedString; resourceTypeIds: string[] }
+> = {
+  [PAYPAL_PAYMENT_TYPE_KEY]: {
+    name: {
+      en: 'Custom payment type to PayPal fields',
+    },
+    resourceTypeIds: ['payment'],
+  },
+  [PAYPAL_CUSTOMER_TYPE_KEY]: {
     name: {
       en: 'Custom customer type for PayPal fields',
     },
     resourceTypeIds: ['customer'],
-    fieldDefinitions: fieldDefinitions,
-  };
-  await addOrUpdateCustomType(apiRoot, customType);
-}
+  },
+  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
+    name: {
+      en: 'Custom payment interaction type to PayPal fields',
+    },
+    resourceTypeIds: ['payment-interface-interaction'],
+  },
+};
 
-async function addOrUpdateCustomType(
+const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
+  ...customTypesNames[key],
+  key,
+  fieldDefinitions: customFieldsDefinitionData[key].map(
+    fieldCredentialsToDefinition
+  ),
+});
+
+const customTypesDrafts = Object.fromEntries(
+  payPalCustomTypeKeys.map((key) => [key, customTypeDataToCustomType(key)])
+);
+
+async function queryTypesByResourceId(
   apiRoot: ByProjectKeyRequestBuilder,
-  customType: TypeDraft
-): Promise<void> {
+  resourceTypeId: string
+) {
   const {
     body: { results: types },
   } = await apiRoot
     .types()
     .get({
       queryArgs: {
-        where: `resourceTypeIds contains any ("${customType.resourceTypeIds[0]}")`,
+        where: `resourceTypeIds contains any ("${resourceTypeId}")`,
       },
     })
     .execute();
+  return types;
+}
 
+const findMatchingDefinitions = (
+  newDefinitions: FieldDefinition[],
+  existingDefinitions: FieldDefinition[],
+  alreadyExisting = false
+) =>
+  newDefinitions.filter((newFieldDefinition: FieldDefinition): boolean => {
+    const alreadyExists = existingDefinitions.some(
+      (existingFieldDefinition: FieldDefinition): boolean =>
+        newFieldDefinition.name === existingFieldDefinition.name
+    );
+    return alreadyExisting ? alreadyExists : !alreadyExists;
+  });
+
+async function updateType(
+  apiRoot: ByProjectKeyRequestBuilder,
+  key: string,
+  version: number,
+  actions: TypeUpdateAction[]
+) {
+  await apiRoot
+    .types()
+    .withKey({ key })
+    .post({
+      body: {
+        version,
+        actions,
+      },
+    })
+    .execute();
+}
+
+export async function addOrUpdateCustomType(
+  apiRoot: ByProjectKeyRequestBuilder,
+  customTypeKey: PayPalCustomTypeKeys
+): Promise<void> {
+  const customTypeDraft = customTypesDrafts[customTypeKey];
+  const types = await queryTypesByResourceId(
+    apiRoot,
+    customTypeDraft.resourceTypeIds[0]
+  );
   for (const type of types) {
-    const updates = (customType.fieldDefinitions ?? [])
-      .filter(
-        (newFieldDefinition: FieldDefinition): boolean =>
-          !type.fieldDefinitions.find(
-            (existingFieldDefinition: FieldDefinition): boolean =>
-              newFieldDefinition.name === existingFieldDefinition.name
-          )
-      )
-      .map((fieldDefinition: FieldDefinition): TypeAddFieldDefinitionAction => {
-        return {
-          action: 'addFieldDefinition',
-          fieldDefinition: fieldDefinition,
-        };
-      });
-    if (updates.length != 0) {
-      await apiRoot
-        .types()
-        .withKey({ key: type.key })
-        .post({
-          body: {
-            version: type.version,
-            actions: updates,
-          },
-        })
-        .execute();
+    const updates = findMatchingDefinitions(
+      customTypeDraft.fieldDefinitions ?? [],
+      type.fieldDefinitions,
+      false
+    ).map((fieldDefinition: FieldDefinition): TypeAddFieldDefinitionAction => {
+      return {
+        action: 'addFieldDefinition',
+        fieldDefinition: fieldDefinition,
+      };
+    });
+    if (updates.length > 0) {
+      await updateType(apiRoot, type.key, type.version, updates);
+      logger.info(`existing type ${type.key} is updated`);
     }
   }
-  if (!types.find((type) => type.key === customType.key)) {
+  if (!types.find((type) => type.key === customTypeKey)) {
     await apiRoot
       .types()
       .post({
-        body: customType,
+        body: customTypeDraft,
       })
       .execute();
+    logger.info(`type ${customTypeKey} is created`);
+  }
+}
+
+export async function deleteOrUpdateCustomType(
+  apiRoot: ByProjectKeyRequestBuilder,
+  customType: PayPalCustomTypeKeys
+) {
+  const customTypeDraft = customTypesDrafts[customType];
+  const types = await queryTypesByResourceId(
+    apiRoot,
+    customTypeDraft.resourceTypeIds[0]
+  );
+  for (const type of types) {
+    const { key, version, fieldDefinitions } = type;
+    const updates = findMatchingDefinitions(
+      customTypeDraft.fieldDefinitions ?? [],
+      fieldDefinitions,
+      true
+    ).map(
+      (fieldDefinition: FieldDefinition): TypeRemoveFieldDefinitionAction => ({
+        action: 'removeFieldDefinition',
+        fieldName: fieldDefinition.name,
+      })
+    );
+    if (type.fieldDefinitions?.length === updates.length) {
+      try {
+        await apiRoot
+          .types()
+          .withKey({ key })
+          .delete({
+            queryArgs: {
+              version,
+            },
+          })
+          .execute();
+        logger.info(`custom type with key ${key} is deleted`);
+      } catch (e) {
+        logger.warn(
+          `could not delete custom type ${key}: error "${
+            (e as Error).message
+          }" received`
+        );
+      }
+    } else {
+      if (updates.length) {
+        await updateType(apiRoot, key, version, updates);
+        logger.info(
+          `only fields related to custom type ${customType} of type ${key} were removed`
+        );
+      } else
+        logger.info(
+          `type ${key} had no fields that match the custom type ${customType}`
+        );
+    }
   }
 }
 
@@ -345,54 +394,6 @@ function mapEndpointsToCondition(endpoints: string[]) {
       .join(' or ') +
     ')'
   );
-}
-
-export async function createCustomPaymentInteractionType(
-  apiRoot: ByProjectKeyRequestBuilder
-): Promise<void> {
-  const fieldDefinitions: FieldDefinition[] = [
-    {
-      name: 'type',
-      label: {
-        en: 'type',
-      },
-      type: {
-        name: 'String',
-      },
-      inputHint: 'SingleLine',
-      required: false,
-    },
-    {
-      name: 'data',
-      label: {
-        en: 'data',
-      },
-      type: {
-        name: 'String',
-      },
-      inputHint: 'MultiLine',
-      required: false,
-    },
-    {
-      name: 'timestamp',
-      label: {
-        en: 'timestamp',
-      },
-      type: {
-        name: 'DateTime',
-      },
-      required: false,
-    },
-  ];
-  const customType = {
-    key: PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
-    name: {
-      en: 'Custom payment interaction type to PayPal fields',
-    },
-    resourceTypeIds: ['payment-interface-interaction'],
-    fieldDefinitions: fieldDefinitions,
-  };
-  await addOrUpdateCustomType(apiRoot, customType);
 }
 
 export async function createAndSetCustomObject(

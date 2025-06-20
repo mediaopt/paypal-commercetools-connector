@@ -373,6 +373,7 @@ const getAPIEndpoint = () => {
 export const createWebhook = async () => {
   const webhookId = await getWebhookId();
   if (webhookId) {
+    logger.info('existing webhook found, new webhook will not be created');
     return;
   }
   const gateway = await getPayPalWebhooksGateway();

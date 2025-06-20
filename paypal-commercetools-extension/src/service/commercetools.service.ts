@@ -11,10 +11,7 @@ import {
 } from '@commercetools/platform-sdk';
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import { createApiRoot } from '../client/create.client';
-import {
-  PAYPAL_CUSTOMER_TYPE_KEY,
-  PAYPAL_PAYMENT_EXTENSION_KEY,
-} from '../connector/actions';
+
 import CustomError from '../errors/custom.error';
 import { Authorization2, Capture2 } from '../paypal/payments_api';
 import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
@@ -28,6 +25,10 @@ import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
 import { updatePaymentFields } from './payments.service';
 import { getPayPalOrder } from './paypal.service';
+import {
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+} from '../constants';
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
   const payments = await createApiRoot()
