@@ -6,14 +6,18 @@ import { createWebhook } from '../service/paypal.service';
 import { assertError, assertString } from '../utils/assert.utils';
 import { readConfiguration } from '../utils/config.utils';
 import {
+  addOrUpdateCustomType,
   createAndSetCustomObject,
-  createCustomCustomerType,
-  createCustomerUpdateExtension,
-  createCustomPaymentInteractionType,
-  createCustomPaymentType,
-  createPaymentUpdateExtension,
+  createExtension,
   deleteAccessTokenIfExists,
 } from './actions';
+import {
+  PAYPAL_CUSTOMER_EXTENSION_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  PAYPAL_PAYMENT_TYPE_KEY,
+} from '../constants';
 
 const CONNECT_APPLICATION_URL_KEY = 'CONNECT_SERVICE_URL';
 
@@ -24,11 +28,11 @@ async function postDeploy(properties: Map<string, unknown>): Promise<void> {
 
   const apiRoot = createApiRoot();
   await deleteAccessTokenIfExists();
-  await createPaymentUpdateExtension(apiRoot, applicationUrl);
-  await createCustomerUpdateExtension(apiRoot, applicationUrl);
-  await createCustomPaymentType(apiRoot);
-  await createCustomCustomerType(apiRoot);
-  await createCustomPaymentInteractionType(apiRoot);
+  await createExtension(apiRoot, applicationUrl, PAYPAL_PAYMENT_EXTENSION_KEY);
+  await createExtension(apiRoot, applicationUrl, PAYPAL_CUSTOMER_EXTENSION_KEY);
+  await addOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_TYPE_KEY);
+  await addOrUpdateCustomType(apiRoot, PAYPAL_CUSTOMER_TYPE_KEY);
+  await addOrUpdateCustomType(apiRoot, PAYPAL_PAYMENT_INTERACTION_TYPE_KEY);
   await createWebhook();
   await createAndSetCustomObject(apiRoot);
 }

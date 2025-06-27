@@ -1,9 +1,9 @@
 import { AxiosError } from 'axios';
-import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../connector/actions';
 import { ErrorDetails } from '../paypal/checkout_api';
 import { StringOrObject, UpdateActions } from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
+import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../constants';
 
 const errorDetailsMapping = {
   PAYMENT_SOURCE_DECLINED_BY_PROCESSOR: 'paymentSourceDeclined',

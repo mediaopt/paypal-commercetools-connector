@@ -12,6 +12,12 @@ const mockConfigModule = () => {
               type: 'HTTP',
               url: 'https://lorem.ipsum',
             },
+            key: 'paymentInteractionMockType',
+            fieldDefinitions: [
+              { name: 'type' },
+              { name: 'data' },
+              { name: 'timestamp' },
+            ],
           },
         ],
       },
@@ -19,6 +25,7 @@ const mockConfigModule = () => {
   };
   apiRoot = {
     customObjects: jest.fn(() => apiRoot),
+    types: jest.fn(() => apiRoot),
     extensions: jest.fn(() => apiRoot),
     withKey: jest.fn(() => apiRoot),
     withContainerAndKey: jest.fn(() => apiRoot),
@@ -42,9 +49,9 @@ describe('Testing pre undeploy', () => {
   test('Testing pre undeploy', async () => {
     require('../src/connector/pre-undeploy');
     await sleep(5000);
-    expect(apiRoot.delete).toBeCalledTimes(3);
-    expect(apiRoot.get).toBeCalledTimes(5);
+    expect(apiRoot.delete).toBeCalledTimes(4);
+    expect(apiRoot.get).toBeCalledTimes(8);
     expect(apiRoot.post).toBeCalledTimes(2);
-    expect(apiRequest.execute).toBeCalledTimes(10);
+    expect(apiRequest.execute).toBeCalledTimes(14);
   }, 15000);
 });
