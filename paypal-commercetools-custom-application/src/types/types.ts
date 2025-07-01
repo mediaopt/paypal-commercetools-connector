@@ -1,5 +1,5 @@
 import { ChangeEvent } from 'react';
-import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
+import { LocalizedString } from '@commercetools-frontend/l10n/dist/declarations/src/types';
 
 export type SettingsFormDataType = {
   acceptPayPal: boolean;
