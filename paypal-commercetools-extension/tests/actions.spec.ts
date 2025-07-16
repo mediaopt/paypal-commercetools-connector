@@ -137,6 +137,9 @@ describe('create custom type actions', () => {
     expect(apiRequest.execute).toBeCalledTimes(4);
     expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(3);
     expect(apiRoot.post.mock.calls[1][0].body.actions).toHaveLength(2);
+    expect(apiRoot.post.mock.calls[2][0].body.key).toEqual(
+      'paypal-payment-interaction-type'
+    );
   });
 
   test('if there are multiple types on the target resource - all are updated to include missing fields, if one of the types has the same key - an extra type is not created', async () => {
@@ -186,6 +189,9 @@ describe('create custom type actions', () => {
     expect(apiRoot.post).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
     expect(apiRoot.post.mock.calls[0][0].body).not.toHaveProperty('actions');
+    expect(apiRoot.post.mock.calls[0][0].body.key).toEqual(
+      'paypal-payment-interaction-type'
+    );
   });
 });
 
