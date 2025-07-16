@@ -305,6 +305,7 @@ export async function addOrUpdateCustomType(
   customTypeKey: PayPalCustomTypeKeys
 ): Promise<void> {
   const customTypeDraft = customTypesDrafts[customTypeKey];
+  const actualKey = customTypeDraft.key;
   const types = await queryTypesByResourceId(
     apiRoot,
     customTypeDraft.resourceTypeIds[0]
@@ -325,14 +326,14 @@ export async function addOrUpdateCustomType(
       logger.info(`existing type ${type.key} is updated`);
     }
   }
-  if (!types.find((type) => type.key === customTypeKey)) {
+  if (!types.find((type) => type.key === actualKey)) {
     await apiRoot
       .types()
       .post({
         body: customTypeDraft,
       })
       .execute();
-    logger.info(`type ${customTypeKey} is created`);
+    logger.info(`type ${actualKey} is created`);
   }
 }
 
