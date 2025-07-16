@@ -214,31 +214,35 @@ const fieldCredentialsToDefinition = ({
 
 const customTypesNames: Record<
   PayPalCustomTypeKeys,
-  { name: LocalizedString; resourceTypeIds: string[] }
+  { name: LocalizedString; resourceTypeIds: string[]; key: string }
 > = {
   [PAYPAL_PAYMENT_TYPE_KEY]: {
     name: {
       en: 'Custom payment type to PayPal fields',
     },
     resourceTypeIds: ['payment'],
+    key: process.env.PAYMENT_TYPE_KEY ?? PAYPAL_PAYMENT_TYPE_KEY,
   },
   [PAYPAL_CUSTOMER_TYPE_KEY]: {
     name: {
       en: 'Custom customer type for PayPal fields',
     },
     resourceTypeIds: ['customer'],
+    key: process.env.CUSTOMER_TYPE_KEY ?? PAYPAL_CUSTOMER_TYPE_KEY,
   },
   [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
     name: {
       en: 'Custom payment interaction type to PayPal fields',
     },
     resourceTypeIds: ['payment-interface-interaction'],
+    key:
+      process.env.PAYMENT_INTERACTION_TYPE_KEY ??
+      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   },
 };
 
 const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
   ...customTypesNames[key],
-  key,
   fieldDefinitions: customFieldsDefinitionData[key].map(
     fieldCredentialsToDefinition
   ),
