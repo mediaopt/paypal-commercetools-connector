@@ -98,24 +98,19 @@ export async function createExtension(
   applicationUrl: string,
   extensionKey: ExtensionKey
 ) {
-  await deleteExtension(apiRoot, extensionKey, applicationUrl);
+  await deleteExtension(apiRoot, extensionKey);
   await apiRoot
     .extensions()
     .post({ body: newExtensionBody(extensionKey, applicationUrl) })
     .execute();
-  logger.info(`extension with key ${extensionKey} is created`);
+  logger.info(`new extension with key ${extensionKey} is created`);
 }
 
 export async function deleteExtension(
   apiRoot: ByProjectKeyRequestBuilder,
-  extensionKey: string,
-  applicationUrl: string
+  extensionKey: string
 ): Promise<void> {
-  const extension = await findMatchingExtension(
-    apiRoot,
-    extensionKey,
-    applicationUrl
-  );
+  const extension = await findMatchingExtension(apiRoot, extensionKey);
   if (extension) {
     await apiRoot
       .extensions()
@@ -127,6 +122,7 @@ export async function deleteExtension(
       })
       .execute();
   }
+  logger.info(`extension ${extensionKey} is deleted`);
 }
 
 export type PayPalCustomTypeKeys =
