@@ -394,9 +394,9 @@ export const deleteWebhook = async () => {
   if (!webhookId) {
     return;
   }
-  logger.info(`Deleting webhook with WebhookId ${webhookId}`);
   try {
     await gateway.webhooksDelete(webhookId);
+    logger.info(`Webhook ${webhookId} is deleted`);
   } catch (e) {
     if (e instanceof AxiosError && e.response?.status === 404) {
       logger.info('Webhook is already deleted');
