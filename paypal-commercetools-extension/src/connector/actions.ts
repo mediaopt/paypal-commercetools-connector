@@ -342,6 +342,7 @@ export async function deleteOrUpdateCustomType(
   customType: PayPalCustomTypeKeys
 ) {
   const customTypeDraft = customTypesDrafts[customType];
+  const actualKey = customTypeDraft.key;
   const types = await queryTypesByResourceId(
     apiRoot,
     customTypeDraft.resourceTypeIds[0]
@@ -381,11 +382,11 @@ export async function deleteOrUpdateCustomType(
       if (updates.length) {
         await updateType(apiRoot, key, version, updates);
         logger.info(
-          `only fields related to custom type ${customType} of type ${key} were removed`
+          `only fields related to custom type ${actualKey} of type ${key} were removed`
         );
       } else
         logger.info(
-          `type ${key} had no fields that match the custom type ${customType}`
+          `type ${key} had no fields that match the custom type ${actualKey}`
         );
     }
   }
