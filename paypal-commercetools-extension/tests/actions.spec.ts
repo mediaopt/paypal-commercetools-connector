@@ -81,7 +81,7 @@ describe('Extension related actions', () => {
       delete: jest.fn(() => apiRequest),
       get: jest.fn(() => apiRequest),
     };
-    await deleteExtension(apiRoot, 'dummyExtensionKey', dummyApplicationUrl);
+    await deleteExtension(apiRoot, 'dummyExtensionKey');
     expect(apiRoot.get).toBeCalledTimes(1);
     expect(apiRoot.delete).toBeCalledTimes(1);
     expect(apiRequest.execute).toBeCalledTimes(2);
