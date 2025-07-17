@@ -320,7 +320,7 @@ export async function addOrUpdateCustomType(
     if (updates.length > 0) {
       await updateType(apiRoot, type.key, type.version, updates);
       logger.info(`existing type ${type.key} is updated`);
-    }
+    } else logger.info(`type ${type.key} already had all necessary fields`);
   }
   if (!types.find((type) => type.key === actualKey)) {
     await apiRoot
@@ -330,7 +330,7 @@ export async function addOrUpdateCustomType(
       })
       .execute();
     logger.info(`type ${actualKey} is created`);
-  }
+  } else logger.info(`the type ${actualKey} already existed`);
 }
 
 export async function deleteOrUpdateCustomType(
@@ -436,5 +436,6 @@ export async function createAndSetCustomObject(
 export const deleteAccessTokenIfExists = async () => {
   if (await getCachedAccessToken()) {
     await deleteAccessToken();
+    logger.info('previous access token is deleted');
   }
 };
