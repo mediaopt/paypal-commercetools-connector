@@ -328,8 +328,7 @@ export const getPayPalUserId = async (
 
 export async function findMatchingExtension(
   apiRoot: ByProjectKeyRequestBuilder,
-  extensionKey: string,
-  applicationUrl: string
+  extensionKey: string
 ): Promise<Extension | undefined> {
   const {
     body: { results: extensions },
@@ -341,12 +340,7 @@ export async function findMatchingExtension(
       },
     })
     .execute();
-
-  const matchingExtensions = extensions.filter(
-    ({ destination }) =>
-      destination.type === 'HTTP' && destination.url === applicationUrl
-  );
-  return matchingExtensions.length > 0 ? matchingExtensions[0] : undefined;
+  return extensions.length > 0 ? extensions[0] : undefined;
 }
 
 export const getPayPalExtensionUrl = async () => {

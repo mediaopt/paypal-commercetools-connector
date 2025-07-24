@@ -98,24 +98,19 @@ export async function createExtension(
   applicationUrl: string,
   extensionKey: ExtensionKey
 ) {
-  await deleteExtension(apiRoot, extensionKey, applicationUrl);
+  await deleteExtension(apiRoot, extensionKey);
   await apiRoot
     .extensions()
     .post({ body: newExtensionBody(extensionKey, applicationUrl) })
     .execute();
-  logger.info(`extension with key ${extensionKey} is created`);
+  logger.info(`new extension with key ${extensionKey} is created`);
 }
 
 export async function deleteExtension(
   apiRoot: ByProjectKeyRequestBuilder,
-  extensionKey: string,
-  applicationUrl: string
+  extensionKey: string
 ): Promise<void> {
-  const extension = await findMatchingExtension(
-    apiRoot,
-    extensionKey,
-    applicationUrl
-  );
+  const extension = await findMatchingExtension(apiRoot, extensionKey);
   if (extension) {
     await apiRoot
       .extensions()
@@ -127,6 +122,7 @@ export async function deleteExtension(
       })
       .execute();
   }
+  logger.info(`extension ${extensionKey} is deleted`);
 }
 
 export type PayPalCustomTypeKeys =
@@ -214,31 +210,35 @@ const fieldCredentialsToDefinition = ({
 
 const customTypesNames: Record<
   PayPalCustomTypeKeys,
-  { name: LocalizedString; resourceTypeIds: string[] }
+  { name: LocalizedString; resourceTypeIds: string[]; key: string }
 > = {
   [PAYPAL_PAYMENT_TYPE_KEY]: {
     name: {
       en: 'Custom payment type to PayPal fields',
     },
     resourceTypeIds: ['payment'],
+    key: process.env.PAYMENT_TYPE_KEY ?? PAYPAL_PAYMENT_TYPE_KEY,
   },
   [PAYPAL_CUSTOMER_TYPE_KEY]: {
     name: {
       en: 'Custom customer type for PayPal fields',
     },
     resourceTypeIds: ['customer'],
+    key: process.env.CUSTOMER_TYPE_KEY ?? PAYPAL_CUSTOMER_TYPE_KEY,
   },
   [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
     name: {
       en: 'Custom payment interaction type to PayPal fields',
     },
     resourceTypeIds: ['payment-interface-interaction'],
+    key:
+      process.env.PAYMENT_INTERACTION_TYPE_KEY ??
+      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   },
 };
 
 const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
   ...customTypesNames[key],
-  key,
   fieldDefinitions: customFieldsDefinitionData[key].map(
     fieldCredentialsToDefinition
   ),
@@ -301,6 +301,7 @@ export async function addOrUpdateCustomType(
   customTypeKey: PayPalCustomTypeKeys
 ): Promise<void> {
   const customTypeDraft = customTypesDrafts[customTypeKey];
+  const actualKey = customTypeDraft.key;
   const types = await queryTypesByResourceId(
     apiRoot,
     customTypeDraft.resourceTypeIds[0]
@@ -319,17 +320,17 @@ export async function addOrUpdateCustomType(
     if (updates.length > 0) {
       await updateType(apiRoot, type.key, type.version, updates);
       logger.info(`existing type ${type.key} is updated`);
-    }
+    } else logger.info(`type ${type.key} already had all necessary fields`);
   }
-  if (!types.find((type) => type.key === customTypeKey)) {
+  if (!types.find((type) => type.key === actualKey)) {
     await apiRoot
       .types()
       .post({
         body: customTypeDraft,
       })
       .execute();
-    logger.info(`type ${customTypeKey} is created`);
-  }
+    logger.info(`type ${actualKey} is created`);
+  } else logger.info(`the type ${actualKey} already existed`);
 }
 
 export async function deleteOrUpdateCustomType(
@@ -337,6 +338,7 @@ export async function deleteOrUpdateCustomType(
   customType: PayPalCustomTypeKeys
 ) {
   const customTypeDraft = customTypesDrafts[customType];
+  const actualKey = customTypeDraft.key;
   const types = await queryTypesByResourceId(
     apiRoot,
     customTypeDraft.resourceTypeIds[0]
@@ -376,11 +378,11 @@ export async function deleteOrUpdateCustomType(
       if (updates.length) {
         await updateType(apiRoot, key, version, updates);
         logger.info(
-          `only fields related to custom type ${customType} of type ${key} were removed`
+          `only fields related to custom type ${actualKey} of type ${key} were removed`
         );
       } else
         logger.info(
-          `type ${key} had no fields that match the custom type ${customType}`
+          `type ${key} had no fields that match the custom type ${actualKey}`
         );
     }
   }
@@ -434,5 +436,6 @@ export async function createAndSetCustomObject(
 export const deleteAccessTokenIfExists = async () => {
   if (await getCachedAccessToken()) {
     await deleteAccessToken();
+    logger.info('previous access token is deleted');
   }
 };

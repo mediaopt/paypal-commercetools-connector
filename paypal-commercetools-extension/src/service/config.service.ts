@@ -35,7 +35,7 @@ export const getCachedAccessToken = async () => {
         .execute()
     ).body;
   } catch (e) {
-    logger.warn('Failed to load cached access token', e);
+    logger.info(`Failed to load cached access token ${(e as Error).message}`);
     return undefined;
   }
 };
