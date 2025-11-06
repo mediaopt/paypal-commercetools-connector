@@ -45,7 +45,7 @@ export const post = async (request: Request, response: Response) => {
     logger.info('Webhook called');
     const { resource_type, event_type, resource, summary } = request.body;
     logger.info(
-      `Got ${event_type} for ${resource_type} with id ${resource.id}`
+      `Got webhook called with ${event_type} for ${resource_type} with id ${resource.id}`
     );
     logger.info(summary);
     await verifyWebhookSignature(request);
@@ -77,11 +77,11 @@ export const post = async (request: Request, response: Response) => {
       default:
         throw new CustomError(
           500,
-          `Internal Server Error - Resource not recognized. Allowed resource_types are 'capture' and 'checkout-order'.`
+          `Internal Server Error - Resource not recognized. Expected values for resource_type are: 'capture', 'checkout-order', 'refund','authorization' and 'payment_token'. Received resource_type ${resource_type} with id ${resource.id} and event ${event_type}`
         );
     }
   } catch (error) {
-    logger.info('Error occured', error);
+    logger.info('Error occurred', error);
 
     response.status(200).json({});
     return;
