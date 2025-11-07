@@ -20,6 +20,7 @@ import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
 } from '../utils/map.utils';
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
@@ -29,6 +30,9 @@ import {
   PAYPAL_CUSTOMER_TYPE_KEY,
   PAYPAL_PAYMENT_EXTENSION_KEY,
 } from '../constants';
+import { sleep } from '../utils/response.utils';
+
+const TIMEOUT_PAYMENT = 9500;
 
 const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
   const payments = await createApiRoot()
@@ -49,7 +53,9 @@ const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
     );
   }
 
-  logger.info(`Found payment with id ${results[0].id}`);
+  logger.info(
+    `For the PayPal order found assigned commercetools payment with id ${results[0].id}`
+  );
   return results[0];
 };
 
@@ -147,9 +153,15 @@ export const handleCaptureWebhook = async (
   eventType: string
 ) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
-  const payment = await getPaymentByPayPalOrderId(orderId);
   const payPalOrder = await getPayPalOrder(orderId);
   const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
+
+  if (!(payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED')) {
+    await sleep(TIMEOUT_PAYMENT); //this prevents concurrent modification occurring if webhook and capturePayPalOrder try to change the status simultaneously, PayUponInvoice works different, see https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/integrate-pui-merchant/
+  }
+
+  const payment = await getPaymentByPayPalOrderId(orderId);
+
   if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
     const settings = await getSettings();
     let customerEmail = payUponInvoiceSource.email;
@@ -189,6 +201,7 @@ export const handleCaptureWebhook = async (
       emailText
     );
   }
+
   const transaction = {
     type: 'Charge',
     amount: {
@@ -208,11 +221,33 @@ export const handleCaptureWebhook = async (
     payment,
     transaction
   );
-  updateActions = updateActions.concat(
-    updatePaymentFields(await getPayPalOrder(orderId))
-  );
 
-  await handleUpdatePayment(payment.id, payment.version, updateActions);
+  const { payment_source, status } = await getPayPalOrder(orderId);
+  if (
+    !(
+      status === 'COMPLETED' &&
+      payment.paymentStatus.interfaceCode === 'COMPLETED' &&
+      payment.paymentStatus.interfaceText === 'COMPLETED' &&
+      payment_source &&
+      payment.paymentMethodInfo.method ===
+        mapPayPalPaymentSourceToCommercetoolsMethodInfo(payment_source)
+    )
+  ) {
+    updateActions = updateActions.concat(
+      updatePaymentFields({ payment_source, status })
+    );
+  }
+
+  if (updateActions.length) {
+    logger.info(
+      `Fallback webhook processing required for payment ${payment.id}: transaction or payment status out of sync`
+    );
+    await handleUpdatePayment(payment.id, payment.version, updateActions);
+  } else {
+    logger.info(
+      `No update actions required within the webhook call for payment ${payment.id}, both transaction and payment statuses are already up to date`
+    );
+  }
 };
 
 export const handleAuthorizeWebhook = async (resource: Authorization2) => {
