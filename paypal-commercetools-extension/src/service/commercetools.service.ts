@@ -156,8 +156,9 @@ export const handleCaptureWebhook = async (
   const payPalOrder = await getPayPalOrder(orderId);
   const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
 
-  if (!(payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED'))
-    await sleep(TIMEOUT_PAYMENT); //this prevents concurrent modification occurring if webhook and capturePayPalOrder try to change the status simultaneously, for PayUponInvoise the capture works different so it is the exception
+  if (!(payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED')) {
+    await sleep(TIMEOUT_PAYMENT); //this prevents concurrent modification occurring if webhook and capturePayPalOrder try to change the status simultaneously, PayUponInvoice works different, see https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/integrate-pui-merchant/
+  }
 
   const payment = await getPaymentByPayPalOrderId(orderId);
 
