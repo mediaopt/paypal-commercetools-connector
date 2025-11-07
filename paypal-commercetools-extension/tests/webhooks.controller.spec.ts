@@ -32,6 +32,10 @@ const mockConfigModule = () => {
 };
 mockConfigModule();
 
+jest.mock('../src/utils/response.utils', () => ({
+  sleep: jest.fn(),
+}));
+
 import { post } from '../src/controllers/webhook.controller';
 
 beforeEach(() => {
@@ -50,6 +54,13 @@ beforeEach(() => {
                   interactionId: 1,
                 },
               ],
+              paymentStatus: {
+                interfaceCode: 'APPROVED',
+                interfaceText: 'APPROVED',
+              },
+              paymentMethodInfo: {
+                method: 'someValidPayPalCredentials',
+              },
             },
           ],
         },
