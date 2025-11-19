@@ -153,7 +153,8 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
   isShipped: boolean,
   taxCalculationMode: string,
   lineItems?: LineItem[],
-  locale?: string
+  locale?: string,
+  isPayUponInvoice?: boolean
 ) => {
   if (!matchingAmounts || !lineItems) {
     return null;
@@ -166,9 +167,15 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
       locale
     )
   );
-  return payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0)
-    ? null
-    : payPalItems;
+  if (payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0))
+    return null;
+  return isPayUponInvoice
+    ? payPalItems.map((item) => ({
+        ...item,
+        tax: { value: '0.00', currency_code: item.unit_amount.currency_code },
+        tax_rate: '0.00',
+      }))
+    : payPalItems; //tax and tax rate are required only for Pay Upon Invoice for now and at the first step are only supported in tax LineItemMode mode where the tax is already included in item price and should not be separately added
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
