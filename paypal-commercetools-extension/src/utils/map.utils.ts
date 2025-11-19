@@ -1,6 +1,7 @@
 import {
   Cart,
   LineItem,
+  Payment,
   TransactionState,
   TypedMoney,
 } from '@commercetools/platform-sdk';
@@ -14,9 +15,44 @@ import {
   Capture2StatusEnum,
   RefundStatusEnum,
 } from '../paypal/payments_api';
+import { UpdateActions } from '../types/index.types';
 
 const isLineItemTaxLevel = (taxCalculationMode: string) =>
   taxCalculationMode === 'LineItemLevel';
+
+const EXPECTED_UPDATE_PAYMENT_ACTIONS_COUNT = 3; //webhook related update actions are setStatusInterfaceCode, setStatusInterfaceText, setMethodInfoMethod and they are not required if payment is already up to date
+export const isPaymentUpToDate = (
+  payment: Payment,
+  updateActions: UpdateActions
+): boolean => {
+  if (updateActions.length !== EXPECTED_UPDATE_PAYMENT_ACTIONS_COUNT)
+    return false;
+  if (
+    !updateActions.some(
+      (action) =>
+        action.action === 'setStatusInterfaceCode' &&
+        action.interfaceCode === payment.paymentStatus?.interfaceCode
+    )
+  )
+    return false;
+  if (
+    !updateActions.some(
+      (action) =>
+        action.action === 'setStatusInterfaceText' &&
+        action.interfaceText === payment.paymentStatus?.interfaceText
+    )
+  )
+    return false;
+  if (
+    !updateActions.some(
+      (action) =>
+        action.action === 'setMethodInfoMethod' &&
+        action.method === payment.paymentMethodInfo?.method
+    )
+  )
+    return false;
+  return true;
+};
 
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney
