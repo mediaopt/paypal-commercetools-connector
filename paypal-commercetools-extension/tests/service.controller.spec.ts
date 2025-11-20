@@ -33,7 +33,7 @@ describe('test controller with wrong requests', () => {
     const response = {} as unknown as Response;
     const next = jest.fn();
     await post(request, response, next);
-    expect(next).toBeCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -83,12 +83,12 @@ describe('test controller with correct requests', () => {
 
     const response = { status: mockWrapper } as unknown as Response;
     await post(request, response, next);
-    expect(mockWrapper).toBeCalledTimes(1);
-    expect(mockWrapper).toBeCalledWith(200);
-    expect(mockInner).toBeCalledTimes(1);
-    expect(mockInner).toBeCalledWith({
+    expect(mockWrapper).toHaveBeenCalledTimes(1);
+    expect(mockWrapper).toHaveBeenCalledWith(200);
+    expect(mockInner).toHaveBeenCalledTimes(1);
+    expect(mockInner).toHaveBeenCalledWith({
       actions: [responseAction],
     });
-    expect(next).toBeCalledTimes(0);
+    expect(next).toHaveBeenCalledTimes(0);
   });
 });

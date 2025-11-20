@@ -141,9 +141,9 @@ describe('Testing webhook controller', () => {
         json: jest.fn(),
       } as unknown as Response;
       await post(request, response);
-      expect(response.status).toBeCalledTimes(1);
-      expect(response.status).toBeCalledWith(200);
-      expect(apiRequest.execute).toBeCalledTimes(executeCalls);
+      expect(response.status).toHaveBeenCalledTimes(1);
+      expect(response.status).toHaveBeenCalledWith(200);
+      expect(apiRequest.execute).toHaveBeenCalledTimes(executeCalls);
       expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(
         actionsCount
       );

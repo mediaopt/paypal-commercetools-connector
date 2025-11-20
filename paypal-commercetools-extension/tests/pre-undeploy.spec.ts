@@ -49,9 +49,9 @@ describe('Testing pre undeploy', () => {
   test('Testing pre undeploy', async () => {
     require('../src/connector/pre-undeploy');
     await sleep(5000);
-    expect(apiRoot.delete).toBeCalledTimes(4);
-    expect(apiRoot.get).toBeCalledTimes(8);
-    expect(apiRoot.post).toBeCalledTimes(2);
-    expect(apiRequest.execute).toBeCalledTimes(14);
+    expect(apiRoot.delete).toHaveBeenCalledTimes(4);
+    expect(apiRoot.get).toHaveBeenCalledTimes(8);
+    expect(apiRoot.post).toHaveBeenCalledTimes(2);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(14);
   }, 15000);
 });

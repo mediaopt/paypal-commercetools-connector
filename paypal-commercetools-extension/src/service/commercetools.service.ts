@@ -17,6 +17,7 @@ import { Authorization2, Capture2 } from '../paypal/payments_api';
 import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
 import { logger } from '../utils/logger.utils';
 import {
+  isPaymentUpToDate,
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
@@ -145,7 +146,15 @@ export const handleOrderWebhook = async (resource: Order) => {
   const order = await getPayPalOrder(orderId);
   const payment = await getPaymentByPayPalOrderId(orderId);
   const updateActions = updatePaymentFields(order);
-  await handleUpdatePayment(payment.id, payment.version, updateActions);
+  if (!isPaymentUpToDate(payment, updateActions)) {
+    logger.info(
+      `Payment ${payment.id} is outdated, performing update within checkout-order webhook scope, previous state: ${payment.paymentStatus.interfaceCode}`
+    );
+    await handleUpdatePayment(payment.id, payment.version, updateActions);
+  } else
+    logger.info(
+      `Payment ${payment.id} is already up to date, no update action required within checkout-order webhook scope`
+    );
 };
 
 export const handleCaptureWebhook = async (

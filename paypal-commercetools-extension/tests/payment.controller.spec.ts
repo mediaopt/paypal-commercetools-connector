@@ -23,6 +23,7 @@ const mockConfigModule = () => {
           lastName: 'Last',
         },
         customerEmail: 'email@for.invoice',
+        taxCalculationMode: 'LineItemLevel',
       };
     }),
     getPayPalUserId: jest.fn(),
@@ -71,6 +72,9 @@ const customFieldCreateOrder = {
     },
   },
 };
+
+const EXPECTED_CART_CENT_AMOUNT = 19400;
+const EXPECTED_LESS_THAN_CART_CENT_AMOUNT = 4200;
 
 describe('Testing Braintree GetClient Token', () => {
   test('create client token', async () => {
@@ -181,12 +185,12 @@ describe('create order with various configurations', () =>
     }
   ));
 
-test('create Pay Upon Invoice order is not possible without device data', async () => {
-  const paymentRequest = {
+describe('Create Pay Upon Invoice orders for LineItemLevel cart tax', () => {
+  const invoicePaymentRequest = (actualCentAmountPlanned: number) => ({
     obj: {
       amountPlanned: {
         ...amountPlanned,
-        centAmount: amountPlanned.centAmount,
+        centAmount: actualCentAmountPlanned,
       },
       custom: {
         fields: {
@@ -203,13 +207,28 @@ test('create Pay Upon Invoice order is not possible without device data', async 
       },
       id: randomUUID(),
     },
-  };
-  try {
-    await paymentController('Update', paymentRequest);
-  } catch (error) {
-    if (error instanceof Error)
-      expect(error.message).toContain('DEVICE_DATA_NOT_AVAILABLE');
-  }
+  });
+
+  test.each([
+    [
+      EXPECTED_LESS_THAN_CART_CENT_AMOUNT,
+      'For Pay Upon Invoice, the payment amount must exactly match the cart',
+    ],
+    [EXPECTED_CART_CENT_AMOUNT, 'DEVICE_DATA_NOT_AVAILABLE'],
+  ])(
+    'attempt to pay %p if the cart is 19400 cents and invalid fraud ned id leads to backend error containing %p',
+    async (actualCentAmountPlanned, expectedError) => {
+      try {
+        await paymentController(
+          'Update',
+          invoicePaymentRequest(actualCentAmountPlanned)
+        );
+      } catch (error) {
+        if (error instanceof Error)
+          expect(error.message).toContain(expectedError);
+      }
+    }
+  );
 });
 
 async function createValidTransaction(customAmount?: number) {
@@ -322,9 +341,9 @@ async function completeValidOrder(
 }
 
 const amountPlannedCentsWithTestResult: [number, string, string][] = [
-  [19400, 'same as cart', '194.00'],
+  [EXPECTED_CART_CENT_AMOUNT, 'same as cart', '194.00'],
   [200000, 'more than in cart', '2000.00'],
-  [4200, 'less than in cart', '42.00'],
+  [EXPECTED_LESS_THAN_CART_CENT_AMOUNT, 'less than in cart', '42.00'],
 ];
 
 describe('Testing PayPal aftersales', () => {
@@ -358,7 +377,9 @@ describe('Testing PayPal aftersales', () => {
   );
 
   test('update PayPal order', async () => {
-    const { paymentRequest, payPalOrder } = await createValidTransaction(19400);
+    const { paymentRequest, payPalOrder } = await createValidTransaction(
+      EXPECTED_CART_CENT_AMOUNT
+    );
     (getCart as jest.Mock).mockReturnValueOnce({
       lineItems: [discountedLineitemWithTaxIncluded],
     });

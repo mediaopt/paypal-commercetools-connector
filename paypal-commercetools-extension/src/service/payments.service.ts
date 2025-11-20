@@ -74,10 +74,11 @@ async function prepareCreateOrderRequest(
     request.payment_source = request.paymentSource;
     delete request.paymentSource;
   }
+  const isPayUponInvoice = !!request?.payment_source?.pay_upon_invoice;
   const cart = await getCart(payment.id);
   const relevantCartCost =
     cart.taxedPrice?.totalGross?.centAmount ?? cart.totalPrice.centAmount;
-  if (request?.payment_source?.pay_upon_invoice) {
+  if (isPayUponInvoice) {
     request.payment_source.pay_upon_invoice = {
       email: cart.customerEmail,
       name: {
@@ -119,6 +120,18 @@ async function prepareCreateOrderRequest(
       ]
     : undefined;
   const matchingAmounts = amountPlanned.centAmount === relevantCartCost;
+  if (isPayUponInvoice) {
+    if (!matchingAmounts)
+      throw new CustomError(
+        '400',
+        'For Pay Upon Invoice, the payment amount must exactly match the cart total gross amount if available and total price if total gross is not provided.'
+      );
+    else if (cart.taxCalculationMode !== 'LineItemLevel')
+      throw new CustomError(
+        '422',
+        'For now only LineItemLevel tax mode is supported for Pay Upon Invoice due to mapping reasons.'
+      );
+  }
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -154,7 +167,8 @@ async function prepareCreateOrderRequest(
             'NO_SHIPPING' || !!cart.shippingAddress,
           cart.taxCalculationMode,
           cart?.lineItems,
-          cart.locale
+          cart.locale,
+          isPayUponInvoice
         ),
       },
     ],

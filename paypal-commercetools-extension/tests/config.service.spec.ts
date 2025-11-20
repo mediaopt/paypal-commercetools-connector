@@ -36,8 +36,8 @@ describe('Testing config service', () => {
     const settings = await getSettings();
 
     expect(settings).toBe('VALUE');
-    expect(apiRequest.execute).toBeCalledTimes(1);
-    expect(apiRoot.get).toBeCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
   });
   test('test get cached access token', async () => {
     apiRequest.execute = jest.fn(() => ({
@@ -52,12 +52,12 @@ describe('Testing config service', () => {
     const cachedToken = await getCachedAccessToken();
 
     expect(cachedToken?.value).toHaveProperty('accessToken');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(1);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
   });
   test('test cacheAccessToken', async () => {
     await cacheAccessToken({ accessToken: '123', validUntil: new Date() }, 1);
-    expect(apiRoot.post).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
   });
 });
