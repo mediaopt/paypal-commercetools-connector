@@ -64,10 +64,10 @@ describe('Extension related actions', () => {
         post: jest.fn(() => apiRequest),
       };
       await createExtension(apiRoot, dummyApplicationUrl, resource);
-      expect(apiRoot.get).toBeCalledTimes(1);
-      expect(apiRoot.delete).toBeCalledTimes(1);
-      expect(apiRoot.post).toBeCalledTimes(1);
-      expect(apiRequest.execute).toBeCalledTimes(3);
+      expect(apiRoot.get).toHaveBeenCalledTimes(1);
+      expect(apiRoot.delete).toHaveBeenCalledTimes(1);
+      expect(apiRoot.post).toHaveBeenCalledTimes(1);
+      expect(apiRequest.execute).toHaveBeenCalledTimes(3);
     }
   );
 
@@ -82,9 +82,9 @@ describe('Extension related actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await deleteExtension(apiRoot, 'dummyExtensionKey');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.delete).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(2);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.delete).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -104,9 +104,9 @@ describe('create custom type actions', () => {
         get: jest.fn(() => apiRequest),
       };
       await addOrUpdateCustomType(apiRoot, key);
-      expect(apiRoot.get).toBeCalledTimes(1);
-      expect(apiRoot.post).toBeCalledTimes(1);
-      expect(apiRequest.execute).toBeCalledTimes(2);
+      expect(apiRoot.get).toHaveBeenCalledTimes(1);
+      expect(apiRoot.post).toHaveBeenCalledTimes(1);
+      expect(apiRequest.execute).toHaveBeenCalledTimes(2);
       expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(
         expectedLength
       );
@@ -134,9 +134,9 @@ describe('create custom type actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(3);
-    expect(apiRequest.execute).toBeCalledTimes(4);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(3);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(4);
     expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(3);
     expect(apiRoot.post.mock.calls[1][0].body.actions).toHaveLength(2);
     expect(apiRoot.post.mock.calls[2][0].body.key).toEqual(
@@ -165,9 +165,9 @@ describe('create custom type actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await addOrUpdateCustomType(apiRoot, 'paypal-customer-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(3);
-    expect(apiRequest.execute).toBeCalledTimes(4);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(3);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(4);
     expect(apiRoot.post.mock.calls[2][0].body.key).toEqual(
       'customCommercetoolsType'
     );
@@ -194,9 +194,9 @@ describe('create custom type actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(2);
-    expect(apiRequest.execute).toBeCalledTimes(3);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(2);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(3);
     expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(3);
     expect(apiRoot.post.mock.calls[1][0].body.actions).toHaveLength(2);
   });
@@ -222,9 +222,9 @@ describe('create custom type actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await addOrUpdateCustomType(apiRoot, 'paypal-customer-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(2);
-    expect(apiRequest.execute).toBeCalledTimes(3);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(2);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(3);
   });
 
   test('if there are no types on the target resource - an extra type is created', async () => {
@@ -242,9 +242,9 @@ describe('create custom type actions', () => {
       get: jest.fn(() => apiRequest),
     };
     await addOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(2);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(2);
     expect(apiRoot.post.mock.calls[0][0].body).not.toHaveProperty('actions');
     expect(apiRoot.post.mock.calls[0][0].body.key).toEqual(
       'paypal-payment-interaction-type'
@@ -273,9 +273,9 @@ describe('delete custom type', () => {
       get: jest.fn(() => apiRequest),
     };
     await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(0);
-    expect(apiRequest.execute).toBeCalledTimes(1);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(0);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
   });
 
   test('if only some fields match the type draft - delete these fields, but not the type', async () => {
@@ -301,9 +301,9 @@ describe('delete custom type', () => {
       get: jest.fn(() => apiRequest),
     };
     await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.post).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(2);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.post).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(2);
   });
 
   test('if all fields match the type draft - delete the type', async () => {
@@ -331,8 +331,8 @@ describe('delete custom type', () => {
       delete: jest.fn(() => apiRequest),
     };
     await deleteOrUpdateCustomType(apiRoot, 'paypal-payment-interaction-type');
-    expect(apiRoot.get).toBeCalledTimes(1);
-    expect(apiRoot.delete).toBeCalledTimes(1);
-    expect(apiRequest.execute).toBeCalledTimes(2);
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRoot.delete).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(2);
   });
 });

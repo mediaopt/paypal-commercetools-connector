@@ -154,11 +154,11 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     } as unknown as Response;
     const next = jest.fn();
     await post(request, response, next);
-    expect(next).toBeCalledTimes(0);
-    expect(response.status).toBeCalledTimes(1);
-    expect(response.status).toBeCalledWith(204);
-    expect(response.send).toBeCalledTimes(1);
-    expect(response.send).toBeCalledWith();
+    expect(next).toHaveBeenCalledTimes(0);
+    expect(response.status).toHaveBeenCalledTimes(1);
+    expect(response.status).toHaveBeenCalledWith(204);
+    expect(response.send).toHaveBeenCalledTimes(1);
+    expect(response.send).toHaveBeenCalledWith();
   };
 
   const expectSuccessFullTracking = async (
@@ -168,9 +168,9 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     trackerItems?: TrackerItem[]
   ) => {
     await expectTrackingResponse(data);
-    expect(api.withId).toBeCalledWith({ ID: orderId });
-    expect(addDeliveryDataCallback).toBeCalledTimes(calledTimes);
-    expect(addDeliveryDataCallback).toBeCalledWith(
+    expect(api.withId).toHaveBeenCalledWith({ ID: orderId });
+    expect(addDeliveryDataCallback).toHaveBeenCalledTimes(calledTimes);
+    expect(addDeliveryDataCallback).toHaveBeenCalledWith(
       payPalOrderId,
       trackerData(trackingNumber, trackerItems)
     );
@@ -187,7 +187,7 @@ describe('Testing PayPal-commercetools-events Controller', () => {
     const message = setMessage(trackingNumber, [validDeliveryItem]);
     const data = Buffer.from(JSON.stringify(message)).toString('base64');
     await expectTrackingResponse(data);
-    expect(addDeliveryDataCallback).toBeCalledTimes(0);
+    expect(addDeliveryDataCallback).toHaveBeenCalledTimes(0);
   });
 
   test('test parcel added with no items', async () => {
@@ -313,7 +313,7 @@ describe('Testing missing data', () => {
     const response = {} as unknown as Response;
     const next = jest.fn();
     await post(request as Request, response, next);
-    expect(next).toBeCalledTimes(1);
-    expect(next).toBeCalledWith(new Error(expectedError));
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledWith(new Error(expectedError));
   });
 });
