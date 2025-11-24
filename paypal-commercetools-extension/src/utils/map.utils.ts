@@ -198,7 +198,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
       return {
         ...mappedItem,
         name: `${name} (${lineItem.quantity})`,
-        quantity: 1,
+        quantity: '1', //to avoid rounding mismatches we set quantity to 1 and adjust the unit amount to total line item price and tax to total line item tax, the quantity gets reflected in the name for PayPal side
         unit_amount: {
           value: mapCommercetoolsMoneyToPayPalMoney({
             centAmount:

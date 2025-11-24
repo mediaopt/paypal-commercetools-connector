@@ -137,7 +137,7 @@ describe('Testing map utilities', () => {
   );
 });
 
-describe('Testing PayPal breakdown mapping', () => {
+describe('Testing PayPal breakdown mapping for all methods except PayUponInvoice', () => {
   test.each([
     [false, 'LineItemLevel', discountedLineItems, null],
     [true, 'LineItemLevel', undefined, null],
@@ -185,6 +185,7 @@ describe('Testing PayPal breakdown mapping', () => {
         matchingAmounts,
         true,
         isLineItemLevel,
+        false,
         lineItems
       );
       if (!result) expect(lineItemsMap).toBeNull();
@@ -200,13 +201,14 @@ describe('Testing PayPal breakdown mapping', () => {
 const paypalToCTEur = (payPalMoneyValue: string) =>
   parseFloat(payPalMoneyValue);
 
-describe('Testing valid PayPal price breakdown mapping', () => {
+describe('Testing valid PayPal price breakdown mapping for all methods except Pay Upon Invoise', () => {
   test.each([[cartWithExternalRate]])('breakdown mapping', (cart: Cart) => {
     const paypalPrice = mapCommercetoolsCartToPayPalPriceBreakdown(cart);
     const payPalItems = mapValidCommercetoolsLineItemsToPayPalItems(
       true,
       true,
       cart.taxCalculationMode,
+      false,
       cart.lineItems
     );
     expect(paypalPrice).toBeDefined();
