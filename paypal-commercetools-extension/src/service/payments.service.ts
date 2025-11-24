@@ -126,11 +126,6 @@ async function prepareCreateOrderRequest(
         '400',
         'For Pay Upon Invoice, the payment amount must exactly match the cart total gross amount if available and total price if total gross is not provided.'
       );
-    else if (cart.taxCalculationMode !== 'LineItemLevel')
-      throw new CustomError(
-        '422',
-        'For now only LineItemLevel tax mode is supported for Pay Upon Invoice due to mapping reasons.'
-      );
   }
   request = {
     intent:
@@ -166,9 +161,9 @@ async function prepareCreateOrderRequest(
           paymentSource?.experience_context?.shipping_preference !==
             'NO_SHIPPING' || !!cart.shippingAddress,
           cart.taxCalculationMode,
+          isPayUponInvoice,
           cart?.lineItems,
-          cart.locale,
-          isPayUponInvoice
+          cart.locale
         ),
       },
     ],
@@ -581,6 +576,7 @@ export const handleUpdateOrderRequest = async (
             true,
             !!cart.shippingAddress,
             cart.taxCalculationMode,
+            !!(payment.paymentMethodInfo.method === 'pay_upon_invoice'),
             cart?.lineItems,
             cart.locale
           ),
