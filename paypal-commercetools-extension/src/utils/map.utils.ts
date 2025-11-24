@@ -157,31 +157,55 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   isPayUponInvoice: boolean,
   locale?: string
 ) => {
+  const taxOnItemLevelRequired = isPayUponInvoice && !isLineItemLevel;
+  /*to avoid possible rounding issues if tax is required and tax mode is UnitPriceMode
+  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1,
+  commercetools */
+
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
   const relevantPrice = isLineItemLevel
     ? lineItem.taxedPrice?.totalGross
     : lineItem.taxedPrice?.totalNet;
+
+  const relevantName = taxOnItemLevelRequired
+    ? `${name} (${lineItem.quantity})`
+    : name;
+  const relevantQuantity = taxOnItemLevelRequired
+    ? '1'
+    : `${lineItem.quantity}`;
+  const relevantCentAmount = taxOnItemLevelRequired
+    ? relevantPrice !== undefined
+      ? relevantPrice.centAmount
+      : lineItem.price.value.centAmount * lineItem.quantity
+    : relevantPrice !== undefined
+    ? relevantPrice.centAmount / lineItem.quantity
+    : lineItem.price.value.centAmount;
+
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
+
+  const relevantTypedMoney = {
+    centAmount: relevantCentAmount,
+    fractionDigits,
+    currencyCode,
+    type: lineItem.price.value.type,
+  } as TypedMoney;
+
   const mappedItem: Item = {
+    name: relevantName,
+    quantity: relevantQuantity,
     unit_amount: {
-      value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount:
-          relevantPrice != null
-            ? relevantPrice.centAmount / lineItem.quantity
-            : lineItem.price.value.centAmount,
-        fractionDigits,
-        currencyCode,
-        type: lineItem.price.value.type,
-      } as TypedMoney),
+      value: mapCommercetoolsMoneyToPayPalMoney(relevantTypedMoney),
       currency_code: currencyCode,
     },
-    name: name,
     sku: lineItem.variant.sku,
-    quantity: `${lineItem.quantity}`,
-    description: name,
+    description:
+      lineItem.lineItemMode === 'GiftLineItem'
+        ? `${relevantName} gift item`
+        : relevantName,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
   };
+
   if (isPayUponInvoice) {
     //tax and tax rate are required only for Pay Upon Invoice for now,
     if (isLineItemLevel) {
@@ -191,26 +215,11 @@ const mapCommercetoolsLineItemsToPayPalItems = (
         tax_rate: '0.00', //in tax LineItemMode mode the tax is already included in item price and should not be separately added
       };
     } else {
-      //at unit price level (the only other available tax mode) the total net and total tax are required to match the cart tax mapping
       const relevantTaxRate = lineItem.taxRate?.amount
         ? `${lineItem.taxRate.amount}`
         : '0.00';
       return {
         ...mappedItem,
-        name: `${name} (${lineItem.quantity})`,
-        quantity: '1', //to avoid rounding mismatches we set quantity to 1 and adjust the unit amount to total line item price and tax to total line item tax, the quantity gets reflected in the name for PayPal side
-        unit_amount: {
-          value: mapCommercetoolsMoneyToPayPalMoney({
-            centAmount:
-              relevantPrice != null
-                ? relevantPrice.centAmount
-                : lineItem.price.value.centAmount * lineItem.quantity,
-            fractionDigits,
-            currencyCode,
-            type: lineItem.price.value.type,
-          } as TypedMoney),
-          currency_code: currencyCode,
-        },
         tax: {
           value: mapCommercetoolsMoneyToPayPalMoney({
             centAmount: lineItem.taxedPrice?.totalTax?.centAmount ?? 0,
