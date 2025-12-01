@@ -32,65 +32,90 @@ const mockConfigModule = () => {
 };
 mockConfigModule();
 
+const mockSleep = jest.fn();
+
 jest.mock('../src/utils/response.utils', () => ({
-  sleep: jest.fn(),
+  sleep: mockSleep,
 }));
 
 import { post } from '../src/controllers/webhook.controller';
 
-beforeEach(() => {
-  apiRequest = {
-    execute: jest
-      .fn()
-      .mockReturnValueOnce({
-        body: {
-          total: 1,
-          results: [
-            {
-              id: 1,
-              transactions: [
-                {
-                  type: 'Charge',
-                  interactionId: 1,
-                },
-              ],
-              paymentStatus: {
-                interfaceCode: 'APPROVED',
-                interfaceText: 'APPROVED',
-              },
-              paymentMethodInfo: {
-                method: 'someValidPayPalCredentials',
-              },
-            },
-          ],
+const mockPaymentBody = {
+  body: {
+    total: 1,
+    results: [
+      {
+        id: 1,
+        transactions: [
+          {
+            type: 'Charge',
+            interactionId: 1,
+          },
+        ],
+        paymentStatus: {
+          interfaceCode: 'APPROVED',
+          interfaceText: 'APPROVED',
         },
-      })
-      .mockReturnValueOnce({
-        body: {
-          total: 1,
-          results: [
-            {
-              id: 1,
-              customerId: 123,
-            },
-          ],
+        paymentMethodInfo: {
+          method: 'someValidPayPalCredentials',
         },
-      })
-      .mockReturnValueOnce({
-        body: {
-          total: 1,
-          results: [
-            {
-              id: 1,
-            },
-          ],
-        },
-      }),
-  };
-  jest.clearAllMocks();
-});
+      },
+    ],
+  },
+};
 
+const mockCartBody = {
+  body: {
+    total: 1,
+    results: [
+      {
+        id: 1,
+        customerId: 123,
+      },
+    ],
+  },
+};
+
+const mockCustomerBody = {
+  body: {
+    total: 1,
+    results: [
+      {
+        id: 1,
+      },
+    ],
+  },
+};
+
+const expectSuccessfullResponse = async (
+  request: any,
+  executeCalls: number,
+  actionsCount: number,
+  action: string
+) => {
+  const response = {
+    status: jest.fn(() => response),
+    json: jest.fn(),
+  } as unknown as Response;
+  await post(request, response);
+  expect(response.status).toHaveBeenCalledTimes(1);
+  expect(response.status).toHaveBeenCalledWith(200);
+  expect(apiRequest.execute).toHaveBeenCalledTimes(executeCalls);
+  expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(actionsCount);
+  expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
+};
 describe('Testing webhook controller', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce(mockPaymentBody)
+        .mockReturnValueOnce(mockCartBody)
+        .mockReturnValueOnce(mockCustomerBody),
+    };
+    jest.clearAllMocks();
+  });
+
   test.each([
     {
       name: 'test capture with existing transaction',
@@ -136,18 +161,36 @@ describe('Testing webhook controller', () => {
           summary: 'Capture is done.',
         },
       } as any;
-      const response = {
-        status: jest.fn(() => response),
-        json: jest.fn(),
-      } as unknown as Response;
-      await post(request, response);
-      expect(response.status).toHaveBeenCalledTimes(1);
-      expect(response.status).toHaveBeenCalledWith(200);
-      expect(apiRequest.execute).toHaveBeenCalledTimes(executeCalls);
-      expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(
-        actionsCount
-      );
-      expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
+      expectSuccessfullResponse(request, executeCalls, actionsCount, action);
     }
   );
+});
+
+describe('test retry fetch cart', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce(mockPaymentBody)
+        .mockReturnValueOnce({ body: { total: 0, results: [] } })
+        .mockReturnValueOnce(mockCartBody)
+        .mockReturnValueOnce(mockCustomerBody),
+    };
+    jest.clearAllMocks();
+  });
+  test('test retry fetch cart on webhook', async () => {
+    expect(mockSleep).not.toHaveBeenCalled();
+    const request = {
+      header: jest.fn(),
+      body: {
+        resource_type: 'payment_token',
+        resource: {
+          customer: { id: 'customer_id' },
+          metadata: { order_id: 'order_id' },
+        },
+      },
+    } as any;
+    await expectSuccessfullResponse(request, 5, 1, 'setCustomType');
+    expect(mockSleep).toHaveBeenCalledTimes(1);
+  });
 });

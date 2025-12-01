@@ -109,6 +109,11 @@ const waitForCart = async (
     try {
       const cart = await getCart(paymentId, paymentAction);
       cartFetched = true;
+      logger.info(
+        `WaitForCart: Successfully fetched cart for payment ${paymentId} on attempt ${
+          currentAttempt + 1
+        }.`
+      );
       return cart;
     } catch (error) {
       currentAttempt++;
