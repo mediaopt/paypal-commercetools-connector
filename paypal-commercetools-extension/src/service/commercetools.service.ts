@@ -97,6 +97,39 @@ function prepareCreateOrUpdateTransactionAction(
   ];
 }
 
+const waitForCart = async (
+  paymentId: string,
+  paymentAction: string
+): Promise<Cart> => {
+  const maxAttempts = 5;
+  const delayBetweenAttemptsMs = TIMEOUT_PAYMENT / maxAttempts;
+  let currentAttempt = 0;
+  let cartFetched = false;
+  while (currentAttempt < maxAttempts && !cartFetched) {
+    try {
+      const cart = await getCart(paymentId, paymentAction);
+      cartFetched = true;
+      return cart;
+    } catch (error) {
+      currentAttempt++;
+      if (currentAttempt >= maxAttempts) {
+        throw new CustomError(
+          500,
+          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${maxAttempts} attempts.`
+        );
+      }
+      logger.info(
+        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId}. Retrying in ${delayBetweenAttemptsMs}ms...`
+      );
+      await sleep(delayBetweenAttemptsMs);
+    }
+  }
+  throw new CustomError(
+    500,
+    `WaitForCart: Unable to fetch cart for payment ${paymentId}.`
+  );
+};
+
 export const handlePaymentTokenWebhook = async (
   resource: PayPalVaultPaymentTokenResource
 ) => {
@@ -109,7 +142,7 @@ export const handlePaymentTokenWebhook = async (
     orderId,
     'PayPalPaymentTokenWebhook'
   );
-  const cart = await getCart(payment.id, 'PayPalPaymentTokenWebhook');
+  const cart = await waitForCart(payment.id, 'PayPalPaymentTokenWebhook');
   const customer = await getCustomerByCart(cart);
   if (!customer) {
     logger.info(
