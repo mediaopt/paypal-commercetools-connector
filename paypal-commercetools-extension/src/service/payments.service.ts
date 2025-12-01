@@ -75,7 +75,7 @@ async function prepareCreateOrderRequest(
     delete request.paymentSource;
   }
   const isPayUponInvoice = !!request?.payment_source?.pay_upon_invoice;
-  const cart = await getCart(payment.id);
+  const cart = await getCart(payment.id, 'CreatePayPalOrder');
   const relevantCartCost =
     cart.taxedPrice?.totalGross?.centAmount ?? cart.totalPrice.centAmount;
   if (isPayUponInvoice) {
@@ -543,7 +543,7 @@ export const handleUpdateOrderRequest = async (
   }
   try {
     let request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
-    const cart = await getCart(payment.id);
+    const cart = await getCart(payment.id, 'UpdatePayPalOrder');
     let amountPlanned = payment.amountPlanned;
     let updateActions: UpdateActions = [];
     const relevantCartPrice = cart.taxedPrice?.totalGross?.centAmount
@@ -569,9 +569,7 @@ export const handleUpdateOrderRequest = async (
           value: {
             currency_code: amountPlanned.currencyCode,
             value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-            breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(
-              await getCart(payment.id)
-            ),
+            breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(cart),
           },
         } as Patch,
         {
@@ -690,7 +688,7 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
     payment?.custom?.fields?.createTrackingInformationRequest
   );
   if (request?.carrier !== 'OTHER') {
-    const order = await getOrder(payment?.id);
+    const order = await getOrder(payment?.id, 'CreatePayPalTracking');
     const carrier = mapCommercetoolsCarrierToPayPalCarrier(
       request?.carrier,
       order?.shippingAddress?.country
@@ -729,7 +727,7 @@ export const handleUpdateTrackingInformation = async (
     payment?.custom?.fields?.updateTrackingInformationRequest
   );
   if (!request?.trackingId) {
-    const order = await getOrder(payment.id);
+    const order = await getOrder(payment.id, 'UpdatePayPalTracking');
     const deliveryWithParcel = order?.shippingInfo?.deliveries?.find(
       (delivery) => delivery.parcels.length > 0
     );

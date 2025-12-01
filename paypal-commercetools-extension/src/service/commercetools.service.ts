@@ -35,7 +35,10 @@ import { sleep } from '../utils/response.utils';
 
 const TIMEOUT_PAYMENT = 9500;
 
-const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
+const getPaymentByPayPalOrderId = async (
+  orderId: string,
+  paymentAction: string
+): Promise<Payment> => {
   const payments = await createApiRoot()
     .payments()
     .get({
@@ -47,11 +50,9 @@ const getPaymentByPayPalOrderId = async (orderId: string): Promise<Payment> => {
 
   const results = payments.body.results;
   if (results.length !== 1) {
-    logger.error('There is not any assigned payment');
-    throw new CustomError(
-      400,
-      'Bad request: There is not any assigned payment'
-    );
+    const detailedErrorMessage = `${paymentAction} action impossible - there is not any assigned commercetools payment for the PayPal order id ${orderId}`;
+    logger.error(`detailedErrorMessage`);
+    throw new CustomError(400, `Bad request: ${detailedErrorMessage}`);
   }
 
   logger.info(
@@ -70,6 +71,7 @@ function prepareCreateOrUpdateTransactionAction(
       transaction.type === transactionDraft.type
   );
   if (commercetoolsTransactions.length === 0) {
+    logger.info(`Creating new transaction for payment ${payment.id}`);
     return [
       {
         action: 'addTransaction',
@@ -78,11 +80,13 @@ function prepareCreateOrUpdateTransactionAction(
     ];
   }
   if (commercetoolsTransactions[0].state === transactionDraft.state) {
-    logger.info('State did not change');
+    logger.info(
+      `Payment ${payment.id} transaction ${commercetoolsTransactions[0].id} is already up to date in a state ${commercetoolsTransactions[0].state}. No transaction update action required.`
+    );
     return [];
   }
   logger.info(
-    `Changing state from ${commercetoolsTransactions[0].state} to ${transactionDraft.state}`
+    `For payment ${payment.id} changing state from ${commercetoolsTransactions[0].state} to ${transactionDraft.state}`
   );
   return [
     {
@@ -99,18 +103,25 @@ export const handlePaymentTokenWebhook = async (
   if (!resource?.customer?.id) {
     return;
   }
+
   const orderId = resource.metadata.order_id;
-  const payment = await getPaymentByPayPalOrderId(orderId);
-  const cart = await getCart(payment.id);
+  const payment = await getPaymentByPayPalOrderId(
+    orderId,
+    'PayPalPaymentTokenWebhook'
+  );
+  const cart = await getCart(payment.id, 'PayPalPaymentTokenWebhook');
   const customer = await getCustomerByCart(cart);
   if (!customer) {
+    logger.info(
+      `PayPalPaymentTokenWebhook action is not possible - no customer found for cart ${cart.id}`
+    );
     return;
   }
   const payPalCustomerId = resource.customer.id;
   const storedPayPalCustomerId = customer?.custom?.fields?.PayPalUserId;
   if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email}`
+      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email} within PayPalPaymentTokenWebhook scope`
     );
     const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
@@ -144,16 +155,19 @@ export const handlePaymentTokenWebhook = async (
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
   const order = await getPayPalOrder(orderId);
-  const payment = await getPaymentByPayPalOrderId(orderId);
+  const payment = await getPaymentByPayPalOrderId(
+    orderId,
+    'CheckoutOrderWebhook'
+  );
   const updateActions = updatePaymentFields(order);
   if (!isPaymentUpToDate(payment, updateActions)) {
     logger.info(
-      `Payment ${payment.id} is outdated, performing update within checkout-order webhook scope, previous state: ${payment.paymentStatus.interfaceCode}`
+      `Payment ${payment.id} is outdated, performing update within CheckoutOrderWebhook scope, previous state: ${payment.paymentStatus.interfaceCode}`
     );
     await handleUpdatePayment(payment.id, payment.version, updateActions);
   } else
     logger.info(
-      `Payment ${payment.id} is already up to date, no update action required within checkout-order webhook scope`
+      `Payment ${payment.id} is already up to date, no update action required within CheckoutOrderWebhook scope`
     );
 };
 
@@ -169,13 +183,16 @@ export const handleCaptureWebhook = async (
     await sleep(TIMEOUT_PAYMENT); //this prevents concurrent modification occurring if webhook and capturePayPalOrder try to change the status simultaneously, PayUponInvoice works different, see https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/integrate-pui-merchant/
   }
 
-  const payment = await getPaymentByPayPalOrderId(orderId);
+  const payment = await getPaymentByPayPalOrderId(
+    orderId,
+    'CapturePayPalOrderWebhook'
+  );
 
   if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
     const settings = await getSettings();
     let customerEmail = payUponInvoiceSource.email;
     if (!customerEmail) {
-      const order = await getOrder(payment.id);
+      const order = await getOrder(payment.id, 'CapturePayPalOrderWebhook');
       customerEmail = order.customerEmail ?? '';
     }
     const fallbackEmailText =
@@ -261,9 +278,13 @@ export const handleCaptureWebhook = async (
 
 export const handleAuthorizeWebhook = async (resource: Authorization2) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
-  const payment = await getPaymentByPayPalOrderId(orderId);
   const authorizationType =
     resource.status === 'VOIDED' ? 'CancelAuthorization' : 'Authorization';
+  const payment = await getPaymentByPayPalOrderId(
+    orderId,
+    `${authorizationType}PayPalOrderWebhook`
+  );
+
   const transaction = {
     type: authorizationType,
     amount: {
@@ -312,8 +333,9 @@ const handleUpdatePayment = async (
       .execute();
 
     if (!payment) {
-      logger.error('Error in updating payment status');
-      throw new CustomError(400, 'Error in updating payment status');
+      const detailedErrorMessage = `Error in updating commercetools payment with id ${paymentId} and version ${paymentVersion}`;
+      logger.error(detailedErrorMessage);
+      throw new CustomError(400, detailedErrorMessage);
     }
     return payment;
   } catch (e) {
@@ -322,7 +344,7 @@ const handleUpdatePayment = async (
   }
 };
 
-export const getCart = async (paymentId: string) => {
+export const getCart = async (paymentId: string, paymentAction: string) => {
   const apiRoot = createApiRoot();
   const cart = await apiRoot
     .carts()
@@ -333,12 +355,15 @@ export const getCart = async (paymentId: string) => {
     })
     .execute();
   if (cart.body.total !== 1) {
-    throw new CustomError(500, 'payment is not associated with a cart.');
+    throw new CustomError(
+      500,
+      `${paymentAction} impossible - payment ${paymentId} is not associated with a cart.`
+    );
   }
   return cart.body.results[0];
 };
 
-export const getOrder = async (paymentId: string) => {
+export const getOrder = async (paymentId: string, paymentAction: string) => {
   const apiRoot = createApiRoot();
   const order = await apiRoot
     .orders()
@@ -349,7 +374,10 @@ export const getOrder = async (paymentId: string) => {
     })
     .execute();
   if (order.body.total !== 1) {
-    throw new CustomError(500, 'payment is not associated with an order.');
+    throw new CustomError(
+      500,
+      `${paymentAction} impossible - payment ${paymentId} is not associated with an order.`
+    );
   }
   return order.body.results[0];
 };
@@ -398,14 +426,17 @@ export const getPayPalExtensionUrl = async () => {
     })
     .execute();
   if (extensions.body.total !== 1)
-    throw new CustomError(500, 'Matching PayPal extension not found.');
+    throw new CustomError(
+      500,
+      `Matching PayPal extension for the key ${PAYPAL_PAYMENT_EXTENSION_KEY} not found.`
+    );
   else {
     const destination = extensions.body.results[0].destination;
     if ('url' in destination) return destination.url;
     else
       throw new CustomError(
         500,
-        `Extension is of ${destination.type} instead of expected HTTP type`
+        `Extension ${PAYPAL_PAYMENT_EXTENSION_KEY} is of ${destination.type} instead of expected HTTP type`
       );
   }
 };

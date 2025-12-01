@@ -45,13 +45,15 @@ export const post = async (request: Request, response: Response) => {
     logger.info('Webhook called');
     const { resource_type, event_type, resource, summary } = request.body;
     logger.info(
-      `Got webhook called with ${event_type} for ${resource_type} with id ${resource.id}`
+      `Got webhook called with ${event_type} for ${resource_type} with id ${resource.id}. Summary: ${summary}`
     );
-    logger.info(summary);
     await verifyWebhookSignature(request);
     logger.info(JSON.stringify(resource));
     if (!resource_type) {
-      throw new CustomError(400, 'Bad request - Missing body parameters.');
+      throw new CustomError(
+        400,
+        'Bad request - Missing body parameters: webhook called without resource_type.'
+      );
     }
     switch (resource_type) {
       case 'capture':
