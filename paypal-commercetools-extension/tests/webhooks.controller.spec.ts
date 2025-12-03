@@ -179,7 +179,7 @@ describe('test retry fetch cart', () => {
     };
     jest.clearAllMocks();
   });
-  test('test retry fetch cart on webhook', async () => {
+  test('refetch cart once', async () => {
     expect(mockSleep).not.toHaveBeenCalled();
     const request = {
       header: jest.fn(),
@@ -210,7 +210,7 @@ describe('test cart could not be fetched', () => {
     };
     jest.clearAllMocks();
   });
-  test('test retry fetch cart on webhook', async () => {
+  test('refetch cart did not succeed', async () => {
     expect(mockSleep).not.toHaveBeenCalled();
     const request = {
       header: jest.fn(),
@@ -228,6 +228,48 @@ describe('test cart could not be fetched', () => {
     } as unknown as Response;
     await post(request, response);
     expect(mockSleep).toHaveBeenCalledTimes(4);
+    expect(apiRoot.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('customer not found', () => {
+  const mockCartWithoutCustomer = {
+    body: {
+      total: 1,
+      results: [
+        {
+          id: 1,
+        },
+      ],
+    },
+  };
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce(mockPaymentBody)
+        .mockReturnValueOnce(mockCartWithoutCustomer),
+    };
+    jest.clearAllMocks();
+  });
+  test('cart fetched success but no customer associated with it', async () => {
+    expect(mockSleep).not.toHaveBeenCalled();
+    const request = {
+      header: jest.fn(),
+      body: {
+        resource_type: 'payment_token',
+        resource: {
+          customer: { id: 'customer_id' },
+          metadata: { order_id: 'order_id' },
+        },
+      },
+    } as any;
+    const response = {
+      status: jest.fn(() => response),
+      json: jest.fn(),
+    } as unknown as Response;
+    await post(request, response);
+    expect(mockSleep).not.toHaveBeenCalled();
     expect(apiRoot.post).not.toHaveBeenCalled();
   });
 });
