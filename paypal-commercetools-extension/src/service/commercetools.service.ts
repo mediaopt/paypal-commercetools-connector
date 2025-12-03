@@ -63,7 +63,8 @@ const getPaymentByPayPalOrderId = async (
 
 function prepareCreateOrUpdateTransactionAction(
   payment: Payment,
-  transactionDraft: TransactionDraft
+  transactionDraft: TransactionDraft,
+  webhookAction: string
 ): PaymentUpdateAction[] {
   const commercetoolsTransactions = payment.transactions.filter(
     (transaction: Transaction) =>
@@ -71,7 +72,9 @@ function prepareCreateOrUpdateTransactionAction(
       transaction.type === transactionDraft.type
   );
   if (commercetoolsTransactions.length === 0) {
-    logger.info(`Creating new transaction for payment ${payment.id}`);
+    logger.info(
+      `Creating new transaction for payment ${payment.id} within ${webhookAction} scope`
+    );
     return [
       {
         action: 'addTransaction',
@@ -81,12 +84,12 @@ function prepareCreateOrUpdateTransactionAction(
   }
   if (commercetoolsTransactions[0].state === transactionDraft.state) {
     logger.info(
-      `Payment ${payment.id} transaction ${commercetoolsTransactions[0].id} is already up to date in a state ${commercetoolsTransactions[0].state}. No transaction update action required.`
+      `Payment ${payment.id} transaction ${commercetoolsTransactions[0].id} is already up to date in a state ${commercetoolsTransactions[0].state} within ${webhookAction} scope. No transaction update action required.`
     );
     return [];
   }
   logger.info(
-    `For payment ${payment.id} changing state from ${commercetoolsTransactions[0].state} to ${transactionDraft.state}`
+    `For payment ${payment.id} changing state from ${commercetoolsTransactions[0].state} to ${transactionDraft.state} within ${webhookAction} scope`
   );
   return [
     {
@@ -120,18 +123,18 @@ const waitForCart = async (
       if (currentAttempt >= maxAttempts) {
         throw new CustomError(
           500,
-          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${maxAttempts} attempts.`
+          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${maxAttempts} attempts within scope of ${paymentAction}.`
         );
       }
       logger.info(
-        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId}. Retrying in ${delayBetweenAttemptsMs}ms...`
+        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId} within scope of ${paymentAction}. Retrying in ${delayBetweenAttemptsMs}ms...`
       );
       await sleep(delayBetweenAttemptsMs);
     }
   }
   throw new CustomError(
     500,
-    `WaitForCart: Unable to fetch cart for payment ${paymentId}.`
+    `WaitForCart: Unable to fetch cart for payment ${paymentId} within scope of ${paymentAction}.`
   );
 };
 
@@ -283,7 +286,8 @@ export const handleCaptureWebhook = async (
   };
   let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
-    transaction
+    transaction,
+    'capturePayPalOrderWebhook'
   );
 
   const { payment_source, status } = await getPayPalOrder(orderId);
@@ -340,7 +344,8 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
   } as TransactionDraft;
   let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
-    transaction
+    transaction,
+    `${authorizationType}PayPalOrderWebhook`
   );
   updateActions = updateActions.concat(
     updatePaymentFields(await getPayPalOrder(orderId))

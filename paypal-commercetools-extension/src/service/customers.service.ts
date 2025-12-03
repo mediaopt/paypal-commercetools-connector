@@ -38,8 +38,7 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
       handleCustomerResponse('getUserIDToken', response)
     );
   } catch (e) {
-    logger.error('Call to getUserIDToken resulted in an error', e);
-    return handleError('getUserIDToken', e);
+    return handleError('getUserIDToken', customer.id, e, 'customer');
   }
 }
 
@@ -60,8 +59,7 @@ export async function handleDeletePaymentTokenRequest(customer: Customer) {
       handleCustomerResponse('deletePaymentToken', response ?? '')
     );
   } catch (e) {
-    logger.error('Call to deletePaymentToken resulted in an error', e);
-    return handleError('deletePaymentToken', e);
+    return handleError('deletePaymentToken', customer.id, e, 'customer');
   }
 }
 
@@ -104,7 +102,7 @@ export const handleCreateVaultSetupTokenRequest = async (
       handleCustomerResponse('createVaultSetupToken', response)
     );
   } catch (e) {
-    return handleError('createVaultSetupToken', e);
+    return handleError('createVaultSetupToken', customer.id, e, 'customer');
   }
 };
 
@@ -148,7 +146,7 @@ export const handleCreatePaymentTokenRequest = async (
       handleCustomerResponse('createPaymentToken', response)
     );
   } catch (e) {
-    return handleError('createPaymentToken', e);
+    return handleError('createPaymentToken', customer.id, e, 'customer');
   }
 };
 
@@ -175,6 +173,6 @@ export const handleGetPaymentTokensRequest = async (
       handleCustomerResponse('getPaymentTokens', response)
     );
   } catch (e) {
-    return handleError('getPaymentTokens', e);
+    return handleError('getPaymentTokens', customer.id, e, 'customer');
   }
 };

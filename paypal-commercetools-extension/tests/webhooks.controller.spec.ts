@@ -4,6 +4,7 @@ import { CheckoutPaymentIntent } from '../src/paypal/checkout_api';
 
 let apiRequest: any = undefined;
 let apiRoot: any = undefined;
+
 const mockConfigModule = () => {
   apiRoot = {
     customObjects: jest.fn(() => apiRoot),
@@ -192,5 +193,41 @@ describe('test retry fetch cart', () => {
     } as any;
     await expectSuccessfullResponse(request, 5, 1, 'setCustomType');
     expect(mockSleep).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('test cart could not be fetched', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce(mockPaymentBody)
+        .mockReturnValueOnce({ body: { total: 0, results: [] } })
+        .mockReturnValueOnce({ body: { total: 0, results: [] } })
+        .mockReturnValueOnce({ body: { total: 0, results: [] } })
+        .mockReturnValueOnce({ body: { total: 0, results: [] } })
+        .mockReturnValueOnce({ body: { total: 0, results: [] } }),
+    };
+    jest.clearAllMocks();
+  });
+  test('test retry fetch cart on webhook', async () => {
+    expect(mockSleep).not.toHaveBeenCalled();
+    const request = {
+      header: jest.fn(),
+      body: {
+        resource_type: 'payment_token',
+        resource: {
+          customer: { id: 'customer_id' },
+          metadata: { order_id: 'order_id' },
+        },
+      },
+    } as any;
+    const response = {
+      status: jest.fn(() => response),
+      json: jest.fn(),
+    } as unknown as Response;
+    await post(request, response);
+    expect(mockSleep).toHaveBeenCalledTimes(4);
+    expect(apiRoot.post).not.toHaveBeenCalled();
   });
 });
