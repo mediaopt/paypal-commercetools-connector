@@ -101,39 +101,26 @@ function prepareCreateOrUpdateTransactionAction(
   ];
 }
 
-const fetchCartLog =
-  (paymentId: string, paymentAction: string) =>
-  (attempt: number, success = false): any =>
-    `waitForCart: ${
-      success ? 'Successfully fetched' : 'Could not fetch'
-    } commercetools cart for commercetools payment ${paymentId} in scope of ${paymentAction} on attempt ${attempt}`;
-
 const waitForCart = async (
   paymentId: string,
   paymentAction: string
 ): Promise<Cart> => {
-  const startTime = Date.now();
-  let currentTime = startTime;
-  const maxTime = startTime + TIMEOUT_PAYMENT;
-  let totalAttempts = 0;
-  const logMessage = fetchCartLog(paymentId, paymentAction);
-  while (currentTime < maxTime) {
-    totalAttempts++;
+  const maxWaitForCartTime = Date.now() + TIMEOUT_PAYMENT;
+  const fetchCartLogMessage = (success = false): string =>
+    `waitForCart: ${
+      success ? 'successfully fetched' : 'could not fetch'
+    } commercetools cart for commercetools payment ${paymentId} in scope of ${paymentAction}`;
+  while (Date.now() < maxWaitForCartTime) {
     try {
       const cart = await getCart(paymentId, paymentAction);
-      logger.info(logMessage(totalAttempts, true));
+      logger.info(fetchCartLogMessage(true));
       return cart;
     } catch (error) {
-      currentTime = Date.now();
-      if (currentTime < maxTime) {
-        logger.info(logMessage(totalAttempts));
-      }
+      logger.info(`${fetchCartLogMessage()}`);
       await sleep(RETRY_DELAY);
     }
   }
-  const failMessage = `${logMessage(
-    totalAttempts
-  )} within payment extension response time`;
+  const failMessage = `${fetchCartLogMessage()} within payment extension response time`;
   logger.error(failMessage);
   throw new CustomError(500, failMessage);
 };
