@@ -34,8 +34,7 @@ import {
 import { sleep } from '../utils/response.utils';
 
 const TIMEOUT_PAYMENT = 9500;
-const MAX_ATTEMPTS = 5;
-const DELAY_BETWEEN_ATTEMPTS = TIMEOUT_PAYMENT / MAX_ATTEMPTS;
+const RETRY_DELAY = 2000;
 
 const getPaymentByPayPalOrderId = async (
   orderId: string,
@@ -102,40 +101,41 @@ function prepareCreateOrUpdateTransactionAction(
   ];
 }
 
+const fetchCartLog =
+  (paymentId: string, paymentAction: string) =>
+  (attempt: number, success = false): any =>
+    `waitForCart: ${
+      success ? 'Successfully fetched' : 'Could not fetch'
+    } commercetools cart for commercetools payment ${paymentId} in scope of ${paymentAction} on attempt ${attempt}`;
+
 const waitForCart = async (
   paymentId: string,
   paymentAction: string
 ): Promise<Cart> => {
-  let currentAttempt = 0;
-  let cartFetched = false;
-  while (currentAttempt < MAX_ATTEMPTS && !cartFetched) {
+  const startTime = Date.now();
+  let currentTime = startTime;
+  const maxTime = startTime + TIMEOUT_PAYMENT;
+  let totalAttempts = 0;
+  const logMessage = fetchCartLog(paymentId, paymentAction);
+  while (currentTime < maxTime) {
+    totalAttempts++;
     try {
       const cart = await getCart(paymentId, paymentAction);
-      cartFetched = true;
-      logger.info(
-        `WaitForCart: Successfully fetched cart for payment ${paymentId} on attempt ${
-          currentAttempt + 1
-        }.`
-      );
+      logger.info(logMessage(totalAttempts, true));
       return cart;
     } catch (error) {
-      currentAttempt++;
-      if (currentAttempt >= MAX_ATTEMPTS) {
-        throw new CustomError(
-          500,
-          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${MAX_ATTEMPTS} attempts within scope of ${paymentAction}.`
-        );
+      currentTime = Date.now();
+      if (currentTime < maxTime) {
+        logger.info(logMessage(totalAttempts));
       }
-      logger.info(
-        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId} within scope of ${paymentAction}. Retrying in ${DELAY_BETWEEN_ATTEMPTS}ms...`
-      );
-      await sleep(DELAY_BETWEEN_ATTEMPTS);
+      await sleep(RETRY_DELAY);
     }
   }
-  throw new CustomError(
-    500,
-    `WaitForCart: Unable to fetch cart for payment ${paymentId} within scope of ${paymentAction}.`
-  );
+  const failMessage = `${logMessage(
+    totalAttempts
+  )} within payment extension response time`;
+  logger.error(failMessage);
+  throw new CustomError(500, failMessage);
 };
 
 export const handlePaymentTokenWebhook = async (
@@ -144,17 +144,15 @@ export const handlePaymentTokenWebhook = async (
   if (!resource?.customer?.id) {
     return;
   }
+  const paymentAction = 'PayPalPaymentTokenWebhook';
 
   const orderId = resource.metadata.order_id;
-  const payment = await getPaymentByPayPalOrderId(
-    orderId,
-    'PayPalPaymentTokenWebhook'
-  );
-  const cart = await waitForCart(payment.id, 'PayPalPaymentTokenWebhook');
+  const payment = await getPaymentByPayPalOrderId(orderId, paymentAction);
+  const cart = await waitForCart(payment.id, paymentAction);
   const customer = await getCustomerByCart(cart);
   if (!customer) {
     logger.info(
-      `PayPalPaymentTokenWebhook action is not possible - no customer found for cart ${cart.id}`
+      `${paymentAction} action is not possible - no customer found for cart ${cart.id}`
     );
     return;
   }
@@ -162,7 +160,7 @@ export const handlePaymentTokenWebhook = async (
   const storedPayPalCustomerId = customer?.custom?.fields?.PayPalUserId;
   if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email} within PayPalPaymentTokenWebhook scope`
+      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email} within ${paymentAction} scope`
     );
     const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
@@ -195,20 +193,18 @@ export const handlePaymentTokenWebhook = async (
 
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
+  const paymentAction = 'CheckoutOrderWebhook';
   const order = await getPayPalOrder(orderId);
-  const payment = await getPaymentByPayPalOrderId(
-    orderId,
-    'CheckoutOrderWebhook'
-  );
+  const payment = await getPaymentByPayPalOrderId(orderId, paymentAction);
   const updateActions = updatePaymentFields(order);
   if (!isPaymentUpToDate(payment, updateActions)) {
     logger.info(
-      `Payment ${payment.id} is outdated, performing update within CheckoutOrderWebhook scope, previous state: ${payment.paymentStatus.interfaceCode}`
+      `Payment ${payment.id} is outdated, performing update within ${paymentAction} scope, previous state: ${payment.paymentStatus.interfaceCode}`
     );
     await handleUpdatePayment(payment.id, payment.version, updateActions);
   } else
     logger.info(
-      `Payment ${payment.id} is already up to date, no update action required within CheckoutOrderWebhook scope`
+      `Payment ${payment.id} is already up to date, no update action required within ${paymentAction} scope`
     );
 };
 
@@ -218,22 +214,20 @@ export const handleCaptureWebhook = async (
 ) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const payPalOrder = await getPayPalOrder(orderId);
+  const paymentAction = 'CapturePayPalOrderWebhook';
   const payUponInvoiceSource = payPalOrder?.payment_source?.pay_upon_invoice;
 
   if (!(payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED')) {
     await sleep(TIMEOUT_PAYMENT); //this prevents concurrent modification occurring if webhook and capturePayPalOrder try to change the status simultaneously, PayUponInvoice works different, see https://developer.paypal.com/docs/checkout/apm/pay-upon-invoice/integrate-pui-merchant/
   }
 
-  const payment = await getPaymentByPayPalOrderId(
-    orderId,
-    'CapturePayPalOrderWebhook'
-  );
+  const payment = await getPaymentByPayPalOrderId(orderId, paymentAction);
 
   if (payUponInvoiceSource && eventType === 'PAYMENT.CAPTURE.COMPLETED') {
     const settings = await getSettings();
     let customerEmail = payUponInvoiceSource.email;
     if (!customerEmail) {
-      const order = await getOrder(payment.id, 'CapturePayPalOrderWebhook');
+      const order = await getOrder(payment.id, paymentAction);
       customerEmail = order.customerEmail ?? '';
     }
     const fallbackEmailText =
@@ -308,12 +302,12 @@ export const handleCaptureWebhook = async (
 
   if (updateActions.length) {
     logger.info(
-      `Fallback webhook processing required for payment ${payment.id}: transaction or payment status out of sync`
+      `Fallback webhook processing required for payment ${payment.id} in scope of ${paymentAction}: transaction or payment status out of sync`
     );
     await handleUpdatePayment(payment.id, payment.version, updateActions);
   } else {
     logger.info(
-      `No update actions required within the webhook call for payment ${payment.id}, both transaction and payment statuses are already up to date`
+      `No update actions required within the webhook call for payment ${payment.id} in scope of ${paymentAction}, both transaction and payment statuses are already up to date`
     );
   }
 };
@@ -322,10 +316,8 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
   const orderId = resource.supplementary_data?.related_ids?.order_id ?? '';
   const authorizationType =
     resource.status === 'VOIDED' ? 'CancelAuthorization' : 'Authorization';
-  const payment = await getPaymentByPayPalOrderId(
-    orderId,
-    `${authorizationType}PayPalOrderWebhook`
-  );
+  const paymentAction = `${authorizationType}PayPalOrderWebhook`;
+  const payment = await getPaymentByPayPalOrderId(orderId, paymentAction);
 
   const transaction = {
     type: authorizationType,
@@ -345,7 +337,7 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
   let updateActions = prepareCreateOrUpdateTransactionAction(
     payment,
     transaction,
-    `${authorizationType}PayPalOrderWebhook`
+    paymentAction
   );
   updateActions = updateActions.concat(
     updatePaymentFields(await getPayPalOrder(orderId))
