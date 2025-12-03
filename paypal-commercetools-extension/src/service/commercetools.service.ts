@@ -34,6 +34,8 @@ import {
 import { sleep } from '../utils/response.utils';
 
 const TIMEOUT_PAYMENT = 9500;
+const MAX_ATTEMPTS = 5;
+const DELAY_BETWEEN_ATTEMPTS = TIMEOUT_PAYMENT / MAX_ATTEMPTS;
 
 const getPaymentByPayPalOrderId = async (
   orderId: string,
@@ -51,7 +53,7 @@ const getPaymentByPayPalOrderId = async (
   const results = payments.body.results;
   if (results.length !== 1) {
     const detailedErrorMessage = `${paymentAction} action impossible - there is not any assigned commercetools payment for the PayPal order id ${orderId}`;
-    logger.error(`detailedErrorMessage`);
+    logger.error(detailedErrorMessage);
     throw new CustomError(400, `Bad request: ${detailedErrorMessage}`);
   }
 
@@ -104,11 +106,9 @@ const waitForCart = async (
   paymentId: string,
   paymentAction: string
 ): Promise<Cart> => {
-  const maxAttempts = 5;
-  const delayBetweenAttemptsMs = TIMEOUT_PAYMENT / maxAttempts;
   let currentAttempt = 0;
   let cartFetched = false;
-  while (currentAttempt < maxAttempts && !cartFetched) {
+  while (currentAttempt < MAX_ATTEMPTS && !cartFetched) {
     try {
       const cart = await getCart(paymentId, paymentAction);
       cartFetched = true;
@@ -120,16 +120,16 @@ const waitForCart = async (
       return cart;
     } catch (error) {
       currentAttempt++;
-      if (currentAttempt >= maxAttempts) {
+      if (currentAttempt >= MAX_ATTEMPTS) {
         throw new CustomError(
           500,
-          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${maxAttempts} attempts within scope of ${paymentAction}.`
+          `WaitForCart: Unable to fetch cart for payment ${paymentId} after ${MAX_ATTEMPTS} attempts within scope of ${paymentAction}.`
         );
       }
       logger.info(
-        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId} within scope of ${paymentAction}. Retrying in ${delayBetweenAttemptsMs}ms...`
+        `WaitForCart: Attempt ${currentAttempt} failed to fetch cart for payment ${paymentId} within scope of ${paymentAction}. Retrying in ${DELAY_BETWEEN_ATTEMPTS}ms...`
       );
-      await sleep(delayBetweenAttemptsMs);
+      await sleep(DELAY_BETWEEN_ATTEMPTS);
     }
   }
   throw new CustomError(
