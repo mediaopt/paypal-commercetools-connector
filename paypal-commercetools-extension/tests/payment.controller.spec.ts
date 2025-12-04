@@ -47,6 +47,7 @@ import {
   discountedLineItems,
   discountedLineitemWithTaxIncluded,
   discountOnTotalPrice,
+  longTestTimeoutMs,
   prices,
 } from './constants';
 import { getCart } from '../src/service/commercetools.service';
@@ -77,31 +78,35 @@ const EXPECTED_CART_CENT_AMOUNT = 19400;
 const EXPECTED_LESS_THAN_CART_CENT_AMOUNT = 4200;
 
 describe('Testing Braintree GetClient Token', () => {
-  test('create client token', async () => {
-    const paymentRequest = {
-      obj: {
-        custom: {
-          fields: {
-            getClientTokenRequest: '{}',
+  test(
+    'create client token',
+    async () => {
+      const paymentRequest = {
+        obj: {
+          custom: {
+            fields: {
+              getClientTokenRequest: '{}',
+            },
           },
         },
-      },
-    } as unknown as PaymentReference;
-    const paymentResponse = await paymentController('Update', paymentRequest);
-    expect(paymentResponse).toBeDefined();
-    expect(paymentResponse).toHaveProperty('statusCode', 200);
-    const getClientTokenResponse = paymentResponse?.actions.find(
-      (action) => action.name === 'getClientTokenResponse'
-    );
-    expect(getClientTokenResponse).toBeDefined();
-    expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
-    const token = getClientTokenResponse?.value;
-    expect(validator.isBase64(token)).toBeTruthy();
-    const data = JSON.parse(Buffer.from(token, 'base64').toString());
-    expect(data).toBeDefined();
-    expect(data).toHaveProperty('braintree');
-    expect(data).toHaveProperty('paypal');
-  }, 20000);
+      } as unknown as PaymentReference;
+      const paymentResponse = await paymentController('Update', paymentRequest);
+      expect(paymentResponse).toBeDefined();
+      expect(paymentResponse).toHaveProperty('statusCode', 200);
+      const getClientTokenResponse = paymentResponse?.actions.find(
+        (action) => action.name === 'getClientTokenResponse'
+      );
+      expect(getClientTokenResponse).toBeDefined();
+      expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
+      const token = getClientTokenResponse?.value;
+      expect(validator.isBase64(token)).toBeTruthy();
+      const data = JSON.parse(Buffer.from(token, 'base64').toString());
+      expect(data).toBeDefined();
+      expect(data).toHaveProperty('braintree');
+      expect(data).toHaveProperty('paypal');
+    },
+    longTestTimeoutMs
+  );
 });
 
 function expectSuccessfulResponse(

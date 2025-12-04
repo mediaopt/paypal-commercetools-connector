@@ -1,4 +1,5 @@
 import { describe, expect } from '@jest/globals';
+import { longTestTimeoutMs } from './constants';
 
 let apiRequest: any = undefined;
 let apiRoot: any = undefined;
@@ -29,21 +30,25 @@ function sleep(milliseconds: number) {
 }
 
 describe('Testing post deploy', () => {
-  test('Testing post deploy with no registered webhook', async () => {
-    const webhooksApi = {
-      webhooksList: jest.fn(() => ({ data: { webhooks: [] } })),
-      webhooksPost: jest.fn(() => ({ data: { id: 1 } })),
-    };
-    jest.mock('../src/paypal/webhooks_api', () => ({
-      WebhooksApi: jest.fn().mockImplementation(() => webhooksApi),
-    }));
-    require('../src/connector/post-deploy');
-    await sleep(10000);
-    expect(apiRoot.post).toHaveBeenCalledTimes(8);
-    expect(apiRoot.delete).toHaveBeenCalledTimes(1);
-    expect(apiRoot.get).toHaveBeenCalledTimes(9);
-    expect(apiRequest.execute).toHaveBeenCalledTimes(18);
-    expect(webhooksApi.webhooksList).toHaveBeenCalledTimes(1);
-    expect(webhooksApi.webhooksPost).toHaveBeenCalledTimes(1);
-  }, 20000);
+  test(
+    'Testing post deploy with no registered webhook',
+    async () => {
+      const webhooksApi = {
+        webhooksList: jest.fn(() => ({ data: { webhooks: [] } })),
+        webhooksPost: jest.fn(() => ({ data: { id: 1 } })),
+      };
+      jest.mock('../src/paypal/webhooks_api', () => ({
+        WebhooksApi: jest.fn().mockImplementation(() => webhooksApi),
+      }));
+      require('../src/connector/post-deploy');
+      await sleep(10000);
+      expect(apiRoot.post).toHaveBeenCalledTimes(8);
+      expect(apiRoot.delete).toHaveBeenCalledTimes(1);
+      expect(apiRoot.get).toHaveBeenCalledTimes(9);
+      expect(apiRequest.execute).toHaveBeenCalledTimes(18);
+      expect(webhooksApi.webhooksList).toHaveBeenCalledTimes(1);
+      expect(webhooksApi.webhooksPost).toHaveBeenCalledTimes(1);
+    },
+    longTestTimeoutMs
+  );
 });

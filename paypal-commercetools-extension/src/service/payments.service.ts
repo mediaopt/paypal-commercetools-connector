@@ -75,7 +75,7 @@ async function prepareCreateOrderRequest(
     delete request.paymentSource;
   }
   const isPayUponInvoice = !!request?.payment_source?.pay_upon_invoice;
-  const cart = await getCart(payment.id);
+  const cart = await getCart(payment.id, 'CreatePayPalOrder');
   const relevantCartCost =
     cart.taxedPrice?.totalGross?.centAmount ?? cart.totalPrice.centAmount;
   if (isPayUponInvoice) {
@@ -290,7 +290,7 @@ export const handleCreateOrderRequest = async (
       });
     return updateActions.concat(updatePaymentFields(response));
   } catch (e) {
-    return handleError('createPayPalOrder', e);
+    return handleError('createPayPalOrder', payment.id, e);
   }
 };
 
@@ -335,8 +335,7 @@ export const handleCaptureOrderRequest = async (
       handlePaymentResponse('capturePayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to capturePayPalOrder resulted in an error', e);
-    return handleError('capturePayPalOrder', e);
+    return handleError('capturePayPalOrder', payment.id, e);
   }
 };
 
@@ -372,8 +371,7 @@ export const handleCaptureAuthorizationRequest = async (
       handlePaymentResponse('capturePayPalAuthorization', response)
     );
   } catch (e) {
-    logger.error('Call to capturePayPalAuthorization resulted in an error', e);
-    return handleError('capturePayPalAuthorization', e);
+    return handleError('capturePayPalAuthorization', payment.id, e);
   }
 };
 
@@ -410,8 +408,7 @@ export const handleVoidAuthorizationRequest = async (
       handlePaymentResponse('voidPayPalAuthorization', response)
     );
   } catch (e) {
-    logger.error('Call to voidPayPalAuthorization resulted in an error', e);
-    return handleError('voidPayPalAuthorization', e);
+    return handleError('voidPayPalAuthorization', payment.id, e);
   }
 };
 
@@ -466,8 +463,7 @@ export const handleRefundPayPalOrderRequest = async (
       handlePaymentResponse('refundPayPalOrder', response)
     );
   } catch (e) {
-    logger.error('Call to refundPayPalOrder resulted in an error', e);
-    return handleError('refundPayPalOrder', e);
+    return handleError('refundPayPalOrder', payment.id, e);
   }
 };
 
@@ -509,7 +505,7 @@ export const handleAuthorizeOrderRequest = async (
     );
   } catch (e) {
     logger.error('Call to authorizePayPalOrder resulted in an error', e);
-    return handleError('authorizePayPalOrder', e);
+    return handleError('authorizePayPalOrder', payment.id, e);
   }
 };
 
@@ -530,8 +526,7 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
       handlePaymentResponse('getClientToken', response)
     );
   } catch (e) {
-    logger.error('Call to getClientToken resulted in an error', e);
-    return handleError('getClientToken', e);
+    return handleError('getClientToken', payment?.id ?? '', e);
   }
 }
 
@@ -543,7 +538,7 @@ export const handleUpdateOrderRequest = async (
   }
   try {
     let request = JSON.parse(payment?.custom?.fields?.updatePayPalOrderRequest);
-    const cart = await getCart(payment.id);
+    const cart = await getCart(payment.id, 'UpdatePayPalOrder');
     let amountPlanned = payment.amountPlanned;
     let updateActions: UpdateActions = [];
     const relevantCartPrice = cart.taxedPrice?.totalGross?.centAmount
@@ -569,9 +564,7 @@ export const handleUpdateOrderRequest = async (
           value: {
             currency_code: amountPlanned.currencyCode,
             value: mapCommercetoolsMoneyToPayPalMoney(amountPlanned),
-            breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(
-              await getCart(payment.id)
-            ),
+            breakdown: mapCommercetoolsCartToPayPalPriceBreakdown(cart),
           },
         } as Patch,
         {
@@ -597,7 +590,7 @@ export const handleUpdateOrderRequest = async (
       handlePaymentResponse('updatePayPalOrder', response ?? '')
     );
   } catch (e) {
-    return handleError('updatePayPalOrder', e);
+    return handleError('updatePayPalOrder', payment.id, e);
   }
 };
 
@@ -619,7 +612,7 @@ export const handleGetOrderRequest = async (
       handlePaymentResponse('getPayPalOrder', response)
     );
   } catch (e) {
-    return handleError('getPayPalOrder', e);
+    return handleError('getPayPalOrder', payment.id, e);
   }
 };
 
@@ -640,7 +633,7 @@ export const handleGetCaptureRequest = async (
       handlePaymentResponse('getPayPalCapture', response)
     );
   } catch (e) {
-    return handleError('getPayPalCapture', e);
+    return handleError('getPayPalCapture', payment.id, e);
   }
 };
 
@@ -677,7 +670,10 @@ function findSuitableTransactionId(
       transaction.type === type && (!status || status === transaction.state)
   );
   if (!transactions || transactions.length === 0) {
-    throw new CustomError(500, 'The payment has no suitable transaction');
+    throw new CustomError(
+      500,
+      `The payment ${payment.id} has no suitable transaction (type ${type}, state: ${status} or none)`
+    );
   }
   return transactions[transactions.length - 1].interactionId;
 }
@@ -690,7 +686,7 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
     payment?.custom?.fields?.createTrackingInformationRequest
   );
   if (request?.carrier !== 'OTHER') {
-    const order = await getOrder(payment?.id);
+    const order = await getOrder(payment?.id, 'CreatePayPalTracking');
     const carrier = mapCommercetoolsCarrierToPayPalCarrier(
       request?.carrier,
       order?.shippingAddress?.country
@@ -715,7 +711,7 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
       handlePaymentResponse('createTrackingInformation', response)
     );
   } catch (e) {
-    return handleError('createTrackingInformation', e);
+    return handleError('createTrackingInformation', payment.id, e);
   }
 };
 
@@ -729,7 +725,7 @@ export const handleUpdateTrackingInformation = async (
     payment?.custom?.fields?.updateTrackingInformationRequest
   );
   if (!request?.trackingId) {
-    const order = await getOrder(payment.id);
+    const order = await getOrder(payment.id, 'UpdatePayPalTracking');
     const deliveryWithParcel = order?.shippingInfo?.deliveries?.find(
       (delivery) => delivery.parcels.length > 0
     );
@@ -751,6 +747,6 @@ export const handleUpdateTrackingInformation = async (
       handlePaymentResponse('updateTrackingInformation', response ?? '')
     );
   } catch (e) {
-    return handleError('updateTrackingInformation', e);
+    return handleError('updateTrackingInformation', payment.id, e);
   }
 };

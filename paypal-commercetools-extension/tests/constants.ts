@@ -5,6 +5,8 @@ import {
   ProductDiscountReference,
 } from '@commercetools/platform-sdk';
 
+export const longTestTimeoutMs = 20000;
+
 const currencyData: Omit<CentPrecisionMoney, 'centAmount'> = {
   type: 'centPrecision',
   currencyCode: 'EUR',
