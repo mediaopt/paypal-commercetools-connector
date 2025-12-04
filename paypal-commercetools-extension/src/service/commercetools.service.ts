@@ -120,7 +120,7 @@ const waitForCart = async (
       await sleep(RETRY_DELAY);
     }
   }
-  const failMessage = `${fetchCartLogMessage()} within payment extension response time`;
+  const failMessage = `${fetchCartLogMessage()} within payment extension's time limit`;
   logger.error(failMessage);
   throw new CustomError(500, failMessage);
 };
