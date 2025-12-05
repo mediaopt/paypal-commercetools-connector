@@ -303,15 +303,11 @@ export const handleCaptureOrderRequest = async (
   const request = JSON.parse(
     payment?.custom?.fields?.capturePayPalOrderRequest
   );
-  logger.info(`got capturePayPalOrderRequest for payment ${payment.id}`);
   const updateActions = handleRequest('capturePayPalOrder', request);
   try {
     const response = await capturePayPalOrder(
       request.orderId ?? payment.custom.fields?.PayPalOrderId,
       request as OrderCaptureRequest
-    );
-    logger.info(
-      `for payment ${payment.id}, got ${response.status} PayPal capture response status after capture call`
     );
     const transactionState = actualTransactionStatus(
       'captures',
