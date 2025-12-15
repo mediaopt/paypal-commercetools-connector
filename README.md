@@ -19,7 +19,7 @@ The payments demo can be seen at https://poc-mediaopt2.frontend.site/.
 
 ## Latest release notes
 
-The latest version of the connector is available in commercetools Merchant Center and under tag 1.1.10.
+The latest version of the connector is available in commercetools Merchant Center and under tag 1.1.14.
 
 ## Integration
 
@@ -54,6 +54,8 @@ Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP
 - SMTP_USERNAME
 - SMTP_SENDER
 - SMTP_PASSWORD
+
+If you already use custom types for commercetools payment, customer or payment_interaction please consider using the corresponding types keys for PAYMENT_TYPE_KEY, CUSTOMER_TYPE_KEY and PAYMENT_INTERACTION_TYPE_KEY. Please see the corresponding [commercetools tutorial](https://docs.commercetools.com/tutorials/composable-custom-types) for details.
 
 ## Instructions
 

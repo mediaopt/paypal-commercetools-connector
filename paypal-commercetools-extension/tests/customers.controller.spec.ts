@@ -24,6 +24,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { customerController } from '../src/controllers/customers.controller';
+import { longTestTimeoutMs } from './constants';
 
 function expectSuccessfulResponse(
   customerResponse:
@@ -45,116 +46,136 @@ function expectSuccessfulResponse(
 }
 
 describe('Testing PayPal customer Requests', () => {
-  test('create client token', async () => {
-    const customerRequest = {
-      obj: {
-        custom: {
-          fields: {
-            getUserIDTokenRequest: '{}',
+  test(
+    'create client token',
+    async () => {
+      const customerRequest = {
+        obj: {
+          custom: {
+            fields: {
+              getUserIDTokenRequest: '{}',
+            },
           },
         },
-      },
-    } as unknown as PaymentReference;
-    const customerResponse = await customerController(
-      'Update',
-      customerRequest
-    );
-    const token = expectSuccessfulResponse(
-      customerResponse,
-      'getUserIDTokenResponse'
-    );
-    expect(token.length).toBe(681);
-  }, 20000);
-
-  test('getPaymentTokens without customer', async () => {
-    const customerRequest = {
-      obj: {
-        custom: {
-          fields: {
-            getPaymentTokensRequest: '{}',
-          },
-        },
-      },
-    } as unknown as PaymentReference;
-    const customerResponse = await customerController(
-      'Update',
-      customerRequest
-    );
-    const payments = JSON.parse(
-      expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
-    );
-    expect(payments.success).toBe(false);
-    expect(payments.details).toContain('MISSING_REQUIRED_PARAMETER');
-  }, 20000);
-
-  test('getPaymentTokens without customer', async () => {
-    const customerRequest = {
-      obj: {
-        custom: {
-          fields: {
-            getPaymentTokensRequest: '{}',
-            PayPalUserId: '12345',
-          },
-        },
-      },
-    } as unknown as PaymentReference;
-    const customerResponse = await customerController(
-      'Update',
-      customerRequest
-    );
-    const payments = JSON.parse(
-      expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
-    );
-    expect(payments.success).toBe(false);
-    expect(payments.details).toContain('CUSTOMER_ID_NOT_FOUND');
-  }, 20000);
-
-  test('create vault setup token', async () => {
-    const customerRequest = {
-      obj: {
-        custom: {
-          fields: {
-            createVaultSetupTokenRequest: JSON.stringify({
-              payment_source: { card: {} },
-            }),
-            PayPalUserId: dummyPayPalUserId,
-          },
-        },
-      },
-    } as unknown as PaymentReference;
-    const customerResponse = await customerController(
-      'Update',
-      customerRequest
-    );
-    const setupToken = JSON.parse(
-      expectSuccessfulResponse(
+      } as unknown as PaymentReference;
+      const customerResponse = await customerController(
+        'Update',
+        customerRequest
+      );
+      const token = expectSuccessfulResponse(
         customerResponse,
-        'createVaultSetupTokenResponse'
-      )
-    );
-    expect(setupToken.id).toBeDefined();
-    expect(setupToken.status).toBe('CREATED');
-  }, 20000);
+        'getUserIDTokenResponse'
+      );
+      expect(token.length).toBe(681);
+    },
+    longTestTimeoutMs
+  );
 
-  test('create payment token', async () => {
-    const customerRequest = {
-      obj: {
-        custom: {
-          fields: {
-            createPaymentTokenRequest: '4G4976650J0948357',
+  test(
+    'getPaymentTokens without customer',
+    async () => {
+      const customerRequest = {
+        obj: {
+          custom: {
+            fields: {
+              getPaymentTokensRequest: '{}',
+            },
           },
         },
-      },
-    };
-    const customerResponse = await customerController(
-      'Update',
-      customerRequest
-    );
-    expectSuccessfulResponse(customerResponse, 'createPaymentTokenRequest');
-    const paymentResponse = customerResponse?.actions?.find(
-      (item) => (item.name = 'createPaymentTokenResponse')
-    );
-    expect(paymentResponse).toBeDefined();
-    expect(paymentResponse?.value).toContain('TOKEN_NOT_FOUND');
-  }, 20000);
+      } as unknown as PaymentReference;
+      const customerResponse = await customerController(
+        'Update',
+        customerRequest
+      );
+      const payments = JSON.parse(
+        expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
+      );
+      expect(payments.success).toBe(false);
+      expect(payments.details).toContain('MISSING_REQUIRED_PARAMETER');
+    },
+    longTestTimeoutMs
+  );
+
+  test(
+    'getPaymentTokens without customer',
+    async () => {
+      const customerRequest = {
+        obj: {
+          custom: {
+            fields: {
+              getPaymentTokensRequest: '{}',
+              PayPalUserId: '12345',
+            },
+          },
+        },
+      } as unknown as PaymentReference;
+      const customerResponse = await customerController(
+        'Update',
+        customerRequest
+      );
+      const payments = JSON.parse(
+        expectSuccessfulResponse(customerResponse, 'getPaymentTokensResponse')
+      );
+      expect(payments.success).toBe(false);
+      expect(payments.details).toContain('CUSTOMER_ID_NOT_FOUND');
+    },
+    longTestTimeoutMs
+  );
+
+  test(
+    'create vault setup token',
+    async () => {
+      const customerRequest = {
+        obj: {
+          custom: {
+            fields: {
+              createVaultSetupTokenRequest: JSON.stringify({
+                payment_source: { card: {} },
+              }),
+              PayPalUserId: dummyPayPalUserId,
+            },
+          },
+        },
+      } as unknown as PaymentReference;
+      const customerResponse = await customerController(
+        'Update',
+        customerRequest
+      );
+      const setupToken = JSON.parse(
+        expectSuccessfulResponse(
+          customerResponse,
+          'createVaultSetupTokenResponse'
+        )
+      );
+      expect(setupToken.id).toBeDefined();
+      expect(setupToken.status).toBe('CREATED');
+    },
+    longTestTimeoutMs
+  );
+
+  test(
+    'create payment token',
+    async () => {
+      const customerRequest = {
+        obj: {
+          custom: {
+            fields: {
+              createPaymentTokenRequest: '4G4976650J0948357',
+            },
+          },
+        },
+      };
+      const customerResponse = await customerController(
+        'Update',
+        customerRequest
+      );
+      expectSuccessfulResponse(customerResponse, 'createPaymentTokenRequest');
+      const paymentResponse = customerResponse?.actions?.find(
+        (item) => (item.name = 'createPaymentTokenResponse')
+      );
+      expect(paymentResponse).toBeDefined();
+      expect(paymentResponse?.value).toContain('TOKEN_NOT_FOUND');
+    },
+    longTestTimeoutMs
+  );
 });

@@ -143,7 +143,9 @@ function parseErrorMessage(error: any, requestName: string) {
 
 export const handleError = (
   requestName: string,
+  entityId: string,
   error: any,
+  entityType: 'payment' | 'customer' = 'payment',
   transactionId?: string
 ): UpdateActions => {
   const payPalDebugId =
@@ -151,7 +153,7 @@ export const handleError = (
       ? error?.response?.headers['paypal-debug-id']
       : undefined;
   logger.error(
-    `Call to ${requestName} resulted in an error` +
+    `Call to ${requestName} resulted in an error for ${entityType} with id ${entityId}` +
       (payPalDebugId ? ` (paypalDebugId: ${payPalDebugId})` : ''),
     error?.response?.data ?? error
   );
