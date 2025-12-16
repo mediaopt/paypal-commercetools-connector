@@ -154,43 +154,85 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   lineItem: LineItem,
   isShipped: boolean,
   isLineItemLevel: boolean,
+  isPayUponInvoice: boolean,
   locale?: string
-): Item => {
+) => {
+  /*to avoid possible rounding issues if tax lead to fractional cent amounts in single commercetools line item price
+  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1 */
+
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
   const relevantPrice = isLineItemLevel
     ? lineItem.taxedPrice?.totalGross
     : lineItem.taxedPrice?.totalNet;
+
+  const isSingleItem = lineItem.quantity === 1;
+  const relevantName = isSingleItem ? name : `${name} (${lineItem.quantity})`;
+  const relevantTotalItemPrice = relevantPrice
+    ? relevantPrice.centAmount
+    : lineItem.price.value.centAmount * lineItem.quantity;
+
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
 
-  return {
+  const relevantTypedMoney = {
+    centAmount: relevantTotalItemPrice,
+    fractionDigits,
+    currencyCode,
+    type: lineItem.price.value.type,
+  } as TypedMoney;
+
+  const mappedItem: Item = {
+    name: relevantName,
+    quantity: '1',
     unit_amount: {
-      value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount:
-          relevantPrice != null
-            ? relevantPrice.centAmount / lineItem.quantity
-            : lineItem.price.value.centAmount,
-        fractionDigits,
-        currencyCode,
-        type: lineItem.price.value.type,
-      } as TypedMoney),
+      value: mapCommercetoolsMoneyToPayPalMoney(relevantTypedMoney),
       currency_code: currencyCode,
     },
-    name: name,
     sku: lineItem.variant.sku,
-    quantity: `${lineItem.quantity}`,
-    description: name,
+    description:
+      lineItem.lineItemMode === 'GiftLineItem'
+        ? `${relevantName} gift item`
+        : relevantName,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
-  } as Item;
+  };
+
+  if (isPayUponInvoice) {
+    //tax and tax rate are required only for Pay Upon Invoice for now,
+    if (isLineItemLevel) {
+      return {
+        ...mappedItem,
+        tax: { value: '0.00', currency_code: currencyCode },
+        tax_rate: '0.00', //in tax LineItemMode mode the tax is already included in item price and should not be separately added
+      };
+    } else {
+      const relevantTaxRate = lineItem.taxRate?.amount
+        ? `${lineItem.taxRate.amount}`
+        : '0.00';
+      return {
+        ...mappedItem,
+        tax: {
+          value: mapCommercetoolsMoneyToPayPalMoney({
+            centAmount: lineItem.taxedPrice?.totalTax?.centAmount ?? 0,
+            fractionDigits,
+            currencyCode,
+            type: lineItem.price.value.type,
+          } as TypedMoney),
+          currency_code: currencyCode,
+        },
+        tax_rate: relevantTaxRate,
+      };
+    }
+  }
+  return mappedItem;
 };
 
 export const mapValidCommercetoolsLineItemsToPayPalItems = (
   matchingAmounts: boolean,
   isShipped: boolean,
   taxCalculationMode: string,
+  isPayUponInvoice: boolean,
   lineItems?: LineItem[],
-  locale?: string,
-  isPayUponInvoice?: boolean
+  locale?: string
 ) => {
   if (!matchingAmounts || !lineItems) {
     return null;
@@ -200,18 +242,13 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
       lineItem,
       isShipped,
       isLineItemTaxLevel(taxCalculationMode),
+      isPayUponInvoice,
       locale
     )
   );
   if (payPalItems.some((item) => parseFloat(item.unit_amount.value) < 0))
     return null;
-  return isPayUponInvoice
-    ? payPalItems.map((item) => ({
-        ...item,
-        tax: { value: '0.00', currency_code: item.unit_amount.currency_code },
-        tax_rate: '0.00',
-      }))
-    : payPalItems; //tax and tax rate are required only for Pay Upon Invoice for now and at the first step are only supported in tax LineItemMode mode where the tax is already included in item price and should not be separately added
+  return payPalItems;
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
