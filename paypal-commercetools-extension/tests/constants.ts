@@ -56,7 +56,7 @@ const taxedPrice = (
   taxPortions: [],
 });
 
-const fullPriceData = (
+export const fullPriceData = (
   totalNet = 0,
   totalGross = 0,
   totalTax = 0,
@@ -66,8 +66,6 @@ const fullPriceData = (
   totalPrice: centPrice(totalGross),
   taxRate: { amount: taxRateAmount },
 });
-
-export const prices = fullPriceData(16303, 19400, 3097);
 
 const giftLineItem: LineItemPropsImportantForMappingTests = {
   name: {

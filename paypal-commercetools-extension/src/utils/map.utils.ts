@@ -157,7 +157,6 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   isPayUponInvoice: boolean,
   locale?: string
 ) => {
-  const taxOnItemLevelRequired = isPayUponInvoice && !isLineItemLevel;
   /*to avoid possible rounding issues if tax lead to fractional cent amounts in single commercetools line item price
   mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1 */
 

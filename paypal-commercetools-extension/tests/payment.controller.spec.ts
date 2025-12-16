@@ -14,7 +14,7 @@ const mockConfigModule = () => {
       return {
         locale: 'en',
         lineItems: discountedLineItems,
-        ...prices,
+        ...fullPriceData(16303, 19400, 3097),
         discountOnTotalPrice: discountOnTotalPrice(500, 420, 500),
         billingAddress: {
           postalCode: '12345',
@@ -47,8 +47,8 @@ import {
   discountedLineItems,
   discountedLineitemWithTaxIncluded,
   discountOnTotalPrice,
+  fullPriceData,
   longTestTimeoutMs,
-  prices,
 } from './constants';
 import { getCart } from '../src/service/commercetools.service';
 
