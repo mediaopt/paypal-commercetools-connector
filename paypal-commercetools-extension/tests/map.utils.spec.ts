@@ -1,4 +1,4 @@
-import { Cart, TypedMoney } from '@commercetools/platform-sdk';
+import { Cart, LineItem, TypedMoney } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import { RefundStatusEnum } from '../src/paypal/payments_api';
 import {
@@ -10,12 +10,17 @@ import {
   mapPayPalRefundStatusToCommercetoolsTransactionState,
   mapValidCommercetoolsLineItemsToPayPalItems,
 } from '../src/utils/map.utils';
-import { cartWithExternalRate, discountedLineItems } from './constants';
+import {
+  cartWithExternalRate,
+  discountedLineItems,
+  multipleItemsCartWithUnitPriceTaxMode,
+} from './constants';
 
 const refundStatusEnum = (status: string) => {
   return status as RefundStatusEnum;
 };
-describe('Testing map utilities', () => {
+
+describe('Test payment source mapping', () => {
   test.each([
     { name: 'card', source: { card: { name: 'TEST' } } },
     { name: 'eps', source: { eps: { name: 'TEST' } } },
@@ -32,12 +37,17 @@ describe('Testing map utilities', () => {
     { name: 'sofort', source: { sofort: { iban_last_chars: 'TEST' } } },
     { name: 'trustly', source: { trustly: { iban_last_chars: 'TEST' } } },
     { name: 'venmo', source: { venmo: { email_address: 'TEST' } } },
-  ])('map $name', async ({ name, source }) => {
-    const mapped = mapPayPalPaymentSourceToCommercetoolsMethodInfo(source);
-    expect(mapped.toLowerCase()).toContain(name);
-    expect(mapped).toContain('TEST');
-  });
+  ])(
+    'map $name payment method returns method and relevant payment details',
+    async ({ name, source }) => {
+      const mapped = mapPayPalPaymentSourceToCommercetoolsMethodInfo(source);
+      expect(mapped.toLowerCase()).toContain(name);
+      expect(mapped).toContain('TEST');
+    }
+  );
+});
 
+describe('Testing mapping of payment between PayPal and Commercetools', () => {
   test.each([
     {
       commercetoolsMoney: {
@@ -95,7 +105,9 @@ describe('Testing map utilities', () => {
       ).toBe(commercetoolsMoney.centAmount);
     }
   );
+});
 
+describe('Testing mapping statuses between PayPal and Commercetools', () => {
   test.each([
     { paypalStatus: undefined, expectedResult: 'Failure' },
     { paypalStatus: refundStatusEnum('COMPLETED'), expectedResult: 'Success' },
@@ -111,7 +123,9 @@ describe('Testing map utilities', () => {
       ).toBe(expectedResult);
     }
   );
+});
 
+describe('Testing map carriers between PayPal and commercetools', () => {
   test.each([
     {
       carrier: undefined,
@@ -179,20 +193,89 @@ describe('Testing PayPal breakdown mapping for all methods except PayUponInvoice
       ],
     ],
   ])(
-    'if matching amounts is %p, tax is lineItemLevel %p, line items are %p, the expected quantities and amounts are %p',
+    'if matching amounts is %p, tax is %p, line items are %p, the expected quantities and amounts are %p',
     (matchingAmounts, isLineItemLevel, lineItems, result) => {
       const lineItemsMap = mapValidCommercetoolsLineItemsToPayPalItems(
         matchingAmounts,
         true,
         isLineItemLevel,
         false,
-        lineItems
+        lineItems as LineItem[] | undefined
       );
       if (!result) expect(lineItemsMap).toBeNull();
       else if (lineItemsMap)
         lineItemsMap.forEach((item, index) => {
           expect(item.quantity).toBe(result[index].quantity);
           expect(item.unit_amount.value).toBe(result[index].amount);
+          expect(item.tax).toBeUndefined();
+        });
+    }
+  );
+});
+
+describe('Testing valid PayPal breakdown mapping for Pay Upon Invoice only', () => {
+  test.each([
+    ['LineItemLevel', undefined, null],
+    ['LineItemLevel', [], []],
+    [
+      'LineItemLevel',
+      discountedLineItems,
+      [
+        { quantity: '1', amount: '0.00', tax: '0.00' },
+        { quantity: '1', amount: '199.00', tax: '0.00' },
+      ],
+    ],
+    [
+      'UnitPriceLevel',
+      discountedLineItems,
+      [
+        { quantity: '1', amount: '0.00', tax: '0.00' },
+        { quantity: '1', amount: '167.23', tax: '31.77' },
+      ],
+    ],
+    [
+      'LineItemLevel',
+      cartWithExternalRate.lineItems,
+      [
+        { quantity: '1', amount: '185.99', tax: '0.00' },
+        { quantity: '1', amount: '221.33', tax: '0.00' },
+      ],
+    ],
+    [
+      'UnitPriceLevel',
+      cartWithExternalRate.lineItems,
+      [
+        { quantity: '1', amount: '156.29', tax: '29.70' },
+        { quantity: '1', amount: '185.99', tax: '35.34' },
+      ],
+    ],
+    [
+      'UnitPriceLevel',
+      multipleItemsCartWithUnitPriceTaxMode.lineItems,
+      [
+        {
+          quantity: '1',
+          amount: '468.87',
+          tax: '89.10',
+        },
+      ],
+    ],
+  ])(
+    'if amounts match, tax is %p, line items are %p, the expected quantities and amounts are %p',
+    (isLineItemLevel, lineItems, result) => {
+      const lineItemsMap = mapValidCommercetoolsLineItemsToPayPalItems(
+        true,
+        true,
+        isLineItemLevel,
+        true,
+        lineItems as LineItem[] | undefined
+      );
+      if (!result) expect(lineItemsMap).toBeNull();
+      else if (lineItemsMap)
+        lineItemsMap.forEach((item, index) => {
+          expect(item.quantity).toBe(result[index].quantity);
+          expect(item.unit_amount.value).toBe(result[index].amount);
+          expect(item?.tax?.value).toBe(result[index].tax);
         });
     }
   );
@@ -201,15 +284,17 @@ describe('Testing PayPal breakdown mapping for all methods except PayUponInvoice
 const paypalToCTEur = (payPalMoneyValue: string) =>
   parseFloat(payPalMoneyValue);
 
-describe('Testing valid PayPal price breakdown mapping for all methods except Pay Upon Invoise', () => {
-  test.each([[cartWithExternalRate]])('breakdown mapping', (cart: Cart) => {
-    const paypalPrice = mapCommercetoolsCartToPayPalPriceBreakdown(cart);
+describe('Testing valid PayPal price breakdown mapping for all methods except Pay Upon Invoice', () => {
+  test.each([[cartWithExternalRate]])('breakdown mapping', (cart) => {
+    const paypalPrice = mapCommercetoolsCartToPayPalPriceBreakdown(
+      cart as Cart
+    );
     const payPalItems = mapValidCommercetoolsLineItemsToPayPalItems(
       true,
       true,
       cart.taxCalculationMode,
       false,
-      cart.lineItems
+      cart.lineItems as LineItem[] | undefined
     );
     expect(paypalPrice).toBeDefined();
     expect(payPalItems).toBeDefined();
