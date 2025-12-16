@@ -158,34 +158,25 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   locale?: string
 ) => {
   const taxOnItemLevelRequired = isPayUponInvoice && !isLineItemLevel;
-  /*to avoid possible rounding issues if tax is required and tax mode is UnitPriceMode
-  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1,
-  commercetools */
+  /*to avoid possible rounding issues if tax lead to fractional cent amounts in single commercetools line item price
+  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1 */
 
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
   const relevantPrice = isLineItemLevel
     ? lineItem.taxedPrice?.totalGross
     : lineItem.taxedPrice?.totalNet;
 
-  const relevantName = taxOnItemLevelRequired
-    ? `${name} (${lineItem.quantity})`
-    : name;
-  const relevantQuantity = taxOnItemLevelRequired
-    ? '1'
-    : `${lineItem.quantity}`;
-  const relevantCentAmount = taxOnItemLevelRequired
-    ? relevantPrice !== undefined
-      ? relevantPrice.centAmount
-      : lineItem.price.value.centAmount * lineItem.quantity
-    : relevantPrice !== undefined
-    ? relevantPrice.centAmount / lineItem.quantity
-    : lineItem.price.value.centAmount;
+  const isSingleItem = lineItem.quantity === 1;
+  const relevantName = isSingleItem ? name : `${name} (${lineItem.quantity})`;
+  const relevantTotalItemPrice = relevantPrice
+    ? relevantPrice.centAmount
+    : lineItem.price.value.centAmount * lineItem.quantity;
 
   const currencyCode = lineItem.price.value.currencyCode;
   const fractionDigits = lineItem.price.value.fractionDigits;
 
   const relevantTypedMoney = {
-    centAmount: relevantCentAmount,
+    centAmount: relevantTotalItemPrice,
     fractionDigits,
     currencyCode,
     type: lineItem.price.value.type,
@@ -193,7 +184,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
 
   const mappedItem: Item = {
     name: relevantName,
-    quantity: relevantQuantity,
+    quantity: '1',
     unit_amount: {
       value: mapCommercetoolsMoneyToPayPalMoney(relevantTypedMoney),
       currency_code: currencyCode,
