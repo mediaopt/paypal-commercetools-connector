@@ -5,7 +5,7 @@ import {
   LineItem,
   Price,
   ProductVariant,
-  TaxedItemPrice,
+  TaxedPrice,
   TaxRate,
 } from '@commercetools/platform-sdk';
 
@@ -14,23 +14,27 @@ type LineItemPropsImportantForMappingTests = Pick<
   'name' | 'lineItemMode' | 'quantity'
 > & {
   variant: Pick<ProductVariant, 'sku'>;
-} & { price: Pick<Price, 'value'> } & {
+  price: Pick<Price, 'value'>;
   taxRate?: Pick<TaxRate, 'amount'>;
 };
+
+type TaxedPricePropsImportantForMappingTests = Omit<TaxedPrice, 'taxPortions'>;
 
 type CartPropsImportantForMappingTests = Pick<
   Cart,
   | 'totalPrice'
-  | 'taxedPrice'
   | 'discountOnTotalPrice'
   | 'taxCalculationMode'
   | 'taxMode'
   | 'taxRoundingMode'
   | 'priceRoundingMode'
   | 'directDiscounts'
-  | 'taxedShippingPrice'
   | 'discountCodes'
-> & { lineItems: LineItemPropsImportantForMappingTests[] };
+> & {
+  lineItems: LineItemPropsImportantForMappingTests[];
+  taxedPrice: TaxedPricePropsImportantForMappingTests;
+  taxedShippingPrice?: TaxedPricePropsImportantForMappingTests;
+};
 
 export const longTestTimeoutMs = 20000;
 
@@ -49,22 +53,23 @@ const taxedPrice = (
   totalNet = 0,
   totalGross = 0,
   totalTax = 0
-): TaxedItemPrice => ({
+): TaxedPricePropsImportantForMappingTests => ({
   totalGross: centPrice(totalGross),
   totalNet: centPrice(totalNet),
   totalTax: centPrice(totalTax),
-  taxPortions: [],
 });
+
+const DEFAULT_EU_TAX_RATE = 0.19;
 
 export const fullPriceData = (
   totalNet = 0,
   totalGross = 0,
   totalTax = 0,
-  taxRateAmount = 0.19
+  taxRate = DEFAULT_EU_TAX_RATE
 ) => ({
   taxedPrice: taxedPrice(totalNet, totalGross, totalTax),
   totalPrice: centPrice(totalGross),
-  taxRate: { amount: taxRateAmount },
+  taxRate: { amount: taxRate },
 });
 
 const giftLineItem: LineItemPropsImportantForMappingTests = {
@@ -138,7 +143,6 @@ export const cartWithExternalRate: CartPropsImportantForMappingTests = {
     {
       name: {
         en: 'Bag ”Amanda B” Liebeskind red',
-        de: 'Tasche „Amanda B” Liebeskind rot',
       },
       variant: {
         sku: 'A0E2000000024BD',
