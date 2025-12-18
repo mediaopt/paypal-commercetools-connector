@@ -1,7 +1,13 @@
-import { Cart, LineItem, TypedMoney } from '@commercetools/platform-sdk';
+import {
+  Cart,
+  LineItem,
+  Payment,
+  TypedMoney,
+} from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import { RefundStatusEnum } from '../src/paypal/payments_api';
 import {
+  isPaymentUpToDate,
   mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsMoneyToPayPalMoney,
@@ -13,12 +19,28 @@ import {
 import {
   cartWithExternalRate,
   discountedLineItems,
+  dummyValidPaymentStatusData,
+  lineItemFromLineItemData,
   multipleItemsCartWithUnitPriceTaxMode,
+  paymentStateMappingWithResults,
 } from './constants';
 
 const refundStatusEnum = (status: string) => {
   return status as RefundStatusEnum;
 };
+
+describe('isPaymentUpToDate verification', () => {
+  test.each(paymentStateMappingWithResults)(
+    'testing %p with payment %p and actions %p results in %p up to date state',
+    (description, actions, result) => {
+      const isUpToDate = isPaymentUpToDate(
+        dummyValidPaymentStatusData as Payment,
+        actions
+      );
+      expect(isUpToDate).toEqual(result);
+    }
+  );
+});
 
 describe('Test payment source mapping', () => {
   test.each([

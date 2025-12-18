@@ -8,8 +8,65 @@ import {
   TaxedPrice,
   TaxRate,
 } from '@commercetools/platform-sdk';
+import { UpdateActions } from '../src/types/index.types';
+
+type PaymentStateMapData = [string, UpdateActions, boolean];
 
 type LineItemPropsImportantForMappingTests = Pick<
+export const dummyValidPaymentStatusData: Pick<
+  Payment,
+  'paymentStatus' | 'paymentMethodInfo'
+> = {
+  paymentStatus: { interfaceCode: 'code1', interfaceText: 'text1' },
+  paymentMethodInfo: { method: 'method1' },
+};
+
+const upToDateDummyActions = [
+  {
+    action: 'setMethodInfoMethod',
+    method: dummyValidPaymentStatusData.paymentMethodInfo.method,
+  },
+  {
+    action: 'setStatusInterfaceText',
+    interfaceText: dummyValidPaymentStatusData.paymentStatus.interfaceText,
+  },
+  {
+    action: 'setStatusInterfaceCode',
+    interfaceCode: dummyValidPaymentStatusData.paymentStatus.interfaceCode,
+  },
+];
+
+const dummyInvalidActionParams = {
+  method: 'different',
+  interfaceText: 'different',
+  interfaceCode: 'different',
+};
+
+export const paymentStateMappingWithResults: PaymentStateMapData[] = [
+  ['different amount of actions', [], false],
+  ...upToDateDummyActions.map(
+    ({ action }, index) =>
+      [
+        `action ${action} missing`,
+        upToDateDummyActions.map((item, index2) =>
+          index2 === index ? { action: 'irrelevant action' } : item
+        ),
+        false,
+      ] as PaymentStateMapData
+  ),
+  ...upToDateDummyActions.map(
+    ({ action }, index) =>
+      [
+        `action ${action} params differ from current payment`,
+        upToDateDummyActions.map((item, index2) =>
+          index2 === index ? { action, ...dummyInvalidActionParams } : item
+        ),
+        false,
+      ] as PaymentStateMapData
+  ),
+  ['up to date payment', upToDateDummyActions, true],
+];
+
   LineItem,
   'name' | 'lineItemMode' | 'quantity'
 > & {
