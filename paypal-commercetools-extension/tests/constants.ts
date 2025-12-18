@@ -12,7 +12,6 @@ import { UpdateActions } from '../src/types/index.types';
 
 type PaymentStateMapData = [string, UpdateActions, boolean];
 
-type LineItemPropsImportantForMappingTests = Pick<
 export const dummyValidPaymentStatusData: Pick<
   Payment,
   'paymentStatus' | 'paymentMethodInfo'
@@ -67,6 +66,7 @@ export const paymentStateMappingWithResults: PaymentStateMapData[] = [
   ['up to date payment', upToDateDummyActions, true],
 ];
 
+type RelevantQuantityIndependentLineItemProps = Pick<
   LineItem,
   'name' | 'lineItemMode' | 'quantity'
 > & {
