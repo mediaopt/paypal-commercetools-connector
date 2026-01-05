@@ -158,7 +158,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
   locale?: string
 ) => {
   /*to avoid possible rounding issues if tax lead to fractional cent amounts in single commercetools line item price
-  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (7), quantity:1 */
+  mapping is done in a way: commercetools - item:socks, quantity:7; PayPal - item:socks (x7), quantity:1 */
 
   const name = lineItem.name[locale ?? Object.keys(lineItem.name)[0]];
   const relevantPrice = isLineItemLevel
@@ -166,7 +166,7 @@ const mapCommercetoolsLineItemsToPayPalItems = (
     : lineItem.taxedPrice?.totalNet;
 
   const isSingleItem = lineItem.quantity === 1;
-  const relevantName = isSingleItem ? name : `${name} (${lineItem.quantity})`;
+  const relevantName = isSingleItem ? name : `${name} (x${lineItem.quantity})`;
   const relevantTotalItemPrice = relevantPrice
     ? relevantPrice.centAmount
     : lineItem.price.value.centAmount * lineItem.quantity;
@@ -189,10 +189,9 @@ const mapCommercetoolsLineItemsToPayPalItems = (
       currency_code: currencyCode,
     },
     sku: lineItem.variant.sku,
-    description:
-      lineItem.lineItemMode === 'GiftLineItem'
-        ? `${relevantName} gift item`
-        : relevantName,
+    description: `${
+      lineItem.lineItemMode === 'GiftLineItem' ? 'GIFT ITEM ' : ''
+    }${relevantName}`,
     category: isShipped ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
   };
 
