@@ -14,8 +14,12 @@ const mockConfigModule = () => {
       return {
         locale: 'en',
         lineItems: discountedLineItems,
-        ...fullPriceData(16303, 19400, 3097),
-        discountOnTotalPrice: discountOnTotalPrice(500, 420, 500),
+        ...fullPriceData({ gross: 19400, net: 16303, tax: 3097 }),
+        discountOnTotalPrice: discountOnTotalPrice({
+          gross: 500,
+          net: 420,
+          amount: 500,
+        }),
         billingAddress: {
           postalCode: '12345',
           country: 'DE',
