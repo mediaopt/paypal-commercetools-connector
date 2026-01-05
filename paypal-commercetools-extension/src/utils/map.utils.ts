@@ -253,7 +253,7 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
   discountOnTotalPrice,
-  taxedShippingPrice,
+  shippingInfo,
   taxCalculationMode,
 }: Cart) => {
   if (!lineItems || !lineItems[0]) {
@@ -297,7 +297,10 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
     shipping: {
       currency_code: currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney({
-        centAmount: taxedShippingPrice?.totalGross?.centAmount ?? 0,
+        centAmount:
+          shippingInfo?.taxedPrice?.totalGross?.centAmount ??
+          shippingInfo?.price.centAmount ??
+          0, //in commercetools shipping discount is included in total discount and can't be easily separated - so amount before discount applied is used here
         fractionDigits,
         currencyCode,
         type,
