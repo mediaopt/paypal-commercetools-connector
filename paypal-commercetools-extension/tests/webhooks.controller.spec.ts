@@ -1,22 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 import { Response } from 'express';
-import {
-  CheckoutPaymentIntent,
-  PaymentSourceResponse,
-} from '../src/paypal/checkout_api';
+import { CheckoutPaymentIntent } from '../src/paypal/checkout_api';
 
 let apiRequest: any = undefined;
 let apiRoot: any = undefined;
-
-const mockPayPalPaymentSource: PaymentSourceResponse = {
-  card: { name: 'TEST' },
-};
 
 const mockConfigModule = () => {
   apiRoot = {
     customObjects: jest.fn(() => apiRoot),
     payments: jest.fn(() => apiRoot),
     carts: jest.fn(() => apiRoot),
+    orders: jest.fn(() => apiRoot),
     customers: jest.fn(() => apiRoot),
     withId: jest.fn(() => apiRoot),
     withContainerAndKey: jest.fn(() => apiRoot),
@@ -34,7 +28,7 @@ const mockConfigModule = () => {
     getWebhookId: () => 1,
     getPayPalOrder: () => ({
       status: 'COMPLETED',
-      payment_source: mockPayPalPaymentSource,
+      payment_source: { pay_upon_invoice: {} },
     }),
   }));
   return apiRoot;
@@ -49,9 +43,12 @@ jest.mock('../src/utils/logger.utils', () => ({
   logger: { info: jest.fn(), error: jest.fn() },
 }));
 
+jest.mock('../src/service/mail.service', () => ({ sendEmail: jest.fn() }));
+
 import { post } from '../src/controllers/webhook.controller';
 import { longTestTimeoutMs } from './constants';
 import { Capture2StatusEnum } from '../src/paypal/payments_api';
+import { sendEmail } from '../src/service/mail.service';
 
 const mockAutrhorizedPayment = {
   id: 1,
@@ -67,7 +64,7 @@ const mockAutrhorizedPayment = {
     interfaceText: 'APPROVED',
   },
   paymentMethodInfo: {
-    method: 'card (TEST)',
+    method: 'pay_upon_invoice',
   },
 };
 
@@ -242,7 +239,7 @@ describe('test cart could not be fetched', () => {
   );
 });
 
-describe('transaction is already up to date', () => {
+describe('transaction is already up to date and payment method is not Pay Upon invoice', () => {
   beforeEach(() => {
     apiRequest = {
       execute: jest
@@ -277,6 +274,7 @@ describe('transaction is already up to date', () => {
         },
       } as any;
       await post(request, response);
+      expect(spyOnSleep).toHaveBeenCalledTimes(1);
       expect(logger.info).toHaveBeenLastCalledWith(
         'No update actions required within the webhook call for payment 1 in scope of CapturePayPalOrderWebhook, both transaction and payment statuses are already up to date'
       );
@@ -327,4 +325,41 @@ describe('payment not found for the PayPal order', () => {
       `PayPalPaymentTokenWebhook action impossible - there is not any assigned commercetools payment for the PayPal order id order_id`
     );
   });
+});
+
+describe('Pay upon invoice capture', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce({
+          body: {
+            results: [mockAutrhorizedPayment],
+          },
+        })
+        .mockReturnValue({ body: { total: 1, results: [{}] } }),
+    };
+    jest.clearAllMocks();
+  });
+  test(
+    '',
+    async () => {
+      const request = {
+        header: jest.fn(),
+        body: {
+          resource_type: 'capture',
+          event_type: 'PAYMENT.CAPTURE.COMPLETED',
+          resource: {
+            id: 1,
+            status: Capture2StatusEnum.Completed,
+          },
+          summary: 'Capture is done.',
+        },
+      } as any;
+      await post(request, response);
+      expect(spyOnSleep).not.toHaveBeenCalled();
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+    },
+    longTestTimeoutMs
+  );
 });
