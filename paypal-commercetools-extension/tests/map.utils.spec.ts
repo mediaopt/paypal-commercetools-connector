@@ -17,21 +17,32 @@ import {
   mapValidCommercetoolsLineItemsToPayPalItems,
 } from '../src/utils/map.utils';
 import {
+  cardFromCardData,
   cartWithExternalRate,
+  discountedCartsData,
   discountedLineItems,
   dummyValidPaymentStatusData,
   lineItemFromLineItemData,
+  LineItemGenerationData,
   multipleItemsCartWithUnitPriceTaxMode,
   paymentStateMappingWithResults,
+  shippedCarts,
+  simpleCartsDataWithLineItemMode,
+  simpleCartsDataWithUnitPriceMode,
 } from './constants';
+import { Item } from '../src/paypal/checkout_api';
+import { logger } from '../src/utils/logger.utils';
 
 const refundStatusEnum = (status: string) => {
   return status as RefundStatusEnum;
 };
 
+const paypalToCTEur = (payPalMoneyValue = '') =>
+  Math.round(parseFloat(payPalMoneyValue) * 100);
+
 describe('isPaymentUpToDate verification', () => {
   test.each(paymentStateMappingWithResults)(
-    'testing %p with payment %p and actions %p results in %p up to date state',
+    'testing %p with actions %p results in %p up to date state',
     (description, actions, result) => {
       const isUpToDate = isPaymentUpToDate(
         dummyValidPaymentStatusData as Payment,
@@ -215,6 +226,114 @@ describe('Testing PayPal breakdown mapping for mapping not possible', () => {
   });
 });
 
+const expectPayPalItem = (
+  ctLineItemData: LineItemGenerationData,
+  mappedItem: Item & { tax_rate?: string },
+  expectedMatch: 'gross' | 'net' = 'gross',
+  isPayUponInvoice = false
+) => {
+  expect(mappedItem.quantity).toBe('1');
+  if (ctLineItemData.quantity > 1)
+    expect(mappedItem.name).toContain(`(x${ctLineItemData.quantity})`);
+  expect(paypalToCTEur(mappedItem.unit_amount.value)).toBe(
+    ctLineItemData[expectedMatch]
+  );
+  if (!isPayUponInvoice) expect(mappedItem?.tax).toBeUndefined();
+  else
+    expect(paypalToCTEur(mappedItem.tax?.value)).toEqual(
+      expectedMatch === 'gross' ? 0 : ctLineItemData.tax
+    );
+};
+
+describe('Testing PayPal breakdown mapping for single item type card in LineItemMode, no discount, no shipping, no PUI)', () => {
+  test.each(simpleCartsDataWithLineItemMode)(
+    `for line item mode total price matches total gross and there is no tax or discount`,
+    (cartData) => {
+      const dummyCart = cardFromCardData(cartData) as Cart;
+      const ctLineItemData = cartData.lineItemsData[0];
+      const mapping = mapCommercetoolsCartToPayPalPriceBreakdown(dummyCart);
+      expect(mapping).toBeDefined();
+      expect(mapping?.discount).toBeUndefined();
+      expect(mapping?.shipping.value).toBe('0.00');
+      expect(mapping?.tax_total.value).toBe('0.00');
+      expect(paypalToCTEur(mapping?.item_total.value)).toEqual(
+        ctLineItemData.gross
+      );
+
+      const itemsMap = mapValidCommercetoolsLineItemsToPayPalItems(
+        true,
+        true,
+        dummyCart.taxCalculationMode,
+        false,
+        dummyCart.lineItems
+      );
+      expect(itemsMap).toBeDefined();
+      expect(itemsMap?.length).toEqual(1);
+      if (itemsMap?.[0]) expectPayPalItem(ctLineItemData, itemsMap[0]);
+    }
+  );
+});
+
+describe('Testing PayPal breakdown mapping for single item type cards in UnitPriceMode, no discount, no shipping)', () => {
+  test.each(simpleCartsDataWithUnitPriceMode)(
+    `for line item mode total price matches total net and there is tax, but no discount`,
+    (cartData) => {
+      const mapping = mapCommercetoolsCartToPayPalPriceBreakdown(
+        cardFromCardData(cartData) as Cart
+      );
+      expect(mapping).toBeDefined();
+      expect(mapping?.discount).toBeUndefined();
+      expect(mapping?.shipping.value).toBe('0.00');
+      expect(paypalToCTEur(mapping?.tax_total.value)).toEqual(
+        cartData.lineItemsData[0].tax
+      );
+      expect(paypalToCTEur(mapping?.item_total.value)).toEqual(
+        cartData.lineItemsData[0].net
+      );
+    }
+  );
+});
+
+describe('Testing PayPal breakdown mapping for single item type card in LineItemMode with discount, no shipping)', () => {
+  test.each(discountedCartsData)(
+    `for line item mode total price matches total gross and there is no tax but is discount`,
+    (cartData) => {
+      const mapping = mapCommercetoolsCartToPayPalPriceBreakdown(
+        cardFromCardData(cartData) as Cart
+      );
+      expect(mapping).toBeDefined();
+      expect(paypalToCTEur(mapping?.discount?.value)).toEqual(
+        cartData.discount?.gross
+      );
+      expect(mapping?.shipping.value).toBe('0.00');
+      expect(mapping?.tax_total.value).toBe('0.00');
+      expect(paypalToCTEur(mapping?.item_total.value)).toEqual(
+        cartData.lineItemsData[0].gross
+      );
+    }
+  );
+});
+
+describe('Testing PayPal breakdown mapping for multiple items type card in UnitPriceLevel mode with discount and shipping)', () => {
+  test.each(shippedCarts)(
+    `for unit price mode total price matches total net and there are tax and discount`,
+    (cartData) => {
+      const mapping = mapCommercetoolsCartToPayPalPriceBreakdown(
+        cardFromCardData(cartData) as Cart
+      );
+      expect(mapping).toBeDefined();
+      logger.info('mapping');
+      logger.info(JSON.stringify(cardFromCardData(cartData)));
+      logger.info(JSON.stringify(mapping));
+
+      expect(paypalToCTEur(mapping?.discount?.value)).toEqual(
+        cartData.discount?.gross
+      );
+      expect(mapping?.shipping.value).toBe('10.00');
+    }
+  );
+});
+
 describe('Testing PayPal breakdown mapping for all methods except PayUponInvoice', () => {
   test.each([
     ['LineItemLevel', [], []],
@@ -334,9 +453,6 @@ describe('Testing valid PayPal breakdown mapping for Pay Upon Invoice only', () 
   );
 });
 
-const paypalToCTEur = (payPalMoneyValue: string) =>
-  parseFloat(payPalMoneyValue);
-
 describe('Testing invalid card mapping', () => {
   test('no line items lead to no price mapping', () => {
     const emptyItemsListMapping = mapCommercetoolsCartToPayPalPriceBreakdown({
@@ -363,13 +479,10 @@ describe('Testing valid PayPal price breakdown mapping for all methods except Pa
     if (paypalPrice) {
       const discountValue = paypalPrice.discount?.value || '0.00';
       expect(cart.taxedPrice?.totalGross.centAmount).toBe(
-        Math.round(
-          (paypalToCTEur(paypalPrice.item_total.value) +
-            paypalToCTEur(paypalPrice.tax_total.value) +
-            paypalToCTEur(paypalPrice.shipping.value) -
-            paypalToCTEur(discountValue)) *
-            100
-        )
+        paypalToCTEur(paypalPrice.item_total.value) +
+          paypalToCTEur(paypalPrice.tax_total.value) +
+          paypalToCTEur(paypalPrice.shipping.value) -
+          paypalToCTEur(discountValue)
       );
       if (payPalItems) {
         const totalItems = payPalItems
