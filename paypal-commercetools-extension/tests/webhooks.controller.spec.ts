@@ -1,9 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 import { Response } from 'express';
-import { CheckoutPaymentIntent } from '../src/paypal/checkout_api';
+import {
+  CheckoutPaymentIntent,
+  PaymentSourceResponse,
+} from '../src/paypal/checkout_api';
 
 let apiRequest: any = undefined;
 let apiRoot: any = undefined;
+
+const mockPayPalPaymentSource: PaymentSourceResponse = {
+  card: { name: 'TEST' },
+};
 
 const mockConfigModule = () => {
   apiRoot = {
@@ -27,39 +34,46 @@ const mockConfigModule = () => {
     getWebhookId: () => 1,
     getPayPalOrder: () => ({
       status: 'COMPLETED',
+      payment_source: mockPayPalPaymentSource,
     }),
   }));
   return apiRoot;
 };
 mockConfigModule();
 
-const actual = jest.requireActual('../src/utils/response.utils');
-const spy = jest.spyOn(actual, 'sleep');
+const responseUtilsActual = jest.requireActual('../src/utils/response.utils');
+const spyOnSleep = jest.spyOn(responseUtilsActual, 'sleep');
+
+import { logger } from '../src/utils/logger.utils';
+jest.mock('../src/utils/logger.utils', () => ({
+  logger: { info: jest.fn(), error: jest.fn() },
+}));
 
 import { post } from '../src/controllers/webhook.controller';
 import { longTestTimeoutMs } from './constants';
+import { Capture2StatusEnum } from '../src/paypal/payments_api';
+
+const mockAutrhorizedPayment = {
+  id: 1,
+  transactions: [
+    {
+      type: 'Charge',
+      interactionId: 1,
+      state: 'Success',
+    },
+  ],
+  paymentStatus: {
+    interfaceCode: 'APPROVED',
+    interfaceText: 'APPROVED',
+  },
+  paymentMethodInfo: {
+    method: 'card (TEST)',
+  },
+};
 
 const mockPaymentBody = {
   body: {
-    total: 1,
-    results: [
-      {
-        id: 1,
-        transactions: [
-          {
-            type: 'Charge',
-            interactionId: 1,
-          },
-        ],
-        paymentStatus: {
-          interfaceCode: 'APPROVED',
-          interfaceText: 'APPROVED',
-        },
-        paymentMethodInfo: {
-          method: 'someValidPayPalCredentials',
-        },
-      },
-    ],
+    results: [mockAutrhorizedPayment],
   },
 };
 
@@ -86,24 +100,33 @@ const mockCustomerBody = {
   },
 };
 
+const response = {
+  status: jest.fn(() => response),
+  json: jest.fn(),
+} as unknown as Response;
+
 const expectSuccessfulResponse = async (
   request: any,
   executeCalls: number,
-  actionsCount: number,
-  action: string
+  expectedActions: string[]
 ) => {
-  const response = {
-    status: jest.fn(() => response),
-    json: jest.fn(),
-  } as unknown as Response;
   await post(request, response);
   expect(response.status).toHaveBeenCalledTimes(1);
   expect(response.status).toHaveBeenCalledWith(200);
   expect(apiRequest.execute).toHaveBeenCalledTimes(executeCalls);
-  expect(apiRoot.post.mock.calls[0][0].body.actions).toHaveLength(actionsCount);
-  expect(apiRoot.post.mock.calls[0][0].body.actions[0].action).toBe(action);
+  const actions = apiRoot.post.mock.calls[0][0].body.actions;
+  expect(actions).toHaveLength(expectedActions.length);
+  expectedActions.forEach((expectedAction, index) =>
+    expect(actions[index].action).toEqual(expectedAction)
+  );
 };
-describe('Testing webhook controller', () => {
+
+const expectedUpdatePaymentActions = [
+  'setStatusInterfaceCode',
+  'setStatusInterfaceText',
+  'setMethodInfoMethod',
+];
+describe('Testing webhook controller success scenarios', () => {
   beforeEach(() => {
     apiRequest = {
       execute: jest
@@ -117,40 +140,37 @@ describe('Testing webhook controller', () => {
 
   test.each([
     {
-      name: 'test capture with existing transaction',
+      name: 'capture with existing transaction (update transaction state)',
       resource_type: 'capture',
       resource: { id: 1 },
-      action: 'changeTransactionState',
+      actions: ['changeTransactionState', ...expectedUpdatePaymentActions],
       executeCalls: 2,
-      actionsCount: 3,
     },
     {
-      name: 'test payment_token',
+      name: 'payment_token',
       resource_type: 'payment_token',
       resource: { id: 1, customer: { id: 123 }, metadata: { order_id: 2 } },
-      action: 'setCustomType',
+      actions: ['setCustomType'],
       executeCalls: 4,
-      actionsCount: 1,
     },
     {
-      name: 'test order with authorization with missing transaction',
+      name: 'checkout order with authorization',
       resource_type: 'checkout-order',
       resource: { id: 1, intent: CheckoutPaymentIntent.Authorize },
-      action: 'setStatusInterfaceCode',
-      executeCalls: 2,
-      actionsCount: 2,
-    },
-    {
-      name: 'test authorization with missing transaction',
-      resource_type: 'authorization',
-      resource: { id: 1 },
-      action: 'addTransaction',
+      actions: expectedUpdatePaymentActions,
       executeCalls: 2,
       actionsCount: 3,
+    },
+    {
+      name: 'authorization with missing transaction (create new transaction)',
+      resource_type: 'authorization',
+      resource: { id: 1 },
+      actions: ['addTransaction', ...expectedUpdatePaymentActions],
+      executeCalls: 2,
     },
   ])(
     '$name',
-    async ({ action, resource, resource_type, executeCalls, actionsCount }) => {
+    async ({ actions, resource, resource_type, executeCalls }) => {
       const request = {
         header: jest.fn(),
         body: {
@@ -160,16 +180,22 @@ describe('Testing webhook controller', () => {
           summary: 'Capture is done.',
         },
       } as any;
-      await expectSuccessfulResponse(
-        request,
-        executeCalls,
-        actionsCount,
-        action
-      );
+      await expectSuccessfulResponse(request, executeCalls, actions);
     },
     longTestTimeoutMs
   );
 });
+
+const mockTokenRequest = {
+  header: jest.fn(),
+  body: {
+    resource_type: 'payment_token',
+    resource: {
+      customer: { id: 'customer_id' },
+      metadata: { order_id: 'order_id' },
+    },
+  },
+} as any;
 
 describe('test retry fetch cart', () => {
   beforeEach(() => {
@@ -186,19 +212,9 @@ describe('test retry fetch cart', () => {
   test(
     'refetch cart once',
     async () => {
-      expect(spy).not.toHaveBeenCalled();
-      const request = {
-        header: jest.fn(),
-        body: {
-          resource_type: 'payment_token',
-          resource: {
-            customer: { id: 'customer_id' },
-            metadata: { order_id: 'order_id' },
-          },
-        },
-      } as any;
-      await expectSuccessfulResponse(request, 5, 1, 'setCustomType');
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spyOnSleep).not.toHaveBeenCalled();
+      await expectSuccessfulResponse(mockTokenRequest, 5, ['setCustomType']);
+      expect(spyOnSleep).toHaveBeenCalledTimes(1);
     },
     longTestTimeoutMs
   );
@@ -217,24 +233,53 @@ describe('test cart could not be fetched', () => {
   test(
     'refetch cart did not succeed',
     async () => {
-      expect(spy).not.toHaveBeenCalled();
+      expect(spyOnSleep).not.toHaveBeenCalled();
+      await post(mockTokenRequest, response);
+      expect(spyOnSleep).toHaveBeenCalled();
+      expect(apiRoot.post).not.toHaveBeenCalled();
+    },
+    longTestTimeoutMs
+  );
+});
+
+describe('transaction is already up to date', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest
+        .fn()
+        .mockReturnValueOnce({
+          body: {
+            results: [
+              {
+                ...mockAutrhorizedPayment,
+                paymentStatus: {
+                  interfaceCode: 'COMPLETED',
+                  interfaceText: 'COMPLETED',
+                },
+              },
+            ],
+          },
+        })
+        .mockReturnValueOnce(mockCartBody),
+    };
+    jest.clearAllMocks();
+  });
+  test(
+    '',
+    async () => {
       const request = {
         header: jest.fn(),
         body: {
-          resource_type: 'payment_token',
-          resource: {
-            customer: { id: 'customer_id' },
-            metadata: { order_id: 'order_id' },
-          },
+          resource_type: 'capture',
+          event_type: 'Captured',
+          resource: { id: 1, status: Capture2StatusEnum.Completed },
+          summary: 'Capture is done.',
         },
       } as any;
-      const response = {
-        status: jest.fn(() => response),
-        json: jest.fn(),
-      } as unknown as Response;
       await post(request, response);
-      expect(spy).toHaveBeenCalled();
-      expect(apiRoot.post).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenLastCalledWith(
+        'No update actions required within the webhook call for payment 1 in scope of CapturePayPalOrderWebhook, both transaction and payment statuses are already up to date'
+      );
     },
     longTestTimeoutMs
   );
@@ -261,23 +306,25 @@ describe('customer not found', () => {
     jest.clearAllMocks();
   });
   test('cart fetched success but no customer associated with it', async () => {
-    expect(spy).not.toHaveBeenCalled();
-    const request = {
-      header: jest.fn(),
-      body: {
-        resource_type: 'payment_token',
-        resource: {
-          customer: { id: 'customer_id' },
-          metadata: { order_id: 'order_id' },
-        },
-      },
-    } as any;
-    const response = {
-      status: jest.fn(() => response),
-      json: jest.fn(),
-    } as unknown as Response;
-    await post(request, response);
-    expect(spy).not.toHaveBeenCalled();
+    expect(spyOnSleep).not.toHaveBeenCalled();
+    await post(mockTokenRequest, response);
+    expect(spyOnSleep).not.toHaveBeenCalled();
     expect(apiRoot.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('payment not found for the PayPal order', () => {
+  beforeEach(() => {
+    apiRequest = {
+      execute: jest.fn().mockReturnValueOnce({ body: { results: [] } }),
+    };
+  });
+  test('no related payment', async () => {
+    expect(logger.error).not.toHaveBeenCalled();
+    await post(mockTokenRequest, response);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenLastCalledWith(
+      `PayPalPaymentTokenWebhook action impossible - there is not any assigned commercetools payment for the PayPal order id order_id`
+    );
   });
 });
