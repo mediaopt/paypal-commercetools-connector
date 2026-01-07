@@ -148,7 +148,7 @@ export const handlePaymentTokenWebhook = async (
   const storedPayPalCustomerId = customer?.custom?.fields?.PayPalUserId;
   if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email} within ${paymentAction} scope`
+      `Changing PayPalUserId within ${paymentAction} scope due to processing payment ${payment.id}`
     );
     const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
