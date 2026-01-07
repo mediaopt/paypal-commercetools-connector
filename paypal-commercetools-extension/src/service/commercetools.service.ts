@@ -304,7 +304,7 @@ const handleUpdatePayment = async (
     upToDate ? [] : paymentUpdateActions
   );
   const { id, version } = payment;
-  const logRelevantEntities = `payment ${id}${
+  const logRelevantEntities = `Payment ${id}${
     transactionDraft ? ` and transaction ${transactionDraft.interactionId}` : ''
   }`;
 
@@ -315,7 +315,7 @@ const handleUpdatePayment = async (
     return;
   }
   logger.info(
-    `update required for ${logRelevantEntities} in scope of ${paymentAction}, previous payment state: ${payment.paymentStatus.interfaceCode}`
+    `${logRelevantEntities} - update required in scope of ${paymentAction}, previous payment state: ${payment.paymentStatus.interfaceCode}`
   );
   try {
     const updatedPayment = await createApiRoot()
