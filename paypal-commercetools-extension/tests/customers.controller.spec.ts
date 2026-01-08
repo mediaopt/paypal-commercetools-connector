@@ -97,7 +97,7 @@ describe('Testing PayPal customer Requests', () => {
   );
 
   test(
-    'getPaymentTokens without customer',
+    'getPaymentTokens without valid PayPal customer id',
     async () => {
       const customerRequest = {
         obj: {
