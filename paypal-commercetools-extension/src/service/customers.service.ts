@@ -5,13 +5,7 @@ import {
   SetupTokenRequest,
   TokenIdRequestTypeEnum,
 } from '../paypal/vault_api';
-import { StringOrObject, UpdateActions } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
-import {
-  handleCustomerResponse,
-  handleError,
-  handleRequest,
-} from '../utils/response.utils';
+import { handleEntityActions } from '../utils/response.utils';
 import {
   createPaymentToken,
   createVaultSetupToken,
@@ -19,44 +13,6 @@ import {
   generateUserIdToken,
   getPaymentTokens,
 } from './paypal.service';
-
-const skipRemoveEmptyProperties = (reqestName: string) =>
-  !['getUserIDToken', 'getUserIDToken'].some((item) => item === reqestName);
-
-async function handleCustomer<T>(
-  customerId: string,
-  requestName: string,
-  request: T,
-  handleResponse: () => Promise<{
-    response: StringOrObject;
-    extraActions?: UpdateActions;
-  }>
-) {
-  const updateActions = handleRequest(
-    requestName,
-    request as StringOrObject,
-    skipRemoveEmptyProperties(requestName),
-    false
-  );
-  logger.info(
-    `${requestName} request for customer leads to ${updateActions.length} update actions`
-  );
-  try {
-    const { response, extraActions } = await handleResponse();
-    const responseActions = handleCustomerResponse(requestName, response);
-
-    logger.info(
-      `${requestName} response success, leads to ${
-        responseActions.length
-      } log response actions and ${
-        extraActions?.length ?? 0
-      } additional actions`
-    );
-    return updateActions.concat(responseActions, extraActions ?? []);
-  } catch (e) {
-    return handleError(requestName, customerId, e, 'customer');
-  }
-}
 
 export async function handleGetUserIDTokenRequest(customer: Customer) {
   const request = customer?.custom?.fields?.getUserIDTokenRequest;
@@ -70,13 +26,14 @@ export async function handleGetUserIDTokenRequest(customer: Customer) {
     return { response };
   };
 
-  return handleCustomer<{ customerId?: string }>(
+  return handleEntityActions(
     customerId,
     'getUserIDToken',
     {
       customerId,
     },
-    handleResponse
+    handleResponse,
+    'customer'
   );
 }
 
@@ -90,11 +47,12 @@ export async function handleDeletePaymentTokenRequest(customer: Customer) {
     return { response };
   };
 
-  return handleCustomer<{ paymentToken: string }>(
+  return handleEntityActions(
     customer.id,
     'deletePaymentToken',
     { paymentToken },
-    handleResponse
+    handleResponse,
+    'customer'
   );
 }
 
@@ -130,11 +88,12 @@ export const handleCreateVaultSetupTokenRequest = async (
     return { response, extraActions };
   };
 
-  return handleCustomer<SetupTokenRequest>(
+  return handleEntityActions(
     customer.id,
     'createVaultSetupToken',
     request,
-    handleResponse
+    handleResponse,
+    'customer'
   );
 };
 
@@ -172,11 +131,12 @@ export const handleCreatePaymentTokenRequest = async (
     return { response, extraActions };
   };
 
-  return handleCustomer(
+  return handleEntityActions(
     customer.id,
     'createPaymentToken',
     request,
-    handleResponse
+    handleResponse,
+    'customer'
   );
 };
 
@@ -196,10 +156,11 @@ export const handleGetPaymentTokensRequest = async (
     return { response };
   };
 
-  return handleCustomer(
+  return handleEntityActions(
     customer.id,
     'getPaymentTokens',
     { customerId },
-    handleResponse
+    handleResponse,
+    'customer'
   );
 };
