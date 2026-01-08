@@ -569,7 +569,7 @@ export const handleUpdateOrderRequest = async (
             true,
             !!cart.shippingAddress,
             cart.taxCalculationMode,
-            !!(payment.paymentMethodInfo.method === 'pay_upon_invoice'),
+            payment.paymentMethodInfo.method === 'pay_upon_invoice',
             cart?.lineItems,
             cart.locale
           ),
