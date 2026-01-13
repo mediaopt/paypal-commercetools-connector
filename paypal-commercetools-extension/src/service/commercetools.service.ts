@@ -51,6 +51,7 @@ const getPaymentByPayPalOrderId = async (
 
   const results = payments.body.results;
   if (results.length !== 1) {
+    //more than 1 assigned order is prevented on commercetools side
     const detailedErrorMessage = `${paymentAction} action impossible - there is not any assigned commercetools payment for the PayPal order id ${orderId}`;
     logger.error(detailedErrorMessage);
     throw new CustomError(400, `Bad request: ${detailedErrorMessage}`);
