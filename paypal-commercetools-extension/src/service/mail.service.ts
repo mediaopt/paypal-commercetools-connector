@@ -5,18 +5,17 @@ import { logger } from '../utils/logger.utils';
 export const sendEmail = async (
   customerEmail: string,
   subject: string,
-  emailText: string,
-  emailHtml?: string
+  paymentId: string,
+  emailText: string
 ) => {
   const transport = getTransport();
   const from = process.env['SMTP_SENDER'];
-  logger.info(`Sending mail from ${from} to ${customerEmail}`);
+  logger.info(`Sending mail related to ${paymentId} from ${from}}`); //payment id does not directly identify the customer, but provides enough information for investigation in case if any problem appears, PayPal stores email on their side so if the problem occurs due to wrong email format - it can be traced
   return await transport.sendMail({
     from,
     to: customerEmail,
     subject,
     text: emailText,
-    html: emailHtml,
   });
 };
 

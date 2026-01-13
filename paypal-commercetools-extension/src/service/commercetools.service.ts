@@ -21,7 +21,6 @@ import {
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
 } from '../utils/map.utils';
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
@@ -148,7 +147,7 @@ export const handlePaymentTokenWebhook = async (
   const storedPayPalCustomerId = customer?.custom?.fields?.PayPalUserId;
   if (storedPayPalCustomerId !== payPalCustomerId) {
     logger.info(
-      `Changing PayPalUserId to ${payPalCustomerId} for ${customer.email} within ${paymentAction} scope`
+      `Changing PayPalUserId within ${paymentAction} scope due to processing payment ${payment.id}`
     );
     const action: CustomerUpdateAction = storedPayPalCustomerId
       ? {
@@ -182,18 +181,8 @@ export const handlePaymentTokenWebhook = async (
 export const handleOrderWebhook = async (resource: Order) => {
   const orderId = resource.id ?? '';
   const paymentAction = 'CheckoutOrderWebhook';
-  const order = await getPayPalOrder(orderId);
   const payment = await getPaymentByPayPalOrderId(orderId, paymentAction);
-  const updateActions = updatePaymentFields(order);
-  if (!isPaymentUpToDate(payment, updateActions)) {
-    logger.info(
-      `Payment ${payment.id} is outdated, performing update within ${paymentAction} scope, previous state: ${payment.paymentStatus.interfaceCode}`
-    );
-    await handleUpdatePayment(payment.id, payment.version, updateActions);
-  } else
-    logger.info(
-      `Payment ${payment.id} is already up to date, no update action required within ${paymentAction} scope`
-    );
+  await handleUpdatePayment(orderId, payment, paymentAction);
 };
 
 export const handleCaptureWebhook = async (
@@ -246,6 +235,7 @@ export const handleCaptureWebhook = async (
     });
     await sendEmail(
       customerEmail,
+      payment.id,
       settings?.payUponInvoiceMailSubject?.de ?? 'Pay Upon Invoice',
       emailText
     );
@@ -266,38 +256,7 @@ export const handleCaptureWebhook = async (
       resource.status
     ),
   };
-  let updateActions = prepareCreateOrUpdateTransactionAction(
-    payment,
-    transaction,
-    'capturePayPalOrderWebhook'
-  );
-
-  const { payment_source, status } = await getPayPalOrder(orderId);
-  if (
-    !(
-      status === 'COMPLETED' &&
-      payment.paymentStatus.interfaceCode === 'COMPLETED' &&
-      payment.paymentStatus.interfaceText === 'COMPLETED' &&
-      payment_source &&
-      payment.paymentMethodInfo.method ===
-        mapPayPalPaymentSourceToCommercetoolsMethodInfo(payment_source)
-    )
-  ) {
-    updateActions = updateActions.concat(
-      updatePaymentFields({ payment_source, status })
-    );
-  }
-
-  if (updateActions.length) {
-    logger.info(
-      `Fallback webhook processing required for payment ${payment.id} in scope of ${paymentAction}: transaction or payment status out of sync`
-    );
-    await handleUpdatePayment(payment.id, payment.version, updateActions);
-  } else {
-    logger.info(
-      `No update actions required within the webhook call for payment ${payment.id} in scope of ${paymentAction}, both transaction and payment statuses are already up to date`
-    );
-  }
+  await handleUpdatePayment(orderId, payment, paymentAction, transaction);
 };
 
 export const handleAuthorizeWebhook = async (resource: Authorization2) => {
@@ -322,45 +281,60 @@ export const handleAuthorizeWebhook = async (resource: Authorization2) => {
       resource.status
     ),
   } as TransactionDraft;
-  let updateActions = prepareCreateOrUpdateTransactionAction(
-    payment,
-    transaction,
-    paymentAction
-  );
-  updateActions = updateActions.concat(
-    updatePaymentFields(await getPayPalOrder(orderId))
-  );
-  await handleUpdatePayment(payment.id, payment.version, updateActions);
+  await handleUpdatePayment(orderId, payment, paymentAction, transaction);
 };
 
 const handleUpdatePayment = async (
-  paymentId: string,
-  paymentVersion: number,
-  updateActions: PaymentUpdateAction[]
+  orderId: string,
+  payment: Payment,
+  paymentAction: string,
+  transactionDraft?: TransactionDraft
 ) => {
-  try {
-    logger.info(`updateActions ${JSON.stringify(updateActions)}`);
-    if (!updateActions) {
-      return;
-    }
+  const order = await getPayPalOrder(orderId);
+  const transactionActions: PaymentUpdateAction[] = transactionDraft
+    ? prepareCreateOrUpdateTransactionAction(
+        payment,
+        transactionDraft,
+        paymentAction
+      )
+    : [];
+  const paymentUpdateActions = updatePaymentFields(order);
+  const upToDate = isPaymentUpToDate(payment, paymentUpdateActions);
+  const updateActions = transactionActions.concat(
+    upToDate ? [] : paymentUpdateActions
+  );
+  const { id, version } = payment;
+  const logRelevantEntities = `Payment ${id}${
+    transactionDraft ? ` and transaction ${transactionDraft.interactionId}` : ''
+  }`;
 
-    const payment = await createApiRoot()
+  if (!updateActions.length) {
+    logger.info(
+      `${logRelevantEntities} already up do date. No action required in scope of ${paymentAction}`
+    );
+    return;
+  }
+  logger.info(
+    `${logRelevantEntities} - update required in scope of ${paymentAction}, previous payment state: ${payment.paymentStatus.interfaceCode}`
+  );
+  try {
+    const updatedPayment = await createApiRoot()
       .payments()
-      .withId({ ID: paymentId })
+      .withId({ ID: id })
       .post({
         body: {
-          version: paymentVersion,
+          version,
           actions: updateActions,
         },
       })
       .execute();
 
-    if (!payment) {
-      const detailedErrorMessage = `Error in updating commercetools payment with id ${paymentId} and version ${paymentVersion}`;
+    if (!updatedPayment) {
+      const detailedErrorMessage = `Error in updating commercetools ${logRelevantEntities}, payment version ${version}`;
       logger.error(detailedErrorMessage);
       throw new CustomError(400, detailedErrorMessage);
     }
-    return payment;
+    return updatedPayment;
   } catch (e) {
     logger.error('There was an error', e);
     throw e;

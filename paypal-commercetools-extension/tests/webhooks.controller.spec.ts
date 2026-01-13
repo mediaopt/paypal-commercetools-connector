@@ -276,7 +276,7 @@ describe('transaction is already up to date and payment method is not Pay Upon i
       await post(request, response);
       expect(spyOnSleep).toHaveBeenCalledTimes(1);
       expect(logger.info).toHaveBeenLastCalledWith(
-        'No update actions required within the webhook call for payment 1 in scope of CapturePayPalOrderWebhook, both transaction and payment statuses are already up to date'
+        'Payment 1 and transaction 1 already up do date. No action required in scope of CapturePayPalOrderWebhook'
       );
     },
     longTestTimeoutMs
