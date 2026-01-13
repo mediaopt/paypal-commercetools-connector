@@ -48,7 +48,6 @@ export const post = async (request: Request, response: Response) => {
       `Got webhook called with ${event_type} for ${resource_type} with id ${resource.id}. Summary: ${summary}`
     );
     await verifyWebhookSignature(request);
-    logger.info(JSON.stringify(resource));
     if (!resource_type) {
       throw new CustomError(
         400,
