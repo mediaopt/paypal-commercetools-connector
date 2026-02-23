@@ -19,7 +19,11 @@ The payments demo can be seen at https://poc-mediaopt2.frontend.site/.
 
 ## Latest release notes
 
-The latest version of the connector is available in commercetools Merchant Center and under tag 1.1.14.
+Refer to the GitHub repository [release notes](https://github.com/mediaopt/paypal-commercetools-connector/releases) for the comprehensive list of connector releases and changelogs. The latest release tag is the same as the version of the connector available in the Commercetools Merchant Center.
+
+## Release notification
+
+If you would like to be notified whenever a new certified version is released, please subscribe to the release event in this repository by clicking `Watch` -> `Custom` -> `Releases` -> `Apply`. 
 
 ## Integration
 
