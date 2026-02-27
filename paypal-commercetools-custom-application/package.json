@@ -105,6 +105,21 @@
     "@types/react-dom": "<18",
     "@types/react-router": "<6",
     "@types/react-router-dom": "<6",
-    "graphql-config": "5.0.3"
+    "graphql-config": "5.0.3",
+    "minimatch": "^10.2.1",
+    "qs": "^6.14.2",
+    "fast-xml-parser": "^5.3.5",
+    "lodash": "^4.17.23",
+    "js-yaml": "^3.14.2",
+    "form-data": "^3.0.4",
+    "webpack-dev-server": "^5.2.1",
+    "jsondiffpatch": "^0.7.2",
+    "webpack": "^5.104.0",
+    "lodash-es": "^4.17.23",
+    "dompurify": "^3.2.4",
+    "vite": "^6.4.1",
+    "path-to-regexp": "^3.3.0",
+    "@babel/runtime": "^7.26.10",
+    "@sentry/browser": "^7.119.1"
   }
 }
