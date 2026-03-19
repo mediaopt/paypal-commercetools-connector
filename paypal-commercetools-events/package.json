@@ -22,10 +22,10 @@
     "@types/jest": "^29.2.0",
     "@types/node": "^18.11.4",
     "@types/validator": "^13.7.10",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
     "concurrently": "^8.2.0",
-    "eslint": "^8.57.1",
+    "eslint": "10.0.3",
     "jest": "^30.2.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.0.1",
@@ -35,7 +35,7 @@
     "typescript": "^5.1.6"
   },
   "dependencies": {
-    "@commercetools-backend/loggers": "^22.35.0",
+    "@commercetools-backend/loggers": "^27.0.0",
     "@commercetools/platform-sdk": "^4.1.0",
     "@commercetools/sdk-client-v2": "^2.0.1",
     "axios": "^1.13.5",
