@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import Constraints from '@commercetools-uikit/constraints';
 import Text from '@commercetools-uikit/text';
 import messages from './messages';
@@ -16,7 +16,7 @@ const WrapWith = (props: TWrapWithProps) => (
 );
 WrapWith.displayName = 'WrapWith';
 
-const Welcome = () => {
+const Welcome = (): ReactElement => {
   return (
     <Constraints.Horizontal max={16}>
       <Spacings.Inset scale="m">

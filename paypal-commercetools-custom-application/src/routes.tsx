@@ -1,15 +1,22 @@
-import type { ReactNode } from 'react';
-import { Switch, Route, useRouteMatch } from 'react-router-dom';
-import Spacings from '@commercetools-uikit/spacings';
-import Settings from './components/settings';
+import { lazy, ReactNode, Suspense } from 'react';
+import { Route, BrowserRouter } from 'react-router-dom';
+import { useLocation } from 'react-router';
+
+// import Spacings from '@commercetools-uikit/spacings';
 import Welcome from './components/welcome';
+
+const Settings = lazy(
+  () =>
+    import('./components/settings/settings' /* webpackChunkName: "channels" */)
+);
 
 type ApplicationRoutesProps = {
   children?: ReactNode;
 };
 const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
-  const match = useRouteMatch();
+  const pathname = useLocation().pathname.split('/').slice(0, 3).join('/');
 
+  console.log('pathname', pathname);
   /**
    * When using routes, there is a good chance that you might want to
    * restrict the access to a certain route based on the user permissions.
@@ -22,34 +29,48 @@ const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
    */
 
   return (
-    <Spacings.Inset scale="l">
-      <Switch>
-        <Route path={`${match.path}/settings`}>
+    <BrowserRouter>
+      <Route path={`${pathname}/settings`}>
+        <Suspense fallback={<></>}>
           <Settings component="Settings" />
-        </Route>
-        <Route path={`${match.path}/payPalCheckoutButtons`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/payPalCheckoutButtons`}>
+        <Suspense>
           <Settings component="CheckoutButtons" />
-        </Route>
-        <Route path={`${match.path}/payPalPayLater`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/payPalPayLater`}>
+        <Suspense>
           <Settings component="PayLater" />
-        </Route>
-        <Route path={`${match.path}/threeDS`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/threeDS`}>
+        <Suspense>
           <Settings component="ThreeDS" />
-        </Route>
-        <Route path={`${match.path}/ratePay`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/ratePay`}>
+        <Suspense>
           <Settings component="RatePay" />
-        </Route>
-        <Route path={`${match.path}/tracking`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/tracking`}>
+        <Suspense>
           <Settings component="Tracking" />
-        </Route>
-        <Route path={`${match.path}/ccFields`}>
+        </Suspense>
+      </Route>
+      <Route path={`${pathname}/ccFields`}>
+        <Suspense>
           <Settings component="CCFields" />
-        </Route>
-        <Route>
+        </Suspense>
+      </Route>
+      <Route>
+        <Suspense fallback={<>fallback</>}>
           <Welcome />
-        </Route>
-      </Switch>
-    </Spacings.Inset>
+        </Suspense>
+      </Route>
+    </BrowserRouter>
   );
 };
 ApplicationRoutes.displayName = 'ApplicationRoutes';
