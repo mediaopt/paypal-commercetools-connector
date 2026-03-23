@@ -5,7 +5,7 @@ import { Redirect, Switch, useLocation } from 'react-router';
 import Spacings from '@commercetools-uikit/spacings';
 import Welcome from './components/welcome';
 import { entryPointUriPath } from './constants';
-import { SettingsPropComponent } from './components/settings/types';
+import { PAYPAL_MENU_LINKS } from './components/constants';
 
 const Settings = lazy(
   () =>
@@ -16,18 +16,8 @@ type ApplicationRoutesProps = {
   children?: ReactNode;
 };
 
-const INDIVIDUAL_COMPONENTS: SettingsPropComponent[] = [
-  'Settings',
-  'CheckoutButtons',
-  'PayLater',
-  'ThreeDS',
-  'RatePay',
-  'Tracking',
-  'CCFields',
-];
-
 const ComponentRoutes = (parentPath: string) =>
-  INDIVIDUAL_COMPONENTS.map((component) => (
+  PAYPAL_MENU_LINKS.map((component) => (
     <Route path={`${parentPath}/${component}`}>
       <Suspense fallback={<>Loading...</>}>
         <Settings component={`${component}`} />

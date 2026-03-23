@@ -5,6 +5,7 @@ import messages from './messages';
 import Link from '@commercetools-uikit/link';
 import Spacings from '@commercetools-uikit/spacings';
 import { entryPointUriPath } from '../../constants';
+import { PAYMENT_TITLES } from '../constants';
 
 type TWrapWithProps = {
   children: ReactNode;
@@ -22,30 +23,11 @@ const Welcome = (): ReactElement => {
       <Spacings.Inset scale="m">
         <Spacings.Stack scale="m" alignItems="stretch">
           <Text.Headline as="h3" intlMessage={messages.title} />
-          <Link isExternal={false} to={`${entryPointUriPath}/settings`}>
-            PayPal general settings
-          </Link>
-          <Link
-            isExternal={false}
-            to={`${entryPointUriPath}/payPalCheckoutButtons`}
-          >
-            Checkout buttons settings
-          </Link>
-          <Link isExternal={false} to={`${entryPointUriPath}/payPalPayLater`}>
-            PayLater settings
-          </Link>
-          <Link isExternal={false} to={`${entryPointUriPath}/threeDS`}>
-            3D Secure settings
-          </Link>
-          <Link isExternal={false} to={`${entryPointUriPath}/ratePay`}>
-            RatePay settings
-          </Link>
-          <Link isExternal={false} to={`${entryPointUriPath}/tracking`}>
-            Parcel tracking settings
-          </Link>
-          <Link isExternal={false} to={`${entryPointUriPath}/ccFields`}>
-            Credit card field settings
-          </Link>
+          {Object.entries(PAYMENT_TITLES).map(([link, title]) => (
+            <Link isExternal={false} to={`${entryPointUriPath}/${link}`}>
+              {title}
+            </Link>
+          ))}
         </Spacings.Stack>
       </Spacings.Inset>
     </Constraints.Horizontal>

@@ -24,7 +24,8 @@ import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
 import HostedFields from './HostedFields';
 import Tracking from './Tracking';
-import { SettingsPropComponent } from './types';
+import { SettingsPropComponent } from '../types';
+import { PAYMENT_DEFAULTS } from './constants';
 type SettingsProp = {
   component: SettingsPropComponent;
 };
@@ -95,99 +96,24 @@ const Settings = ({ component }: SettingsProp) => {
 
   const getComponent = ({ values, handleChange }: PayPalSettingsType) => {
     switch (component) {
-      case 'Settings':
+      case 'settings':
         return <PayPalSettings values={values} handleChange={handleChange} />;
-      case 'CheckoutButtons':
+      case 'payPalCheckoutButtons':
         return (
           <PayPalCheckoutButtons values={values} handleChange={handleChange} />
         );
-      case 'PayLater':
+      case 'payPalPayLater':
         return <PayPalPayLater values={values} handleChange={handleChange} />;
-      case 'ThreeDS':
+      case 'threeDS':
         return <ThreeDSecure values={values} handleChange={handleChange} />;
-      case 'RatePay':
+      case 'ratePay':
         return <RatePay values={values} handleChange={handleChange} />;
-      case 'Tracking':
+      case 'tracking':
         return <Tracking values={values} handleChange={handleChange} />;
-      case 'CCFields':
+      case 'ccFields':
         return <HostedFields values={values} handleChange={handleChange} />;
       default:
         return <></>;
-    }
-  };
-
-  const getComponentDefaults = (): Record<string, any> => {
-    switch (component) {
-      case 'Settings':
-        return {
-          merchantId: DEFAULT_SETTINGS.merchantId,
-          acceptPayPal: DEFAULT_SETTINGS.acceptPayPal,
-          acceptPayLater: DEFAULT_SETTINGS.acceptPayLater,
-          acceptVenmo: DEFAULT_SETTINGS.acceptVenmo,
-          acceptLocal: DEFAULT_SETTINGS.acceptLocal,
-          acceptCredit: DEFAULT_SETTINGS.acceptCredit,
-          payPalIntent: DEFAULT_SETTINGS.payPalIntent,
-          paymentDescription: DEFAULT_SETTINGS.paymentDescription,
-          storeInVaultOnSuccess: DEFAULT_SETTINGS.storeInVaultOnSuccess,
-        };
-      case 'CheckoutButtons':
-        return {
-          buttonPaymentPage: DEFAULT_SETTINGS.buttonPaymentPage,
-          buttonCartPage: DEFAULT_SETTINGS.buttonCartPage,
-          buttonDetailPage: DEFAULT_SETTINGS.buttonDetailPage,
-          buttonShippingPage: DEFAULT_SETTINGS.buttonShippingPage,
-          buttonShape: DEFAULT_SETTINGS.buttonShape,
-          paypalButtonConfig: DEFAULT_SETTINGS.paypalButtonConfig,
-        };
-      case 'PayLater':
-        return {
-          payLaterMessagingType: DEFAULT_SETTINGS.payLaterMessagingType,
-          payLaterMessageCartPage: DEFAULT_SETTINGS.payLaterMessageCartPage,
-          payLaterMessagePaymentPage:
-            DEFAULT_SETTINGS.payLaterMessagePaymentPage,
-          payLaterMessageCategoryPage:
-            DEFAULT_SETTINGS.payLaterMessageCategoryPage,
-          payLaterMessageDetailsPage:
-            DEFAULT_SETTINGS.payLaterMessageDetailsPage,
-          payLaterMessageHomePage: DEFAULT_SETTINGS.payLaterMessageHomePage,
-          payLaterMessageTextLogoType:
-            DEFAULT_SETTINGS.payLaterMessageTextLogoType,
-          payLaterMessageTextLogoPosition:
-            DEFAULT_SETTINGS.payLaterMessageTextLogoPosition,
-          payLaterMessageTextColor: DEFAULT_SETTINGS.payLaterMessageTextColor,
-          payLaterMessageTextSize: DEFAULT_SETTINGS.payLaterMessageTextSize,
-          payLaterMessageTextAlign: DEFAULT_SETTINGS.payLaterMessageTextAlign,
-          payLaterMessageFlexColor: DEFAULT_SETTINGS.payLaterMessageFlexColor,
-          payLaterMessageFlexRatio: DEFAULT_SETTINGS.payLaterMessageFlexRatio,
-        };
-      case 'ThreeDS':
-        return {
-          threeDSOption: DEFAULT_SETTINGS.threeDSOption,
-          threeDSAction: DEFAULT_SETTINGS.threeDSAction,
-        };
-      case 'RatePay':
-        return {
-          ratePayBrandName: DEFAULT_SETTINGS.ratePayBrandName,
-          ratePayLogoUrl: DEFAULT_SETTINGS.ratePayLogoUrl,
-          ratePayCustomerServiceInstructions:
-            DEFAULT_SETTINGS.ratePayCustomerServiceInstructions,
-          payUponInvoiceMailSubject: DEFAULT_SETTINGS.payUponInvoiceMailSubject,
-          payUponInvoiceMailEmailText:
-            DEFAULT_SETTINGS.payUponInvoiceMailEmailText,
-        };
-      case 'Tracking':
-        return {
-          sendTrackingToPayPal: DEFAULT_SETTINGS.sendTrackingToPayPal,
-        };
-      case 'CCFields':
-        return {
-          hostedFieldsPayButtonClasses:
-            DEFAULT_SETTINGS.hostedFieldsPayButtonClasses,
-          hostedFieldsInputFieldClasses:
-            DEFAULT_SETTINGS.hostedFieldsInputFieldClasses,
-        };
-      default:
-        return {};
     }
   };
 
@@ -218,7 +144,7 @@ const Settings = ({ component }: SettingsProp) => {
                 onClick={() => {
                   saveSettings({
                     ...values,
-                    ...getComponentDefaults(),
+                    ...PAYMENT_DEFAULTS[component],
                   });
                 }}
                 tone="critical"
