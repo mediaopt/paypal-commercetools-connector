@@ -24,16 +24,9 @@ import ThreeDSecure from './ThreeDSecure';
 import RatePay from './RatePay';
 import HostedFields from './HostedFields';
 import Tracking from './Tracking';
+import { SettingsPropComponent } from './types';
 type SettingsProp = {
-  component:
-    | 'Settings'
-    | 'CheckoutButtons'
-    | 'PayLater'
-    | 'ThreeDS'
-    | 'RatePay'
-    | 'Tracking'
-    | 'CCFields'
-    | '';
+  component: SettingsPropComponent;
 };
 const Settings = ({ component }: SettingsProp) => {
   const [isReady, setIsReady] = useState<boolean>(false);

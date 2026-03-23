@@ -2,8 +2,10 @@ import { lazy, ReactNode, Suspense } from 'react';
 import { Route, BrowserRouter } from 'react-router-dom';
 import { useLocation } from 'react-router';
 
-// import Spacings from '@commercetools-uikit/spacings';
+import Spacings from '@commercetools-uikit/spacings';
 import Welcome from './components/welcome';
+import { entryPointUriPath } from './constants';
+import { SettingsPropComponent } from './components/settings/types';
 
 const Settings = lazy(
   () =>
@@ -13,8 +15,30 @@ const Settings = lazy(
 type ApplicationRoutesProps = {
   children?: ReactNode;
 };
+
+const INDIVIDUAL_COMPONENTS: SettingsPropComponent[] = [
+  'Settings',
+  'CheckoutButtons',
+  'PayLater',
+  'ThreeDS',
+  'RatePay',
+  'Tracking',
+  'CCFields',
+];
+
+const ComponentRoutes = (parentPath: string) =>
+  INDIVIDUAL_COMPONENTS.map((component) => (
+    <Route path={`${parentPath}/${component}`}>
+      <Suspense fallback={<>Loading...</>}>
+        <Settings component={`${component}`} />
+      </Suspense>
+    </Route>
+  ));
+
 const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
-  const pathname = useLocation().pathname.split('/').slice(0, 3).join('/');
+  const parentPath = `${
+    useLocation().pathname.split(`${entryPointUriPath}`)[0]
+  }${entryPointUriPath}`;
 
   /**
    * When using routes, there is a good chance that you might want to
@@ -28,48 +52,16 @@ const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
    */
 
   return (
-    <BrowserRouter>
-      <Route path={`${pathname}/settings`}>
-        <Suspense fallback={<></>}>
-          <Settings component="Settings" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/payPalCheckoutButtons`}>
-        <Suspense>
-          <Settings component="CheckoutButtons" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/payPalPayLater`}>
-        <Suspense>
-          <Settings component="PayLater" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/threeDS`}>
-        <Suspense>
-          <Settings component="ThreeDS" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/ratePay`}>
-        <Suspense>
-          <Settings component="RatePay" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/tracking`}>
-        <Suspense>
-          <Settings component="Tracking" />
-        </Suspense>
-      </Route>
-      <Route path={`${pathname}/ccFields`}>
-        <Suspense>
-          <Settings component="CCFields" />
-        </Suspense>
-      </Route>
-      <Route>
-        <Suspense fallback={<>fallback</>}>
-          <Welcome />
-        </Suspense>
-      </Route>
-    </BrowserRouter>
+    <Spacings.Inset scale="l">
+      <BrowserRouter>
+        <Route exact path={parentPath}>
+          <Suspense fallback={<>Loading...</>}>
+            <Welcome />
+          </Suspense>
+        </Route>
+        {ComponentRoutes(parentPath)}
+      </BrowserRouter>
+    </Spacings.Inset>
   );
 };
 ApplicationRoutes.displayName = 'ApplicationRoutes';
