@@ -9,7 +9,7 @@ import {
   useFetchSettings,
   useSetSettings,
 } from '../connector-hooks/use-customObject-connector';
-import { ReactElement, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ApollonFetchedCustomObjectType,
   PayPalSettingsType,
@@ -35,7 +35,7 @@ type SettingsProp = {
     | 'CCFields'
     | '';
 };
-const Settings = ({ component }: SettingsProp): ReactElement => {
+const Settings = ({ component }: SettingsProp) => {
   const [isReady, setIsReady] = useState<boolean>(false);
   const [isLanguageReady, setIsLanguageReady] = useState<boolean>(false);
   const [customObjectVersion, setCustomObjectVersion] = useState<number>();

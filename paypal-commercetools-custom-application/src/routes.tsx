@@ -16,7 +16,6 @@ type ApplicationRoutesProps = {
 const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
   const pathname = useLocation().pathname.split('/').slice(0, 3).join('/');
 
-  console.log('pathname', pathname);
   /**
    * When using routes, there is a good chance that you might want to
    * restrict the access to a certain route based on the user permissions.
