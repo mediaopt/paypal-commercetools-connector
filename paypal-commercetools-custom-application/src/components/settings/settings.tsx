@@ -1,15 +1,23 @@
+import { useEffect, useState } from 'react';
 import { Formik } from 'formik';
 import Spacings from '@commercetools-uikit/spacings';
 import PrimaryButton from '@commercetools-uikit/primary-button';
+import './settings.module.css';
+
 import PayPalSettings from './PayPalSettings';
 import PayPalCheckoutButtons from './PayPalCheckoutButtons';
 import PayPalPayLater from './PayPalPayLater';
+import ThreeDSecure from './ThreeDSecure';
+import RatePay from './RatePay';
+import HostedFields from './HostedFields';
+import Tracking from './Tracking';
+
 import {
   useFetchLanguages,
   useFetchSettings,
   useSetSettings,
 } from '../connector-hooks/use-customObject-connector';
-import { useEffect, useState } from 'react';
+
 import {
   ApollonFetchedCustomObjectType,
   PayPalSettingsType,
@@ -20,10 +28,7 @@ import {
   GRAPHQL_CUSTOMOBJECT_KEY_NAME,
 } from '../../constants';
 import { DEFAULT_SETTINGS } from './defaultSettings';
-import ThreeDSecure from './ThreeDSecure';
-import RatePay from './RatePay';
-import HostedFields from './HostedFields';
-import Tracking from './Tracking';
+
 import { SettingsPropComponent } from '../types';
 import { PAYMENT_DEFAULTS } from './constants';
 type SettingsProp = {
@@ -132,7 +137,11 @@ const Settings = ({ component }: SettingsProp) => {
       {({ values, handleChange, handleSubmit }) => (
         <form onSubmit={handleSubmit}>
           <Spacings.Stack alignItems="stretch" scale="xl">
-            {getComponent({ values, handleChange })}
+            <div className="border">
+              <Spacings.Inset scale="m">
+                {getComponent({ values, handleChange })}
+              </Spacings.Inset>
+            </div>
             <Spacings.Inline
               scale="s"
               alignItems="flex-start"
