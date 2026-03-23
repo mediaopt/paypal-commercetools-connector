@@ -1,6 +1,6 @@
 import { lazy, ReactNode, Suspense } from 'react';
-import { Route, BrowserRouter } from 'react-router-dom';
-import { useLocation } from 'react-router';
+import { Route } from 'react-router-dom';
+import { Redirect, Switch, useLocation } from 'react-router';
 
 import Spacings from '@commercetools-uikit/spacings';
 import Welcome from './components/welcome';
@@ -53,14 +53,15 @@ const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
 
   return (
     <Spacings.Inset scale="l">
-      <BrowserRouter>
+      <Switch>
         <Route exact path={parentPath}>
           <Suspense fallback={<>Loading...</>}>
             <Welcome />
           </Suspense>
         </Route>
         {ComponentRoutes(parentPath)}
-      </BrowserRouter>
+        <Redirect to={parentPath} />
+      </Switch>
     </Spacings.Inset>
   );
 };
