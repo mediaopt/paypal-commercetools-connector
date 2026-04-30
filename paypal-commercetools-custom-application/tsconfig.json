@@ -1,6 +1,12 @@
 {
   "extends": "@commercetools-frontend/application-config/tsconfig-mc-app.json",
   "compilerOptions": {
+    "moduleResolution": "node",
+    "paths": {
+      "@commercetools-frontend/application-shell/test-utils": [
+        "node_modules/@commercetools-frontend/application-shell/test-utils/dist/commercetools-frontend-application-shell-test-utils.cjs.d.ts"
+      ]
+    },
     "typeRoots": ["@types", "@types-extensions", "node_modules/@types"],
     // Allow tsc to resolve dependencies of `@types` packages in the way pnpm sets up the `node_modules`.
     "preserveSymlinks": false,
