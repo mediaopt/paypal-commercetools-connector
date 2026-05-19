@@ -1,14 +1,34 @@
-import type { ReactNode } from 'react';
-import { Switch, Route, useRouteMatch } from 'react-router-dom';
+import { lazy, ReactNode, Suspense } from 'react';
+import { Route } from 'react-router-dom';
+import { Redirect, Switch, useLocation } from 'react-router';
+
 import Spacings from '@commercetools-uikit/spacings';
-import Settings from './components/settings';
 import Welcome from './components/welcome';
+import { entryPointUriPath } from './constants';
+import { PAYPAL_MENU_LINKS } from './components/constants';
+
+const Settings = lazy(
+  () =>
+    import('./components/settings/settings' /* webpackChunkName: "channels" */)
+);
 
 type ApplicationRoutesProps = {
   children?: ReactNode;
 };
+
+const ComponentRoutes = (parentPath: string) =>
+  PAYPAL_MENU_LINKS.map((component) => (
+    <Route path={`${parentPath}/${component}`}>
+      <Suspense fallback={<>Loading...</>}>
+        <Settings component={`${component}`} />
+      </Suspense>
+    </Route>
+  ));
+
 const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
-  const match = useRouteMatch();
+  const parentPath = `${
+    useLocation().pathname.split(`${entryPointUriPath}`)[0]
+  }${entryPointUriPath}`;
 
   /**
    * When using routes, there is a good chance that you might want to
@@ -24,30 +44,13 @@ const ApplicationRoutes = (_props: ApplicationRoutesProps) => {
   return (
     <Spacings.Inset scale="l">
       <Switch>
-        <Route path={`${match.path}/settings`}>
-          <Settings component="Settings" />
+        <Route exact path={parentPath}>
+          <Suspense fallback={<>Loading...</>}>
+            <Welcome />
+          </Suspense>
         </Route>
-        <Route path={`${match.path}/payPalCheckoutButtons`}>
-          <Settings component="CheckoutButtons" />
-        </Route>
-        <Route path={`${match.path}/payPalPayLater`}>
-          <Settings component="PayLater" />
-        </Route>
-        <Route path={`${match.path}/threeDS`}>
-          <Settings component="ThreeDS" />
-        </Route>
-        <Route path={`${match.path}/ratePay`}>
-          <Settings component="RatePay" />
-        </Route>
-        <Route path={`${match.path}/tracking`}>
-          <Settings component="Tracking" />
-        </Route>
-        <Route path={`${match.path}/ccFields`}>
-          <Settings component="CCFields" />
-        </Route>
-        <Route>
-          <Welcome />
-        </Route>
+        {ComponentRoutes(parentPath)}
+        <Redirect to={parentPath} />
       </Switch>
     </Spacings.Inset>
   );
