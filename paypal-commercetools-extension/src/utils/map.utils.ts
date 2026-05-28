@@ -2,6 +2,7 @@ import {
   Cart,
   LineItem,
   Payment,
+  ShippingInfo,
   TaxCalculationMode,
   TransactionState,
   TypedMoney,
@@ -294,11 +295,18 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
 type RestrictedAmountBreakdown = Pick<AmountBreakdown, 'discount'> &
   Required<Pick<AmountBreakdown, 'item_total' | 'tax_total' | 'shipping'>>;
 
+const shippingInfoCentAmount = (shippingInfo?: ShippingInfo) =>
+  shippingInfo?.taxedPrice?.totalGross?.centAmount ??
+  shippingInfo?.price.centAmount ??
+  0;
+
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
   discountOnTotalPrice,
   shippingInfo,
+  shipping,
   taxCalculationMode,
+  shippingMode,
 }: Cart): RestrictedAmountBreakdown | undefined => {
   if (!lineItems || !lineItems[0]) {
     return undefined;
@@ -313,6 +321,13 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       : lineItems
           .map((lineItem) => relevantTotalItemTax(lineItem, roundItemPrice))
           .reduce((x, y) => x + y, 0);
+
+  const relevantShippingCentAmount: number =
+    shippingMode === 'Multiple'
+      ? shipping
+          .map(({ shippingInfo }) => shippingInfoCentAmount(shippingInfo))
+          .reduce((x, y) => x + y, 0)
+      : shippingInfoCentAmount(shippingInfo);
 
   return {
     item_total: {
@@ -341,10 +356,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       currency_code: currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney({
         // in commercetools shipping discount is included in total discount and can't be easily separated - so amount before discount applied is used here
-        centAmount:
-          shippingInfo?.taxedPrice?.totalGross?.centAmount ??
-          shippingInfo?.price.centAmount ??
-          0,
+        centAmount: relevantShippingCentAmount,
         fractionDigits,
         currencyCode,
         type,
