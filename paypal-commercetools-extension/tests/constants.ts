@@ -85,6 +85,11 @@ type LineItemPropsImportantForMappingTests =
       taxedPrice: TaxedPricePropsImportantForMappingTests;
     };
 
+type ShippingInfoPropsImportantForMappingTests = {
+  taxedPrice?: TaxedPricePropsImportantForMappingTests;
+  price?: CentPrecisionMoney;
+};
+
 type CartPropsImportantForMappingTests = Pick<
   Cart,
   | 'totalPrice'
@@ -95,14 +100,13 @@ type CartPropsImportantForMappingTests = Pick<
   | 'directDiscounts'
   | 'discountCodes'
   | 'locale'
+  | 'shippingMode'
 > & {
   lineItems: LineItemPropsImportantForMappingTests[];
   taxedPrice: TaxedPricePropsImportantForMappingTests;
-  shippingInfo?: {
-    taxedPrice?: TaxedPricePropsImportantForMappingTests;
-    price?: CentPrecisionMoney;
-  };
+  shippingInfo?: ShippingInfoPropsImportantForMappingTests;
   discountOnTotalPrice?: Omit<DiscountOnTotalPrice, 'includedDiscounts'>;
+  shipping?: { shippingInfo?: ShippingInfoPropsImportantForMappingTests }[];
 };
 
 type PriceGenerationProps = { gross?: number; net?: number; tax?: number };
@@ -534,5 +538,162 @@ export const complexCartsData: CartTestData[] = [
     expectedDiscount: 13874,
     expectedShipping: 1000,
     expectedTax: 16879,
+  },
+];
+
+const multiShippingCartDataSingleShipping: CartGenerationData = {
+  lineItemsData: [
+    {
+      itemType: 'defaultItem',
+      quantity: 3,
+      totalPrice: centPrice(112125),
+    },
+    {
+      itemType: 'defaultItem',
+      quantity: 1,
+      totalPrice: centPrice(19750),
+    },
+  ],
+  cartPrice: { gross: 132875 },
+  customCardProps: {
+    shippingMode: 'Multiple',
+    shipping: [
+      {
+        shippingInfo: {
+          price: centPrice(1000),
+          taxedPrice: taxedPrice({ gross: 1000, net: 840, tax: 160 }),
+        },
+      },
+    ],
+  },
+};
+
+const multiShippingCartDataIdenticalShipping: CartGenerationData = {
+  lineItemsData: [
+    {
+      itemType: 'defaultItem',
+      quantity: 1,
+      gross: 212958,
+      net: 178956,
+      tax: 34002,
+    },
+    {
+      itemType: 'defaultItem',
+      quantity: 1,
+      gross: 93842,
+      net: 78859,
+      tax: 14983,
+    },
+  ],
+  cartPrice: { gross: 316600, net: 266051, tax: 50549 },
+  customCardProps: {
+    shippingMode: 'Multiple',
+    shipping: [
+      {
+        shippingInfo: {
+          price: centPrice(4900),
+          taxedPrice: taxedPrice({ gross: 4900, net: 4118, tax: 782 }),
+        },
+      },
+      {
+        shippingInfo: {
+          price: centPrice(4900),
+          taxedPrice: taxedPrice({ gross: 4900, net: 4118, tax: 782 }),
+        },
+      },
+    ],
+  },
+};
+
+const multiShippingCartDataDiscountedShipping: CartGenerationData = {
+  lineItemsData: [
+    { itemType: 'defaultItem', quantity: 1, gross: 22375, net: 18803, tax: 3572 },
+    { itemType: 'doubleDiscountedItemWithGift', quantity: 1, gross: 23134, net: 19440, tax: 3694 },
+    { itemType: 'doubleDiscountedItemWithGift', quantity: 1, gross: 23134, net: 19440, tax: 3694 },
+    { itemType: 'giftLineItem', quantity: 1 },
+    { itemType: 'productDiscountItem', quantity: 2, gross: 48752, net: 44860, tax: 3892 },
+  ],
+  cartPrice: { gross: 102891 },
+  discount: { amount: 15374 },
+  customCardProps: {
+    shippingMode: 'Multiple',
+    shipping: [
+      {
+        shippingInfo: {
+          price: centPrice(870),
+          taxedPrice: taxedPrice({ gross: 870, net: 731, tax: 139 }),
+        },
+      },
+      {
+        shippingInfo: {
+          price: centPrice(0),
+          taxedPrice: taxedPrice({ gross: 0, net: 0, tax: 0 }),
+        },
+      },
+      {
+        shippingInfo: {
+          price: centPrice(0),
+          taxedPrice: taxedPrice({ gross: 0, net: 0, tax: 0 }),
+        },
+      },
+    ],
+  },
+};
+
+const multiShippingCartDataWithDiscountAndGift: CartGenerationData = {
+  lineItemsData: [
+    { itemType: 'defaultItem', quantity: 1, gross: 22375, net: 18803, tax: 3572 },
+    { itemType: 'doubleDiscountedItemWithGift', quantity: 1, totalPrice: centPrice(23134) },
+    { itemType: 'doubleDiscountedItemWithGift', quantity: 1, gross: 23134, net: 19440, tax: 3694 },
+    { itemType: 'giftLineItem', quantity: 1 },
+    { itemType: 'productDiscountItem', quantity: 1, gross: 24376, net: 20484, tax: 3892 },
+  ],
+  cartPrice: { gross: 81797 },
+  discount: { amount: 12222 },
+  customCardProps: {
+    shippingMode: 'Multiple',
+    shipping: [
+      {
+        shippingInfo: {
+          price: centPrice(1000),
+          taxedPrice: taxedPrice({ gross: 1000, net: 840, tax: 160 }),
+        },
+      },
+      {
+        shippingInfo: {
+          price: centPrice(0),
+          taxedPrice: taxedPrice({ gross: 0, net: 0, tax: 0 }),
+        },
+      },
+    ],
+  },
+};
+
+export const multiShippingData: CartTestData[] = [
+  {
+    cartData: multiShippingCartDataSingleShipping,
+    expectedShipping: 1000,
+    expectedTax: 0,
+    testDescription: 'multiple items with same shipping',
+  },
+  {
+    cartData: multiShippingCartDataIdenticalShipping,
+    expectedShipping: 9800,
+    expectedTax: 0,
+    testDescription: 'multiple items with identical shipping',
+  },
+  {
+    cartData: multiShippingCartDataWithDiscountAndGift,
+    testDescription: 'multiple items with discount, gift and mixed-price shipping',
+    expectedShipping: 1000,
+    expectedDiscount: 12222,
+    expectedTax: 0,
+  },
+  {
+    cartData: multiShippingCartDataDiscountedShipping,
+    testDescription: 'three shipping entries with discounted shipping, gift and cart discount',
+    expectedShipping: 870,
+    expectedDiscount: 15374,
+    expectedTax: 0,
   },
 ];
