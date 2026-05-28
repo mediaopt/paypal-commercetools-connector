@@ -172,7 +172,9 @@ async function prepareCreateOrderRequest(
         items: mapValidCommercetoolsLineItemsToPayPalItems(
           matchingAmounts,
           paymentSource?.experience_context?.shipping_preference !==
-            'NO_SHIPPING' || !!cart.shippingAddress,
+            'NO_SHIPPING' ||
+            !!cart.shippingAddress ||
+            !!cart.shipping.length,
           cart.taxCalculationMode,
           isPayUponInvoice,
           cart?.lineItems,
@@ -587,7 +589,7 @@ export const handleUpdateOrderRequest = async (
           path: "/purchase_units/@reference_id=='default'/items",
           value: mapValidCommercetoolsLineItemsToPayPalItems(
             true,
-            !!cart.shippingAddress,
+            !!cart.shippingAddress || !!cart.shipping.length,
             cart.taxCalculationMode,
             payment.paymentMethodInfo.method === 'pay_upon_invoice',
             cart?.lineItems,
