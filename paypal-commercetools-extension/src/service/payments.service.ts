@@ -1,4 +1,5 @@
 import {
+  Cart,
   Payment,
   PaymentAddTransactionAction,
   PaymentUpdateAction,
@@ -78,6 +79,19 @@ const addTransactionAction = ({
   },
 });
 
+const validateCart = (cart: Cart, paymentId: string) => {
+  if (cart.shippingMode === 'Multiple') {
+    if (
+      cart.lineItems.some(
+        ({ shippingDetails }) => shippingDetails?.valid === false
+      )
+    )
+      throw new Error(
+        `Invalid shipping details for line items payment ${paymentId}`
+      );
+  }
+};
+
 async function prepareCreateOrderRequest(
   payment: Payment,
   settings?: PayPalSettings
@@ -140,6 +154,7 @@ async function prepareCreateOrderRequest(
         'For Pay Upon Invoice, the payment amount must exactly match the cart total gross amount if available and total price if total gross is not provided.'
       );
   }
+  validateCart(cart, payment.id);
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -570,6 +585,8 @@ export const handleUpdateOrderRequest = async (
     const currentPayment = paymentDoestMatchCart
       ? relevantCartPrice
       : payment.amountPlanned;
+
+    validateCart(cart, payment.id);
 
     request = {
       ...request,
