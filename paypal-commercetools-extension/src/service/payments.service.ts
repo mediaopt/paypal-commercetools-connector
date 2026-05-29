@@ -86,8 +86,9 @@ const validateCart = (cart: Cart, paymentId: string) => {
         ({ shippingDetails }) => shippingDetails?.valid === false
       )
     )
-      throw new Error(
-        `Invalid shipping details for line items payment ${paymentId}`
+      throw new CustomError(
+        '400',
+        `Payment ${paymentId} has invalid shipping details for at least one line item. Multiple shipping mode requires valid shipping details for all line items.`
       );
   }
 };
