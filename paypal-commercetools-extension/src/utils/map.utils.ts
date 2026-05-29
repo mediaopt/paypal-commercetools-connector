@@ -2,6 +2,7 @@ import {
   Cart,
   LineItem,
   Payment,
+  Shipping,
   ShippingInfo,
   TaxCalculationMode,
   TransactionState,
@@ -300,6 +301,27 @@ const shippingInfoCentAmount = (shippingInfo?: ShippingInfo) =>
   shippingInfo?.price.centAmount ??
   0;
 
+const shippingByItem = (shipping: Shipping[], lineItems: LineItem[]) => {
+  const relevantShippingKeys = lineItems
+    .flatMap(({ shippingDetails }) => shippingDetails?.targets ?? [])
+    .reduce((acc, { shippingMethodKey }) => {
+      if (!shippingMethodKey || acc.some((item) => item === shippingMethodKey))
+        return acc;
+      acc.push(shippingMethodKey);
+      return acc;
+    }, [] as string[]);
+  const shippingTotal = shipping
+    .filter(({ shippingKey }) =>
+      relevantShippingKeys.some((key) => key === shippingKey)
+    )
+    .reduce(
+      (acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo),
+      0
+    );
+
+  return shippingTotal;
+};
+
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
   discountOnTotalPrice,
@@ -324,9 +346,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
 
   const relevantShippingCentAmount: number =
     shippingMode === 'Multiple'
-      ? shipping
-          .map(({ shippingInfo }) => shippingInfoCentAmount(shippingInfo))
-          .reduce((x, y) => x + y, 0)
+      ? shippingByItem(shipping, lineItems)
       : shippingInfoCentAmount(shippingInfo);
 
   return {
