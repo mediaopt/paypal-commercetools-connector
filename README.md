@@ -23,7 +23,7 @@ Refer to the GitHub repository [release notes](https://github.com/mediaopt/paypa
 
 ## Release notification
 
-If you would like to be notified whenever a new certified version is released, please subscribe to the release event in this repository by clicking `Watch` -> `Custom` -> `Releases` -> `Apply`. 
+If you would like to be notified whenever a new certified version is released, please subscribe to the release event in this repository by clicking `Watch` -> `Custom` -> `Releases` -> `Apply`.
 
 ## Integration
 
@@ -106,3 +106,20 @@ In the docs folder you can find:
 - architecture of the connector (Architecture.pdf)
 - documented PayPal Commercetools API Postman collection (PayPal.md, paypal.postman_collection.json)
 - workflows folder with examples how to use the connector individually or together with PayPal client and commercetools frontend
+
+### Limited Support: Multiple Shipping Mode
+
+The connector provides limited support for the [`Multiple` shipping mode in commercetools](https://docs.commercetools.com/tutorials/multiple-shipping-addresses-methods). This feature is supported only for project level setting `"totalPriceDiscountDoesNotReduceExternalTax": false`,
+prices `"type": "centPrecision"` (lineItem variant prices can be any type) and a specific set of Cart level settings listed below.
+
+| Name                    | Value         |
+| ----------------------- | ------------- |
+| taxMode                 | Platform      |
+| taxRoundingMode         | HalfEven      |
+| taxCalculationMode      | LineItemLevel |
+| discountTypeCombination | Stacking      |
+| shippingMode            | Multiple      |
+
+If your use case requires a different set of parameters, please request it by opening an issue or contacting us directly.
+
+**Using this feature outside the supported parameter set is entirely at your own risk** — any issues arising from unsupported configurations are your responsibility to resolve.
