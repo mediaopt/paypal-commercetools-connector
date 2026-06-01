@@ -273,7 +273,7 @@ async function createValidTransaction(customAmount?: number) {
   return { paymentRequest, payPalOrder, customInvoiceId };
 }
 
-describe('multi shipping cart invalid shipping', () => {
+describe('Invalid Multiple shipping cart', () => {
   const mockMultipleShippingCart = {
     ...mockCart,
     lineItems: [
@@ -281,7 +281,7 @@ describe('multi shipping cart invalid shipping', () => {
     ],
     shippingMode: 'Multiple',
   };
-  test('Create order for multi shipping cart with invalid shipping for an item', async () => {
+  test('Create PayPal order fails with error invalid shipping for some items', async () => {
     (getCart as jest.Mock).mockReturnValueOnce(mockMultipleShippingCart);
     try {
       const paymentRequest = {
@@ -314,7 +314,7 @@ describe('multi shipping cart invalid shipping', () => {
         );
     }
   });
-  test('update PayPal order', async () => {
+  test('Update PayPal order fails with error invalid shipping for some items', async () => {
     const { paymentRequest, payPalOrder } = await createValidTransaction(
       EXPECTED_CART_CENT_AMOUNT
     );
