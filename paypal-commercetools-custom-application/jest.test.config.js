@@ -7,4 +7,5 @@ module.exports = {
   preset: '@commercetools-frontend/jest-preset-mc-app/typescript',
   setupFiles: ['./setup.js'],
   transformIgnorePatterns: ['node_modules/(?!(uuid)/)'],
+  coverageProvider: 'v8',
 };
