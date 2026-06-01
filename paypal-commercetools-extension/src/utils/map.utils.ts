@@ -327,8 +327,8 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   discountOnTotalPrice,
   shippingInfo,
   shipping,
-  taxCalculationMode,
   shippingMode,
+  taxCalculationMode,
 }: Cart): RestrictedAmountBreakdown | undefined => {
   if (!lineItems || !lineItems[0]) {
     return undefined;
