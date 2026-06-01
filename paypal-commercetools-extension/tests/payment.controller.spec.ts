@@ -74,6 +74,22 @@ const customFieldCreateOrder = {
 const EXPECTED_CART_CENT_AMOUNT = mockCart.taxedPrice.totalGross.centAmount;
 const EXPECTED_LESS_THAN_CART_CENT_AMOUNT = EXPECTED_CART_CENT_AMOUNT - 1; //one cent less
 
+const updateOrderMockFields = (payPalOrderId?: string) => ({
+  custom: {
+    fields: {
+      updatePayPalOrderRequest: '{}',
+      PayPalOrderId: payPalOrderId,
+      patch: [
+        {
+          op: 'replace',
+          path: "/purchase_units/@reference_id=='default'/amount",
+          value: { currency_code: 'EUR', value: '130.00' },
+        },
+      ],
+    },
+  },
+});
+
 describe('Testing Braintree GetClient Token', () => {
   test(
     'create client token',
@@ -258,14 +274,15 @@ async function createValidTransaction(customAmount?: number) {
 }
 
 describe('multi shipping cart invalid shipping', () => {
+  const mockMultipleShippingCart = {
+    ...mockCart,
+    lineItems: [
+      { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
+    ],
+    shippingMode: 'Multiple',
+  };
   test('Create order for multi shipping cart with invalid shipping for an item', async () => {
-    (getCart as jest.Mock).mockReturnValueOnce({
-      ...mockCart,
-      lineItems: [
-        { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
-      ],
-      shippingMode: 'Multiple',
-    });
+    (getCart as jest.Mock).mockReturnValueOnce(mockMultipleShippingCart);
     try {
       const paymentRequest = {
         obj: {
@@ -301,28 +318,10 @@ describe('multi shipping cart invalid shipping', () => {
     const { paymentRequest, payPalOrder } = await createValidTransaction(
       EXPECTED_CART_CENT_AMOUNT
     );
-    (getCart as jest.Mock).mockReturnValueOnce({
-      ...mockCart,
-      lineItems: [
-        { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
-      ],
-      shippingMode: 'Multiple',
-    });
+    (getCart as jest.Mock).mockReturnValueOnce(mockMultipleShippingCart);
     paymentRequest.obj = {
       ...paymentRequest.obj,
-      custom: {
-        fields: {
-          updatePayPalOrderRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
-          patch: [
-            {
-              op: 'replace',
-              path: "/purchase_units/@reference_id=='default'/amount",
-              value: { currency_code: 'EUR', value: '130.00' },
-            },
-          ],
-        },
-      },
+      ...updateOrderMockFields(payPalOrder.id),
     };
     try {
       await paymentController('Update', paymentRequest);
@@ -465,19 +464,7 @@ describe('Testing PayPal aftersales', () => {
     });
     paymentRequest.obj = {
       ...paymentRequest.obj,
-      custom: {
-        fields: {
-          updatePayPalOrderRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
-          patch: [
-            {
-              op: 'replace',
-              path: "/purchase_units/@reference_id=='default'/amount",
-              value: { currency_code: 'EUR', value: '130.00' },
-            },
-          ],
-        },
-      },
+      ...updateOrderMockFields(payPalOrder.id),
     };
     const paymentResponse = await paymentController('Update', paymentRequest);
     const response = expectSuccessfulResponse(
