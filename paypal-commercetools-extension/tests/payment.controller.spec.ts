@@ -257,6 +257,84 @@ async function createValidTransaction(customAmount?: number) {
   return { paymentRequest, payPalOrder, customInvoiceId };
 }
 
+describe('multi shipping cart invalid shipping', () => {
+  test('Create order for multi shipping cart with invalid shipping for an item', async () => {
+    (getCart as jest.Mock).mockReturnValueOnce({
+      ...mockCart,
+      lineItems: [
+        { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
+      ],
+      shippingMode: 'Multiple',
+    });
+    try {
+      const paymentRequest = {
+        obj: {
+          amountPlanned: {
+            ...amountPlanned,
+            centAmount: amountPlanned.centAmount,
+          },
+          custom: {
+            fields: {
+              createPayPalOrderRequest: JSON.stringify([
+                {
+                  storeInVaultOnSuccess: false,
+                  intent: 'AUTHORIZE',
+                  custom_invoice_id: 'custom_invoice_id',
+                  paymentSource: { card: {} },
+                },
+                'card with authorize and custom invoice id',
+              ]),
+            },
+          },
+          id: randomUUID(),
+        },
+      } as any;
+      await paymentController('Update', paymentRequest);
+    } catch (error) {
+      if (error instanceof Error)
+        expect(error.message).toContain(
+          'has invalid shipping details for at least one line item'
+        );
+    }
+  });
+  test('update PayPal order', async () => {
+    const { paymentRequest, payPalOrder } = await createValidTransaction(
+      EXPECTED_CART_CENT_AMOUNT
+    );
+    (getCart as jest.Mock).mockReturnValueOnce({
+      ...mockCart,
+      lineItems: [
+        { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
+      ],
+      shippingMode: 'Multiple',
+    });
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      custom: {
+        fields: {
+          updatePayPalOrderRequest: '{}',
+          PayPalOrderId: payPalOrder.id,
+          patch: [
+            {
+              op: 'replace',
+              path: "/purchase_units/@reference_id=='default'/amount",
+              value: { currency_code: 'EUR', value: '130.00' },
+            },
+          ],
+        },
+      },
+    };
+    try {
+      await paymentController('Update', paymentRequest);
+    } catch (error) {
+      if (error instanceof Error)
+        expect(error.message).toContain(
+          'has invalid shipping details for at least one line item'
+        );
+    }
+  });
+});
+
 async function completeValidOrder(
   customAmount?: number,
   customStringAmount?: string
