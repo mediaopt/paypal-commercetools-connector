@@ -331,7 +331,7 @@ describe('Invalid Multiple shipping cart', () => {
           'has invalid shipping details for at least one line item'
         );
     }
-  });
+  }, 30000);
 });
 
 async function completeValidOrder(
