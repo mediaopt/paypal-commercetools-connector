@@ -302,24 +302,15 @@ const shippingInfoCentAmount = (shippingInfo?: ShippingInfo) =>
   0;
 
 const shippingByItem = (shipping: Shipping[], lineItems: LineItem[]) => {
-  const relevantShippingKeys = lineItems
-    .flatMap(({ shippingDetails }) => shippingDetails?.targets ?? [])
-    .reduce((acc, { shippingMethodKey }) => {
-      if (!shippingMethodKey || acc.some((item) => item === shippingMethodKey))
-        return acc;
-      acc.push(shippingMethodKey);
-      return acc;
-    }, [] as string[]);
-  const shippingTotal = shipping
-    .filter(({ shippingKey }) =>
-      relevantShippingKeys.some((key) => key === shippingKey)
-    )
-    .reduce(
-      (acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo),
-      0
-    );
-
-  return shippingTotal;
+  const relevantShippingKeys = new Set(
+    lineItems
+      .flatMap(({ shippingDetails }) => shippingDetails?.targets ?? [])
+      .map(({ shippingMethodKey }) => shippingMethodKey)
+      .filter((key): key is string => !!key)
+  );
+  return shipping
+    .filter(({ shippingKey }) => shippingKey && relevantShippingKeys.has(shippingKey))
+    .reduce((acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo), 0);
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
