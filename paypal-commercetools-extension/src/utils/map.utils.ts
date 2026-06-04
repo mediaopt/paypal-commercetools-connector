@@ -2,6 +2,8 @@ import {
   Cart,
   LineItem,
   Payment,
+  Shipping,
+  ShippingInfo,
   TaxCalculationMode,
   TransactionState,
   TypedMoney,
@@ -294,10 +296,38 @@ export const mapValidCommercetoolsLineItemsToPayPalItems = (
 type RestrictedAmountBreakdown = Pick<AmountBreakdown, 'discount'> &
   Required<Pick<AmountBreakdown, 'item_total' | 'tax_total' | 'shipping'>>;
 
+const shippingInfoCentAmount = (shippingInfo?: ShippingInfo) =>
+  shippingInfo?.taxedPrice?.totalGross?.centAmount ??
+  shippingInfo?.price.centAmount ??
+  0;
+
+const shippingByItem = (shipping: Shipping[], lineItems: LineItem[]) => {
+  const relevantShippingKeys = lineItems
+    .flatMap(({ shippingDetails }) => shippingDetails?.targets ?? [])
+    .reduce((acc, { shippingMethodKey }) => {
+      if (!shippingMethodKey || acc.some((item) => item === shippingMethodKey))
+        return acc;
+      acc.push(shippingMethodKey);
+      return acc;
+    }, [] as string[]);
+  const shippingTotal = shipping
+    .filter(({ shippingKey }) =>
+      relevantShippingKeys.some((key) => key === shippingKey)
+    )
+    .reduce(
+      (acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo),
+      0
+    );
+
+  return shippingTotal;
+};
+
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
   lineItems,
   discountOnTotalPrice,
   shippingInfo,
+  shipping,
+  shippingMode,
   taxCalculationMode,
 }: Cart): RestrictedAmountBreakdown | undefined => {
   if (!lineItems || !lineItems[0]) {
@@ -313,6 +343,11 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       : lineItems
           .map((lineItem) => relevantTotalItemTax(lineItem, roundItemPrice))
           .reduce((x, y) => x + y, 0);
+
+  const relevantShippingCentAmount: number =
+    shippingMode === 'Multiple'
+      ? shippingByItem(shipping, lineItems)
+      : shippingInfoCentAmount(shippingInfo);
 
   return {
     item_total: {
@@ -341,10 +376,7 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       currency_code: currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney({
         // in commercetools shipping discount is included in total discount and can't be easily separated - so amount before discount applied is used here
-        centAmount:
-          shippingInfo?.taxedPrice?.totalGross?.centAmount ??
-          shippingInfo?.price.centAmount ??
-          0,
+        centAmount: relevantShippingCentAmount,
         fractionDigits,
         currencyCode,
         type,

@@ -1,4 +1,5 @@
 import {
+  Cart,
   Payment,
   PaymentAddTransactionAction,
   PaymentUpdateAction,
@@ -78,6 +79,20 @@ const addTransactionAction = ({
   },
 });
 
+const validateCart = (cart: Cart, paymentId: string) => {
+  if (cart.shippingMode === 'Multiple') {
+    if (
+      cart.lineItems.some(
+        ({ shippingDetails }) => shippingDetails?.valid === false
+      )
+    )
+      throw new CustomError(
+        '400',
+        `Payment ${paymentId} has invalid shipping details for at least one line item. Multiple shipping mode requires valid shipping details for all line items.`
+      );
+  }
+};
+
 async function prepareCreateOrderRequest(
   payment: Payment,
   settings?: PayPalSettings
@@ -140,6 +155,7 @@ async function prepareCreateOrderRequest(
         'For Pay Upon Invoice, the payment amount must exactly match the cart total gross amount if available and total price if total gross is not provided.'
       );
   }
+  validateCart(cart, payment.id);
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -172,7 +188,9 @@ async function prepareCreateOrderRequest(
         items: mapValidCommercetoolsLineItemsToPayPalItems(
           matchingAmounts,
           paymentSource?.experience_context?.shipping_preference !==
-            'NO_SHIPPING' || !!cart.shippingAddress,
+            'NO_SHIPPING' ||
+            !!cart.shippingAddress ||
+            !!cart.shipping.length,
           cart.taxCalculationMode,
           isPayUponInvoice,
           cart?.lineItems,
@@ -569,6 +587,8 @@ export const handleUpdateOrderRequest = async (
       ? relevantCartPrice
       : payment.amountPlanned;
 
+    validateCart(cart, payment.id);
+
     request = {
       ...request,
       orderId: payment.custom.fields?.PayPalOrderId,
@@ -587,7 +607,7 @@ export const handleUpdateOrderRequest = async (
           path: "/purchase_units/@reference_id=='default'/items",
           value: mapValidCommercetoolsLineItemsToPayPalItems(
             true,
-            !!cart.shippingAddress,
+            !!cart.shippingAddress || !!cart.shipping.length,
             cart.taxCalculationMode,
             payment.paymentMethodInfo.method === 'pay_upon_invoice',
             cart?.lineItems,

@@ -25,6 +25,7 @@ import {
   lineItemFromLineItemData,
   LineItemGenerationData,
   LineItemTestData,
+  multiShippingData,
   paymentStateMappingWithResults,
   singleLineItemTypeCartsDataWithMatchingTotal,
   testLineItemsWithExpectationsExternalTax,
@@ -462,6 +463,18 @@ describe('PayPal breakdown mapping', () => {
   test.each(complexCartsData)(
     'complex carts if relevant have matching discount, shipping and tax for $testDescription',
     ({ cartData, expectedDiscount, expectedShipping, expectedTax }) => {
+      expectCartMapping(
+        cartData,
+        expectedDiscount,
+        expectedShipping,
+        expectedTax
+      );
+    }
+  );
+
+  test.each(multiShippingData)(
+    'multiple shipping carts have matching discount, shipping and no tax for $testDescription',
+    ({ cartData, expectedShipping, expectedDiscount, expectedTax }) => {
       expectCartMapping(
         cartData,
         expectedDiscount,

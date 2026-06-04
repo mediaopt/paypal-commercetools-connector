@@ -74,6 +74,22 @@ const customFieldCreateOrder = {
 const EXPECTED_CART_CENT_AMOUNT = mockCart.taxedPrice.totalGross.centAmount;
 const EXPECTED_LESS_THAN_CART_CENT_AMOUNT = EXPECTED_CART_CENT_AMOUNT - 1; //one cent less
 
+const updateOrderMockFields = (payPalOrderId?: string) => ({
+  custom: {
+    fields: {
+      updatePayPalOrderRequest: '{}',
+      PayPalOrderId: payPalOrderId,
+      patch: [
+        {
+          op: 'replace',
+          path: "/purchase_units/@reference_id=='default'/amount",
+          value: { currency_code: 'EUR', value: '130.00' },
+        },
+      ],
+    },
+  },
+});
+
 describe('Testing Braintree GetClient Token', () => {
   test(
     'create client token',
@@ -257,6 +273,67 @@ async function createValidTransaction(customAmount?: number) {
   return { paymentRequest, payPalOrder, customInvoiceId };
 }
 
+describe('Invalid Multiple shipping cart', () => {
+  const mockMultipleShippingCart = {
+    ...mockCart,
+    lineItems: [
+      { ...mockCart.lineItems[0], shippingDetails: { valid: false } },
+    ],
+    shippingMode: 'Multiple',
+  };
+  test('Create PayPal order fails with error invalid shipping for some items', async () => {
+    (getCart as jest.Mock).mockReturnValueOnce(mockMultipleShippingCart);
+    try {
+      const paymentRequest = {
+        obj: {
+          amountPlanned: {
+            ...amountPlanned,
+            centAmount: amountPlanned.centAmount,
+          },
+          custom: {
+            fields: {
+              createPayPalOrderRequest: JSON.stringify([
+                {
+                  storeInVaultOnSuccess: false,
+                  intent: 'AUTHORIZE',
+                  custom_invoice_id: 'custom_invoice_id',
+                  paymentSource: { card: {} },
+                },
+                'card with authorize and custom invoice id',
+              ]),
+            },
+          },
+          id: randomUUID(),
+        },
+      } as any;
+      await paymentController('Update', paymentRequest);
+    } catch (error) {
+      if (error instanceof Error)
+        expect(error.message).toContain(
+          'has invalid shipping details for at least one line item'
+        );
+    }
+  });
+  test('Update PayPal order fails with error invalid shipping for some items', async () => {
+    const { paymentRequest, payPalOrder } = await createValidTransaction(
+      EXPECTED_CART_CENT_AMOUNT
+    );
+    (getCart as jest.Mock).mockReturnValueOnce(mockMultipleShippingCart);
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      ...updateOrderMockFields(payPalOrder.id),
+    };
+    try {
+      await paymentController('Update', paymentRequest);
+    } catch (error) {
+      if (error instanceof Error)
+        expect(error.message).toContain(
+          'has invalid shipping details for at least one line item'
+        );
+    }
+  });
+});
+
 async function completeValidOrder(
   customAmount?: number,
   customStringAmount?: string
@@ -387,19 +464,7 @@ describe('Testing PayPal aftersales', () => {
     });
     paymentRequest.obj = {
       ...paymentRequest.obj,
-      custom: {
-        fields: {
-          updatePayPalOrderRequest: '{}',
-          PayPalOrderId: payPalOrder.id,
-          patch: [
-            {
-              op: 'replace',
-              path: "/purchase_units/@reference_id=='default'/amount",
-              value: { currency_code: 'EUR', value: '130.00' },
-            },
-          ],
-        },
-      },
+      ...updateOrderMockFields(payPalOrder.id),
     };
     const paymentResponse = await paymentController('Update', paymentRequest);
     const response = expectSuccessfulResponse(
