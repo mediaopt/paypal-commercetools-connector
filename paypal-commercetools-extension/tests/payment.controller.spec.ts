@@ -8,6 +8,7 @@ import { logger } from '../src/utils/logger.utils';
 import {
   cartFromCartData,
   complexCartsData,
+  findActionByName,
   longTestTimeoutMs,
 } from './constants';
 
@@ -48,6 +49,7 @@ mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
 import { getCart } from '../src/service/commercetools.service';
+import * as paypalService from '../src/service/paypal.service';
 
 const amountPlanned = {
   centAmount: 8200,
@@ -106,8 +108,9 @@ describe('Testing Braintree GetClient Token', () => {
       const paymentResponse = await paymentController('Update', paymentRequest);
       expect(paymentResponse).toBeDefined();
       expect(paymentResponse).toHaveProperty('statusCode', 200);
-      const getClientTokenResponse = paymentResponse?.actions.find(
-        (action) => action.name === 'getClientTokenResponse'
+      const getClientTokenResponse = findActionByName(
+        paymentResponse?.actions ?? [],
+        'getClientTokenResponse'
       );
       expect(getClientTokenResponse).toBeDefined();
       expect(getClientTokenResponse?.name).toBe('getClientTokenResponse');
@@ -133,8 +136,9 @@ function expectSuccessfulResponse(
 ): Order | Refund | Capture {
   expect(paymentResponse).toBeDefined();
   expect(paymentResponse).toHaveProperty('statusCode', 200);
-  const transactionSaleResponse = paymentResponse?.actions.find(
-    (action) => action.name === responseField
+  const transactionSaleResponse = findActionByName(
+    paymentResponse?.actions ?? [],
+    responseField
   );
   expect(transactionSaleResponse).toBeDefined();
   return JSON.parse(transactionSaleResponse?.value);
@@ -472,6 +476,36 @@ describe('Testing PayPal aftersales', () => {
       'updatePayPalOrderRequest'
     );
     expect(response).toBe(null);
+  }, 30000);
+
+  test('update PayPal order emits changeAmountPlanned with a Money-shaped amount when payment does not match cart', async () => {
+    const { paymentRequest, payPalOrder } = await createValidTransaction(
+      EXPECTED_LESS_THAN_CART_CENT_AMOUNT
+    );
+    jest
+      .spyOn(paypalService, 'updatePayPalOrder')
+      .mockResolvedValueOnce({ status: 'success' });
+    (getCart as jest.Mock).mockReturnValueOnce({
+      ...mockCart,
+      shipping: [],
+    });
+    paymentRequest.obj = {
+      ...paymentRequest.obj,
+      paymentMethodInfo: { method: 'card' },
+      ...updateOrderMockFields(payPalOrder.id),
+    };
+    const paymentResponse = await paymentController('Update', paymentRequest);
+    expect(paymentResponse).toHaveProperty('statusCode', 200);
+    const changeAmountPlannedAction = paymentResponse?.actions.find(
+      (action) => action.action === 'changeAmountPlanned'
+    );
+    expect(changeAmountPlannedAction).toBeDefined();
+    expect(changeAmountPlannedAction).toHaveProperty('amount', {
+      type: 'centPrecision',
+      currencyCode: 'EUR',
+      fractionDigits: 2,
+      centAmount: EXPECTED_CART_CENT_AMOUNT,
+    });
   }, 30000);
 
   test('Settle an authorization', async () => {

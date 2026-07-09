@@ -8,7 +8,6 @@ import {
   TransactionState,
   TransactionType,
 } from '@commercetools/platform-sdk';
-import { UpdateAction } from '@commercetools/sdk-client-v2';
 import CustomError from '../errors/custom.error';
 import {
   CheckoutPaymentIntent,
@@ -26,6 +25,7 @@ import {
 } from '../paypal/payments_api';
 import {
   ClientTokenRequest,
+  EntityResponse,
   PayPalSettings,
   UpdateActions,
 } from '../types/index.types';
@@ -279,7 +279,7 @@ const actualTransactionStatus = (
 
 export const handleCreateOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.createPayPalOrderRequest) {
     return [];
   }
@@ -300,9 +300,11 @@ export const handleCreateOrderRequest = async (
       },
     ];
     if (!payment?.interfaceId) {
+      // response.id is optional in the PayPal SDK type, but createPayPalOrder
+      // always returns an id for a successfully created order.
       extraActions.push({
         action: 'setInterfaceId',
-        interfaceId: response.id,
+        interfaceId: response.id as string,
       });
     }
     if (customId)
@@ -326,7 +328,7 @@ export const handleCreateOrderRequest = async (
 
 export const handleCaptureOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.capturePayPalOrderRequest) {
     return [];
   }
@@ -371,7 +373,7 @@ export const handleCaptureOrderRequest = async (
 
 export const handleCaptureAuthorizationRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.capturePayPalAuthorizationRequest) {
     return [];
   }
@@ -408,7 +410,7 @@ export const handleCaptureAuthorizationRequest = async (
 
 export const handleVoidAuthorizationRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.voidPayPalAuthorizationRequest) {
     return [];
   }
@@ -445,7 +447,7 @@ export const handleVoidAuthorizationRequest = async (
 
 export const handleRefundPayPalOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.refundPayPalOrderRequest) {
     return [];
   }
@@ -497,7 +499,7 @@ export const handleRefundPayPalOrderRequest = async (
 
 export const handleAuthorizeOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.authorizePayPalOrderRequest) {
     return [];
   }
@@ -565,7 +567,7 @@ export async function handleGetClientTokenRequest(payment?: Payment) {
 
 export const handleUpdateOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.updatePayPalOrderRequest) {
     return [];
   }
@@ -618,7 +620,9 @@ export const handleUpdateOrderRequest = async (
     };
     const { orderId, patch } = request;
 
-    const handleResponse = async () => {
+    const handleResponse = async (): Promise<
+      EntityResponse<PaymentUpdateAction>
+    > => {
       const response = (await updatePayPalOrder(orderId, patch)) ?? '';
       return {
         response,
@@ -626,7 +630,7 @@ export const handleUpdateOrderRequest = async (
           ? [
               {
                 action: 'changeAmountPlanned',
-                amount: currentPayment.centAmount,
+                amount: currentPayment,
               },
             ]
           : undefined,
@@ -646,7 +650,7 @@ export const handleUpdateOrderRequest = async (
 
 export const handleGetOrderRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.getPayPalOrderRequest) {
     return [];
   }
@@ -669,7 +673,7 @@ export const handleGetOrderRequest = async (
 
 export const handleGetCaptureRequest = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.getPayPalCaptureRequest) {
     return [];
   }
@@ -773,7 +777,7 @@ export const handleCreateTrackingInformation = async (payment: Payment) => {
 
 export const handleUpdateTrackingInformation = async (
   payment: Payment
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!payment?.custom?.fields?.updateTrackingInformationRequest) {
     return [];
   }

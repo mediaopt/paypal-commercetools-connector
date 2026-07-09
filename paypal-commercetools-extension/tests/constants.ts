@@ -12,7 +12,18 @@ import {
 } from '@commercetools/platform-sdk';
 import { UpdateActions } from '../src/types/index.types';
 
-type PaymentStateMapData = [string, UpdateActions, boolean];
+type TestUpdateAction = { action: string; [key: string]: unknown };
+
+type PaymentStateMapData = [string, TestUpdateAction[], boolean];
+
+// Narrows to the subset of PaymentUpdateAction | CustomerUpdateAction that
+// carries a name/value pair (e.g. setCustomField, setTransactionCustomField),
+// so test assertions can read .name/.value without an `any` cast.
+export const findActionByName = (actions: UpdateActions, name: string) =>
+  actions.find(
+    (action): action is Extract<UpdateActions[number], { name: string }> =>
+      'name' in action && action.name === name
+  );
 
 export const dummyValidPaymentStatusData: Pick<
   Payment,
