@@ -576,14 +576,11 @@ export const handleUpdateOrderRequest = async (
     const cart = await getCart(payment.id, 'UpdatePayPalOrder');
     // let amountPlanned = payment.amountPlanned;
 
-    const relevantCartPrice = cart.taxedPrice?.totalGross?.centAmount
-      ? cart.taxedPrice?.totalGross
-      : cart.totalPrice;
+    const relevantCartPrice = cart.taxedPrice?.totalGross ?? cart.totalPrice;
 
-    const paymentDoestMatchCart = !!(
-      relevantCartPrice?.centAmount &&
-      relevantCartPrice.centAmount !== payment.amountPlanned.centAmount
-    );
+    const paymentDoestMatchCart =
+      relevantCartPrice?.centAmount !== undefined &&
+      relevantCartPrice.centAmount !== payment.amountPlanned.centAmount;
 
     const currentPayment = paymentDoestMatchCart
       ? relevantCartPrice
