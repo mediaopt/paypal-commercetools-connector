@@ -311,8 +311,13 @@ const shippingByItem = (shipping: Shipping[], lineItems: LineItem[]) => {
       .filter((key): key is string => !!key)
   );
   return shipping
-    .filter(({ shippingKey }) => shippingKey && relevantShippingKeys.has(shippingKey))
-    .reduce((acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo), 0);
+    .filter(
+      ({ shippingKey }) => shippingKey && relevantShippingKeys.has(shippingKey)
+    )
+    .reduce(
+      (acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo),
+      0
+    );
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
