@@ -8,8 +8,15 @@ import {
 import { describe, test } from '@jest/globals';
 import { RefundStatusEnum } from '../src/paypal/payments_api';
 import { UpdateActions } from '../src/types/index.types';
+
+jest.mock('../src/utils/logger.utils', () => ({
+  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
+}));
+
+import { logger } from '../src/utils/logger.utils';
 import {
   isPaymentUpToDate,
+  mapCommercetoolsAddressToPayPalAddress,
   mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   mapCommercetoolsMoneyToPayPalMoney,
@@ -17,11 +24,13 @@ import {
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
   mapValidCommercetoolsLineItemsToPayPalItems,
+  resolveCommercetoolsCartShippingAddress,
 } from '../src/utils/map.utils';
 import {
   cartFromCartData,
   CartGenerationData,
   complexCartsData,
+  dummyAddress,
   dummyValidPaymentStatusData,
   lineItemFromLineItemData,
   LineItemGenerationData,
@@ -488,4 +497,181 @@ describe('PayPal breakdown mapping', () => {
       );
     }
   );
+});
+
+describe('mapCommercetoolsAddressToPayPalAddress', () => {
+  test('returns undefined when no address is given', () => {
+    expect(mapCommercetoolsAddressToPayPalAddress(undefined)).toBeUndefined();
+  });
+
+  test('maps a complete commercetools address to the PayPal shipping shape', () => {
+    expect(mapCommercetoolsAddressToPayPalAddress(dummyAddress())).toEqual({
+      type: 'SHIPPING',
+      name: { full_name: 'Jane Doe' },
+      address: {
+        address_line_1: 'Main Street 1',
+        admin_area_2: 'Berlin',
+        postal_code: '10115',
+        country_code: 'DE',
+      },
+    });
+  });
+});
+
+describe('resolveCommercetoolsCartShippingAddress', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('passes through cart.shippingAddress for shippingMode Single', () => {
+    const address = dummyAddress();
+    const cart = cartFromCartData({
+      lineItemsData: [{ itemType: 'defaultItem', quantity: 1 }],
+      customCardProps: { shippingMode: 'Single', shippingAddress: address },
+    }) as Cart;
+
+    expect(resolveCommercetoolsCartShippingAddress(cart, 'payment-single')).toEqual(
+      { address, hasMultipleAddresses: false }
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  test('resolves the single address of a Multiple-mode cart with one shipping method', () => {
+    const address = dummyAddress();
+    const cart = cartFromCartData({
+      lineItemsData: [
+        {
+          itemType: 'defaultItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method1', quantity: 1 }],
+            valid: true,
+          },
+        },
+      ],
+      customCardProps: {
+        shippingMode: 'Multiple',
+        shipping: [{ shippingKey: 'method1', shippingAddress: address }],
+      },
+    }) as Cart;
+
+    expect(resolveCommercetoolsCartShippingAddress(cart, 'payment-1')).toEqual({
+      address,
+      hasMultipleAddresses: false,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  test('does not flag two shipping methods sharing the same address as multiple addresses', () => {
+    const address = dummyAddress();
+    const cart = cartFromCartData({
+      lineItemsData: [
+        {
+          itemType: 'defaultItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method1', quantity: 1 }],
+            valid: true,
+          },
+        },
+        {
+          itemType: 'productDiscountItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method2', quantity: 1 }],
+            valid: true,
+          },
+        },
+      ],
+      customCardProps: {
+        shippingMode: 'Multiple',
+        shipping: [
+          { shippingKey: 'method1', shippingAddress: address },
+          { shippingKey: 'method2', shippingAddress: address },
+        ],
+      },
+    }) as Cart;
+
+    expect(resolveCommercetoolsCartShippingAddress(cart, 'payment-2')).toEqual({
+      address,
+      hasMultipleAddresses: false,
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  test('picks the first complete address and logs when shipping methods have distinct addresses', () => {
+    const incompleteAddress = dummyAddress({ postalCode: undefined });
+    const completeAddress = dummyAddress({ city: 'Munich' });
+    const cart = cartFromCartData({
+      lineItemsData: [
+        {
+          itemType: 'defaultItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method1', quantity: 1 }],
+            valid: true,
+          },
+        },
+        {
+          itemType: 'productDiscountItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method2', quantity: 1 }],
+            valid: true,
+          },
+        },
+      ],
+      customCardProps: {
+        shippingMode: 'Multiple',
+        shipping: [
+          { shippingKey: 'method1', shippingAddress: incompleteAddress },
+          { shippingKey: 'method2', shippingAddress: completeAddress },
+        ],
+      },
+    }) as Cart;
+
+    expect(resolveCommercetoolsCartShippingAddress(cart, 'payment-3')).toEqual({
+      address: completeAddress,
+      hasMultipleAddresses: true,
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('payment-3')
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'address(es) skipped for missing required fields'
+      )
+    );
+  });
+
+  test('logs when a line item has no assigned shipping target', () => {
+    const address = dummyAddress();
+    const cart = cartFromCartData({
+      lineItemsData: [
+        { itemType: 'defaultItem', quantity: 1 },
+        {
+          itemType: 'productDiscountItem',
+          quantity: 1,
+          shippingDetails: {
+            targets: [{ shippingMethodKey: 'method1', quantity: 1 }],
+            valid: true,
+          },
+        },
+      ],
+      customCardProps: {
+        shippingMode: 'Multiple',
+        shipping: [{ shippingKey: 'method1', shippingAddress: address }],
+      },
+    }) as Cart;
+
+    expect(resolveCommercetoolsCartShippingAddress(cart, 'payment-4')).toEqual({
+      address,
+      hasMultipleAddresses: false,
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'line item(s) have no assigned shipping address'
+      )
+    );
+  });
 });

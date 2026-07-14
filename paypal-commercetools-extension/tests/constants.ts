@@ -1,4 +1,5 @@
 import {
+  Address,
   Cart,
   CentPrecisionMoney,
   DiscountOnTotalPrice,
@@ -112,6 +113,7 @@ type CartPropsImportantForMappingTests = Pick<
   | 'discountCodes'
   | 'locale'
   | 'shippingMode'
+  | 'shippingAddress'
 > & {
   lineItems: LineItemPropsImportantForMappingTests[];
   taxedPrice: TaxedPricePropsImportantForMappingTests;
@@ -120,6 +122,7 @@ type CartPropsImportantForMappingTests = Pick<
   shipping?: {
     shippingInfo?: ShippingInfoPropsImportantForMappingTests;
     shippingKey: string;
+    shippingAddress?: Address;
   }[];
 };
 
@@ -165,6 +168,17 @@ export const discountOnTotalPrice = ({
   discountedAmount: centPrice(amount),
   discountedNetAmount: net ? centPrice(net) : undefined,
   discountedGrossAmount: gross ? centPrice(gross) : undefined,
+});
+
+export const dummyAddress = (overrides: Partial<Address> = {}): Address => ({
+  streetName: 'Main Street',
+  streetNumber: '1',
+  city: 'Berlin',
+  postalCode: '10115',
+  country: 'DE',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  ...overrides,
 });
 
 const defaultRelevantForMappingCTCartParams = {
