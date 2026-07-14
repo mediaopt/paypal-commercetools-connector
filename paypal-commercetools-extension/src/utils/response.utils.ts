@@ -1,9 +1,23 @@
 import { AxiosError } from 'axios';
+import { PaymentUpdateAction } from '@commercetools/platform-sdk';
 import { ErrorDetails } from '../paypal/checkout_api';
-import { StringOrObject, UpdateActions } from '../types/index.types';
+import {
+  EntityResponse,
+  StringOrObject,
+  UpdateActions,
+} from '../types/index.types';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
 import { logger } from './logger.utils';
 import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../constants';
+
+const buildCustomFieldAction = (
+  name: string,
+  value: unknown,
+  transactionId?: string
+): PaymentUpdateAction =>
+  transactionId
+    ? { action: 'setTransactionCustomField', transactionId, name, value }
+    : { action: 'setCustomField', name, value };
 
 const errorDetailsMapping = {
   PAYMENT_SOURCE_DECLINED_BY_PROCESSOR: 'paymentSourceDeclined',
@@ -51,12 +65,13 @@ export const handlePaymentResponse = (
   if (typeof response === 'object') {
     removeEmptyProperties(response);
   }
-  updateActions.push({
-    action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
-    transactionId: transactionId,
-    name: `${requestName}Response`,
-    value: stringifyData(response),
-  });
+  updateActions.push(
+    buildCustomFieldAction(
+      `${requestName}Response`,
+      stringifyData(response),
+      transactionId
+    )
+  );
   updateActions.push({
     action: 'addInterfaceInteraction',
     type: {
@@ -69,12 +84,9 @@ export const handlePaymentResponse = (
       timestamp: getCurrentTimestamp(),
     },
   });
-  updateActions.push({
-    action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
-    transactionId: transactionId,
-    name: `${requestName}Request`,
-    value: null,
-  });
+  updateActions.push(
+    buildCustomFieldAction(`${requestName}Request`, null, transactionId)
+  );
   return updateActions;
 };
 
@@ -158,18 +170,16 @@ export const handleError = (
   );
   const { message, details } = parseErrorMessage(error, requestName);
   const updateActions: UpdateActions = [];
-  updateActions.push({
-    action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
-    transactionId: transactionId,
-    name: `${requestName}Response`,
-    value: JSON.stringify({ success: false, message, details }),
-  });
-  updateActions.push({
-    action: transactionId ? 'setTransactionCustomField' : 'setCustomField',
-    transactionId: transactionId,
-    name: `${requestName}Request`,
-    value: null,
-  });
+  updateActions.push(
+    buildCustomFieldAction(
+      `${requestName}Response`,
+      JSON.stringify({ success: false, message, details }),
+      transactionId
+    )
+  );
+  updateActions.push(
+    buildCustomFieldAction(`${requestName}Request`, null, transactionId)
+  );
   return updateActions;
 };
 
@@ -184,10 +194,7 @@ export async function handleEntityActions(
   entityID: string,
   requestName: string,
   request: StringOrObject,
-  handleResponse: () => Promise<{
-    response: StringOrObject;
-    extraActions?: UpdateActions;
-  }>,
+  handleResponse: () => Promise<EntityResponse>,
   entityType: 'payment' | 'customer' = 'payment'
 ) {
   const isPayment = entityType === 'payment';

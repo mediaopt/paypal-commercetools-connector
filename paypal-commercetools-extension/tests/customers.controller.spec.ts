@@ -24,7 +24,7 @@ const mockConfigModule = () => {
 mockConfigModule();
 
 import { customerController } from '../src/controllers/customers.controller';
-import { longTestTimeoutMs } from './constants';
+import { findActionByName, longTestTimeoutMs } from './constants';
 
 function expectSuccessfulResponse(
   customerResponse:
@@ -37,8 +37,9 @@ function expectSuccessfulResponse(
 ): string {
   expect(customerResponse).toBeDefined();
   expect(customerResponse).toHaveProperty('statusCode', 200);
-  const transactionSaleResponse = customerResponse?.actions.find(
-    (action) => action.name === responseField
+  const transactionSaleResponse = findActionByName(
+    customerResponse?.actions ?? [],
+    responseField
   );
   expect(transactionSaleResponse).toBeDefined();
   expect(transactionSaleResponse?.name).toBe(responseField);
@@ -170,8 +171,9 @@ describe('Testing PayPal customer Requests', () => {
         customerRequest
       );
       expectSuccessfulResponse(customerResponse, 'createPaymentTokenRequest');
-      const paymentResponse = customerResponse?.actions?.find(
-        (item) => (item.name = 'createPaymentTokenResponse')
+      const paymentResponse = findActionByName(
+        customerResponse?.actions ?? [],
+        'createPaymentTokenResponse'
       );
       expect(paymentResponse).toBeDefined();
       expect(paymentResponse?.value).toContain('TOKEN_NOT_FOUND');

@@ -1,5 +1,8 @@
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
-import { UpdateAction } from '@commercetools/sdk-client-v2';
+import {
+  CustomerUpdateAction,
+  PaymentUpdateAction,
+} from '@commercetools/platform-sdk';
 import {
   Bancontact,
   Blik,
@@ -43,9 +46,16 @@ export type Wrapper = (
   validator: ValidatorFunction
 ) => (value: object) => boolean;
 
-export type UpdateActions = Array<UpdateAction>;
+export type UpdateActions = Array<PaymentUpdateAction | CustomerUpdateAction>;
 
 export type StringOrObject = string | object;
+
+export type EntityResponse<
+  T extends PaymentUpdateAction | CustomerUpdateAction = UpdateActions[number]
+> = {
+  response: StringOrObject;
+  extraActions?: T[];
+};
 
 export type ClientTokenRequest = {
   customerId?: string;

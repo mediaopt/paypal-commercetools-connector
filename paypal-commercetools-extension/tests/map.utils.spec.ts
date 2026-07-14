@@ -7,6 +7,7 @@ import {
 } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
 import { RefundStatusEnum } from '../src/paypal/payments_api';
+import { UpdateActions } from '../src/types/index.types';
 import {
   isPaymentUpToDate,
   mapCommercetoolsCarrierToPayPalCarrier,
@@ -44,9 +45,13 @@ describe('isPaymentUpToDate verification', () => {
   test.each(paymentStateMappingWithResults)(
     'testing %p with actions %p results in %p up to date state',
     (description, actions, result) => {
+      // paymentStateMappingWithResults deliberately mixes fields from
+      // different actions to exercise the "not up to date" branches, so
+      // these fixtures can never satisfy the strict UpdateActions union —
+      // the cast is intentional, not a shape we expect at runtime.
       const isUpToDate = isPaymentUpToDate(
         dummyValidPaymentStatusData as Payment,
-        actions
+        actions as unknown as UpdateActions
       );
       expect(isUpToDate).toEqual(result);
     }
