@@ -54,7 +54,7 @@
     "qs": "^6.14.2",
     "validator": "^13.15.22"
   },
-  "resolutions": {
+  "overrides": {
     "minimatch": "^10.2.1",
     "ajv": "^6.14.0",
     "qs": "^6.14.2",
