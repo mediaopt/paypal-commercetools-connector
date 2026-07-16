@@ -1,4 +1,5 @@
 import {
+  Address,
   Cart,
   LineItem,
   Payment,
@@ -20,6 +21,7 @@ import {
   RefundStatusEnum,
 } from '../paypal/payments_api';
 import { UpdateActions } from '../types/index.types';
+import { logger } from './logger.utils';
 
 const EXPECTED_UPDATE_PAYMENT_ACTIONS_COUNT = 3; //webhook related update actions are setStatusInterfaceCode, setStatusInterfaceText, setMethodInfoMethod and they are not required if payment is already up to date
 export const isPaymentUpToDate = (
@@ -309,8 +311,13 @@ const shippingByItem = (shipping: Shipping[], lineItems: LineItem[]) => {
       .filter((key): key is string => !!key)
   );
   return shipping
-    .filter(({ shippingKey }) => shippingKey && relevantShippingKeys.has(shippingKey))
-    .reduce((acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo), 0);
+    .filter(
+      ({ shippingKey }) => shippingKey && relevantShippingKeys.has(shippingKey)
+    )
+    .reduce(
+      (acc, { shippingInfo }) => acc + shippingInfoCentAmount(shippingInfo),
+      0
+    );
 };
 
 export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
@@ -389,6 +396,104 @@ export const mapCommercetoolsCartToPayPalPriceBreakdown = ({
       : undefined,
   };
 };
+
+// PayPal requires these fields to accept a shipping address.
+export const isCompleteCommercetoolsAddress = (address?: Address): boolean =>
+  !!(
+    address?.streetName &&
+    address?.streetNumber &&
+    address?.city &&
+    address?.postalCode &&
+    address?.country
+  );
+
+// PayPal only supports a single shipping address per order, but a cart with
+// shippingMode 'Multiple' has no single cart.shippingAddress - line items are
+// distributed across cart.shipping[], each with its own shippingAddress. The
+// array order isn't meaningful, and one entry can be incomplete while another
+// is valid, so the first *complete* address is used rather than shipping[0].
+export const resolveCommercetoolsCartShippingAddress = (
+  cart: Cart,
+  paymentId: string
+): { address?: Address; hasMultipleAddresses: boolean } => {
+  if (cart.shippingMode !== 'Multiple') {
+    return { address: cart.shippingAddress, hasMultipleAddresses: false };
+  }
+  const relevantShippingKeys = new Set(
+    cart.lineItems
+      .flatMap(({ shippingDetails }) => shippingDetails?.targets ?? [])
+      .map(({ shippingMethodKey }) => shippingMethodKey)
+      .filter((key): key is string => !!key)
+  );
+  const relevantShipping = (cart.shipping ?? []).filter(({ shippingKey }) =>
+    relevantShippingKeys.has(shippingKey)
+  );
+  const distinctAddressSignatures = new Set(
+    relevantShipping.map(({ shippingAddress }) =>
+      JSON.stringify({
+        streetName: shippingAddress?.streetName,
+        streetNumber: shippingAddress?.streetNumber,
+        postalCode: shippingAddress?.postalCode,
+        city: shippingAddress?.city,
+        country: shippingAddress?.country,
+      })
+    )
+  );
+  const itemsWithoutShippingTarget = cart.lineItems.filter(
+    ({ shippingDetails }) => !shippingDetails?.targets?.length
+  ).length;
+  const hasMultipleAddresses = distinctAddressSignatures.size > 1;
+
+  const completeAddresses = relevantShipping
+    .map(({ shippingAddress }) => shippingAddress)
+    .filter(isCompleteCommercetoolsAddress);
+  const incompleteAddressCount =
+    relevantShipping.length - completeAddresses.length;
+  const resolvedAddress =
+    completeAddresses[0] ??
+    (isCompleteCommercetoolsAddress(cart.shippingAddress)
+      ? cart.shippingAddress
+      : undefined);
+
+  if (
+    hasMultipleAddresses ||
+    itemsWithoutShippingTarget > 0 ||
+    incompleteAddressCount > 0
+  ) {
+    logger.warn(
+      `Payment ${paymentId}: cart has shippingMode 'Multiple' with ${distinctAddressSignatures.size} distinct shipping address(es) across ${relevantShipping.length} shipping method(s)` +
+        (itemsWithoutShippingTarget
+          ? `; ${itemsWithoutShippingTarget} line item(s) have no assigned shipping address`
+          : '') +
+        (incompleteAddressCount
+          ? `; ${incompleteAddressCount} address(es) skipped for missing required fields (street/city/postal code/country)`
+          : '') +
+        (resolvedAddress
+          ? '. PayPal only supports a single shipping address per order - sending the first complete resolved address.'
+          : '. No complete shipping address could be resolved for PayPal.')
+    );
+  }
+  return {
+    address: resolvedAddress,
+    hasMultipleAddresses,
+  };
+};
+
+export const mapCommercetoolsAddressToPayPalAddress = (address?: Address) =>
+  !address
+    ? undefined
+    : {
+        type: 'SHIPPING',
+        name: {
+          full_name: `${address.firstName} ${address.lastName}`,
+        },
+        address: {
+          address_line_1: `${address.streetName} ${address.streetNumber}`,
+          admin_area_2: address.city,
+          postal_code: address.postalCode,
+          country_code: address.country,
+        },
+      };
 
 export const mapCommercetoolsCarrierToPayPalCarrier = (
   carrier?: string,

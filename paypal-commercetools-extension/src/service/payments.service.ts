@@ -31,6 +31,7 @@ import {
 } from '../types/index.types';
 import { getCurrentTimestamp } from '../utils/data.utils';
 import {
+  mapCommercetoolsAddressToPayPalAddress,
   mapCommercetoolsCarrierToPayPalCarrier,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   mapValidCommercetoolsLineItemsToPayPalItems,
@@ -40,6 +41,7 @@ import {
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
+  resolveCommercetoolsCartShippingAddress,
 } from '../utils/map.utils';
 import { handleEntityActions, handleError } from '../utils/response.utils';
 import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
@@ -104,6 +106,9 @@ async function prepareCreateOrderRequest(
   }
   const isPayUponInvoice = !!request?.payment_source?.pay_upon_invoice;
   const cart = await getCart(payment.id, 'CreatePayPalOrder');
+  validateCart(cart, payment.id);
+  const { address: shippingAddress, hasMultipleAddresses } =
+    resolveCommercetoolsCartShippingAddress(cart, payment.id);
   const relevantCartCost =
     cart.taxedPrice?.totalGross?.centAmount ?? cart.totalPrice.centAmount;
   if (isPayUponInvoice) {
@@ -135,18 +140,21 @@ async function prepareCreateOrderRequest(
   const paymentSource = request?.payment_source
     ? request?.payment_source[Object.keys(request?.payment_source)[0]]
     : undefined;
-  if (paymentSource && cart.shippingAddress) {
+  if (paymentSource && shippingAddress) {
     paymentSource.experience_context = {
       shipping_preference: 'SET_PROVIDED_ADDRESS',
       ...paymentSource?.experience_context,
     };
   }
   const amountPlanned = payment.amountPlanned;
-  const paymentDescription = settings?.paymentDescription
+  const paymentDescriptionBase = settings?.paymentDescription
     ? settings?.paymentDescription[
         cart.locale ?? Object.keys(settings?.paymentDescription)[0]
       ]
     : undefined;
+  const paymentDescription = hasMultipleAddresses
+    ? `${paymentDescriptionBase ?? ''} (ships to multiple addresses)`.trim()
+    : paymentDescriptionBase;
   const matchingAmounts = amountPlanned.centAmount === relevantCartCost;
   if (isPayUponInvoice) {
     if (!matchingAmounts)
@@ -155,7 +163,6 @@ async function prepareCreateOrderRequest(
         'For Pay Upon Invoice, the payment amount must exactly match the cart total gross amount if available and total price if total gross is not provided.'
       );
   }
-  validateCart(cart, payment.id);
   request = {
     intent:
       settings?.payPalIntent.toUpperCase() ?? CheckoutPaymentIntent.Capture,
@@ -168,20 +175,7 @@ async function prepareCreateOrderRequest(
             ? mapCommercetoolsCartToPayPalPriceBreakdown(cart)
             : null,
         },
-        shipping: !cart.shippingAddress
-          ? undefined
-          : {
-              type: 'SHIPPING',
-              name: {
-                full_name: `${cart.shippingAddress.firstName} ${cart.shippingAddress.lastName}`,
-              },
-              address: {
-                address_line_1: `${cart.shippingAddress.streetName} ${cart.shippingAddress.streetNumber}`,
-                admin_area_2: cart.shippingAddress.city,
-                postal_code: cart.shippingAddress.postalCode,
-                country_code: cart.shippingAddress.country,
-              },
-            },
+        shipping: mapCommercetoolsAddressToPayPalAddress(shippingAddress),
         invoice_id: request?.custom_invoice_id ?? payment.id,
         custom_id: request?.custom_id,
         description: paymentDescription,
