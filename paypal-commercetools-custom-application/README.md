@@ -1,7 +1,7 @@
 # PayPal commercetools Custom Application
 
 ## Start development
-- `yarn install`
+- `npm install`
 - `npm start`
 
 ## Deployment

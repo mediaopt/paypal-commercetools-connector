@@ -1,10 +1,10 @@
-import { Customer } from '@commercetools/platform-sdk';
-import { UpdateAction } from '@commercetools/sdk-client-v2';
+import { Customer, CustomerUpdateAction } from '@commercetools/platform-sdk';
 import {
   PaymentTokenRequest,
   SetupTokenRequest,
   TokenIdRequestTypeEnum,
 } from '../paypal/vault_api';
+import { UpdateActions } from '../types/index.types';
 import { handleEntityActions } from '../utils/response.utils';
 import {
   createPaymentToken,
@@ -58,7 +58,7 @@ export async function handleDeletePaymentTokenRequest(customer: Customer) {
 
 export const handleCreateVaultSetupTokenRequest = async (
   customer: Customer
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!customer?.custom?.fields?.createVaultSetupTokenRequest) {
     return [];
   }
@@ -76,7 +76,8 @@ export const handleCreateVaultSetupTokenRequest = async (
 
   const handleResponse = async () => {
     const response = await createVaultSetupToken(request);
-    const extraActions = response.customer?.id
+    const extraActions: CustomerUpdateAction[] | undefined = response.customer
+      ?.id
       ? [
           {
             action: 'setCustomField',
@@ -99,7 +100,7 @@ export const handleCreateVaultSetupTokenRequest = async (
 
 export const handleCreatePaymentTokenRequest = async (
   customer: Customer
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!customer?.custom?.fields?.createPaymentTokenRequest) {
     return [];
   }
@@ -119,7 +120,8 @@ export const handleCreatePaymentTokenRequest = async (
 
   const handleResponse = async () => {
     const response = await createPaymentToken(request);
-    const extraActions = response.customer?.id
+    const extraActions: CustomerUpdateAction[] | undefined = response.customer
+      ?.id
       ? [
           {
             action: 'setCustomField',
@@ -142,7 +144,7 @@ export const handleCreatePaymentTokenRequest = async (
 
 export const handleGetPaymentTokensRequest = async (
   customer: Customer
-): Promise<UpdateAction[]> => {
+): Promise<UpdateActions> => {
   if (!customer?.custom?.fields?.getPaymentTokensRequest) {
     return [];
   }

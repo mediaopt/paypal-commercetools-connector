@@ -6,7 +6,6 @@ module.exports = {
   displayName: 'eslint',
   moduleFileExtensions: ['js', 'ts', 'tsx'],
   modulePathIgnorePatterns: [
-    '.yarn',
     '.cache',
     'build/',
     'dist/',

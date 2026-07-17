@@ -1,4 +1,5 @@
 import {
+  Address,
   Cart,
   CentPrecisionMoney,
   DiscountOnTotalPrice,
@@ -12,7 +13,18 @@ import {
 } from '@commercetools/platform-sdk';
 import { UpdateActions } from '../src/types/index.types';
 
-type PaymentStateMapData = [string, UpdateActions, boolean];
+type TestUpdateAction = { action: string; [key: string]: unknown };
+
+type PaymentStateMapData = [string, TestUpdateAction[], boolean];
+
+// Narrows to the subset of PaymentUpdateAction | CustomerUpdateAction that
+// carries a name/value pair (e.g. setCustomField, setTransactionCustomField),
+// so test assertions can read .name/.value without an `any` cast.
+export const findActionByName = (actions: UpdateActions, name: string) =>
+  actions.find(
+    (action): action is Extract<UpdateActions[number], { name: string }> =>
+      'name' in action && action.name === name
+  );
 
 export const dummyValidPaymentStatusData: Pick<
   Payment,
@@ -101,6 +113,7 @@ type CartPropsImportantForMappingTests = Pick<
   | 'discountCodes'
   | 'locale'
   | 'shippingMode'
+  | 'shippingAddress'
 > & {
   lineItems: LineItemPropsImportantForMappingTests[];
   taxedPrice: TaxedPricePropsImportantForMappingTests;
@@ -109,6 +122,7 @@ type CartPropsImportantForMappingTests = Pick<
   shipping?: {
     shippingInfo?: ShippingInfoPropsImportantForMappingTests;
     shippingKey: string;
+    shippingAddress?: Address;
   }[];
 };
 
@@ -154,6 +168,17 @@ export const discountOnTotalPrice = ({
   discountedAmount: centPrice(amount),
   discountedNetAmount: net ? centPrice(net) : undefined,
   discountedGrossAmount: gross ? centPrice(gross) : undefined,
+});
+
+export const dummyAddress = (overrides: Partial<Address> = {}): Address => ({
+  streetName: 'Main Street',
+  streetNumber: '1',
+  city: 'Berlin',
+  postalCode: '10115',
+  country: 'DE',
+  firstName: 'Jane',
+  lastName: 'Doe',
+  ...overrides,
 });
 
 const defaultRelevantForMappingCTCartParams = {

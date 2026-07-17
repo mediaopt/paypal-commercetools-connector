@@ -80,11 +80,11 @@ The connector can be installed [directly from the commercetools marketplace](htt
 To run the connector locally for test purposes:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
-- run `yarn` to install the dependencies
+- run `npm install` to install the dependencies
 - insert commercetools and PayPal credentials to `.env` file
 - for paypal-commercetools-extension run `./bin/ngrok.sh` to start ngrok and insert the dynamic url in the `.env` file as specified in post-deploy script
-- for paypal-commercetools-extension run `yarn connector:post-deploy` to register the extension with the public ngrok url
-- run `yarn start:dev` to build the application
+- for paypal-commercetools-extension run `npm run connector:post-deploy` to register the extension with the public ngrok url
+- run `npm run start:dev` to build the application
 
 ### Hosting externally
 
@@ -92,7 +92,7 @@ Please set your application url (see the example in [ngrok.sh](./paypal-commerce
 
 ## Technology Stack
 
-The connector is written in TypeScript and yarn is used as the package manager.
+The connector is written in TypeScript and npm is used as the package manager.
 
 ## Contributing
 
