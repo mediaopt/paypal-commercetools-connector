@@ -40,7 +40,7 @@
     "@commercetools/sdk-client-v2": "^2.0.1",
     "ajv": "^6.14.0",
     "axios": "^1.13.5",
-    "body-parser": "2.2.1",
+    "body-parser": "^2.3.0",
     "dotenv": "^16.3.1",
     "express": "^4.22.1",
     "listr2": "^6.6.1",

@@ -115,12 +115,11 @@
     "follow-redirects": "^1.16.0",
     "path-to-regexp": "^0.1.13",
     "ws": "^8.17.1",
-    "jest-environment-jsdom": "^30.4.1"
+    "jest-environment-jsdom": "^30.4.1",
+    "sharp": "^0.35.0",
+    "ts-deepmerge": "^8.0.0"
   },
   "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "extends": ["react-app", "react-app/jest"]
   }
 }
