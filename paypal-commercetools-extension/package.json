@@ -44,7 +44,7 @@
     "@types/nodemailer": "^6.4.14",
     "ajv": "^6.14.0",
     "axios": "^1.13.5",
-    "body-parser": "2.2.1",
+    "body-parser": "^2.3.0",
     "dotenv": "^16.0.3",
     "express": "4.22.1",
     "fast-xml-parser": "^5.3.5",
