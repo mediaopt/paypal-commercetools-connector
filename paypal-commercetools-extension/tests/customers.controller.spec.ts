@@ -1,6 +1,6 @@
 import { PaymentReference } from '@commercetools/platform-sdk';
 import { describe, expect, test } from '@jest/globals';
-import { PayPalSettings, UpdateActions } from '../src/types/index.types';
+import { PayPalSettings, UpdateActions } from 'common-connect/dist';
 
 const dummyPayPalUserId = '12345';
 const mockConfigModule = () => {
@@ -15,10 +15,12 @@ const mockConfigModule = () => {
         payPalIntent: 'Authorize',
       } as PayPalSettings;
     }),
-    getCachedAccessToken: jest.fn(),
-    cacheAccessToken: jest.fn(),
   };
   jest.mock('../src/service/config.service', () => configMock);
+  jest.mock('common-connect/dist/service/config.service', () => ({
+    getCachedAccessToken: jest.fn(),
+    cacheAccessToken: jest.fn(),
+  }));
   return configMock;
 };
 mockConfigModule();

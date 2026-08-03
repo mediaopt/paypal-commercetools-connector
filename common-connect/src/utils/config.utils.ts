@@ -1,6 +1,6 @@
-import CustomError from '../errors/custom.error';
-import envValidators from '../validators/env.validators';
-import { getValidateMessages } from '../validators/helpers.validators';
+import { CustomError } from "../errors/custom.error";
+import envValidators from "../validators/env.validators";
+import { getValidateMessages } from "../validators/helpers.validators";
 
 /**
  * Read the configuration env vars
@@ -22,8 +22,8 @@ export const readConfiguration = (validate = false) => {
 
     if (validationErrors.length) {
       throw new CustomError(
-        'InvalidEnvironmentVariablesError',
-        'Invalid Environment Variables please check your .env file',
+        "InvalidEnvironmentVariablesError",
+        "Invalid Environment Variables please check your .env file",
         validationErrors
       );
     }

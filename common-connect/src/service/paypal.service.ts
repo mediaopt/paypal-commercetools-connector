@@ -1,7 +1,7 @@
-import axios, { AxiosError } from 'axios';
-import { randomUUID } from 'crypto';
-import qs from 'qs';
-import CustomError from '../errors/custom.error';
+import axios, { AxiosError } from "axios";
+import { randomUUID } from "crypto";
+import qs from "qs";
+import { CustomError } from "../errors/custom.error";
 import {
   OrderAuthorizeRequest,
   OrderCaptureRequest,
@@ -10,42 +10,42 @@ import {
   OrderTrackerRequest,
   Patch,
   TrackersApi,
-} from '../paypal/checkout_api';
-import { Configuration } from '../paypal/configuration';
+} from "../paypal/checkout_api";
+import { Configuration } from "../paypal/configuration";
 import {
   AuthorizationsApi,
   CaptureRequest,
   CapturesApi,
   RefundRequest,
-} from '../paypal/payments_api';
+} from "../paypal/payments_api";
 import {
   PaymentTokenRequest,
   PaymentTokensApi,
   SetupTokenRequest,
   SetupTokensApi,
-} from '../paypal/vault_api';
+} from "../paypal/vault_api";
 import {
   EventType,
   VerifyWebhookSignature,
   VerifyWebhookSignatureApi,
   WebhooksApi,
-} from '../paypal/webhooks_api';
-import { PAYPAL_EXTENSION_PATH } from '../routes/service.route';
-import { PAYPAL_WEBHOOKS_PATH } from '../routes/webhook.route';
-import { Order } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
-import { cacheAccessToken, getCachedAccessToken } from './config.service';
-import { getPayPalExtensionUrl } from './commercetools.service';
+} from "../paypal/webhooks_api";
+import { Order } from "../types/index.types";
 
-const PAYPAL_API_SANDBOX = 'https://api-m.sandbox.paypal.com';
-const PAYPAL_API_LIVE = 'https://api-m.paypal.com';
-const PAYPAL_PARTNER_ATTRIBUTION_ID = 'commercetoolsGmbH_SP_PPCP';
+import { PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH } from "../constants";
+import { logger } from "../utils/logger.utils";
+import { cacheAccessToken, getCachedAccessToken } from "./config.service";
+import { getPayPalExtensionUrl } from "./commercetools.service";
+
+const PAYPAL_API_SANDBOX = "https://api-m.sandbox.paypal.com";
+const PAYPAL_API_LIVE = "https://api-m.paypal.com";
+const PAYPAL_PARTNER_ATTRIBUTION_ID = "commercetoolsGmbH_SP_PPCP";
 
 const TIMEOUT_PAYMENT = 9500;
 
 function getPayPalPartnerAttributionHeader() {
   return {
-    'PayPal-Partner-Attribution-Id': PAYPAL_PARTNER_ATTRIBUTION_ID,
+    "PayPal-Partner-Attribution-Id": PAYPAL_PARTNER_ATTRIBUTION_ID,
   };
 }
 
@@ -137,7 +137,7 @@ export const updatePayPalOrder = async (
   const response = await gateway.ordersPatch(orderId, request);
   if (response.status === 204) {
     return {
-      status: 'success',
+      status: "success",
     };
   }
   return response.data;
@@ -151,7 +151,7 @@ export const getPayPalOrder = async (orderId: string) => {
 
 export const getPayPalCapture = async (captureId: string) => {
   const gateway = await getPayPalCapturesGateway();
-  const response = await gateway.capturesGet(captureId, 'application/json');
+  const response = await gateway.capturesGet(captureId, "application/json");
   return response.data;
 };
 
@@ -163,8 +163,8 @@ export const capturePayPalAuthorization = async (
   const response = await gateway.authorizationsCapture(
     authorizationId,
     randomUUID(),
-    'application/json',
-    'return=representation',
+    "application/json",
+    "return=representation",
     request
   );
   return response.data;
@@ -174,9 +174,9 @@ export const voidPayPalAuthorization = async (authorizationId: string) => {
   const gateway = await getPayPalAuhorizationsGateway();
   const response = await gateway.authorizationsVoid(
     authorizationId,
-    'application/json',
+    "application/json",
     undefined,
-    'return=representation'
+    "return=representation"
   );
   return response.data;
 };
@@ -189,7 +189,7 @@ export const capturePayPalOrder = async (
   const response = await gateway.ordersCapture(
     orderId,
     randomUUID(),
-    'return=representation',
+    "return=representation",
     undefined,
     undefined,
     request
@@ -205,8 +205,8 @@ export const refundPayPalOrder = async (
   const response = await gateway.capturesRefund(
     captureId,
     randomUUID(),
-    'application/json',
-    'return=representation',
+    "application/json",
+    "return=representation",
     undefined,
     request
   );
@@ -216,11 +216,11 @@ export const refundPayPalOrder = async (
 export async function getClientToken() {
   const token = await generateAccessToken();
   const options = {
-    method: 'POST',
+    method: "POST",
     url: `${getAPIEndpoint()}/v1/identity/generate-token`,
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...getPayPalPartnerAttributionHeader(),
     },
   };
@@ -236,7 +236,7 @@ const generateAccessToken = async (): Promise<string> => {
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
-      'Internal Server Error - PayPal config is missing'
+      "Internal Server Error - PayPal config is missing"
     );
   }
   const cachedToken = await getCachedAccessToken();
@@ -244,23 +244,23 @@ const generateAccessToken = async (): Promise<string> => {
     cachedToken?.value &&
     cachedToken.value.validUntil > new Date().toISOString()
   ) {
-    logger.info('Using cached token');
+    logger.info("Using cached token");
     return cachedToken.value.accessToken;
   }
   const credentials = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
-  ).toString('base64');
+  ).toString("base64");
   const options = {
-    method: 'POST',
+    method: "POST",
     url: `${getAPIEndpoint()}/v1/oauth2/token`,
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${credentials}`,
       ...getPayPalPartnerAttributionHeader(),
     },
     data: qs.stringify({
-      grant_type: 'client_credentials',
-      ignoreCache: 'true',
+      grant_type: "client_credentials",
+      ignoreCache: "true",
     }),
   };
   const response = await axios.request(options);
@@ -287,24 +287,24 @@ export const generateUserIdToken = async (
   if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
     throw new CustomError(
       500,
-      'Internal Server Error - PayPal config is missing'
+      "Internal Server Error - PayPal config is missing"
     );
   }
   const credentials = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
-  ).toString('base64');
+  ).toString("base64");
   const options = {
-    method: 'POST',
+    method: "POST",
     url: `${getAPIEndpoint()}/v1/oauth2/token`,
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${credentials}`,
       ...getPayPalPartnerAttributionHeader(),
     },
     data: qs.stringify({
-      grant_type: 'client_credentials',
-      ignoreCache: 'true',
-      response_type: 'id_token',
+      grant_type: "client_credentials",
+      ignoreCache: "true",
+      response_type: "id_token",
       target_customer_id: customerId,
     }),
   };
@@ -319,7 +319,7 @@ export const generateUserIdToken = async (
 export const createVaultSetupToken = async (request: SetupTokenRequest) => {
   const gateway = await getPayPalSetupTokenGateway(2000);
   const response = await gateway.setupTokensCreate(
-    'application/json',
+    "application/json",
     randomUUID(),
     request
   );
@@ -329,7 +329,7 @@ export const createVaultSetupToken = async (request: SetupTokenRequest) => {
 export const createPaymentToken = async (request: PaymentTokenRequest) => {
   const gateway = await getPayPalPaymentTokenGateway(2000);
   const response = await gateway.paymentTokensCreate(
-    'application/json',
+    "application/json",
     randomUUID(),
     request
   );
@@ -340,11 +340,11 @@ export const deletePaymentToken = async (paymentTokenId: string) => {
   const gateway = await getPayPalPaymentTokenGateway(2000);
   const response = await gateway.paymentTokensDelete(
     paymentTokenId,
-    'application/json'
+    "application/json"
   );
   if (response.status === 204) {
     return {
-      status: 'success',
+      status: "success",
     };
   }
   return response.data;
@@ -353,7 +353,7 @@ export const deletePaymentToken = async (paymentTokenId: string) => {
 export const getPaymentTokens = async (customerId: string) => {
   const gateway = await getPayPalPaymentTokenGateway(2000);
   const response = await gateway.customerPaymentTokensGet(
-    'application/json',
+    "application/json",
     customerId
   );
   return response.data;
@@ -365,7 +365,7 @@ export const validateSignature = async (signature: VerifyWebhookSignature) => {
 };
 
 const getAPIEndpoint = () => {
-  return process.env.PAYPAL_ENVIRONMENT === 'Production'
+  return process.env.PAYPAL_ENVIRONMENT === "Production"
     ? PAYPAL_API_LIVE
     : PAYPAL_API_SANDBOX;
 };
@@ -373,7 +373,7 @@ const getAPIEndpoint = () => {
 export const createWebhook = async () => {
   const webhookId = await getWebhookId();
   if (webhookId) {
-    logger.info('existing webhook found, new webhook will not be created');
+    logger.info("existing webhook found, new webhook will not be created");
     return;
   }
   const gateway = await getPayPalWebhooksGateway();
@@ -381,7 +381,7 @@ export const createWebhook = async () => {
     url: await getWebhookUrl(),
     event_types: [
       {
-        name: '*',
+        name: "*",
       } as EventType,
     ],
   });
@@ -399,7 +399,7 @@ export const deleteWebhook = async () => {
     logger.info(`Webhook ${webhookId} is deleted`);
   } catch (e) {
     if (e instanceof AxiosError && e.response?.status === 404) {
-      logger.info('Webhook is already deleted');
+      logger.info("Webhook is already deleted");
     } else {
       throw e;
     }
@@ -409,7 +409,7 @@ export const deleteWebhook = async () => {
 export const getWebhookId = async () => {
   const webhookUrl = await getWebhookUrl();
   const gateway = await getPayPalWebhooksGateway();
-  const webhooks = await gateway.webhooksList('APPLICATION');
+  const webhooks = await gateway.webhooksList("APPLICATION");
   const webhook = webhooks.data.webhooks?.find(
     (webhook) => webhook.url === webhookUrl
   );
@@ -422,8 +422,8 @@ export const getWebhookUrl = async () => {
       process.env.CONNECT_SERVICE_URL ?? (await getPayPalExtensionUrl());
     return extensionUrl.replace(PAYPAL_EXTENSION_PATH, PAYPAL_WEBHOOKS_PATH);
   } catch (e) {
-    logger.info('no webhook url identified');
-    return '';
+    logger.info("no webhook url identified");
+    return "";
   }
 };
 
@@ -449,7 +449,7 @@ export const updateDeliveryData = async (
   );
   if (response.status === 204) {
     return {
-      status: 'success',
+      status: "success",
     };
   }
   return response.data;

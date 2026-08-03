@@ -8,45 +8,14 @@ import {
   TransactionState,
   TransactionType,
 } from '@commercetools/platform-sdk';
-import CustomError from '../errors/custom.error';
-import {
-  CheckoutPaymentIntent,
-  Order,
-  OrderAuthorizeRequest,
-  OrderCaptureRequest,
-  OrderRequest,
-  Patch,
-  PurchaseUnit,
-} from '../paypal/checkout_api';
-import {
-  Authorization2StatusEnum,
-  Capture2StatusEnum,
-  CaptureRequest,
-} from '../paypal/payments_api';
+
+import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
+import { getSettings } from './config.service';
 import {
   ClientTokenRequest,
   EntityResponse,
   PayPalSettings,
   UpdateActions,
-} from '../types/index.types';
-import { getCurrentTimestamp } from '../utils/data.utils';
-import {
-  mapCommercetoolsAddressToPayPalAddress,
-  mapCommercetoolsCarrierToPayPalCarrier,
-  mapCommercetoolsCartToPayPalPriceBreakdown,
-  mapValidCommercetoolsLineItemsToPayPalItems,
-  mapCommercetoolsMoneyToPayPalMoney,
-  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
-  mapPayPalCaptureStatusToCommercetoolsTransactionState,
-  mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
-  mapPayPalRefundStatusToCommercetoolsTransactionState,
-  resolveCommercetoolsCartShippingAddress,
-} from '../utils/map.utils';
-import { handleEntityActions, handleError } from '../utils/response.utils';
-import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
-import { getSettings } from './config.service';
-import {
   addDeliveryData,
   authorizePayPalOrder,
   capturePayPalAuthorization,
@@ -59,8 +28,31 @@ import {
   refundPayPalOrder,
   updateDeliveryData,
   updatePayPalOrder,
-} from './paypal.service';
-import customError from '../errors/custom.error';
+  mapCommercetoolsAddressToPayPalAddress,
+  mapCommercetoolsCarrierToPayPalCarrier,
+  mapCommercetoolsCartToPayPalPriceBreakdown,
+  mapCommercetoolsMoneyToPayPalMoney,
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
+  mapPayPalCaptureStatusToCommercetoolsTransactionState,
+  mapPayPalMoneyToCommercetoolsMoney,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
+  mapPayPalRefundStatusToCommercetoolsTransactionState,
+  mapValidCommercetoolsLineItemsToPayPalItems,
+  resolveCommercetoolsCartShippingAddress,
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
+  CaptureRequest,
+  CheckoutPaymentIntent,
+  CustomError,
+  Order,
+  OrderAuthorizeRequest,
+  OrderCaptureRequest,
+  OrderRequest,
+  Patch,
+  PurchaseUnit,
+} from 'common-connect/dist';
+import { handleEntityActions, handleError } from '../utils/response.utils';
+import { getCurrentTimestamp } from '../utils/data.utils';
 
 type PayPalTransaction = 'captures' | 'authorizations';
 
@@ -260,7 +252,7 @@ const actualTransactionStatus = (
     purchase_units
   );
   if (!relevantPayPalPayment)
-    throw new customError(500, 'No relevant PayPal payment found');
+    throw new CustomError(500, 'No relevant PayPal payment found');
   else
     return relevantTransactionType === 'authorizations'
       ? mapPayPalAuthorizationStatusToCommercetoolsTransactionState(

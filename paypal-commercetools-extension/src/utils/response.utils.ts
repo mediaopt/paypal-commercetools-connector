@@ -1,14 +1,14 @@
 import { AxiosError } from 'axios';
 import { PaymentUpdateAction } from '@commercetools/platform-sdk';
-import { ErrorDetails } from '../paypal/checkout_api';
+import { ErrorDetails } from 'common-connect/dist/paypal/checkout_api';
 import {
   EntityResponse,
   StringOrObject,
   UpdateActions,
-} from '../types/index.types';
+  logger,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+} from 'common-connect/dist';
 import { getCurrentTimestamp, stringifyData } from './data.utils';
-import { logger } from './logger.utils';
-import { PAYPAL_PAYMENT_INTERACTION_TYPE_KEY } from '../constants';
 
 const buildCustomFieldAction = (
   name: string,

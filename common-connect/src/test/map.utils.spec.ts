@@ -6,14 +6,14 @@ import {
   TypedMoney,
 } from '@commercetools/platform-sdk';
 import { describe, test } from '@jest/globals';
-import { RefundStatusEnum } from '../src/paypal/payments_api';
-import { UpdateActions } from '../src/types/index.types';
+import { RefundStatusEnum } from '../paypal/payments_api';
+import { UpdateActions } from '../types/index.types';
 
-jest.mock('../src/utils/logger.utils', () => ({
+jest.mock('../utils/logger.utils', () => ({
   logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
 }));
 
-import { logger } from '../src/utils/logger.utils';
+import { logger } from '../utils/logger.utils';
 import {
   isPaymentUpToDate,
   mapCommercetoolsAddressToPayPalAddress,
@@ -25,7 +25,7 @@ import {
   mapPayPalRefundStatusToCommercetoolsTransactionState,
   mapValidCommercetoolsLineItemsToPayPalItems,
   resolveCommercetoolsCartShippingAddress,
-} from '../src/utils/map.utils';
+} from '../utils/map.utils';
 import {
   cartFromCartData,
   CartGenerationData,
