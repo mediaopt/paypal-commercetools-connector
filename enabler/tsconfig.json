@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "outDir": "./dist/esm",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "typeRoots": [
+      "index.d.ts",
+      "node_modules/@types",
+      "node_modules/@testing-library"
+    ],
+    "types": ["node", "jest", "jest-dom"],
+    "paths": {
+      "paypal-commercetools-client": ["./node_modules/paypal-commercetools-client/dist/esm/index.d.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}
