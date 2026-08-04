@@ -7,13 +7,6 @@ deployAs:
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
-        - key: CTP_REGION
-          description: commercetools Composable Commerce API region
-        - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
-        - key: PAYPAL_ENVIRONMENT
-          description: PayPal environment (Sandbox or Production)
         - key: PAYMENT_TYPE_KEY
           description: key for commercetools custom type for payment
           default: paypal-payment-type
@@ -32,17 +25,6 @@ deployAs:
         - key: SMTP_SENDER
           description: SMTP Sender for sending pay upon invoice mail
       securedConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools Composable Commerce project key
-        - key: CTP_CLIENT_ID
-          description: commercetools Composable Commerce client ID
-        - key: CTP_CLIENT_SECRET
-          description: commercetools Composable Commerce client secret
-        - key: CTP_SCOPE
-          description: commercetools Composable Commerce client scope
-        - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
         - key: SMTP_PASSWORD
           description: SMTP Password for sending pay upon invoice mail
   - name: paypal-commercetools-custom-application
@@ -65,24 +47,25 @@ deployAs:
     scripts:
       postDeploy: npm install && npm run build && npm run connector:post-deploy
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
-    configuration:
-      standardConfiguration:
-        - key: CTP_REGION
-          description: commercetools Composable Commerce API region
-        - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
-        - key: PAYPAL_ENVIRONMENT
-          description: PayPal environment (Sandbox or Production)
-      securedConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools Composable Commerce project key
-        - key: CTP_CLIENT_ID
-          description: commercetools Composable Commerce client ID
-        - key: CTP_CLIENT_SECRET
-          description: commercetools Composable Commerce client secret
-        - key: CTP_SCOPE
-          description: commercetools Composable Commerce client scope
-        - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
+inheritAs:
+  configuration:
+    standardConfiguration:
+      - key: CTP_REGION
+        description: commercetools Composable Commerce API region
+      - key: PAYPAL_CLIENT_ID
+        description: PayPal Client Id
+        required: true
+      - key: PAYPAL_ENVIRONMENT
+        description: PayPal environment (Sandbox or Production)
+    securedConfiguration:
+      - key: CTP_PROJECT_KEY
+        description: commercetools Composable Commerce project key
+      - key: CTP_CLIENT_ID
+        description: commercetools Composable Commerce client ID
+      - key: CTP_CLIENT_SECRET
+        description: commercetools Composable Commerce client secret
+      - key: CTP_SCOPE
+        description: commercetools Composable Commerce client scope
+      - key: PAYPAL_CLIENT_SECRET
+        description: PayPal Client Secret
+        required: true
