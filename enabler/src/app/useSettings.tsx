@@ -13,8 +13,9 @@ import {
   SettingsProviderProps,
   GetUserInfoResponse,
   PaymentTokens,
+  RemovePaymentTokenRequest,
 } from "../types";
-import { getSettings, getUserInfo, removePaymentToken } from "../services";
+import { processorRequest } from "../services/processorRequest";
 import { useLoader } from "./useLoader";
 import { PARTNER_ATTRIBUTION_ID } from "../constants";
 import { useNotifications } from "./useNotifications";
@@ -54,20 +55,23 @@ export const SettingsProvider: FC<
       isLoading(true);
 
       if (getUserInfoUrl && !userIdToken) {
-        const { userIdToken, paymentTokens } = (await getUserInfo(
-          requestHeader,
-          getUserInfoUrl
-        )) as GetUserInfoResponse;
+        const { userIdToken, paymentTokens } = (await processorRequest<
+          undefined,
+          GetUserInfoResponse
+        >(requestHeader, getUserInfoUrl, undefined, "GET")) as GetUserInfoResponse;
 
         setPaymentTokens(paymentTokens);
         setUserIdToken(userIdToken);
       }
 
       if (getSettingsUrl && !settings) {
-        const getSettingsResult = (await getSettings(
-          requestHeader,
-          getSettingsUrl
-        )) as Record<any, any>;
+        const getSettingsResult = (await processorRequest<
+          undefined,
+          GetSettingsResponse
+        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<
+          any,
+          any
+        >;
 
         if (
           !getSettingsResult ||
@@ -84,10 +88,10 @@ export const SettingsProvider: FC<
     const handleRemovePaymentToken = async (paymentTokenId: string) => {
       isLoading(true);
       if (removePaymentTokenUrl) {
-        await removePaymentToken(
+        await processorRequest<RemovePaymentTokenRequest>(
           requestHeader,
           removePaymentTokenUrl,
-          paymentTokenId
+          { paymentTokenId }
         );
 
         if (paymentTokens) {

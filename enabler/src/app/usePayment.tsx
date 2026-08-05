@@ -15,32 +15,31 @@ import {
   CartInformationInitial,
   CreatePaymentResponse,
   RequestHeader,
+  ClientTokenRequest,
   ClientTokenResponse,
   CustomOnApproveData,
+  OnApproveRequest,
   OnApproveResponse,
   CustomOrderData,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  CreateVaultSetupTokenRequest,
+  CreateVaultSetupTokenResponse,
   ApproveVaultSetupTokenData,
+  ApproveVaultSetupTokenRequest,
+  ApproveVaultSetupTokenResponse,
   CreateInvoiceData,
   OrderDataLinks,
   OrderData,
 } from "../types";
-import {
-  createPayment,
-  createOrder,
-  onApprove,
-  createVaultSetupToken,
-  approveVaultSetupToken,
-  authenticateThreeDSOrder,
-} from "../services";
+import { processorRequest } from "../services/processorRequest";
 
 import { useLoader } from "./useLoader";
 import { useNotifications } from "./useNotifications";
 import { useSettings } from "./useSettings";
-import { getClientToken } from "../services/getClientToken";
-import { getActionIndex } from "../components/CardFields/constants";
+// import { getActionIndex } from "../components/CardFields/constants"; todo - restore all commented out code when enabling other payment methods
 import { useTranslation } from "react-i18next";
 import { handleResponseError } from "../messages/errorMessages";
-import { getOrder } from "../services/getOrder";
 
 const PaymentInfoInitialObject = {
   version: 0,
@@ -70,7 +69,7 @@ type PaymentContextT = {
   handleApproveVaultSetupToken: (
     data: ApproveVaultSetupTokenData
   ) => Promise<void>;
-  handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
+  // handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
   orderId?: string;
 };
 
@@ -101,7 +100,7 @@ const PaymentContext = createContext<PaymentContextT>({
     Promise.resolve(""),
   handleApproveVaultSetupToken: (data?: ApproveVaultSetupTokenData) =>
     Promise.resolve(),
-  handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
+  // handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
   orderDataLinks: undefined,
   orderId: undefined,
 });
@@ -175,11 +174,10 @@ export const PaymentProvider: FC<
     ) => {
       if (!createVaultSetupTokenUrl) return "";
 
-      const createVaultSetupTokenResult = await createVaultSetupToken(
-        requestHeader,
-        createVaultSetupTokenUrl,
-        paymentSource
-      );
+      const createVaultSetupTokenResult = await processorRequest<
+        CreateVaultSetupTokenRequest,
+        CreateVaultSetupTokenResponse
+      >(requestHeader, createVaultSetupTokenUrl, { paymentSource });
 
       return createVaultSetupTokenResult
         ? createVaultSetupTokenResult.createVaultSetupTokenResponse.id
@@ -190,11 +188,10 @@ export const PaymentProvider: FC<
     }: ApproveVaultSetupTokenData) => {
       if (!approveVaultSetupTokenUrl) return;
 
-      const result = await approveVaultSetupToken(
-        requestHeader,
-        approveVaultSetupTokenUrl,
-        vaultSetupToken
-      );
+      const result = await processorRequest<
+        ApproveVaultSetupTokenRequest,
+        ApproveVaultSetupTokenResponse
+      >(requestHeader, approveVaultSetupTokenUrl, { vaultSetupToken });
       if (result) {
         setShowResult(true);
         setResultSuccess(true);
@@ -214,15 +211,16 @@ export const PaymentProvider: FC<
         enableVaulting
       );
 
-      const createOrderResult = await createOrder(
-        requestHeader,
-        createOrderUrl,
-        paymentInfo.id,
-        latestPaymentVersion,
-        {
+      const createOrderResult = await processorRequest<
+        CreateOrderRequest,
+        CreateOrderResponse
+      >(requestHeader, createOrderUrl, {
+        paymentId: paymentInfo.id,
+        paymentVersion: latestPaymentVersion,
+        orderData: {
           ...relevantOrderData,
-        }
-      );
+        },
+      });
 
       if (
         !createOrderResult ||
@@ -267,6 +265,8 @@ export const PaymentProvider: FC<
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
           ) {
+            return "";
+            /*
             //@ts-ignore
             paypal
               .Googlepay()
@@ -300,7 +300,7 @@ export const PaymentProvider: FC<
                     }
                   }
                 );
-              });
+              });*/
           } else {
             return "";
           }
@@ -344,14 +344,15 @@ export const PaymentProvider: FC<
 
       if (!requestUrl) return;
 
-      const onApproveResult = await onApprove(
-        requestHeader,
-        requestUrl,
-        paymentInfo.id,
-        latestPaymentVersion,
+      const onApproveResult = await processorRequest<
+        OnApproveRequest,
+        OnApproveResponse
+      >(requestHeader, requestUrl, {
+        paymentId: paymentInfo.id,
+        paymentVersion: latestPaymentVersion,
         orderID,
-        saveCard
-      );
+        saveCard,
+      });
 
       //@ts-ignore
       if (onApproveResult.ok === false) {
@@ -379,12 +380,13 @@ export const PaymentProvider: FC<
       isLoading(true);
 
       if (createPaymentUrl) {
-        const createPaymentResult = (await createPayment(
-          requestHeader,
-          createPaymentUrl,
-          cartInformation,
-          shippingMethodId
-        )) as CreatePaymentResponse;
+        const createPaymentResult = await processorRequest<
+          {},
+          CreatePaymentResponse
+        >(requestHeader, createPaymentUrl, {
+          ...cartInformation,
+          shippingMethodId: shippingMethodId,
+        });
 
         if (!createPaymentResult) {
           isLoading(false);
@@ -394,13 +396,15 @@ export const PaymentProvider: FC<
 
         let paymentVersion: number = createPaymentResult.version;
         if (getClientTokenUrl) {
-          const clientTokenResult = (await getClientToken(
-            requestHeader,
-            getClientTokenUrl,
-            createPaymentResult.id,
-            createPaymentResult.version,
-            createPaymentResult.braintreeCustomerId
-          )) as ClientTokenResponse;
+          const clientTokenResult = (await processorRequest<
+            ClientTokenRequest,
+            ClientTokenResponse
+          >(requestHeader, getClientTokenUrl, {
+            paymentId: createPaymentResult.id,
+            paymentVersion: createPaymentResult.version,
+            braintreeCustomerId: createPaymentResult.braintreeCustomerId,
+            merchantAccountId: undefined,
+          })) as ClientTokenResponse;
           setClientToken(clientTokenResult.clientToken);
           paymentVersion = clientTokenResult.paymentVersion;
         }
@@ -425,43 +429,53 @@ export const PaymentProvider: FC<
       createVaultSetupTokenUrl && approveVaultSetupTokenUrl
     );
 
-    const handleAuthenticateThreeDSOrder = async (
-      orderID: string,
-      isGPay?: boolean
-    ): Promise<number> => {
-      if (!authenticateThreeDSOrderUrl) {
-        return 0;
-      }
-      const result = await authenticateThreeDSOrder(
-        requestHeader,
-        authenticateThreeDSOrderUrl,
-        orderID,
-        latestPaymentVersion,
-        paymentInfo.id,
-        isGPay
-      );
-
-      if (!result) {
-        return 0;
-      }
-
-      latestPaymentVersion = result.version;
-
-      if (!result.hasOwnProperty("approve")) {
-        if (isGPay) {
-          return 1;
-        } else {
-          return 2;
-        }
-      }
-
-      const action = getActionIndex(
-        result.approve.three_d_secure.enrollment_status || "",
-        result.approve.three_d_secure.authentication_status || "",
-        result.approve.liability_shift || ""
-      );
-      return settings?.threeDSAction[action];
-    };
+    // const handleAuthenticateThreeDSOrder = async (
+    //   orderID: string,
+    //   isGPay?: boolean
+    // ): Promise<number> => {
+    //   if (!authenticateThreeDSOrderUrl) {
+    //     return 0;
+    //   }
+    //   const result = await processorRequest<
+    //     Record<string, string | number | boolean>,
+    //     {
+    //       version: number;
+    //       approve: {
+    //         liability_shift: string;
+    //         three_d_secure: {
+    //           enrollment_status: string;
+    //           authentication_status: string;
+    //         };
+    //       };
+    //     }
+    //   >(requestHeader, authenticateThreeDSOrderUrl, {
+    //     orderID,
+    //     paymentVersion: latestPaymentVersion,
+    //     paymentId: paymentInfo.id,
+    //     isGPay: isGPay ?? false,
+    //   });
+    //
+    //   if (!result) {
+    //     return 0;
+    //   }
+    //
+    //   latestPaymentVersion = result.version;
+    //
+    //   if (!result.hasOwnProperty("approve")) {
+    //     if (isGPay) {
+    //       return 1;
+    //     } else {
+    //       return 2;
+    //     }
+    //   }
+    //
+    //   const action = getActionIndex(
+    //     result.approve.three_d_secure.enrollment_status || "",
+    //     result.approve.three_d_secure.authentication_status || "",
+    //     result.approve.liability_shift || ""
+    //   );
+    //   return settings?.threeDSAction[action];
+    // };
 
     return {
       setSuccess,
@@ -474,7 +488,7 @@ export const PaymentProvider: FC<
       vaultOnly,
       handleCreateVaultSetupToken,
       handleApproveVaultSetupToken,
-      handleAuthenticateThreeDSOrder,
+      // handleAuthenticateThreeDSOrder,
       orderDataLinks,
       orderId,
     };
