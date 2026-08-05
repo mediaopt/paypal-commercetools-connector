@@ -11,7 +11,7 @@ import {
   StoredPaymentMethod,
 } from "./interfaces/stored";
 import { BaseOptions } from "./interfaces/baseOptions";
-import { PayPalComponentBuilder } from "../components/Builder/PayPalBuilder";
+import { PayPalComponentBuilder } from "../components/PayPalBuilder";
 import { sessionHeader } from "../helpers/sessionHeader";
 
 export type PayPalPaymentMethodType =
@@ -35,7 +35,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   }
 
   private static _Setup = async (
-    options: EnablerOptions,
+    options: EnablerOptions
   ): Promise<{ baseOptions: BaseOptions }> => {
     console.log(
       "[paypal-enabler] processorUrl:",
@@ -50,9 +50,8 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       {
         method: "GET",
         headers: sessionHeader(options.sessionId),
-      },
+      }
     );
-    console.log("[paypal-enabler] configResponse:", configResponse);
 
     if (!configResponse.ok) {
       throw new Error("Could not fetch config");
@@ -64,7 +63,8 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       baseOptions: {
         processorUrl: options.processorUrl,
         sessionId: options.sessionId,
-        storedPaymentMethodsEnabled: !!configJson.storedPaymentMethodsConfig?.isEnabled,
+        storedPaymentMethodsEnabled:
+          !!configJson.storedPaymentMethodsConfig?.isEnabled,
         enableVaulting: !!configJson.enableVaulting,
         purchaseCallback:
           configJson.purchaseCallback ||
@@ -77,25 +77,27 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   };
 
   async createComponentBuilder(
-    type: string,
+    type: string
   ): Promise<PaymentComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
     return Promise.resolve(new PayPalComponentBuilder(type, baseOptions));
   }
 
-  async createDropinBuilder(type: DropinType): Promise<PaymentDropinBuilder | never> {
+  async createDropinBuilder(
+    type: DropinType
+  ): Promise<PaymentDropinBuilder | never> {
     throw new Error(`Drop-in builder is not supported for PayPal`);
   }
 
   async createExpressBuilder(
-    type: string,
+    type: string
   ): Promise<PaymentComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
     return Promise.resolve(new PayPalComponentBuilder(type, baseOptions));
   }
 
   async createStoredPaymentMethodBuilder(
-    type: string,
+    type: string
   ): Promise<StoredComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
 
@@ -115,7 +117,10 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
     const { baseOptions } = await this.setupData;
-    const url = `${baseOptions.processorUrl.replace(/\/$/, "")}/stored-payment-methods`;
+    const url = `${baseOptions.processorUrl.replace(
+      /\/$/,
+      ""
+    )}/stored-payment-methods`;
     const response = await fetch(url, {
       method: "GET",
       headers: sessionHeader(baseOptions.sessionId),
@@ -124,9 +129,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       return {};
     }
     const data = await response.json();
-    const methods: StoredPaymentMethod[] = (data.storedPaymentMethods ?? []).filter(
-      (m: StoredPaymentMethod) => allowedMethodTypes.includes(m.type),
-    );
+    const methods: StoredPaymentMethod[] = (
+      data.storedPaymentMethods ?? []
+    ).filter((m: StoredPaymentMethod) => allowedMethodTypes.includes(m.type));
     return { storedPaymentMethods: methods };
   }
 

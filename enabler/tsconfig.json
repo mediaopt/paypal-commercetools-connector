@@ -22,7 +22,7 @@
     ],
     "types": ["node", "jest", "jest-dom"],
     "paths": {
-      "paypal-commercetools-client": ["./node_modules/paypal-commercetools-client/dist/esm/index.d.ts"]
+      "@paypal/paypal-js/types/components/funding-eligibility": ["./node_modules/@paypal/paypal-js/types/components/funding-eligibility.d.ts"]
     }
   },
   "include": ["src"],

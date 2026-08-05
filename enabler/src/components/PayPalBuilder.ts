@@ -5,11 +5,11 @@ import {
   ComponentOptions,
   PaymentComponent,
   PaymentComponentBuilder,
-} from "../../payment-enabler/interfaces/enabler";
-import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
-import { ValidationHandlers } from "../../types";
-import { RenderTemplate } from "../RenderTemplate";
-import { processorUrls } from "../constants";
+} from "../payment-enabler/interfaces/enabler";
+import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
+import { ValidationHandlers } from "../types";
+import { processorUrls } from "./constants";
+import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
 
 class PayPalComponent implements PaymentComponent {
   private root: Root | null = null;
@@ -34,7 +34,8 @@ class PayPalComponent implements PaymentComponent {
 
     const scriptOptions: ReactPayPalScriptOptions = {
       clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "",
-      currency: "USD",
+      currency: "EUR",
+      components: "buttons,card-fields",
       // Add other required options as needed
     };
 
