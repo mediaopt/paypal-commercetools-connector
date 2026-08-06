@@ -36,16 +36,25 @@ export function getPayPalComponent(type: string): ComponentType<any> {
 type RenderTemplateProps = {
   paymentMethodType: string;
   customOptions: Record<string, unknown>;
+  builderType?: string;
+  processorUrl?: string;
 };
 
 export const RenderTemplate: FC<RenderTemplateProps> = ({
   paymentMethodType,
   customOptions,
+  builderType,
+  processorUrl,
 }) => {
   const ComponentClass = getPayPalComponent(paymentMethodType);
   return (
     <RenderPurchase>
-      {createElement(ComponentClass, customOptions)}
+      {createElement(ComponentClass, {
+        ...customOptions,
+        paymentMethodType,
+        builderType,
+        processorUrl,
+      })}
     </RenderPurchase>
   );
 };

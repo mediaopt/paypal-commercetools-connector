@@ -25,6 +25,9 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
   cartInformation,
   purchaseCallback,
   enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
 
   ...restProps
 }) => {
@@ -46,6 +49,9 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
       createVaultSetupTokenUrl={createVaultSetupTokenUrl}
       approveVaultSetupTokenUrl={approveVaultSetupTokenUrl}
       onApproveRedirectionUrl={onApproveRedirectionUrl}
+      paymentMethodType={paymentMethodType}
+      builderType={builderType}
+      processorUrl={processorUrl}
     >
       <PayPalButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>

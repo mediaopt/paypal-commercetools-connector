@@ -8,7 +8,6 @@ import {
 } from "../payment-enabler/interfaces/enabler";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 import { ValidationHandlers } from "../types";
-import { processorUrls } from "./constants";
 import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
 
 class PayPalComponent implements PaymentComponent {
@@ -21,7 +20,8 @@ class PayPalComponent implements PaymentComponent {
   constructor(
     private componentType: string,
     private baseOptions: BaseOptions,
-    private config: ComponentOptions
+    private config: ComponentOptions,
+    private builderType?: string
   ) {}
 
   async mount(selector: string): Promise<void> {
@@ -44,7 +44,6 @@ class PayPalComponent implements PaymentComponent {
       requestHeader: {
         "X-Session-Id": this.baseOptions.sessionId,
       },
-      ...processorUrls(this.baseOptions.processorUrl),
       shippingMethodId: "standard",
       purchaseCallback: this.baseOptions.purchaseCallback,
       enableVaulting: this.baseOptions.enableVaulting ?? false,
@@ -66,6 +65,8 @@ class PayPalComponent implements PaymentComponent {
     this.root.render(
       createElement(RenderTemplate, {
         paymentMethodType: this.componentType,
+        builderType: this.builderType,
+        processorUrl: this.baseOptions.processorUrl,
         customOptions,
       })
     );
@@ -106,10 +107,16 @@ export class PayPalComponentBuilder implements PaymentComponentBuilder {
 
   constructor(
     private componentType: string,
-    private baseOptions: BaseOptions
+    private baseOptions: BaseOptions,
+    private builderType?: string
   ) {}
 
   build(config: ComponentOptions): PaymentComponent {
-    return new PayPalComponent(this.componentType, this.baseOptions, config);
+    return new PayPalComponent(
+      this.componentType,
+      this.baseOptions,
+      config,
+      this.builderType
+    );
   }
 }

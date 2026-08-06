@@ -21,6 +21,9 @@ export const PaymentTokens: React.FC<SmartComponentsProps> = ({
   cartInformation,
   purchaseCallback,
   enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
 }) => {
   return (
     <PayPalContextProvider
@@ -37,6 +40,9 @@ export const PaymentTokens: React.FC<SmartComponentsProps> = ({
       getUserInfoUrl={getUserInfoUrl}
       enableVaulting={enableVaulting}
       removePaymentTokenUrl={removePaymentTokenUrl}
+      paymentMethodType={paymentMethodType}
+      builderType={builderType}
+      processorUrl={processorUrl}
     >
       <PaymentTokensList />
     </PayPalContextProvider>

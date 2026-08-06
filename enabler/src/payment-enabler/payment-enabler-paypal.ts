@@ -93,7 +93,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     type: string
   ): Promise<PaymentComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
-    return Promise.resolve(new PayPalComponentBuilder(type, baseOptions));
+    return Promise.resolve(
+      new PayPalComponentBuilder(type, baseOptions, "express")
+    );
   }
 
   async createStoredPaymentMethodBuilder(

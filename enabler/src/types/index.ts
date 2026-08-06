@@ -98,29 +98,51 @@ export type LoadingOverlayType = {
 
 export type RequestHeader = { [key: string]: string };
 
-export type GeneralComponentsProps = {
+/** Category 1 — basic data every payment component needs. */
+export type BasicComponentProps = {
   options: ReactPayPalScriptOptions;
   requestHeader: RequestHeader;
+  enableVaulting?: boolean;
+};
 
+/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`. */
+export type LegacyEndpointUrlProps = {
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createPaymentUrl: string;
-  getSettingsUrl: string;
-  createOrderUrl?: string;
-  getOrderUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   onApproveUrl?: string;
-  onApproveRedirectionUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   authorizeOrderUrl?: string;
-  getUserInfoUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   removePaymentTokenUrl?: string;
-  authenticateThreeDSOrderUrl?: string;
+};
 
+/** Category 3 — Checkout-only fields, no standalone-client equivalent. */
+export type CheckoutOnlyProps = {
+  paymentMethodType?: string;
+  builderType?: BuilderType;
+  processorUrl?: string;
+};
+
+/** Category 4 — legacy fields with no `processorUrl` migration path (yet). */
+export type LegacyOnlyProps = {
+  purchaseCallback: (result: any, options?: any) => void;
+  shippingMethodId: string;
+  createOrderUrl?: string;
+  authenticateThreeDSOrderUrl?: string;
+  getSettingsUrl: string;
+  getOrderUrl?: string;
+  onApproveRedirectionUrl?: string;
+  getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;
   approveVaultSetupTokenUrl?: string;
-
-  shippingMethodId: string;
-  purchaseCallback: (result: any, options?: any) => void;
   getClientTokenUrl?: string;
-  enableVaulting?: boolean;
 } & CartInformationProps;
+
+export type GeneralComponentsProps = BasicComponentProps &
+  LegacyEndpointUrlProps &
+  CheckoutOnlyProps &
+  LegacyOnlyProps;
 
 export type ThreeDSVerification = "SCA_ALWAYS" | "SCA_WHEN_REQUIRED";
 
@@ -128,14 +150,12 @@ export type HostedFieldsThreeDSAuth = {
   threeDSAuth?: ThreeDSVerification;
 };
 
-export type HostedFieldsProps = {
-  options: ReactPayPalScriptOptions;
-  enableVaulting?: boolean;
-};
+export type HostedFieldsProps = Pick<
+  BasicComponentProps,
+  "options" | "enableVaulting"
+>;
 
-export type CardFieldsProps = {
-  enableVaulting?: boolean;
-};
+export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting">;
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
   HostedFieldsThreeDSAuth;
@@ -163,8 +183,7 @@ export type PayUponInvoiceProps = ratepayPaymentRestrictions & {
 
 export type PayUponInvoiceMaskProps = {
   fraudNetSessionId: string;
-  invoiceBenefitsMessage?: string;
-};
+} & Pick<PayUponInvoiceProps, "invoiceBenefitsMessage">;
 
 export type PayUponInvoiceButtonProps = ratepayPaymentRestrictions &
   PayUponInvoiceMaskProps;
@@ -181,8 +200,7 @@ export type CustomPayPalButtonsComponentProps = Omit<
   | "onInit"
 > & {
   paypalMessages?: PayPalMessagesComponentProps;
-  enableVaulting?: boolean;
-};
+} & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
   GeneralComponentsProps;
@@ -434,13 +452,14 @@ export type CustomOrderData = CreatePayPalOrderData & {
   googlePayData?: GooglePayDataType;
 };
 
-export type SettingsProviderProps = {
-  getSettingsUrl: string;
-  getUserInfoUrl?: string;
-  requestHeader: RequestHeader;
-  options: ReactPayPalScriptOptions;
-  removePaymentTokenUrl?: string;
-};
+export type SettingsProviderProps = Pick<
+  GeneralComponentsProps,
+  | "requestHeader"
+  | "options"
+  | "getSettingsUrl"
+  | "getUserInfoUrl"
+  | "removePaymentTokenUrl"
+>;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };
 

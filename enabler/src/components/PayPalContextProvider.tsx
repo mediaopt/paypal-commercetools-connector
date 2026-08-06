@@ -34,6 +34,9 @@ export const PayPalContextProvider: FC<
   shippingMethodId,
   cartInformation,
   enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
 
   children,
 }) => {
@@ -65,6 +68,9 @@ export const PayPalContextProvider: FC<
             approveVaultSetupTokenUrl={approveVaultSetupTokenUrl}
             onApproveRedirectionUrl={onApproveRedirectionUrl}
             authenticateThreeDSOrderUrl={authenticateThreeDSOrderUrl}
+            paymentMethodType={paymentMethodType}
+            builderType={builderType}
+            processorUrl={processorUrl}
           >
             <RenderPurchase>{children}</RenderPurchase>
           </PaymentProvider>
