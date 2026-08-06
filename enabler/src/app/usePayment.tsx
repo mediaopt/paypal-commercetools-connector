@@ -56,7 +56,6 @@ const PaymentInfoInitialObject = {
 };
 
 type PaymentContextT = {
-  setSuccess: () => void;
   paymentInfo: PaymentInfo;
   requestHeader: RequestHeader;
   clientToken: string;
@@ -89,7 +88,6 @@ const setRelevantData = (
 };
 
 const PaymentContext = createContext<PaymentContextT>({
-  setSuccess: () => {},
   paymentInfo: PaymentInfoInitialObject,
   requestHeader: {},
   clientToken: "",
@@ -176,174 +174,167 @@ export const PaymentProvider: FC<
 
     const initPayment = async () => {
       isLoading(true);
-
-      let createPaymentRequestUrl: string;
       try {
-        createPaymentRequestUrl = resolveEndpointUrl(
+        const createPaymentRequestUrl = resolveEndpointUrl(
           derivedUrls.createPaymentUrl,
           createPaymentUrl,
-          "createPaymentUrl"
+          "createPaymentUrl",
+          t
         );
-      } catch {
+
+        const createPaymentResult = await processorRequest<
+          {},
+          CreatePaymentResponse
+        >(requestHeader, createPaymentRequestUrl, {
+          ...cartInformation,
+          shippingMethodId: shippingMethodId,
+          paymentMethodType,
+          builderType,
+        });
+
+        if (!createPaymentResult) {
+          throw new Error(t("payPal.generalError"));
+        }
+
+        let paymentVersion: number = createPaymentResult.version;
+        if (getClientTokenUrl) {
+          const clientTokenResult = (await processorRequest<
+            ClientTokenRequest,
+            ClientTokenResponse
+          >(requestHeader, getClientTokenUrl, {
+            paymentId: createPaymentResult.id,
+            paymentVersion: createPaymentResult.version,
+            braintreeCustomerId: createPaymentResult.braintreeCustomerId,
+            merchantAccountId: undefined,
+          })) as ClientTokenResponse;
+          setClientToken(clientTokenResult.clientToken);
+          paymentVersion = clientTokenResult.paymentVersion;
+        }
+
+        const { amountPlanned, lineItems, shippingMethod } =
+          createPaymentResult;
+
+        console.log(createPaymentResult);
+
+        setPaymentInfo({
+          id: createPaymentResult.id,
+          version: paymentVersion,
+          amount: amountPlanned.centAmount / 100,
+          currency: amountPlanned.currencyCode,
+          lineItems: lineItems,
+          shippingMethod: shippingMethod,
+          cartInformation: cartInformation,
+        });
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
+      } finally {
         isLoading(false);
-        notify("Error", "something went wrong");
-        return;
       }
-
-      const createPaymentResult = await processorRequest<
-        {},
-        CreatePaymentResponse
-      >(requestHeader, createPaymentRequestUrl, {
-        ...cartInformation,
-        shippingMethodId: shippingMethodId,
-        paymentMethodType,
-        builderType,
-      });
-
-      if (!createPaymentResult) {
-        isLoading(false);
-        notify("Error", "There is an error in creating payment!");
-        return;
-      }
-
-      let paymentVersion: number = createPaymentResult.version;
-      if (getClientTokenUrl) {
-        const clientTokenResult = (await processorRequest<
-          ClientTokenRequest,
-          ClientTokenResponse
-        >(requestHeader, getClientTokenUrl, {
-          paymentId: createPaymentResult.id,
-          paymentVersion: createPaymentResult.version,
-          braintreeCustomerId: createPaymentResult.braintreeCustomerId,
-          merchantAccountId: undefined,
-        })) as ClientTokenResponse;
-        setClientToken(clientTokenResult.clientToken);
-        paymentVersion = clientTokenResult.paymentVersion;
-      }
-
-      const { amountPlanned, lineItems, shippingMethod } = createPaymentResult;
-
-      setPaymentInfo({
-        id: createPaymentResult.id,
-        version: paymentVersion,
-        amount: amountPlanned.centAmount / 100,
-        currency: amountPlanned.currencyCode,
-        lineItems: lineItems,
-        shippingMethod: shippingMethod,
-        cartInformation: cartInformation,
-      });
-      isLoading(false);
     };
     initPayment();
   }, []);
 
   const value = useMemo(() => {
-    const setSuccess = () => {
-      setResultSuccess(true);
-      setShowResult(true);
-      setResultMessage("Test success successful");
-    };
-
     const handleCreateVaultSetupToken = async (
       paymentSource: FUNDING_SOURCE
     ) => {
-      let requestUrl: string;
       try {
-        requestUrl = resolveEndpointUrl(
+        const requestUrl = resolveEndpointUrl(
           undefined,
           createVaultSetupTokenUrl,
-          "createVaultSetupTokenUrl"
+          "createVaultSetupTokenUrl",
+          t
         );
-      } catch {
-        notify("Error", "something went wrong");
+
+        const createVaultSetupTokenResult = await processorRequest<
+          CreateVaultSetupTokenRequest,
+          CreateVaultSetupTokenResponse
+        >(requestHeader, requestUrl, { paymentSource });
+
+        return createVaultSetupTokenResult
+          ? createVaultSetupTokenResult.createVaultSetupTokenResponse.id
+          : "";
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
         return "";
       }
-
-      const createVaultSetupTokenResult = await processorRequest<
-        CreateVaultSetupTokenRequest,
-        CreateVaultSetupTokenResponse
-      >(requestHeader, requestUrl, { paymentSource });
-
-      return createVaultSetupTokenResult
-        ? createVaultSetupTokenResult.createVaultSetupTokenResponse.id
-        : "";
     };
     const handleApproveVaultSetupToken = async ({
       vaultSetupToken,
     }: ApproveVaultSetupTokenData) => {
-      let requestUrl: string;
       try {
-        requestUrl = resolveEndpointUrl(
+        const requestUrl = resolveEndpointUrl(
           undefined,
           approveVaultSetupTokenUrl,
-          "approveVaultSetupTokenUrl"
+          "approveVaultSetupTokenUrl",
+          t
         );
-      } catch {
-        notify("Error", "something went wrong");
-        return;
-      }
 
-      const result = await processorRequest<
-        ApproveVaultSetupTokenRequest,
-        ApproveVaultSetupTokenResponse
-      >(requestHeader, requestUrl, { vaultSetupToken });
-      if (result) {
-        setShowResult(true);
-        setResultSuccess(true);
-        purchaseCallback(result);
-      } else {
-        setShowResult(true);
-        setResultSuccess(false);
+        const result = await processorRequest<
+          ApproveVaultSetupTokenRequest,
+          ApproveVaultSetupTokenResponse
+        >(requestHeader, requestUrl, { vaultSetupToken });
+        if (result) {
+          setShowResult(true);
+          setResultSuccess(true);
+          purchaseCallback(result);
+        } else {
+          setShowResult(true);
+          setResultSuccess(false);
+        }
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
       }
     };
 
     const handleCreateOrder = async (orderData?: CustomOrderData) => {
-      let createOrderRequestUrl: string;
+      const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
       try {
-        createOrderRequestUrl = resolveEndpointUrl(
+        const createOrderRequestUrl = resolveEndpointUrl(
           derivedUrls.createOrderUrl,
           createOrderUrl,
-          "createOrderUrl"
+          "createOrderUrl",
+          t
         );
-      } catch {
-        notify("Error", "something went wrong");
-        isLoading(false);
-        return "";
-      }
 
-      const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
-      const relevantOrderData = setRelevantData(
-        orderData,
-        !!setRatepayMessage,
-        enableVaulting
-      );
+        const relevantOrderData = setRelevantData(
+          orderData,
+          !!setRatepayMessage,
+          enableVaulting
+        );
 
-      const createOrderResult = await processorRequest<
-        CreateOrderRequest,
-        CreateOrderResponse
-      >(requestHeader, createOrderRequestUrl, {
-        paymentId: paymentInfo.id,
-        paymentVersion: latestPaymentVersion,
-        orderData: {
-          ...relevantOrderData,
-        },
-      });
+        const createOrderResult = await processorRequest<
+          CreateOrderRequest,
+          CreateOrderResponse
+        >(requestHeader, createOrderRequestUrl, {
+          paymentId: paymentInfo.id,
+          paymentVersion: latestPaymentVersion,
+          orderData: {
+            ...relevantOrderData,
+          },
+        });
 
-      if (
-        !createOrderResult ||
-        (createOrderResult && createOrderResult.ok === false)
-      ) {
-        notify("Error", "something went wrong");
-        isLoading(false);
-        return "";
-      }
+        if (
+          !createOrderResult ||
+          (createOrderResult && createOrderResult.ok === false)
+        ) {
+          throw new Error(t("interface.generalError"));
+        }
 
-      const oldOrderData = orderData;
+        const oldOrderData = orderData;
 
-      if (createOrderResult) {
-        const { orderData, paymentVersion } = createOrderResult;
+        const { orderData: newOrderData, paymentVersion } = createOrderResult;
         const { id, status, payment_source, details, links, message } =
-          orderData;
+          newOrderData;
         latestPaymentVersion = paymentVersion;
 
         if (!id) {
@@ -359,14 +350,14 @@ export const PaymentProvider: FC<
         } else if (oldOrderData?.googlePayData) {
           //@ts-ignore
           const confirmOrderResult = await paypal.Googlepay().confirmOrder({
-            orderId: orderData.id,
+            orderId: newOrderData.id,
             paymentMethodData:
               oldOrderData.googlePayData.paymentData.paymentMethodData,
           });
           const { status } = confirmOrderResult;
           if (status === "APPROVED") {
-            handleOnApprove({ orderID: orderData.id }).then(() =>
-              onSuccess(orderData)
+            handleOnApprove({ orderID: newOrderData.id }).then(() =>
+              onSuccess(newOrderData)
             );
           } else if (
             oldOrderData?.googlePayData &&
@@ -414,10 +405,10 @@ export const PaymentProvider: FC<
         } else {
           if (setRatepayMessage) {
             setRatepayMessage && setRatepayMessage(undefined);
-            onSuccess(orderData);
+            onSuccess(newOrderData);
           } else {
             if (status === "COMPLETED" && payment_source) {
-              onSuccess(orderData);
+              onSuccess(newOrderData);
             } else if (
               status === "PAYER_ACTION_REQUIRED" &&
               payment_source &&
@@ -429,7 +420,14 @@ export const PaymentProvider: FC<
           }
         }
         return id;
-      } else return "";
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
+        isLoading(false);
+        return "";
+      }
     };
 
     const handleOnApprove = async (data: CustomOnApproveData) => {
@@ -441,55 +439,56 @@ export const PaymentProvider: FC<
         return;
       }
 
-      let requestUrl: string;
       try {
-        requestUrl =
+        const requestUrl =
           settings?.payPalIntent === "Authorize"
             ? resolveEndpointUrl(
                 derivedUrls.authorizeOrderUrl,
                 authorizeOrderUrl,
-                "authorizeOrderUrl"
+                "authorizeOrderUrl",
+                t
               )
             : resolveEndpointUrl(
                 derivedUrls.onApproveUrl,
                 onApproveUrl,
-                "onApproveUrl"
+                "onApproveUrl",
+                t
               );
-      } catch {
-        isLoading(false);
-        notify("Error", "something went wrong");
-        return;
-      }
 
-      const onApproveResult = await processorRequest<
-        OnApproveRequest,
-        OnApproveResponse
-      >(requestHeader, requestUrl, {
-        paymentId: paymentInfo.id,
-        paymentVersion: latestPaymentVersion,
-        orderID,
-        saveCard,
-      });
+        const onApproveResult = await processorRequest<
+          OnApproveRequest,
+          OnApproveResponse
+        >(requestHeader, requestUrl, {
+          paymentId: paymentInfo.id,
+          paymentVersion: latestPaymentVersion,
+          orderID,
+          saveCard,
+        });
 
-      //@ts-ignore
-      if (onApproveResult.ok === false) {
-        isLoading(false);
-        notify("Error", "There was an error completing the payment");
-        return;
-      }
-      const { orderData } = onApproveResult as OnApproveResponse;
-      if (orderData.status === "COMPLETED") {
-        setShowResult(true);
-        setResultSuccess(true);
-        purchaseCallback(onApproveResult);
-      } else {
-        setShowResult(true);
-        setResultSuccess(false);
-        if (orderData) {
-          setResultMessage(orderData.message);
+        //@ts-ignore
+        if (onApproveResult.ok === false) {
+          throw new Error(t("payPal.generalError"));
         }
+        const { orderData } = onApproveResult as OnApproveResponse;
+        if (orderData.status === "COMPLETED") {
+          setShowResult(true);
+          setResultSuccess(true);
+          purchaseCallback(onApproveResult);
+        } else {
+          setShowResult(true);
+          setResultSuccess(false);
+          if (orderData) {
+            setResultMessage(orderData.message);
+          }
+        }
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
+      } finally {
+        isLoading(false);
       }
-      isLoading(false);
     };
 
     // const handleAuthenticateThreeDSOrder = async (
@@ -541,7 +540,6 @@ export const PaymentProvider: FC<
     // };
 
     return {
-      setSuccess,
       requestHeader,
       paymentInfo,
       clientToken,

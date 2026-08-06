@@ -36,7 +36,7 @@ i18n.use(initReactI18next).init({
         payPal: {
           paymentSourceNotVerified:
             "Your address could not be validated. Please correct your data and try again.",
-          unknownIssue:
+          generalError:
             "Something went wrong. Please check your data and try again.",
         },
       },
@@ -72,7 +72,7 @@ i18n.use(initReactI18next).init({
         payPal: {
           paymentSourceNotVerified:
             "Ihre Adresse konnte nicht validiert werden. Bitte korrigieren Sie Ihre Daten und versuchen Sie es erneut.",
-          unknownIssue:
+          generalError:
             "Etwas ist schief gelaufen. Bitte überprüfen Sie Ihre Daten und versuchen Sie es erneut.",
         },
       },
