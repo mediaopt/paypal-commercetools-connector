@@ -59,7 +59,6 @@ type PaymentContextT = {
   setSuccess: () => void;
   paymentInfo: PaymentInfo;
   requestHeader: RequestHeader;
-  handleCreatePayment: () => Promise<void>;
   clientToken: string;
   handleCreateOrder: (orderData?: CustomOrderData) => Promise<string>;
   handleOnApprove: (data: CustomOnApproveData) => Promise<void>;
@@ -93,7 +92,6 @@ const PaymentContext = createContext<PaymentContextT>({
   setSuccess: () => {},
   paymentInfo: PaymentInfoInitialObject,
   requestHeader: {},
-  handleCreatePayment: () => Promise.resolve(),
   clientToken: "",
   handleCreateOrder: (orderData?: CustomOrderData) => Promise.resolve(""),
   handleOnApprove: () => Promise.resolve(),
@@ -166,11 +164,80 @@ export const PaymentProvider: FC<
     }
   }, [showResult]);
 
-  const value = useMemo(() => {
-    const derivedUrls: Partial<ReturnType<typeof processorUrls>> = processorUrl
-      ? processorUrls(processorUrl)
-      : {};
+  const derivedUrls: Partial<ReturnType<typeof processorUrls>> = processorUrl
+    ? processorUrls(processorUrl)
+    : {};
+  const vaultOnly: boolean = !!(
+    createVaultSetupTokenUrl && approveVaultSetupTokenUrl
+  );
 
+  useEffect(() => {
+    if (vaultOnly) return;
+
+    const initPayment = async () => {
+      isLoading(true);
+
+      let createPaymentRequestUrl: string;
+      try {
+        createPaymentRequestUrl = resolveEndpointUrl(
+          derivedUrls.createPaymentUrl,
+          createPaymentUrl,
+          "createPaymentUrl"
+        );
+      } catch {
+        isLoading(false);
+        notify("Error", "something went wrong");
+        return;
+      }
+
+      const createPaymentResult = await processorRequest<
+        {},
+        CreatePaymentResponse
+      >(requestHeader, createPaymentRequestUrl, {
+        ...cartInformation,
+        shippingMethodId: shippingMethodId,
+        paymentMethodType,
+        builderType,
+      });
+
+      if (!createPaymentResult) {
+        isLoading(false);
+        notify("Error", "There is an error in creating payment!");
+        return;
+      }
+
+      let paymentVersion: number = createPaymentResult.version;
+      if (getClientTokenUrl) {
+        const clientTokenResult = (await processorRequest<
+          ClientTokenRequest,
+          ClientTokenResponse
+        >(requestHeader, getClientTokenUrl, {
+          paymentId: createPaymentResult.id,
+          paymentVersion: createPaymentResult.version,
+          braintreeCustomerId: createPaymentResult.braintreeCustomerId,
+          merchantAccountId: undefined,
+        })) as ClientTokenResponse;
+        setClientToken(clientTokenResult.clientToken);
+        paymentVersion = clientTokenResult.paymentVersion;
+      }
+
+      const { amountPlanned, lineItems, shippingMethod } = createPaymentResult;
+
+      setPaymentInfo({
+        id: createPaymentResult.id,
+        version: paymentVersion,
+        amount: amountPlanned.centAmount / 100,
+        currency: amountPlanned.currencyCode,
+        lineItems: lineItems,
+        shippingMethod: shippingMethod,
+        cartInformation: cartInformation,
+      });
+      isLoading(false);
+    };
+    initPayment();
+  }, []);
+
+  const value = useMemo(() => {
     const setSuccess = () => {
       setResultSuccess(true);
       setShowResult(true);
@@ -425,71 +492,6 @@ export const PaymentProvider: FC<
       isLoading(false);
     };
 
-    const handleCreatePayment = async () => {
-      isLoading(true);
-
-      let createPaymentRequestUrl: string;
-      try {
-        createPaymentRequestUrl = resolveEndpointUrl(
-          derivedUrls.createPaymentUrl,
-          createPaymentUrl,
-          "createPaymentUrl"
-        );
-      } catch {
-        isLoading(false);
-        notify("Error", "something went wrong");
-        return;
-      }
-
-      const createPaymentResult = await processorRequest<
-        {},
-        CreatePaymentResponse
-      >(requestHeader, createPaymentRequestUrl, {
-        ...cartInformation,
-        shippingMethodId: shippingMethodId,
-        paymentMethodType,
-        builderType,
-      });
-
-      if (!createPaymentResult) {
-        isLoading(false);
-        notify("Error", "There is an error in creating payment!");
-        return;
-      }
-
-      let paymentVersion: number = createPaymentResult.version;
-      if (getClientTokenUrl) {
-        const clientTokenResult = (await processorRequest<
-          ClientTokenRequest,
-          ClientTokenResponse
-        >(requestHeader, getClientTokenUrl, {
-          paymentId: createPaymentResult.id,
-          paymentVersion: createPaymentResult.version,
-          braintreeCustomerId: createPaymentResult.braintreeCustomerId,
-          merchantAccountId: undefined,
-        })) as ClientTokenResponse;
-        setClientToken(clientTokenResult.clientToken);
-        paymentVersion = clientTokenResult.paymentVersion;
-      }
-
-      const { amountPlanned, lineItems, shippingMethod } = createPaymentResult;
-
-      setPaymentInfo({
-        id: createPaymentResult.id,
-        version: paymentVersion,
-        amount: amountPlanned.centAmount / 100,
-        currency: amountPlanned.currencyCode,
-        lineItems: lineItems,
-        shippingMethod: shippingMethod,
-        cartInformation: cartInformation,
-      });
-      isLoading(false);
-    };
-
-    let vaultOnly: boolean = !!(
-      createVaultSetupTokenUrl && approveVaultSetupTokenUrl
-    );
-
     // const handleAuthenticateThreeDSOrder = async (
     //   orderID: string,
     //   isGPay?: boolean
@@ -542,7 +544,6 @@ export const PaymentProvider: FC<
       setSuccess,
       requestHeader,
       paymentInfo,
-      handleCreatePayment,
       clientToken,
       handleOnApprove,
       handleCreateOrder,
@@ -555,13 +556,10 @@ export const PaymentProvider: FC<
     };
   }, [
     paymentInfo,
-    cartInformation,
     createOrderUrl,
-    createPaymentUrl,
     isLoading,
     onApproveUrl,
     requestHeader,
-    shippingMethodId,
     notify,
     settings,
     createVaultSetupTokenUrl,
