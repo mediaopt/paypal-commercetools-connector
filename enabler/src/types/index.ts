@@ -75,7 +75,10 @@ export type OrderData = {
 
 export type CreateOrderResponse = {
   orderData: OrderData;
-  paymentVersion: number;
+  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
+   * expects a client-tracked version. See the processor implementation for how version/concurrency
+   * is actually handled. */
+  paymentVersion?: number;
   ok?: boolean;
 };
 

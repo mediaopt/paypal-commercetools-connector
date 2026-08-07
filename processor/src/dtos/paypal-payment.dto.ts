@@ -79,3 +79,39 @@ export const PaymentUpdateResponseSchema = Type.Object({
 export type PaymentUpdateResponseSchemaDTO = Static<
   typeof PaymentUpdateResponseSchema
 >;
+
+// Mirrors enabler's CreatePayPalOrderData — the full field set is kept for future payment
+// methods (see enabler/src/types/index.ts's FUNDING_SOURCE), even though only
+// paymentSource === "paypal" is functionally wired up today.
+const CreateOrderDataSchema = Type.Object({
+  paymentSource: Type.Optional(Type.String()),
+  storeInVault: Type.Optional(Type.Boolean()),
+  vaultId: Type.Optional(Type.String()),
+  verificationMethod: Type.Optional(Type.String()),
+  fraudNetSessionId: Type.Optional(Type.String()),
+  birthDate: Type.Optional(Type.String()),
+  nationalNumber: Type.Optional(Type.String()),
+  countryCode: Type.Optional(Type.String()),
+});
+
+// Shape must match CreateOrderRequest in enabler
+export const CreateOrderRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  paymentVersion: Type.Optional(Type.Number()), // accepted, never used — dead everywhere else in processor
+  orderData: Type.Optional(CreateOrderDataSchema),
+});
+export type CreateOrderRequestSchemaDTO = Static<typeof CreateOrderRequestSchema>;
+
+// Shape must match CreateOrderResponse in enabler. No paymentVersion field — processor never
+// invents/echoes a commercetools version for an entity the fast checkout APIs already manage.
+export const CreateOrderResponseSchema = Type.Object({
+  orderData: Type.Object({
+    id: Type.String(),
+    status: Type.String(),
+    payment_source: Type.Optional(Type.Any()),
+    links: Type.Optional(Type.Array(Type.Any())),
+    message: Type.Optional(Type.String()),
+  }),
+  ok: Type.Optional(Type.Boolean()),
+});
+export type CreateOrderResponseSchemaDTO = Static<typeof CreateOrderResponseSchema>;

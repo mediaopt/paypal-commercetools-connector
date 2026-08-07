@@ -16,6 +16,8 @@ import {
   PaymentUpdateResponseSchemaDTO,
   PaymentRequestSchemaDTO,
   PaymentResponseSchemaDTO,
+  CreateOrderRequestSchemaDTO,
+  CreateOrderResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { logger } from "common-connect/dist";
 
@@ -33,7 +35,14 @@ import { logger } from "common-connect/dist";
  *
  * Note on class structure - there are 3 groups of methods
  * - operation - general routes required to initialize the client, do not involve payment or customer yet
- * - payment - responsible for actual payment operations, all methods except createPayment require valid payment
+ * - payment - responsible for actual payment operations, all methods except createPayment require valid payment.
+ *   createPayment only creates a commercetools Payment; createOrder is the first method in this group that
+ *   calls PayPal and syncs pspReference/status/method onto that payment, but it must never add a transaction —
+ *   commercetools Checkout creates the commercetools Order as soon as it observes ANY in-progress transaction
+ *   on the payment, so adding one at createOrder time (before the buyer has approved on PayPal) would create a
+ *   commercetools Order prematurely. The transaction belongs to the future capture/confirm step (settlement),
+ *   once the buyer has actually approved and PayPal's capture call is made. The "PayPal order" (this PSP-side
+ *   resource) and the "commercetools Order" (created later by Checkout's own mechanism) are different things.
  * - customer - responsible for vault related operations for CoCo customer. Customer id and version is required for these calls.
  */
 
@@ -110,6 +119,21 @@ export abstract class AbstractPaymentService {
   abstract createPayment(
     request: PaymentRequestSchemaDTO
   ): Promise<PaymentResponseSchemaDTO>;
+
+  /**
+   * Create order
+   *
+   * @remarks
+   * Abstract method to create a real order with PayPal for a previously-created commercetools payment.
+   * Unlike createPayment (commercetools-only), this method calls PayPal's Orders API (`POST /v2/checkout/orders`)
+   * and returns the resulting PayPal order id/status to the enabler so it can complete the PayPal button flow.
+   *
+   * @param request - commercetools payment ID plus optional PayPal order options (funding source, vaulting)
+   * @returns Promise with the PayPal order id/status for the enabler's PayPal JS SDK button
+   */
+  abstract createOrder(
+    request: CreateOrderRequestSchemaDTO
+  ): Promise<CreateOrderResponseSchemaDTO>;
 
   /**
    * Refund payment

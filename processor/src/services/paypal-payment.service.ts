@@ -1,12 +1,9 @@
 import {
   statusHandler,
   healthCheckCommercetoolsPermissions,
-  ErrorRequiredField,
   ErrorInvalidOperation,
-  Cart,
-  Payment,
-  CustomFieldsDraft,
 } from "@commercetools/connect-payments-sdk";
+import { PaymentUpdateAction } from "@commercetools/platform-sdk";
 
 import {
   CancelPaymentRequest,
@@ -26,6 +23,8 @@ import {
   PaymentUpdateResponseSchemaDTO,
   PaymentRequestSchemaDTO,
   PaymentResponseSchemaDTO,
+  CreateOrderRequestSchemaDTO,
+  CreateOrderResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { getCartIdFromContext } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
@@ -34,9 +33,14 @@ import {
   mapCommercetoolsCartToPayPalPriceBreakdown,
   resolveCommercetoolsCartShippingAddress,
   mapCommercetoolsAddressToPayPalAddress,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
+  createPayPalOrder,
+  Order,
 } from "common-connect";
 
 import { log } from "../libs/logger";
+import { retryCTSync } from "../utils/error.utils";
+import { buildOrderRequest } from "../utils/order.utils";
 
 export class PayPalPaymentService extends AbstractPaymentService {
   constructor(opts: PayPalPaymentServiceOptions) {
@@ -217,7 +221,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     // Gather additional cart data for the response
     const isShipped =
-      !!ctCart.shippingAddress || (ctCart.shipping && ctCart.shipping.length > 0);
+      !!ctCart.shippingAddress ||
+      (ctCart.shipping && ctCart.shipping.length > 0);
     const lineItems = mapValidCommercetoolsLineItemsToPayPalItems(
       true, // matchingAmounts: true because amountPlanned was just computed from this cart
       isShipped,
@@ -253,6 +258,110 @@ export class PayPalPaymentService extends AbstractPaymentService {
       lineItems: lineItems ?? undefined,
       priceBreakdown,
     };
+  }
+
+  /**
+   * Create order
+   *
+   * @remarks
+   * Calls PayPal's Orders API to create the real PayPal order for a previously-created
+   * commercetools payment, then syncs the PayPal order id/status/method onto that payment.
+   * Deliberately does not add a commercetools transaction — see abstract-payment.service.ts's
+   * createOrder doc for why (commercetools Checkout would create a commercetools Order
+   * prematurely, before the buyer has approved on PayPal).
+   *
+   * @param request - commercetools payment ID plus optional PayPal order options
+   * @returns Promise with the PayPal order id/status for the enabler's PayPal JS SDK button
+   */
+  public async createOrder({
+    paymentId,
+    orderData,
+  }: CreateOrderRequestSchemaDTO): Promise<CreateOrderResponseSchemaDTO> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    const ctCart = await this.ctCartService.getCart({
+      id: getCartIdFromContext(),
+    });
+
+    const orderRequest = buildOrderRequest(payment, ctCart, orderData);
+
+    let response: Order;
+    try {
+      response = await createPayPalOrder(orderRequest);
+    } catch (e) {
+      log.error(
+        `createOrder: PayPal order creation failed for payment ${
+          payment.id
+        } — ${e instanceof Error ? e.message : JSON.stringify(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to create PayPal order for payment ${payment.id}`
+      );
+    }
+
+    await retryCTSync(
+      () => this.syncPayPalOrderStatus(payment.id, response),
+      "createOrder",
+      payment.id,
+      response.status ?? ""
+    );
+
+    return {
+      orderData: {
+        id: response.id ?? "",
+        status: response.status ?? "",
+        payment_source: response.payment_source,
+        links: response.links,
+      },
+    };
+  }
+
+  /**
+   * Applies setInterfaceId / setStatusInterfaceCode / setStatusInterfaceText /
+   * setMethodInfoMethod via a raw CT API call — connect-payments-sdk's generic
+   * updatePayment() does not expose the status actions. Re-fetches the payment
+   * for a fresh version on every call so retryCTSync's retries avoid version
+   * conflicts. Used to sync the data with connect format to keep full
+   * compatibility with connect modules
+   */
+  private async syncPayPalOrderStatus(
+    paymentId: string,
+    response: Order
+  ): Promise<void> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+    const actions: PaymentUpdateAction[] = [
+      ...(!payment.interfaceId && response.id
+        ? [{ action: "setInterfaceId" as const, interfaceId: response.id }]
+        : []),
+      ...(response.status
+        ? [
+            {
+              action: "setStatusInterfaceCode" as const,
+              interfaceCode: response.status,
+            },
+            {
+              action: "setStatusInterfaceText" as const,
+              interfaceText: response.status,
+            },
+          ]
+        : []),
+      ...(response.payment_source && !payment.paymentMethodInfo?.method
+        ? [
+            {
+              action: "setMethodInfoMethod" as const,
+              method: mapPayPalPaymentSourceToCommercetoolsMethodInfo(
+                response.payment_source
+              ),
+            },
+          ]
+        : []),
+    ];
+    if (!actions.length) return;
+    await paymentSDK.ctAPI.client
+      .payments()
+      .withId({ ID: paymentId })
+      .post({ body: { version: payment.version, actions } })
+      .execute();
   }
 
   /**

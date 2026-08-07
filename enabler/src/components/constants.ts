@@ -13,7 +13,7 @@ getSettingsUrl, createVaultSetupTokenUrl, approveVaultSetupTokenUrl
 export const processorUrls = (processorUrl: string) => ({
   createPaymentUrl: `${processorUrl}/payments`,
   onApproveUrl: `${processorUrl}/payments/approve`,
-  createOrderUrl: `${processorUrl}/orders`,
+  createOrderUrl: `${processorUrl}/payments/createOrder`,
   authorizeOrderUrl: `${processorUrl}/orders/authorize`,
   authenticateThreeDSOrderUrl: `${processorUrl}/orders/3ds/authenticate`,
   getStoredPaymentMethodsURL: `${processorUrl}/stored-payment-methods`,
