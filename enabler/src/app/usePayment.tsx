@@ -43,16 +43,10 @@ import { useSettings } from "./useSettings";
 import { useTranslation } from "react-i18next";
 import { handleResponseError } from "../messages/errorMessages";
 
-const PaymentInfoInitialObject = {
-  version: 0,
+const PaymentInfoInitialObject: PaymentInfo = {
   id: "",
-  amount: 0,
-  currency: "",
-  lineItems: [],
-  shippingMethod: {},
+  amountPlanned: { centAmount: 0, currencyCode: "", fractionDigits: 0 },
   cartInformation: CartInformationInitial,
-  sessionKey: "",
-  sessionValue: "",
 };
 
 type PaymentContextT = {
@@ -196,7 +190,7 @@ export const PaymentProvider: FC<
           throw new Error(t("payPal.generalError"));
         }
 
-        let paymentVersion: number = createPaymentResult.version;
+        let paymentVersion: number | undefined = createPaymentResult.version;
         if (getClientTokenUrl) {
           const clientTokenResult = (await processorRequest<
             ClientTokenRequest,
@@ -211,18 +205,20 @@ export const PaymentProvider: FC<
           paymentVersion = clientTokenResult.paymentVersion;
         }
 
-        const { amountPlanned, lineItems, shippingMethod } =
-          createPaymentResult;
-
-        console.log(createPaymentResult);
-
         setPaymentInfo({
           id: createPaymentResult.id,
+          amountPlanned: createPaymentResult.amountPlanned,
+          lineItems: createPaymentResult.lineItems,
+          email: createPaymentResult.email,
+          firstName: createPaymentResult.firstName,
+          lastName: createPaymentResult.lastName,
+          countryCode: createPaymentResult.countryCode,
+          shippingAddress: createPaymentResult.shippingAddress,
+          shippingOptions: createPaymentResult.shippingOptions,
+          priceBreakdown: createPaymentResult.priceBreakdown,
+          ctCustomerId: createPaymentResult.ctCustomerId,
+          customerVersion: createPaymentResult.customerVersion,
           version: paymentVersion,
-          amount: amountPlanned.centAmount / 100,
-          currency: amountPlanned.currencyCode,
-          lineItems: lineItems,
-          shippingMethod: shippingMethod,
           cartInformation: cartInformation,
         });
       } catch (error) {

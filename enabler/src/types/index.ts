@@ -34,7 +34,7 @@ export type ApproveVaultSetupTokenData = { vaultSetupToken: string };
 
 export type CreateOrderRequest = {
   paymentId: string;
-  paymentVersion: number;
+  paymentVersion?: number;
   orderData?: CreatePayPalOrderData;
 };
 
@@ -81,7 +81,7 @@ export type CreateOrderResponse = {
 
 export type OnApproveRequest = {
   paymentId: string;
-  paymentVersion: number;
+  paymentVersion?: number;
   orderID: string;
   saveCard?: boolean;
 };
@@ -261,27 +261,48 @@ export const CartInformationInitial: CartInformation = {
 
 export type CartInformationProps = { cartInformation?: CartInformation };
 
-export type PaymentInfo = {
+/**
+ * Source of truth for every field shared between `PaymentInfo` (enabler state) and
+ * `CreatePaymentResponse` (the processor's wire response) — defined once here so their
+ * deprecation notices don't drift between the two.
+ */
+export type PaymentData = {
   id: string;
-  version: number;
-  amount: number;
-  currency: string;
-  lineItems: Array<any>;
-  shippingMethod: {};
-} & CartInformationProps;
-
-export type CreatePaymentResponse = {
-  id: string;
-  version: number;
   amountPlanned: {
     centAmount: number;
     currencyCode: string;
     fractionDigits: number;
   };
-  lineItems: [object]; // @todo add better types maybe?
-  shippingMethod: object; // @todo add better types maybe?
-  braintreeCustomerId: string;
+  lineItems?: unknown[];
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  countryCode?: string;
+  shippingAddress?: unknown;
+  shippingOptions?: unknown[];
+  priceBreakdown?: unknown;
+  ctCustomerId?: string;
+  /** Not used by the checkout. Please open an
+   * issue if you are interested in vault-based customer-version tracking. */
   customerVersion?: number;
+  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
+   * expects a client-tracked version. See the processor implementation for how version/concurrency
+   * is actually handled. */
+  version?: number;
+};
+
+export type PaymentInfo = PaymentData & CartInformationProps;
+
+export type CreatePaymentResponse = PaymentData & {
+  paypalData: { clientId: string; currency: string; intent: string };
+  /** @deprecated Not used by the checkout;
+   * only relevant for a self-hosted backend built against the old Braintree-style
+   * contract. */
+  braintreeCustomerId?: string;
+  /** @deprecated Superseded by shippingAddress/shippingOptions — shipping is handled differently
+   * now. Kept only for backward compatibility
+   * with a self-hosted backend still using the old contract. */
+  shippingMethod?: unknown;
 };
 
 export type ClientTokenResponse = {
@@ -365,7 +386,7 @@ export type GetUserInfoResponse = {
 
 export type ClientTokenRequest = {
   paymentId: string;
-  paymentVersion: number;
+  paymentVersion?: number;
   braintreeCustomerId?: string;
   merchantAccountId?: string;
 };
