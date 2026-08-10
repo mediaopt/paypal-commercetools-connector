@@ -39,6 +39,15 @@ i18n.use(initReactI18next).init({
           generalError:
             "Something went wrong. Please check your data and try again.",
         },
+        cardFields: {
+          pay: "Pay",
+          save: "Save",
+          addNewCard: "Add a new card",
+          saveForFuture: "Save this card for future purchases",
+          notEligible: "Card payment currently not supported",
+          tryAgain: "Try again",
+          selectDifferentMethod: "Please select different payment method",
+        },
       },
     },
     de: {
@@ -74,6 +83,15 @@ i18n.use(initReactI18next).init({
             "Ihre Adresse konnte nicht validiert werden. Bitte korrigieren Sie Ihre Daten und versuchen Sie es erneut.",
           generalError:
             "Etwas ist schief gelaufen. Bitte überprüfen Sie Ihre Daten und versuchen Sie es erneut.",
+        },
+        cardFields: {
+          pay: "Zahlen",
+          save: "Speichern",
+          addNewCard: "Neue Karte hinzufügen",
+          saveForFuture: "Diese Karte für zukünftige Käufe speichern",
+          notEligible: "Kartenzahlung wird derzeit nicht unterstützt",
+          tryAgain: "Bitte versuchen Sie es erneut",
+          selectDifferentMethod: "Bitte wählen Sie eine andere Zahlungsart",
         },
       },
     },
