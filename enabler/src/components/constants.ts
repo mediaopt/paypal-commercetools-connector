@@ -14,7 +14,7 @@ export const processorUrls = (processorUrl: string) => ({
   createPaymentUrl: `${processorUrl}/payments`,
   onApproveUrl: `${processorUrl}/payments/approve`,
   createOrderUrl: `${processorUrl}/payments/createOrder`,
-  authorizeOrderUrl: `${processorUrl}/orders/authorize`,
-  authenticateThreeDSOrderUrl: `${processorUrl}/orders/3ds/authenticate`,
+  authorizeOrderUrl: `${processorUrl}/payments/authorize`,
+  authenticateThreeDSOrderUrl: `${processorUrl}/payments/3ds`,
   getStoredPaymentMethodsURL: `${processorUrl}/stored-payment-methods`,
 });
