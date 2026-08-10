@@ -11,6 +11,10 @@ import {
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchema,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchema,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchema,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
 } from '../dtos/paypal-payment.dto';
 import { PayPalPaymentService } from '../services/paypal-payment.service';
 import { Type } from '@sinclair/typebox';
@@ -51,6 +55,23 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
     },
     async (request, reply) => {
       const resp = await opts.paymentService.createOrder(request.body);
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.post<{ Body: AuthenticateThreeDSOrderRequestSchemaDTO; Reply: AuthenticateThreeDSOrderResponseSchemaDTO }>(
+    '/payments/3ds',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: AuthenticateThreeDSOrderRequestSchema,
+        response: {
+          200: AuthenticateThreeDSOrderResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.authenticateThreeDSOrder(request.body);
       return reply.status(200).send(resp);
     },
   );

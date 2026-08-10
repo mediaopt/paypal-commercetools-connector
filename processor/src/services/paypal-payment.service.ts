@@ -25,6 +25,8 @@ import {
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { getCartIdFromContext } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
@@ -35,11 +37,12 @@ import {
   mapCommercetoolsAddressToPayPalAddress,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   createPayPalOrder,
+  getPayPalOrder,
   Order,
 } from "common-connect";
 
 import { log } from "../libs/logger";
-import { retryCTSync } from "../utils/error.utils";
+import { errorMessage, retryCTSync } from "../utils/error.utils";
 import { buildOrderRequest } from "../utils/order.utils";
 
 export class PayPalPaymentService extends AbstractPaymentService {
@@ -313,6 +316,54 @@ export class PayPalPaymentService extends AbstractPaymentService {
         payment_source: response.payment_source,
         links: response.links,
       },
+    };
+  }
+
+  /**
+   * Read-only lookup — does not add a transaction or otherwise mutate the commercetools payment,
+   * same lifecycle constraint as createOrder (see the class-level doc comment). Only fetches the
+   * payment to sanity-check that the caller-supplied orderID actually belongs to it.
+   */
+  public async authenticateThreeDSOrder({
+    paymentId,
+    orderID,
+  }: AuthenticateThreeDSOrderRequestSchemaDTO): Promise<AuthenticateThreeDSOrderResponseSchemaDTO> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    if (payment.interfaceId && payment.interfaceId !== orderID) {
+      throw new ErrorInvalidOperation(
+        `Order ${orderID} does not belong to payment ${paymentId}`
+      );
+    }
+
+    let order: Order;
+    try {
+      order = await getPayPalOrder(orderID);
+    } catch (e) {
+      log.error(
+        `authenticateThreeDSOrder: PayPal order lookup failed for payment ${payment.id} — ${errorMessage(
+          e
+        )}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to look up PayPal order ${orderID}`
+      );
+    }
+
+    const authenticationResult = order.payment_source?.card?.authentication_result;
+
+    return {
+      ...(authenticationResult && {
+        approve: {
+          liability_shift: authenticationResult.liability_shift,
+          three_d_secure: {
+            enrollment_status:
+              authenticationResult.three_d_secure?.enrollment_status,
+            authentication_status:
+              authenticationResult.three_d_secure?.authentication_status,
+          },
+        },
+      }),
     };
   }
 

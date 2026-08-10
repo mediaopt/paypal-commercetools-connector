@@ -115,3 +115,38 @@ export const CreateOrderResponseSchema = Type.Object({
   ok: Type.Optional(Type.Boolean()),
 });
 export type CreateOrderResponseSchemaDTO = Static<typeof CreateOrderResponseSchema>;
+
+// Shape must match the request body enabler's handleAuthenticateThreeDSOrder sends (usePayment.tsx).
+// isGPay is accepted for enabler-contract compatibility but not currently branched on — PayPal's
+// Orders API has no `google_pay` field under payment_source today; see TODO.md.
+export const AuthenticateThreeDSOrderRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  paymentVersion: Type.Optional(Type.Number()), // accepted, never used — dead everywhere else in processor
+  orderID: Type.String(),
+  isGPay: Type.Optional(Type.Boolean()),
+});
+export type AuthenticateThreeDSOrderRequestSchemaDTO = Static<
+  typeof AuthenticateThreeDSOrderRequestSchema
+>;
+
+// Shape must match the response enabler's handleAuthenticateThreeDSOrder expects (usePayment.tsx).
+// No paymentVersion field — same reasoning as CreateOrderResponseSchema, processor never invents/
+// echoes a commercetools version for an entity the fast checkout APIs already manage; the enabler
+// no longer reads one from this response either (legacy paymentVersion plumbing, dead everywhere
+// in processor already — see the request schema above). `approve` is entirely absent (not just
+// empty) when the PayPal order has no authentication_result — the enabler checks for its presence
+// via hasOwnProperty.
+export const AuthenticateThreeDSOrderResponseSchema = Type.Object({
+  approve: Type.Optional(
+    Type.Object({
+      liability_shift: Type.Optional(Type.String()),
+      three_d_secure: Type.Object({
+        enrollment_status: Type.Optional(Type.String()),
+        authentication_status: Type.Optional(Type.String()),
+      }),
+    })
+  ),
+});
+export type AuthenticateThreeDSOrderResponseSchemaDTO = Static<
+  typeof AuthenticateThreeDSOrderResponseSchema
+>;

@@ -18,6 +18,8 @@ import {
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { logger } from "common-connect/dist";
 
@@ -134,6 +136,22 @@ export abstract class AbstractPaymentService {
   abstract createOrder(
     request: CreateOrderRequestSchemaDTO
   ): Promise<CreateOrderResponseSchemaDTO>;
+
+  /**
+   * Authenticate 3DS order
+   *
+   * @remarks
+   * Abstract method to check a PayPal order's 3D Secure authentication result. This is a read-only
+   * lookup against PayPal's Orders API (`GET /v2/checkout/orders/{id}`) — like createOrder, it must
+   * never add a transaction or otherwise mutate the commercetools payment; it exists purely to tell
+   * the enabler whether it's safe to proceed to the actual approve/capture step.
+   *
+   * @param request - commercetools payment ID plus the PayPal order ID to check
+   * @returns Promise with the 3DS result, if available
+   */
+  abstract authenticateThreeDSOrder(
+    request: AuthenticateThreeDSOrderRequestSchemaDTO
+  ): Promise<AuthenticateThreeDSOrderResponseSchemaDTO>;
 
   /**
    * Refund payment
