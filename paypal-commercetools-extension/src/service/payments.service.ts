@@ -3,7 +3,6 @@ import {
   Payment,
   PaymentAddTransactionAction,
   PaymentUpdateAction,
-  Transaction,
   TransactionDraft,
   TransactionState,
   TransactionType,
@@ -50,6 +49,8 @@ import {
   OrderRequest,
   Patch,
   PurchaseUnit,
+  extractPayPalPurchaseUnitTransaction,
+  findMostRecentTransaction,
 } from 'common-connect/dist';
 import { handleEntityActions, handleError } from '../utils/response.utils';
 import { getCurrentTimestamp } from '../utils/data.utils';
@@ -237,11 +238,7 @@ async function prepareCreateOrderRequest(
 const relevantTransaction = (
   paymentType: PayPalTransaction,
   purchase_units?: PurchaseUnit[]
-) => {
-  const relevantPayment =
-    purchase_units && purchase_units[0].payments?.[paymentType];
-  return relevantPayment?.length ? relevantPayment[0] : undefined;
-};
+) => extractPayPalPurchaseUnitTransaction(purchase_units, paymentType);
 
 const actualTransactionStatus = (
   relevantTransactionType: PayPalTransaction,
@@ -705,17 +702,14 @@ function findSuitableTransactionId(
   type: TransactionType,
   status?: TransactionState
 ) {
-  const transactions = payment?.transactions.filter(
-    (transaction: Transaction): boolean =>
-      transaction.type === type && (!status || status === transaction.state)
-  );
-  if (!transactions || transactions.length === 0) {
+  const transaction = findMostRecentTransaction(payment, type, status);
+  if (!transaction) {
     throw new CustomError(
       500,
       `The payment ${payment.id} has no suitable transaction (type ${type}, state: ${status} or none)`
     );
   }
-  return transactions[transactions.length - 1].interactionId;
+  return transaction.interactionId;
 }
 
 export const handleCreateTrackingInformation = async (payment: Payment) => {

@@ -1,5 +1,5 @@
 import { createApiRoot } from "../client/create.client";
-import { AccessTokenObject } from "../types/index.types";
+import { AccessTokenObject, PayPalSettings } from "../types/index.types";
 import { logger } from "../utils/logger.utils";
 
 export const getCachedAccessToken = async () => {
@@ -17,6 +17,26 @@ export const getCachedAccessToken = async () => {
     ).body;
   } catch (e) {
     logger.info(`Failed to load cached access token ${(e as Error).message}`);
+    return undefined;
+  }
+};
+
+export const getSettings = async (): Promise<PayPalSettings | undefined> => {
+  try {
+    const apiRoot = createApiRoot();
+    const customObject = (
+      await apiRoot
+        .customObjects()
+        .withContainerAndKey({
+          container: "paypal-commercetools-connector",
+          key: "settings",
+        })
+        .get()
+        .execute()
+    ).body;
+    return customObject.value as PayPalSettings;
+  } catch (e) {
+    logger.error(`Failed to load settings from custom object ${(e as Error).message}`);
     return undefined;
   }
 };
