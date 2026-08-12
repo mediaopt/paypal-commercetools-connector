@@ -31,6 +31,8 @@ export const CardFields: React.FC<
   paymentMethodType,
   builderType,
   processorUrl,
+  initialSettings,
+  initialUserIdToken,
 
   onRegisterSubmit,
   onRegisterValidation,
@@ -56,6 +58,8 @@ export const CardFields: React.FC<
       paymentMethodType={paymentMethodType}
       builderType={builderType}
       processorUrl={processorUrl}
+      initialSettings={initialSettings}
+      initialUserIdToken={initialUserIdToken}
     >
       <CardFieldsButton
         enableVaulting={enableVaulting}

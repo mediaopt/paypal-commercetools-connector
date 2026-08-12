@@ -53,10 +53,10 @@ export class PayPalCustomerService {
     const RETRY_DELAY_MS = 1000; //timing selected based on permitted time for resolve for payment connector operations
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const ctCustomer = await this.getCtCustomer(ctCustomerId);
-      if (!ctCustomer || ctCustomer.custom?.fields?.paypalCustomerId) return;
+      if (!ctCustomer || ctCustomer.custom?.fields?.PayPalUserId) return;
       const action: CustomerSetCustomFieldAction = {
         action: 'setCustomField',
-        name: 'paypalCustomerId',
+        name: 'PayPalUserId',
         value: paypalCustomerId,
       };
       const result = await this.updateCtCustomer(ctCustomer.id, ctCustomer.version, [action]);

@@ -10,11 +10,20 @@ since that data is instead handled by the processor and/or have limited support 
 getSettingsUrl, createVaultSetupTokenUrl, approveVaultSetupTokenUrl
  */
 
-export const processorUrls = (processorUrl: string) => ({
-  createPaymentUrl: `${processorUrl}/payments`,
-  onApproveUrl: `${processorUrl}/payments/approve`,
-  createOrderUrl: `${processorUrl}/payments/createOrder`,
-  authorizeOrderUrl: `${processorUrl}/payments/authorize`,
-  authenticateThreeDSOrderUrl: `${processorUrl}/payments/3ds`,
-  getStoredPaymentMethodsURL: `${processorUrl}/stored-payment-methods`,
-});
+const stripTrailingSlash = (processorUrl: string) => processorUrl.replace(/\/$/, "");
+
+export const processorUrls = (processorUrl: string) => {
+  const base = stripTrailingSlash(processorUrl);
+  return {
+    createPaymentUrl: `${base}/payments`,
+    onApproveUrl: `${base}/payments/approve`,
+    createOrderUrl: `${base}/payments/createOrder`,
+    authorizeOrderUrl: `${base}/payments/authorize`,
+    authenticateThreeDSOrderUrl: `${base}/payments/3ds`,
+    getStoredPaymentMethodsURL: `${base}/stored-payment-methods`,
+  };
+};
+
+// The one route needing a path param — processorUrls()'s flat string map can't express that.
+export const storedPaymentMethodUrl = (processorUrl: string, id: string) =>
+  `${stripTrailingSlash(processorUrl)}/stored-payment-methods/${id}`;

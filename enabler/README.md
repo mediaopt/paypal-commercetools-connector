@@ -121,6 +121,46 @@ submission: the form becomes silently unusable. Only pass `onRegisterSubmit` if 
 driving the component through the `PaymentComponent` contract
 (`src/payment-enabler/interfaces/enabler.ts`) yourself.
 
+### PayPal JS SDK script options (currency, funding sources, etc.)
+
+`<PayPal/>`/`<CreditCard/>` (`CardFields`) both load against the PayPal JS SDK, whose script options
+(`currency`, `components`, `enableFunding`/`disableFunding`, `buyerCountry`, `locale`, `vault`, and
+so on) used to be supplied directly as component props by the merchant's own frontend code in the
+standalone client. In Checkout mode there's no merchant frontend code path left to supply them — the
+enabler is mounted by Checkout itself — so **for now these are configured separately, from
+`processor`'s environment**: see `PAYPAL_SDK_OPTIONS` in `processor/.env.template`.
+
+They're configurable per component (`PayPal`, `CardFields`) and, for `PayPal` specifically,
+separately for the **standard** and **express** builder variants (`PayPalComponentBuilder` vs.
+`createExpressBuilder` — see `enabler/src/components/PayPalBuilder.ts`), since a merchant may want
+different funding sources/currency for a regular PayPal button versus an express-checkout one.
+`CardFields` has no standard/express split since it has no express variant. `enableFunding` defaults
+to `"paylater"` for both PayPal variants if left unset, so the PayPal Pay Later button stays enabled
+out of the box even with no configuration at all.
+
+`currency` and `buyerCountry` specifically are the exception to "configured from `processor`'s
+environment": `processor` derives them from the current cart on every `/operations/config` request
+(the cart's total price currency, and its `country` field — not billing/shipping address) and
+overrides whatever `PAYPAL_SDK_OPTIONS` configured for them, since the actual cart in progress is a
+better source of truth than a static deploy-time value. `PAYPAL_SDK_OPTIONS`'s `currency`/
+`buyerCountry` only take effect as a fallback when the cart can't supply them (e.g. no `country` set
+on the cart).
+
+This is a stopgap, not the final shape — richer configuration is expected in future versions. **If
+you need something this doesn't yet cover, please open an issue.**
+
+### PayPal button label/color config (`paypalButtonConfig`) per variant
+
+Similarly to the SDK script options above, the PayPal button's `style.label`/`style.color`
+(`GetSettingsResponse.paypalButtonConfig`) can be overridden per builder variant via
+`PayPalStandard`/`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
+`{...paypalButtonConfig, ...(builderType === "express" ? PayPalExpress : PayPalStandard)}` before
+the settings ever reach `SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
+
+**The settings-providing app currently only supplies the single, shared `paypalButtonConfig`** —
+`PayPalStandard`/`PayPalExpress` aren't populated yet, so that shared config is used as the
+fallback for both variants until the settings source is extended to supply per-variant overrides.
+
 ### New props: `onRegisterSubmit` / `onRegisterValidation`
 
 These two props are new additions, not carried over from the standalone client. They only affect

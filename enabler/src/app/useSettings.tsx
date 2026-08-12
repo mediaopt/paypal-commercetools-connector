@@ -16,6 +16,7 @@ import {
   RemovePaymentTokenRequest,
 } from "../types";
 import { processorRequest } from "../services/processorRequest";
+import { storedPaymentMethodUrl } from "../components/constants";
 import { useLoader } from "./useLoader";
 import { PARTNER_ATTRIBUTION_ID } from "../constants";
 import { useNotifications } from "./useNotifications";
@@ -43,9 +44,15 @@ export const SettingsProvider: FC<
   options,
   children,
   removePaymentTokenUrl,
+  processorUrl,
+  initialSettings,
+  initialUserIdToken,
 }) => {
-  const [settings, setSettings] = useState<GetSettingsResponse>();
-  const [userIdToken, setUserIdToken] = useState<string>();
+  // Seeds from the processor's /operations/config response when available (Checkout mode) — in
+  // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
+  // otherwise never populate these at all.
+  const [settings, setSettings] = useState<GetSettingsResponse | undefined>(initialSettings);
+  const [userIdToken, setUserIdToken] = useState<string | undefined>(initialUserIdToken);
   const [paymentTokens, setPaymentTokens] = useState<PaymentTokens>();
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
@@ -87,20 +94,33 @@ export const SettingsProvider: FC<
     };
     const handleRemovePaymentToken = async (paymentTokenId: string) => {
       isLoading(true);
-      if (removePaymentTokenUrl) {
+      // Prefers the processor-derived DELETE route over the legacy removePaymentTokenUrl (POST +
+      // body) — this route needs a path param processorUrls()'s flat-string map doesn't support,
+      // hence the dedicated storedPaymentMethodUrl() helper alongside it.
+      let didRequest = false;
+      if (processorUrl) {
+        await processorRequest(
+          requestHeader,
+          storedPaymentMethodUrl(processorUrl, paymentTokenId),
+          undefined,
+          "DELETE"
+        );
+        didRequest = true;
+      } else if (removePaymentTokenUrl) {
         await processorRequest<RemovePaymentTokenRequest>(
           requestHeader,
           removePaymentTokenUrl,
           { paymentTokenId }
         );
+        didRequest = true;
+      }
 
-        if (paymentTokens) {
-          const filterPaymentTokens = paymentTokens.payment_tokens?.filter(
-            (paymentToken) => paymentToken.id !== paymentTokenId
-          );
-          paymentTokens.payment_tokens = filterPaymentTokens;
-          setPaymentTokens({ ...paymentTokens });
-        }
+      if (didRequest && paymentTokens) {
+        const filterPaymentTokens = paymentTokens.payment_tokens?.filter(
+          (paymentToken) => paymentToken.id !== paymentTokenId
+        );
+        paymentTokens.payment_tokens = filterPaymentTokens;
+        setPaymentTokens({ ...paymentTokens });
       }
       isLoading(false);
     };

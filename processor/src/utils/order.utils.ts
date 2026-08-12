@@ -1,32 +1,53 @@
-import { Cart, Payment } from '@commercetools/connect-payments-sdk';
+import { Cart, Payment } from "@commercetools/connect-payments-sdk";
 import {
   mapValidCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   resolveCommercetoolsCartShippingAddress,
   mapCommercetoolsAddressToPayPalAddress,
   mapCommercetoolsMoneyToPayPalMoney,
+  findMostRecentTransaction,
   CheckoutPaymentIntent,
   OrderRequest,
   PurchaseUnitRequest,
-} from 'common-connect';
-import { CreateOrderRequestSchemaDTO } from '../dtos/paypal-payment.dto';
+} from "common-connect";
+import { CreateOrderRequestSchemaDTO } from "../dtos/paypal-payment.dto";
+import { ErrorInvalidOperation } from "@commercetools/connect-payments-sdk";
 
 /**
  * Builds the PayPal OrderRequest for createOrder from the commercetools payment/cart.
- * Only paymentSource === "paypal" is functionally wired to a real payment_source — other
+ * Only paymentSource === "paypal"/"card" are functionally wired to a real payment_source — other
  * funding sources (kept in the request type for future payment methods) omit
  * payment_source entirely and let PayPal default.
+ *
+ * The last argument, existingPayPalCustomerId, is the CT customer's existing PayPal customer id
+ * (custom.fields.PayPalUserId), when known — see paypal-payment.service.ts's createOrder().
+ * Without this, vaulting a new payment source for a returning customer mints PayPal a brand-new,
+ * disconnected customer id instead of adding to their existing one, since a card has no
+ * OAuth/login step of its own to let PayPal infer the link the way payment_source.paypal's
+ * buyer-login flow can.
  */
+// Shared by the paypal/card vault branches below — see buildOrderRequest's docblock for why
+// existingPayPalCustomerId matters.
+const buildVaultCustomerAttributes = (existingPayPalCustomerId?: string) =>
+  existingPayPalCustomerId ? { customer: { id: existingPayPalCustomerId } } : {};
+
 export const buildOrderRequest = (
   payment: Payment,
   ctCart: Cart,
-  orderData?: CreateOrderRequestSchemaDTO['orderData'],
+  orderData?: CreateOrderRequestSchemaDTO["orderData"],
+  payPalIntent?: CreateOrderRequestSchemaDTO["payPalIntent"],
+  existingPayPalCustomerId?: string
 ): OrderRequest => {
-  const { address: resolvedShippingAddress } = resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
-  const shipping = resolvedShippingAddress ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress) : undefined;
-  const isShipped = !!ctCart.shippingAddress || (ctCart.shipping && ctCart.shipping.length > 0);
+  const { address: resolvedShippingAddress } =
+    resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
+  const shipping = resolvedShippingAddress
+    ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
+    : undefined;
+  const isShipped =
+    !!ctCart.shippingAddress || (ctCart.shipping && ctCart.shipping.length > 0);
   const relevantCartCost = ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice;
-  const matchingAmounts = payment.amountPlanned.centAmount === relevantCartCost?.centAmount;
+  const matchingAmounts =
+    payment.amountPlanned.centAmount === relevantCartCost?.centAmount;
 
   // mapCommercetoolsAddressToPayPalAddress's return type isn't narrowed to ShippingDetail
   // (its `type` field is inferred as `string`) — same looseness createPayment already
@@ -35,7 +56,9 @@ export const buildOrderRequest = (
     amount: {
       currency_code: payment.amountPlanned.currencyCode,
       value: mapCommercetoolsMoneyToPayPalMoney(payment.amountPlanned),
-      breakdown: matchingAmounts ? mapCommercetoolsCartToPayPalPriceBreakdown(ctCart) : undefined,
+      breakdown: matchingAmounts
+        ? mapCommercetoolsCartToPayPalPriceBreakdown(ctCart)
+        : undefined,
     },
     shipping,
     invoice_id: payment.id,
@@ -46,21 +69,24 @@ export const buildOrderRequest = (
         ctCart.taxCalculationMode,
         false, // TODO: make configurable when working on PUI
         ctCart.lineItems,
-        ctCart.locale,
+        ctCart.locale
       ) ?? undefined,
   } as PurchaseUnitRequest;
 
   return {
-    intent: CheckoutPaymentIntent.Capture, // TODO: Make configurable — same existing gap as createPayment's response
+    intent:
+      payPalIntent === "Authorize"
+        ? CheckoutPaymentIntent.Authorize
+        : CheckoutPaymentIntent.Capture,
     purchase_units: [purchaseUnit],
-    ...(orderData?.paymentSource === 'paypal'
+    ...(orderData?.paymentSource === "paypal"
       ? {
           payment_source: {
             paypal: {
               ...(shipping
                 ? {
                     experience_context: {
-                      shipping_preference: 'SET_PROVIDED_ADDRESS' as const,
+                      shipping_preference: "SET_PROVIDED_ADDRESS" as const,
                     },
                   }
                 : {}),
@@ -68,9 +94,32 @@ export const buildOrderRequest = (
                 ? {
                     attributes: {
                       vault: {
-                        store_in_vault: 'ON_SUCCESS' as const,
-                        usage_type: 'MERCHANT' as const,
+                        store_in_vault: "ON_SUCCESS" as const,
+                        usage_type: "MERCHANT" as const,
                       },
+                      ...buildVaultCustomerAttributes(existingPayPalCustomerId),
+                    },
+                  }
+                : {}),
+              ...(orderData?.vaultId ? { vault_id: orderData.vaultId } : {}),
+            },
+          },
+        }
+      : {}),
+    ...(orderData?.paymentSource === "card"
+      ? {
+          payment_source: {
+            // No card number/expiry/cvv here — Card Fields collects those directly in the
+            // browser and attaches them via its own confirm-payment-source call after this
+            // order is created. Only vaulting instructions are relevant server-side.
+            card: {
+              ...(orderData?.storeInVault
+                ? {
+                    attributes: {
+                      vault: {
+                        store_in_vault: "ON_SUCCESS" as const,
+                      },
+                      ...buildVaultCustomerAttributes(existingPayPalCustomerId),
                     },
                   }
                 : {}),
@@ -80,4 +129,34 @@ export const buildOrderRequest = (
         }
       : {}),
   };
+};
+
+// Extracts the authorization/capture sub-object PayPal attaches to an Order response's first
+// purchase unit — shared with paypal-commercetools-extension, see common-connect's map.utils.ts.
+export { extractPayPalPurchaseUnitTransaction } from "common-connect";
+
+/**
+ * Finds the interactionId (PayPal authorization id) of the payment's most recent Authorization/
+ * Success transaction — the transaction lookup itself is shared with paypal-commercetools-
+ * extension's findSuitableTransactionId (see common-connect's findMostRecentTransaction); the
+ * error type/messages here are processor-specific.
+ * Used by settlement() to capture an authorization added earlier by authorizeOrder().
+ */
+export const findAuthorizationTransactionId = (payment: Payment): string => {
+  const transaction = findMostRecentTransaction(
+    payment,
+    "Authorization",
+    "Success"
+  );
+  if (!transaction) {
+    throw new ErrorInvalidOperation(
+      `Payment ${payment.id} has no Authorization/Success transaction to capture`
+    );
+  }
+  if (!transaction.interactionId) {
+    throw new ErrorInvalidOperation(
+      `Payment ${payment.id}'s Authorization transaction has no interactionId`
+    );
+  }
+  return transaction.interactionId;
 };

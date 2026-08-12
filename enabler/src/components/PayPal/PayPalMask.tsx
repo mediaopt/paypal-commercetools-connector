@@ -18,8 +18,10 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     vaultOnly,
     handleCreateVaultSetupToken,
     handleApproveVaultSetupToken,
+    builderType,
   } = usePayment();
   const { settings, paymentTokens } = useSettings();
+  const isExpress = builderType === "express";
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
   const { t } = useTranslation();
@@ -43,6 +45,9 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
     let styles: Record<string, string | boolean> = {};
     if (settings.paypalButtonConfig) {
+      // Already resolved per builder variant (PayPalStandard/PayPalExpress) by PayPalBuilder
+      // before reaching SettingsProvider — see enabler/README.md's "PayPal button label/color
+      // config" section.
       styles.label = settings.paypalButtonConfig.buttonLabel;
       if (
         props.fundingSource &&
@@ -81,6 +86,10 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     <>
       <PayPalButtons
         {...restprops}
+        // Express is a single buy-now button — restrict to the "paypal" funding source so PayPal
+        // Later/local payment methods (e.g. Sepa) never render alongside it, regardless of which
+        // funding sources the loaded SDK script is eligible for.
+        fundingSource={isExpress ? "paypal" : restprops.fundingSource}
         style={style}
         {...actions}
         onError={(err) => errorFunc(err, isLoading, notify, t)}

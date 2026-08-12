@@ -7,6 +7,8 @@ export default async function (server: FastifyInstance) {
   const paypalPaymentService = new PayPalPaymentService({
     ctCartService: paymentSDK.ctCartService,
     ctPaymentService: paymentSDK.ctPaymentService,
+    ctPaymentMethodService: paymentSDK.ctPaymentMethodService,
+    ctAPI: paymentSDK.ctAPI,
   });
 
   await server.register(paymentRoutes, {

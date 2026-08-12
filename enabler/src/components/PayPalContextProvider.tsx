@@ -37,6 +37,8 @@ export const PayPalContextProvider: FC<
   paymentMethodType,
   builderType,
   processorUrl,
+  initialSettings,
+  initialUserIdToken,
 
   children,
 }) => {
@@ -49,6 +51,9 @@ export const PayPalContextProvider: FC<
           requestHeader={requestHeader}
           getUserInfoUrl={getUserInfoUrl}
           removePaymentTokenUrl={removePaymentTokenUrl}
+          processorUrl={processorUrl}
+          initialSettings={initialSettings}
+          initialUserIdToken={initialUserIdToken}
         >
           <PaymentProvider
             options={options}

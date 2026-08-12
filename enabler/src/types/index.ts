@@ -52,6 +52,10 @@ export type CreateOrderRequest = {
   paymentId: string;
   paymentVersion?: number;
   orderData?: CreatePayPalOrderData;
+  /** The merchant's configured PayPal intent (from settings), so the processor can create the
+   * PayPal order with a matching intent — PayPal rejects an authorize call against an order
+   * created with intent=CAPTURE, and vice versa for capture. */
+  payPalIntent?: "Authorize" | "Capture";
 };
 
 export type CreateOrderData = {
@@ -107,7 +111,10 @@ export type OnApproveRequest = {
 
 export type OnApproveResponse = {
   orderData: { id: string; status: string; message?: string };
-  paymentVersion: number;
+  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
+   * expects a client-tracked version. See the processor implementation for how version/concurrency
+   * is actually handled. */
+  paymentVersion?: number;
 };
 
 export type LoadingOverlayType = {
@@ -134,6 +141,10 @@ export type LegacyEndpointUrlProps = {
   authorizeOrderUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   removePaymentTokenUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
+  createOrderUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
+  authenticateThreeDSOrderUrl?: string;
 };
 
 /** Category 3 — Checkout-only fields, no standalone-client equivalent. */
@@ -141,16 +152,24 @@ export type CheckoutOnlyProps = {
   paymentMethodType?: string;
   builderType?: BuilderType;
   processorUrl?: string;
+  /** Seeds SettingsProvider's `settings` state from the processor's `/operations/config` response. */
+  initialSettings?: GetSettingsResponse;
+  /** Seeds SettingsProvider's `userIdToken` state from the processor's `/operations/config` response. */
+  initialUserIdToken?: string;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path (yet). */
 export type LegacyOnlyProps = {
   purchaseCallback: (result: any, options?: any) => void;
   shippingMethodId: string;
-  createOrderUrl?: string;
-  authenticateThreeDSOrderUrl?: string;
   getSettingsUrl: string;
+  // Unlike its siblings above (now in LegacyEndpointUrlProps), this one is fully dead — no
+  // processorUrls() entry, no consumer anywhere. Kept per user decision (2026-08-05); see TODO.md.
   getOrderUrl?: string;
+  /** Relevant to PayPal Express only — other payment methods finalize the cart before their
+   * button/fields render, so there's nothing that can drift between order-creation and approval.
+   * PayPal Express can still let the buyer change shipping inside the PayPal popup after the order
+   * was created, hence this redirect to a merchant page for a final review. */
   onApproveRedirectionUrl?: string;
   getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;
@@ -413,6 +432,10 @@ export type ClientTokenRequest = {
 
 type CustomDataStringObject = { [key: string]: string };
 type PayPalButtonColors = "gold" | "blue" | "white" | "silver" | "black";
+type PayPalButtonConfig = {
+  buttonColor: PayPalButtonColors;
+  buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
+};
 
 export type GetSettingsResponse = {
   merchantId: string;
@@ -455,10 +478,11 @@ export type GetSettingsResponse = {
   ratePayCustomerServiceInstructions: CustomDataStringObject;
   paymentDescription: CustomDataStringObject;
   storeInVaultOnSuccess: boolean;
-  paypalButtonConfig: {
-    buttonColor: PayPalButtonColors;
-    buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
-  };
+  // Shared fallback used by both builder variants whenever PayPalStandard/PayPalExpress don't
+  // override a given field — see enabler/README.md's "PayPal button label/color config" section.
+  paypalButtonConfig: PayPalButtonConfig;
+  PayPalStandard?: Partial<PayPalButtonConfig>;
+  PayPalExpress?: Partial<PayPalButtonConfig>;
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, any>;
@@ -500,6 +524,9 @@ export type SettingsProviderProps = Pick<
   | "getSettingsUrl"
   | "getUserInfoUrl"
   | "removePaymentTokenUrl"
+  | "processorUrl"
+  | "initialSettings"
+  | "initialUserIdToken"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };

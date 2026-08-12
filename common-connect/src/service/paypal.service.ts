@@ -274,7 +274,6 @@ const generateAccessToken = async (): Promise<string> => {
       },
       cachedToken?.version ?? 0
     );
-    logger.info(body.access_token);
     return body.access_token;
   } else {
     throw new CustomError(response.status, response.statusText);
