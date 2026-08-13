@@ -128,6 +128,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       : undefined;
 
     return {
+      clientId: getConfig().paypalClientId ?? "",
       returnUrl: getConfig().returnUrl,
       environment: getConfig().paypalEnvironment,
       storedPaymentMethodsConfig: {

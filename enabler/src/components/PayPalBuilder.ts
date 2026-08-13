@@ -45,7 +45,7 @@ class PayPalComponent implements PaymentComponent {
           : undefined;
 
     const scriptOptions: ReactPayPalScriptOptions = {
-      clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "",
+      clientId: this.baseOptions.clientId || "",
       currency: "EUR",
       components: "buttons,card-fields",
       enableFunding: "paylater",

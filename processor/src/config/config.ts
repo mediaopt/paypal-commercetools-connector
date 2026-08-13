@@ -5,7 +5,7 @@
 // (PayPal, CardFields) and, for PayPal specifically, separately for the "standard" and "express"
 // builder variants (see PayPalComponentBuilder/createExpressBuilder in the enabler). Format: JSON
 // object matching (a subset of) @paypal/paypal-js's PayPalScriptOptions shape (excluding clientId,
-// which the enabler supplies separately) keyed by component, e.g.
+// which the config() response supplies separately from paypalClientId below) keyed by component, e.g.
 // {"PayPal":{"standard":{"currency":"USD"},"express":{"currency":"USD","enableFunding":"venmo"}},"CardFields":{"currency":"USD"}}
 // PayPal's enableFunding defaults to "paylater" for both standard and express so Pay Later stays
 // enabled if nothing is configured; set PAYPAL_SDK_OPTIONS.PayPal.standard/express.enableFunding

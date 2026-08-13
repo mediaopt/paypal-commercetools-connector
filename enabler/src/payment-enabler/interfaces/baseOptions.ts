@@ -23,6 +23,8 @@ export type BaseOptions = {
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;
   sdkOptions?: PayPalSdkOptions;
+  /** PayPal client id from `/operations/config`, used to load the PayPal JS SDK script. */
+  clientId?: string;
   /**
    * Merchant settings from the processor's `/operations/config` response — seeds
    * SettingsProvider's `settings` state.

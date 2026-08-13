@@ -10,7 +10,7 @@ import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
 
 export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
-  props,
+  props
 ) => {
   const {
     handleCreateOrder,
@@ -33,7 +33,7 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {
       return paymentTokens.payment_tokens.some(
-        (token) => token.payment_source.paypal,
+        (token) => token.payment_source.paypal
       );
     }
     return false;
