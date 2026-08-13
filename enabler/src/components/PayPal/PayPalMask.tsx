@@ -95,6 +95,7 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
         onError={(err) => errorFunc(err, isLoading, notify, t)}
       />
       {!vaultOnly &&
+        builderType !== "express" &&
         !hasPaypalToken &&
         (enableVaulting || storeInVaultOnSuccess) && (
           <label>
