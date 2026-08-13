@@ -6,13 +6,16 @@ import {
   Shipping,
   ShippingInfo,
   TaxCalculationMode,
+  Transaction,
   TransactionState,
+  TransactionType,
   TypedMoney,
 } from '@commercetools/platform-sdk';
 import {
   AmountBreakdown,
   Item,
   PaymentSourceResponse,
+  PurchaseUnit,
   ShipmentCarrier,
 } from '../paypal/checkout_api';
 import {
@@ -56,6 +59,33 @@ export const isPaymentUpToDate = (
     return false;
   return true;
 };
+
+/**
+ * The most recent transaction of the given type (and, when provided, state) on a payment —
+ * shared by paypal-commercetools-extension's findSuitableTransactionId and processor's
+ * findAuthorizationTransactionId, which each wrap this with their own error type/message on a
+ * miss rather than throwing here, since their error-handling contracts differ.
+ */
+export const findMostRecentTransaction = (
+  payment: Payment,
+  type: TransactionType,
+  state?: TransactionState
+): Transaction | undefined => {
+  const transactions = payment.transactions.filter(
+    (transaction) => transaction.type === type && (!state || transaction.state === state)
+  );
+  return transactions.length ? transactions[transactions.length - 1] : undefined;
+};
+
+/**
+ * Extracts the authorization/capture sub-object PayPal attaches to an Order response's first
+ * purchase unit — shared by paypal-commercetools-extension's relevantTransaction and processor's
+ * own use in paypal-payment.service.ts.
+ */
+export const extractPayPalPurchaseUnitTransaction = (
+  purchaseUnits: PurchaseUnit[] | undefined,
+  key: 'authorizations' | 'captures'
+) => purchaseUnits?.[0]?.payments?.[key]?.[0];
 
 export const mapCommercetoolsMoneyToPayPalMoney = (
   amountPlanned: TypedMoney

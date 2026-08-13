@@ -24,6 +24,7 @@ mockConfigModule();
 import {
   cacheAccessToken,
   getCachedAccessToken,
+  getSettings,
 } from "../service/config.service";
 
 describe("Testing config service", () => {
@@ -51,5 +52,25 @@ describe("Testing config service", () => {
     await cacheAccessToken({ accessToken: "123", validUntil: new Date() }, 1);
     expect(apiRoot.post).toHaveBeenCalledTimes(1);
     expect(apiRequest.execute).toHaveBeenCalledTimes(1);
+  });
+
+  test("test getSettings", async () => {
+    apiRequest.execute = jest.fn(() => ({
+      body: { value: { acceptPayPal: true } },
+    }));
+    const settings = await getSettings();
+
+    expect(settings).toEqual({ acceptPayPal: true });
+    expect(apiRoot.get).toHaveBeenCalledTimes(1);
+    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
+  });
+
+  test("test getSettings returns undefined when custom object is missing", async () => {
+    apiRequest.execute = jest.fn(() => {
+      throw new Error("Not found");
+    });
+    const settings = await getSettings();
+
+    expect(settings).toBeUndefined();
   });
 });

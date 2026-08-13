@@ -6,7 +6,7 @@ export * from "./types/index.types";
 export * from "./constants";
 export { createApiRoot, getProject } from "./client/create.client";
 
-export { getCachedAccessToken } from "./service/config.service";
+export { getCachedAccessToken, getSettings } from "./service/config.service";
 export {
   createPaymentToken,
   createVaultSetupToken,
@@ -54,6 +54,7 @@ export {
 export { VerifyWebhookSignature } from "./paypal/webhooks_api";
 export {
   PaymentTokenRequest,
+  PaymentTokenResponse,
   SetupTokenRequest,
   TokenIdRequestTypeEnum,
 } from "./paypal/vault_api";
@@ -71,4 +72,6 @@ export {
   mapValidCommercetoolsLineItemsToPayPalItems,
   resolveCommercetoolsCartShippingAddress,
   isPaymentUpToDate,
+  findMostRecentTransaction,
+  extractPayPalPurchaseUnitTransaction,
 } from "./utils/map.utils";
