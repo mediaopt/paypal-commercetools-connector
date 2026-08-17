@@ -35,7 +35,9 @@ import {
   AuthenticateThreeDSOrderResponseSchemaDTO,
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchemaDTO,
+  StandardPaymentMethodType,
 } from "../dtos/paypal-payment.dto";
+import { toPaymentMethodIconKey } from "../utils/paymentMethodIcon.utils";
 import {
   StoredPaymentMethodsResponse,
 } from "../dtos/stored-payment-methods.dto";
@@ -258,12 +260,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
       dropins: [],
-      components: [
-        { type: "CardFields" },
-        { type: "PayPal" },
-        // Add more payment methods as supported by PayPal
+      components: Object.values(StandardPaymentMethodType).map((type) => ({
+        type: toPaymentMethodIconKey(type),
+      })),
+      express: [
+        { type: toPaymentMethodIconKey(StandardPaymentMethodType.PAYPAL) },
       ],
-      express: [{ type: "PayPal" }],
     };
   }
 

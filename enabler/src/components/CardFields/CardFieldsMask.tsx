@@ -44,7 +44,8 @@ passed in — there is no separate prop/flag for it, and no other part of this f
 anything else to tell the two apart.
 
 Checkout mode (onRegisterSubmit is set): the component is mounted inside commercetools
-Checkout, via `enabler.createComponentBuilder("CardFields")` -> `PayPalBuilder.ts`. Checkout
+Checkout, via `enabler.createComponentBuilder("card")` -> `payment-enabler-paypal.ts` (which
+normalizes the commercetools icon key "card" to "CardFields") -> `PayPalBuilder.ts`. Checkout
 renders its own single "Pay" button for the whole page and drives every mounted payment
 component from there through the `PaymentComponent` contract
 (`payment-enabler/interfaces/enabler.ts`) — it calls `component.submit()`/`isValid()`/
