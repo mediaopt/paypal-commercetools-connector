@@ -7,7 +7,6 @@ import {
   CommercetoolsPaymentMethodService,
 } from "@commercetools/connect-payments-sdk";
 import {
-  PaymentMethod,
   PaymentUpdateAction,
   TransactionState,
 } from "@commercetools/platform-sdk";
@@ -77,7 +76,12 @@ import {
 import {
   isCardPaymentToken,
   mapPayPalPaymentTokenToStoredPaymentMethod,
+  resolveStoredPaymentMethodCreatedAt,
 } from "../utils/storedPaymentMethod.utils";
+import {
+  isStoredPaymentMethodsEnabled,
+  buildSdkOptions,
+} from "../utils/config.utils";
 import { PayPalCustomerService } from "./paypal-customer.service";
 
 export class PayPalPaymentService extends AbstractPaymentService {
@@ -132,13 +136,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
       returnUrl: getConfig().returnUrl,
       environment: getConfig().paypalEnvironment,
       storedPaymentMethodsConfig: {
-        isEnabled: this.isStoredPaymentMethodsEnabled(cartSummary),
+        isEnabled: isStoredPaymentMethodsEnabled(cartSummary),
       },
       enableVaulting: getConfig().enableVaulting,
       perMethodConfig: getConfig().perMethodConfig,
       settings,
       userIdToken,
-      sdkOptions: this.buildSdkOptions(cartSummary),
+      sdkOptions: buildSdkOptions(cartSummary),
     };
   }
 
@@ -176,54 +180,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
       return undefined;
     }
-  }
-
-  /**
-   * Indicates if the feature stored payment methods is enabled/available.
-   * It can be enhanced with further checks if so required.
-   */
-  isStoredPaymentMethodsEnabled(cartSummary?: {
-    customerId?: string;
-  }): boolean {
-    if (!getStoredPaymentMethodsConfig().enabled) {
-      return false;
-    }
-
-    return cartSummary?.customerId !== undefined;
-  }
-
-  /**
-   * Overlays cart-derived currency/buyerCountry onto every component's PayPal SDK script
-   * options — cart data wins when available, PAYPAL_SDK_OPTIONS/defaults stay as the fallback.
-   */
-  private buildSdkOptions(cartSummary?: {
-    country?: string;
-    currency?: string;
-  }): ConfigResponse["sdkOptions"] {
-    const configured = getConfig().sdkOptions;
-    if (!cartSummary) {
-      return configured;
-    }
-
-    const cartOptions: Record<string, unknown> = {};
-    if (cartSummary.currency) {
-      cartOptions.currency = cartSummary.currency;
-    }
-    if (cartSummary.country) {
-      cartOptions.buyerCountry = cartSummary.country;
-    }
-    if (!Object.keys(cartOptions).length) {
-      return configured;
-    }
-
-    return {
-      ...configured,
-      PayPal: {
-        standard: { ...configured.PayPal?.standard, ...cartOptions },
-        express: { ...configured.PayPal?.express, ...cartOptions },
-      },
-      CardFields: { ...configured.CardFields, ...cartOptions },
-    };
   }
 
   /**
@@ -885,7 +841,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         : [];
 
       const storedPaymentMethods = cardTokens.map((token) => {
-        const createdAt = this.resolveStoredPaymentMethodCreatedAt(
+        const createdAt = resolveStoredPaymentMethodCreatedAt(
           ctCart.customerId as string,
           token.id,
           ctPaymentMethods
@@ -902,28 +858,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
       return { storedPaymentMethods: [] };
     }
-  }
-
-  /**
-   * PayPal's vault "list customer payment tokens" API doesn't return a creation timestamp per
-   * token — expose commercetools' own PaymentMethod record's createdAt when one exists (kept in
-   * sync on a best-effort basis, see deleteStoredPaymentMethod), otherwise fall back to the
-   * current request time. Matches against an already-fetched list of the customer's CT
-   * PaymentMethod records (see getStoredPaymentMethods) rather than querying per token.
-   */
-  private resolveStoredPaymentMethodCreatedAt(
-    customerId: string,
-    tokenValue: string,
-    ctPaymentMethods: PaymentMethod[]
-  ): string {
-    const ctPaymentMethod = ctPaymentMethods.find(
-      (paymentMethod) => paymentMethod.token?.value === tokenValue
-    );
-    if (!ctPaymentMethod?.createdAt)
-      log.warn(
-        `One of the tokens for customer ${customerId} was created outside of checkout connector and therefore has no available creation time, resolving to current date`
-      );
-    return ctPaymentMethod?.createdAt ?? new Date().toISOString();
   }
 
   /**

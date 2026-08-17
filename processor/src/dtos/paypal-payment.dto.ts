@@ -47,7 +47,7 @@ const PaymentVaultSchema = Type.Object({
   ctCustomerId: Type.Optional(Type.String()),
 });
 
-// Shape must match CreatePaymentResponse in enabler
+// Enabler's CreatePaymentResponse must match this shape.
 export const InitPaymentResponseSchema = Type.Intersect([
   Type.Object({
     paypalData: Type.Object({
@@ -94,10 +94,7 @@ const CreateOrderDataSchema = Type.Object({
   countryCode: Type.Optional(Type.String()),
 });
 
-// Shape must match CreateOrderRequest in enabler. No paymentVersion field here — the enabler's
-// own CreateOrderRequest.paymentVersion is legacy/self-hosted-only and stays undefined against
-// this processor (see enabler/src/app/usePayment.tsx); Fastify/AJV's default additionalProperties
-// behavior means a caller that still sends it is unaffected by its absence from this schema.
+// Enabler's CreateOrderRequest must match this shape.
 export const CreateOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderData: Type.Optional(CreateOrderDataSchema),
@@ -112,8 +109,7 @@ export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
 >;
 
-// Shape must match CreateOrderResponse in enabler. No paymentVersion field — processor never
-// invents/echoes a commercetools version for an entity the fast checkout APIs already manage.
+// Enabler's CreateOrderResponse must match this shape.
 export const CreateOrderResponseSchema = Type.Object({
   orderData: Type.Object({
     id: Type.String(),
@@ -128,9 +124,8 @@ export type CreateOrderResponseSchemaDTO = Static<
   typeof CreateOrderResponseSchema
 >;
 
-// Shape must match the request body enabler's handleAuthenticateThreeDSOrder sends (usePayment.tsx).
-// isGPay is accepted for enabler-contract compatibility but not currently branched on
-
+// Enabler's handleAuthenticateThreeDSOrder request body must match this shape (usePayment.tsx).
+// isGPay is accepted for enabler-contract compatibility but not currently branched on.
 export const AuthenticateThreeDSOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderID: Type.String(),
@@ -140,13 +135,9 @@ export type AuthenticateThreeDSOrderRequestSchemaDTO = Static<
   typeof AuthenticateThreeDSOrderRequestSchema
 >;
 
-// Shape must match the response enabler's handleAuthenticateThreeDSOrder expects (usePayment.tsx).
-// No paymentVersion field — same reasoning as CreateOrderResponseSchema, processor never invents/
-// echoes a commercetools version for an entity the fast checkout APIs already manage; the enabler
-// no longer reads one from this response either (legacy paymentVersion plumbing, dead everywhere
-// in processor already — see the request schema above). `approve` is entirely absent (not just
-// empty) when the PayPal order has no authentication_result — the enabler checks for its presence
-// via hasOwnProperty.
+// Enabler's handleAuthenticateThreeDSOrder response must match this shape (usePayment.tsx).
+// `approve` is entirely absent (not just empty) when the PayPal order has no
+// authentication_result — the enabler checks for its presence via hasOwnProperty.
 export const AuthenticateThreeDSOrderResponseSchema = Type.Object({
   approve: Type.Optional(
     Type.Object({
@@ -162,9 +153,9 @@ export type AuthenticateThreeDSOrderResponseSchemaDTO = Static<
   typeof AuthenticateThreeDSOrderResponseSchema
 >;
 
-// Shape must match the request body enabler's handleOnApprove sends (usePayment.tsx) — shared by
-// both /payments/authorize and /payments/approve, mirroring the enabler's single OnApproveRequest
-// type used for both calls. No paymentVersion field — the enabler's own OnApproveRequest.paymentVersion is legacy/self-hosted-only.
+// Enabler's OnApproveRequest must match this shape (usePayment.tsx) — shared by both
+// /payments/authorize and /payments/approve, mirroring the enabler's single OnApproveRequest type
+// used for both calls.
 export const OnApproveRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderID: Type.String(),
@@ -174,7 +165,7 @@ export const OnApproveRequestSchema = Type.Object({
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
 
-// Shape must match the enabler's OnApproveResponse.orderData. Real PayPal status/message are
+// Enabler's OnApproveResponse.orderData must match this shape. Real PayPal status/message are
 // passed through unmodified — the enabler checks orderData.status === "COMPLETED" directly.
 export const OnApproveResponseSchema = Type.Object({
   orderData: Type.Object({

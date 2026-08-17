@@ -48,9 +48,19 @@ export type ApproveVaultSetupTokenResponse = {
 
 export type ApproveVaultSetupTokenData = { vaultSetupToken: string };
 
+/**
+ * @deprecated Legacy/self-hosted-only — not used by commercetools Checkout. This processor never
+ * invents/echoes a commercetools version for an entity the fast checkout APIs already manage, so
+ * this stays undefined against it (see enabler/src/app/usePayment.tsx); only relevant for a
+ * self-hosted backend that still expects a client-tracked version. See the processor
+ * implementation (processor/src/dtos/paypal-payment.dto.ts) for how version/concurrency is
+ * actually handled instead.
+ */
+export type PaymentVersion = number;
+
 export type CreateOrderRequest = {
   paymentId: string;
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   orderData?: CreatePayPalOrderData;
   /** The merchant's configured PayPal intent (from settings), so the processor can create the
    * PayPal order with a matching intent — PayPal rejects an authorize call against an order
@@ -95,26 +105,20 @@ export type OrderData = {
 
 export type CreateOrderResponse = {
   orderData: OrderData;
-  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
-   * expects a client-tracked version. See the processor implementation for how version/concurrency
-   * is actually handled. */
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   ok?: boolean;
 };
 
 export type OnApproveRequest = {
   paymentId: string;
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   orderID: string;
   saveCard?: boolean;
 };
 
 export type OnApproveResponse = {
   orderData: { id: string; status: string; message?: string };
-  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
-   * expects a client-tracked version. See the processor implementation for how version/concurrency
-   * is actually handled. */
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
 };
 
 export type LoadingOverlayType = {
@@ -302,8 +306,8 @@ export type CartInformationProps = { cartInformation?: CartInformation };
 
 /**
  * Source of truth for every field shared between `PaymentInfo` (enabler state) and
- * `CreatePaymentResponse` (the processor's wire response) — defined once here so their
- * deprecation notices don't drift between the two.
+ * `CreatePaymentResponse` (the processor's wire response) — defined once here so the two
+ * don't drift apart.
  */
 export type PaymentData = {
   id: string;
@@ -324,9 +328,10 @@ export type PaymentData = {
   /** Not used by the checkout. Please open an
    * issue if you are interested in vault-based customer-version tracking. */
   customerVersion?: number;
-  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
-   * expects a client-tracked version. See the processor implementation for how version/concurrency
-   * is actually handled. */
+  /** @deprecated Not used by the checkout; only relevant for a self-hosted backend that still
+   * expects a client-tracked version. See the processor implementation
+   * (processor/src/dtos/paypal-payment.dto.ts) for how version/concurrency is actually handled
+   * instead. */
   version?: number;
 };
 
@@ -334,13 +339,13 @@ export type PaymentInfo = PaymentData & CartInformationProps;
 
 export type CreatePaymentResponse = PaymentData & {
   paypalData: { clientId: string; currency: string; intent: string };
-  /** @deprecated Not used by the checkout;
-   * only relevant for a self-hosted backend built against the old Braintree-style
-   * contract. */
+  /** @deprecated Not used by the checkout; only relevant for a self-hosted backend built against
+   * the old `paypal-commercetools-client` npm package's contract. See the processor implementation
+   * (processor/src/dtos/paypal-payment.dto.ts) for the current, checkout-native contract. */
   braintreeCustomerId?: string;
-  /** @deprecated Superseded by shippingAddress/shippingOptions — shipping is handled differently
-   * now. Kept only for backward compatibility
-   * with a self-hosted backend still using the old contract. */
+  /** TODO: not implemented in the processor yet. Meant to be superseded by
+   * shippingAddress/shippingOptions, but PayPal Express shipping hasn't been fully designed/built
+   * end-to-end there yet (see TODO.md) — keep this field until that lands. */
   shippingMethod?: unknown;
 };
 

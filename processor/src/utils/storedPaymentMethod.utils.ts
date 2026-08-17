@@ -1,5 +1,7 @@
 import { PaymentTokenResponse } from 'common-connect';
+import { PaymentMethod } from '@commercetools/platform-sdk';
 import { StoredPaymentMethod } from '../dtos/stored-payment-methods.dto';
+import { log } from '../libs/logger';
 
 type NonNullableCard = NonNullable<NonNullable<PaymentTokenResponse['payment_source']>['card']>;
 
@@ -44,4 +46,27 @@ export const mapPayPalPaymentTokenToStoredPaymentMethod = (
       expiryYear: expiryYear ? parseInt(expiryYear, 10) : undefined,
     },
   };
+};
+
+/**
+ * PayPal's vault "list customer payment tokens" API doesn't return a creation timestamp per
+ * token — expose commercetools' own PaymentMethod record's createdAt when one exists (kept in
+ * sync on a best-effort basis, see paypal-payment.service.ts's deleteStoredPaymentMethod),
+ * otherwise fall back to the current request time. Matches against an already-fetched list of the
+ * customer's CT PaymentMethod records (see getStoredPaymentMethods) rather than querying per
+ * token.
+ */
+export const resolveStoredPaymentMethodCreatedAt = (
+  customerId: string,
+  tokenValue: string,
+  ctPaymentMethods: PaymentMethod[],
+): string => {
+  const ctPaymentMethod = ctPaymentMethods.find(
+    (paymentMethod) => paymentMethod.token?.value === tokenValue,
+  );
+  if (!ctPaymentMethod?.createdAt)
+    log.warn(
+      `One of the tokens for customer ${customerId} was created outside of checkout connector and therefore has no available creation time, resolving to current date`,
+    );
+  return ctPaymentMethod?.createdAt ?? new Date().toISOString();
 };
