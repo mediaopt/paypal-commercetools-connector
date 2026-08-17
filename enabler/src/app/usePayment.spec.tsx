@@ -289,6 +289,54 @@ describe("PaymentProvider missing endpoint configuration", () => {
     expect(mockedProcessorRequest).not.toHaveBeenCalled();
   });
 
+  it("handleOnApprove takes the legacy onApproveRedirectionUrl branch unchanged (no processor call at all)", async () => {
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        onApproveRedirectionUrl="https://merchant.example.com/review"
+        builderType="express"
+      >
+        <OnApproveConsumer />
+      </PaymentProvider>
+    );
+
+    // jsdom doesn't allow asserting on window.location.href directly (its Location setter is
+    // non-configurable and navigation is a no-op) — the reliable, DOM-independent signal that this
+    // branch ran is that it never calls the processor at all, same as before this change.
+    await waitFor(() => expect(mockedProcessorRequest).not.toHaveBeenCalled());
+  });
+
+  it("handleOnApprove short-circuits to the redirect when the response has a merchantReturnUrl, without running the normal success handling", async () => {
+    mockedProcessorRequest.mockResolvedValue({
+      orderData: { id: "order-1", status: "COMPLETED" },
+      merchantReturnUrl:
+        "https://merchant.example.com/approve?paymentReference=payment-1",
+    } as never);
+    const purchaseCallback = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={purchaseCallback}
+      >
+        <OnApproveConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+    // If the merchantReturnUrl branch didn't return early, orderData.status === "COMPLETED" would
+    // have triggered purchaseCallback — asserting it never fires confirms the early return.
+    expect(purchaseCallback).not.toHaveBeenCalled();
+  });
+
   it("handleCreateVaultSetupToken logs and returns an empty string when createVaultSetupTokenUrl is not configured", async () => {
     const onResult = jest.fn();
     render(

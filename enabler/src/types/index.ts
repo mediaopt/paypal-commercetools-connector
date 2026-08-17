@@ -114,11 +114,15 @@ export type OnApproveRequest = {
   paymentVersion?: PaymentVersion;
   orderID: string;
   saveCard?: boolean;
+  builderType?: BuilderType;
 };
 
 export type OnApproveResponse = {
   orderData: { id: string; status: string; message?: string };
   paymentVersion?: PaymentVersion;
+  /** Buyer redirect target built by the processor (see PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL) — when
+   * present, the enabler navigates there instead of showing the normal result UI. */
+  merchantReturnUrl?: string;
 };
 
 export type LoadingOverlayType = {
@@ -173,7 +177,11 @@ export type LegacyOnlyProps = {
   /** Relevant to PayPal Express only — other payment methods finalize the cart before their
    * button/fields render, so there's nothing that can drift between order-creation and approval.
    * PayPal Express can still let the buyer change shipping inside the PayPal popup after the order
-   * was created, hence this redirect to a merchant page for a final review. */
+   * was created, hence this redirect to a merchant page for a final review.
+   * @deprecated Prefer configuring `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
+   * on the processor instead — `authorizeOrder()`/`captureOrder()` responses now carry their own
+   * `merchantReturnUrl`, so the enabler doesn't need a dedicated prop for this. Still fully
+   * supported for self-hosting/legacy merchants who already pass it directly. */
   onApproveRedirectionUrl?: string;
   getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;

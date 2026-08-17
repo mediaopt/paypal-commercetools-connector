@@ -51,6 +51,11 @@ export const config = {
 
   // Payment Providers config
   returnUrl: process.env.MERCHANT_RETURN_URL || "",
+  // PayPal-Express-only override for the buyer redirect after authorizeOrder()/captureOrder() (see
+  // buildRedirectMerchantUrl in paypal-payment.service.ts) — lets a merchant send the buyer to a
+  // different page for that one flow. Falls back to the generic MERCHANT_RETURN_URL/session return
+  // url when unset.
+  onApprovePrefix: process.env.PAYPAL_ONAPPROVE_PREFIX || undefined,
   paymentInterface: PAYMENT_INTERFACE_NAME,
 
   // env variables related to stored payment methods feature

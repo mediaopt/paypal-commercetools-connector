@@ -36,12 +36,14 @@ import {
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchemaDTO,
   StandardPaymentMethodType,
+  CustomBuilderType,
 } from "../dtos/paypal-payment.dto";
 import { toPaymentMethodIconKey } from "../utils/paymentMethodIcon.utils";
+import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import {
-  StoredPaymentMethodsResponse,
-} from "../dtos/stored-payment-methods.dto";
-import { getCartIdFromContext } from "../libs/fastify/context/context";
+  getCartIdFromContext,
+  getMerchantReturnUrlFromContext,
+} from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
 import {
   mapValidCommercetoolsLineItemsToPayPalItems,
@@ -66,6 +68,8 @@ import {
   Capture2StatusEnum,
   Capture2,
   logger,
+  CheckoutPaymentIntent,
+  findMostRecentTransaction,
 } from "common-connect";
 
 import { log } from "../libs/logger";
@@ -456,12 +460,76 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * Shared by authorizeOrder()/captureOrder() — both call a PayPal API, add the matching CT
-   * transaction, sync order status, and link a vaulted card's customer id, differing only in
-   * which PayPal call/purchase-unit key/transaction type/status mapper applies.
+   * Shared by authorizeOrder()/captureOrder()/settlement() — calls a PayPal API, adds the
+   * matching CT transaction, syncs order status, and links a vaulted card's customer id,
+   * differing only in which PayPal call/purchase-unit key/transaction type/status mapper applies.
+   */
+  private async applyPayPalOrderTransaction(
+    payment: Payment,
+    orderID: string,
+    config: {
+      operation: "authorizeOrder" | "captureOrder";
+      callPayPal: (orderID: string) => Promise<Order>;
+      purchaseUnitKey: "authorizations" | "captures";
+      transactionType: "Authorization" | "Charge";
+      mapStatus: (status?: string) => TransactionState;
+    }
+  ): Promise<Order> {
+    let response: Order;
+    try {
+      response = await config.callPayPal(orderID);
+    } catch (e) {
+      log.error(
+        `${config.operation}: PayPal call failed for payment ${
+          payment.id
+        } — ${errorMessage(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to ${
+          config.operation === "authorizeOrder" ? "authorize" : "capture"
+        } PayPal order ${orderID}`
+      );
+    }
+
+    const transaction = extractPayPalPurchaseUnitTransaction(
+      response.purchase_units,
+      config.purchaseUnitKey
+    );
+
+    // updatePayment (Payment resource) and syncPayPalOrderStatus (same Payment resource, via a
+    // raw CT call) both retry on a version conflict with a fresh refetch, so running them
+    // alongside linkVaultedCardCustomer (Customer resource) here is safe, not just faster.
+    await Promise.all([
+      this.ctPaymentService.updatePayment({
+        id: payment.id,
+        transaction: {
+          type: config.transactionType,
+          amount: payment.amountPlanned,
+          interactionId: transaction?.id,
+          state: config.mapStatus(transaction?.status),
+        },
+      }),
+      retryCTSync(
+        () => this.syncPayPalOrderStatus(payment.id, response),
+        config.operation,
+        payment.id,
+        response.status ?? ""
+      ),
+      this.linkVaultedCardCustomer(payment, response),
+    ]);
+
+    return response;
+  }
+
+  /**
+   * Fetches the payment, checks the caller-supplied orderID actually belongs to it, then
+   * delegates to applyPayPalOrderTransaction() and shapes the result for authorizeOrder()/
+   * captureOrder() — including the optional merchantReturnUrl convenience (PayPal Express only
+   * uses onApprovePrefix; every other flow falls back to the generic MERCHANT_RETURN_URL/session
+   * return url, same as buildRedirectMerchantUrl's default).
    */
   private async finalizeOrder(
-    { paymentId, orderID }: OnApproveRequestSchemaDTO,
+    { paymentId, orderID, builderType }: OnApproveRequestSchemaDTO,
     config: {
       operation: "authorizeOrder" | "captureOrder";
       callPayPal: (orderID: string) => Promise<Order>;
@@ -478,50 +546,40 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    let response: Order;
-    try {
-      response = await config.callPayPal(orderID);
-    } catch (e) {
-      log.error(
-        `${config.operation}: PayPal call failed for payment ${
-          payment.id
-        } — ${errorMessage(e)}`
-      );
-      throw new ErrorInvalidOperation(
-        `Failed to ${config.operation === "authorizeOrder" ? "authorize" : "capture"} PayPal order ${orderID}`
-      );
-    }
-
-    const transaction = extractPayPalPurchaseUnitTransaction(
-      response.purchase_units,
-      config.purchaseUnitKey
+    const response = await this.applyPayPalOrderTransaction(
+      payment,
+      orderID,
+      config
     );
-
-    // updatePayment (Payment resource) and syncPayPalOrderStatus (same Payment resource, via a
-    // raw CT call) both retry on a version conflict with a fresh refetch, so running them
-    // alongside linkVaultedCardCustomer (Customer resource) here is safe, not just faster.
-    await Promise.all([
-      this.ctPaymentService.updatePayment({
-        id: paymentId,
-        transaction: {
-          type: config.transactionType,
-          amount: payment.amountPlanned,
-          interactionId: transaction?.id,
-          state: config.mapStatus(transaction?.status),
-        },
-      }),
-      retryCTSync(
-        () => this.syncPayPalOrderStatus(paymentId, response),
-        config.operation,
-        paymentId,
-        response.status ?? ""
-      ),
-      this.linkVaultedCardCustomer(payment, response),
-    ]);
 
     return {
       orderData: { id: response.id ?? "", status: response.status ?? "" },
     };
+  }
+
+  /**
+   * Builds the buyer-facing redirect URL after authorizeOrder()/captureOrder(), appending
+   * paymentReference/paymentStatus query params. Falls back to the CT Checkout session's own
+   * merchantReturnUrl, then the static MERCHANT_RETURN_URL config. `approveUrlOverride` (PayPal
+   * Express only, from onApprovePrefix) takes priority over both when set, so a merchant can send
+   * the buyer to a different page for that one flow without changing the fallback for every other.
+   */
+  private buildRedirectMerchantUrl(
+    paymentReference: string,
+    paymentStatus?: string,
+    approveUrlOverride?: string
+  ): string | undefined {
+    const baseUrl =
+      approveUrlOverride ||
+      getMerchantReturnUrlFromContext() ||
+      getConfig().returnUrl;
+    if (!baseUrl?.length) return undefined;
+    const redirectUrl = new URL(baseUrl);
+    redirectUrl.searchParams.append("paymentReference", paymentReference);
+    if (paymentStatus) {
+      redirectUrl.searchParams.append("paymentStatus", paymentStatus);
+    }
+    return redirectUrl.toString();
   }
 
   /**
@@ -679,7 +737,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * Settlement (Capture)
    *
    * @remarks
-   * Implementation to capture an authorized PayPal payment
+   * Implementation to capture an authorized PayPal payment. Also handles the case where nothing
+   * has been authorized/captured yet — the state a payment is in when a merchant drives things
+   * via commercetools' Payment Intents API directly (e.g. behind the PayPal-Express legal-review
+   * redirect, see enabler/README.md), since that API has no separate "authorize" action of its
+   * own. The branch is intent-first: capture when the configured PayPal intent is Capture, or when
+   * an Authorization/Success transaction already exists (second call under Authorize intent);
+   * otherwise authorize.
    *
    * @param request - commercetools payment and optional amount
    * @returns Promise with success response
@@ -689,46 +753,108 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment, amount } = request;
 
-    const authorizationId = findAuthorizationTransactionId(ctPayment);
-    // `amount` (from the commercetools Payment Intents request) has no fractionDigits of its own —
-    // borrow it from the payment's own amountPlanned (same currency, same precision).
-    const paypalAmount = {
-      currency_code: amount.currencyCode,
-      value: mapCommercetoolsMoneyToPayPalMoney({
-        ...amount,
-        type: "centPrecision",
-        fractionDigits: ctPayment.amountPlanned.fractionDigits,
-      }),
-    };
+    const settings = (await getSettings()) ?? getConfig().settingsFallback;
+    const intent =
+      settings?.payPalIntent === "Authorize"
+        ? CheckoutPaymentIntent.Authorize
+        : CheckoutPaymentIntent.Capture;
+    const authorizationTransaction = findMostRecentTransaction(
+      ctPayment,
+      "Authorization",
+      "Success"
+    );
+    const shouldCapture =
+      intent === CheckoutPaymentIntent.Capture || !!authorizationTransaction;
 
-    let response: Capture2;
-    try {
-      response = await capturePayPalAuthorization(authorizationId, {
-        amount: paypalAmount,
+    if (!shouldCapture) {
+      // intent === Authorize, nothing authorized yet — first call.
+      if (!ctPayment.interfaceId) {
+        throw new ErrorInvalidOperation(
+          `Payment ${ctPayment.id} has no associated PayPal order to settle`
+        );
+      }
+      await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
+        operation: "authorizeOrder",
+        callPayPal: (id) => authorizePayPalOrder(id, {}),
+        purchaseUnitKey: "authorizations",
+        transactionType: "Authorization",
+        mapStatus: (status) =>
+          mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+            status as Authorization2StatusEnum | undefined
+          ),
       });
-    } catch (e) {
-      log.error(
-        `settlement: PayPal capture failed for payment ${
-          ctPayment.id
-        } — ${errorMessage(e)}`
-      );
-      throw new ErrorInvalidOperation(
-        `Failed to capture PayPal authorization ${authorizationId}`
-      );
+      return {
+        success: true,
+        message: `Payment ${ctPayment.id} authorized — call capturePayment again to capture funds`,
+        paymentReference: ctPayment.id,
+      };
     }
 
-    await this.ctPaymentService.updatePayment({
-      id: ctPayment.id,
-      transaction: {
-        type: "Charge",
-        amount,
-        interactionId: response.id,
-        state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
-          response.status
-        ),
-      },
-    });
+    if (authorizationTransaction) {
+      const authorizationId = findAuthorizationTransactionId(ctPayment);
+      // `amount` (from the commercetools Payment Intents request) has no fractionDigits of its own —
+      // borrow it from the payment's own amountPlanned (same currency, same precision).
+      const paypalAmount = {
+        currency_code: amount.currencyCode,
+        value: mapCommercetoolsMoneyToPayPalMoney({
+          ...amount,
+          type: "centPrecision",
+          fractionDigits: ctPayment.amountPlanned.fractionDigits,
+        }),
+      };
 
+      let response: Capture2;
+      try {
+        response = await capturePayPalAuthorization(authorizationId, {
+          amount: paypalAmount,
+        });
+      } catch (e) {
+        log.error(
+          `settlement: PayPal capture failed for payment ${
+            ctPayment.id
+          } — ${errorMessage(e)}`
+        );
+        throw new ErrorInvalidOperation(
+          `Failed to capture PayPal authorization ${authorizationId}`
+        );
+      }
+
+      await this.ctPaymentService.updatePayment({
+        id: ctPayment.id,
+        transaction: {
+          type: "Charge",
+          amount,
+          interactionId: response.id,
+          state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
+            response.status
+          ),
+        },
+      });
+
+      return {
+        success: true,
+        message: `Payment ${ctPayment.id} captured successfully`,
+        paymentReference: ctPayment.id,
+      };
+    }
+
+    // intent === Capture, nothing authorized (e.g. first call under Capture intent via the
+    // redirect flow).
+    if (!ctPayment.interfaceId) {
+      throw new ErrorInvalidOperation(
+        `Payment ${ctPayment.id} has no associated PayPal order to settle`
+      );
+    }
+    await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
+      operation: "captureOrder",
+      callPayPal: (id) => capturePayPalOrder(id, {}),
+      purchaseUnitKey: "captures",
+      transactionType: "Charge",
+      mapStatus: (status) =>
+        mapPayPalCaptureStatusToCommercetoolsTransactionState(
+          status as Capture2StatusEnum | undefined
+        ),
+    });
     return {
       success: true,
       message: `Payment ${ctPayment.id} captured successfully`,
@@ -836,7 +962,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
         ? await this.ctPaymentMethodService
             .find({
               customerId: ctCart.customerId,
-              paymentInterface: getStoredPaymentMethodsConfig().config.paymentInterface,
+              paymentInterface:
+                getStoredPaymentMethodsConfig().config.paymentInterface,
             })
             .then((result) => result.results)
             .catch(() => [])
@@ -904,7 +1031,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
         .getByTokenValue({
           customerId,
           tokenValue: token,
-          paymentInterface: getStoredPaymentMethodsConfig().config.paymentInterface,
+          paymentInterface:
+            getStoredPaymentMethodsConfig().config.paymentInterface,
         })
         .then((ctPaymentMethod) =>
           this.ctPaymentMethodService.delete({
@@ -915,7 +1043,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
         )
         .catch((e) =>
           log.warn(
-            `deleteStoredPaymentMethod: no matching commercetools PaymentMethod record: ${errorMessage(e)}`
+            `deleteStoredPaymentMethod: no matching commercetools PaymentMethod record: ${errorMessage(
+              e
+            )}`
           )
         );
     }

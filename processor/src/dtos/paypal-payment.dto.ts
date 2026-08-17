@@ -171,6 +171,9 @@ export const OnApproveRequestSchema = Type.Object({
   // Accepted for enabler-contract compatibility; not yet acted on — no CT-native PaymentMethod
   // "save" flow exists yet.
   saveCard: Type.Optional(Type.Boolean()),
+  // Lets finalizeOrder tell the PayPal Express flow apart, to decide whether to use
+  // onApprovePrefix for the response's merchantReturnUrl.
+  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
 
@@ -182,5 +185,7 @@ export const OnApproveResponseSchema = Type.Object({
     status: Type.String(),
     message: Type.Optional(Type.String()),
   }),
+  // Buyer redirect target — see buildRedirectMerchantUrl in paypal-payment.service.ts.
+  merchantReturnUrl: Type.Optional(Type.String()),
 });
 export type OnApproveResponseSchemaDTO = Static<typeof OnApproveResponseSchema>;

@@ -468,13 +468,19 @@ export const PaymentProvider: FC<
           paymentVersion: latestPaymentVersion,
           orderID,
           saveCard,
+          builderType,
         });
 
         //@ts-ignore
         if (onApproveResult.ok === false) {
           throw new Error(t("payPal.generalError"));
         }
-        const { orderData } = onApproveResult as OnApproveResponse;
+        const { orderData, merchantReturnUrl } =
+          onApproveResult as OnApproveResponse;
+        if (merchantReturnUrl) {
+          window.location.href = merchantReturnUrl;
+          return;
+        }
         if (orderData.status === "COMPLETED") {
           setShowResult(true);
           setResultSuccess(true);
