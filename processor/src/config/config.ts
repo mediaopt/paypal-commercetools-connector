@@ -14,6 +14,8 @@ const configuredSdkOptions = process.env.PAYPAL_SDK_OPTIONS
   ? JSON.parse(process.env.PAYPAL_SDK_OPTIONS)
   : {};
 
+const PAYMENT_INTERFACE_NAME = "PayPal";
+
 export const config = {
   // Required by Payment SDK
   projectKey: process.env.CTP_PROJECT_KEY || "payment-integration",
@@ -49,13 +51,14 @@ export const config = {
 
   // Payment Providers config
   returnUrl: process.env.MERCHANT_RETURN_URL || "",
-  paymentInterface: "PayPal",
+  paymentInterface: PAYMENT_INTERFACE_NAME,
 
   // env variables related to stored payment methods feature
   storedPaymentMethodsEnabled:
     process.env.STORED_PAYMENT_METHODS_ENABLED || "false",
   storedPaymentMethodsPaymentInterface:
-    process.env.STORED_PAYMENT_METHODS_PAYMENT_INTERFACE || "psp-template",
+    process.env.STORED_PAYMENT_METHODS_PAYMENT_INTERFACE ||
+    PAYMENT_INTERFACE_NAME,
   storedPaymentMethodsInterfaceAccount:
     process.env.STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT || undefined,
 
