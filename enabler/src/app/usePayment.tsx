@@ -39,7 +39,7 @@ import { resolveEndpointUrl } from "../helpers/resolveEndpointUrl";
 import { useLoader } from "./useLoader";
 import { useNotifications } from "./useNotifications";
 import { useSettings } from "./useSettings";
-// import { getActionIndex } from "../components/CardFields/constants"; todo - restore all commented out code when enabling other payment methods
+import { getActionIndex } from "../components/CardFields/constants";
 import { useTranslation } from "react-i18next";
 import { handleResponseError } from "../messages/errorMessages";
 
@@ -63,7 +63,7 @@ type PaymentContextT = {
   handleApproveVaultSetupToken: (
     data: ApproveVaultSetupTokenData
   ) => Promise<void>;
-  // handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
+  handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
   orderId?: string;
 };
 
@@ -92,7 +92,7 @@ const PaymentContext = createContext<PaymentContextT>({
     Promise.resolve(""),
   handleApproveVaultSetupToken: (data?: ApproveVaultSetupTokenData) =>
     Promise.resolve(),
-  // handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
+  handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
   orderDataLinks: undefined,
   orderId: undefined,
 });
@@ -487,53 +487,58 @@ export const PaymentProvider: FC<
       }
     };
 
-    // const handleAuthenticateThreeDSOrder = async (
-    //   orderID: string,
-    //   isGPay?: boolean
-    // ): Promise<number> => {
-    //   if (!authenticateThreeDSOrderUrl) {
-    //     return 0;
-    //   }
-    //   const result = await processorRequest<
-    //     Record<string, string | number | boolean>,
-    //     {
-    //       version: number;
-    //       approve: {
-    //         liability_shift: string;
-    //         three_d_secure: {
-    //           enrollment_status: string;
-    //           authentication_status: string;
-    //         };
-    //       };
-    //     }
-    //   >(requestHeader, authenticateThreeDSOrderUrl, {
-    //     orderID,
-    //     paymentVersion: latestPaymentVersion,
-    //     paymentId: paymentInfo.id,
-    //     isGPay: isGPay ?? false,
-    //   });
-    //
-    //   if (!result) {
-    //     return 0;
-    //   }
-    //
-    //   latestPaymentVersion = result.version;
-    //
-    //   if (!result.hasOwnProperty("approve")) {
-    //     if (isGPay) {
-    //       return 1;
-    //     } else {
-    //       return 2;
-    //     }
-    //   }
-    //
-    //   const action = getActionIndex(
-    //     result.approve.three_d_secure.enrollment_status || "",
-    //     result.approve.three_d_secure.authentication_status || "",
-    //     result.approve.liability_shift || ""
-    //   );
-    //   return settings?.threeDSAction[action];
-    // };
+    const handleAuthenticateThreeDSOrder = async (
+      orderID: string,
+      isGPay?: boolean
+    ): Promise<number> => {
+      if (!authenticateThreeDSOrderUrl) {
+        return 0;
+      }
+      const result = await processorRequest<
+        {
+          orderID: string;
+          paymentVersion?: number;
+          paymentId: string;
+          isGPay: boolean;
+        },
+        {
+          version: number;
+          approve: {
+            liability_shift: string;
+            three_d_secure: {
+              enrollment_status: string;
+              authentication_status: string;
+            };
+          };
+        }
+      >(requestHeader, authenticateThreeDSOrderUrl, {
+        orderID,
+        paymentVersion: latestPaymentVersion,
+        paymentId: paymentInfo.id,
+        isGPay: isGPay ?? false,
+      });
+
+      if (!result) {
+        return 0;
+      }
+
+      latestPaymentVersion = result.version;
+
+      if (!result.hasOwnProperty("approve")) {
+        if (isGPay) {
+          return 1;
+        } else {
+          return 2;
+        }
+      }
+
+      const action = getActionIndex(
+        result.approve.three_d_secure.enrollment_status || "",
+        result.approve.three_d_secure.authentication_status || "",
+        result.approve.liability_shift || ""
+      );
+      return settings?.threeDSAction[action];
+    };
 
     return {
       requestHeader,
@@ -544,7 +549,7 @@ export const PaymentProvider: FC<
       vaultOnly,
       handleCreateVaultSetupToken,
       handleApproveVaultSetupToken,
-      // handleAuthenticateThreeDSOrder,
+      handleAuthenticateThreeDSOrder,
       orderDataLinks,
       orderId,
     };
@@ -558,6 +563,7 @@ export const PaymentProvider: FC<
     settings,
     createVaultSetupTokenUrl,
     approveVaultSetupTokenUrl,
+    authenticateThreeDSOrderUrl,
     orderDataLinks,
     orderId,
     processorUrl,

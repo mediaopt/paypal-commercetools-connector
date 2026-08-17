@@ -2,7 +2,7 @@ import { DropinType, PaymentDropinBuilder } from "./dropin";
 import { PaymentExpressBuilder } from "./express";
 import { StoredComponentBuilder, StoredPaymentMethod } from "./stored";
 import { CTAmount } from "./general";
-import { GenericError, ValidationHandlers } from "../../types";
+import { FormComponentProps, GenericError } from "../../types";
 
 /**
  * Represents the payment enabler. The payment enabler is the entry point for creating the components.
@@ -255,7 +255,7 @@ export type PaymentResult =
 /**
  * Represents the options for a payment component.
  */
-export type ComponentOptions = {
+export type ComponentOptions = FormComponentProps & {
   /**
    * Indicates whether to show the pay button.
    */
@@ -276,20 +276,6 @@ export type ComponentOptions = {
    * Override text for the pay button.
    */
   buttonText?: string;
-
-  /**
-   * Lets a mounted component register its own submit handler, which `PaymentComponent.submit()`
-   * then delegates to.
-   */
-  onRegisterSubmit?: (
-    handler: (storePaymentDetails?: boolean) => Promise<void>,
-  ) => void;
-
-  /**
-   * Lets a mounted component register its own validation handlers, which
-   * `PaymentComponent.showValidation()`/`isValid()` then delegate to.
-   */
-  onRegisterValidation?: (handlers: ValidationHandlers) => void;
 
   /**
    * A callback function that is called when an error occurs within the component.

@@ -1,7 +1,7 @@
 import { createElement, ComponentType, FC } from "react";
 import { PayPal } from "../PayPal";
+import { CardFields } from "../CardFields";
 // import {
-//   CardFields,
 //   ApplePay,
 //   GooglePay,
 //   PayUponInvoice,
@@ -18,8 +18,8 @@ export function getPayPalComponent(type: string): ComponentType<any> {
   switch (type) {
     case "PayPal":
       return PayPal;
-    // case "CardFields":
-    //   return CardFields;
+    case "CardFields":
+      return CardFields;
     // case "ApplePay":
     //   return ApplePay;
     // case "GooglePay":

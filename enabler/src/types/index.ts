@@ -11,6 +11,22 @@ export type ValidationHandlers = {
   showValidation: () => Promise<void>;
 };
 
+export type FormComponentProps = {
+  /**
+   * Lets a mounted component register its own submit handler, which `PaymentComponent.submit()`
+   * then delegates to.
+   */
+  onRegisterSubmit?: (
+    handler: (storePaymentDetails?: boolean) => Promise<void>
+  ) => void;
+
+  /**
+   * Lets a mounted component register its own validation handlers, which
+   * `PaymentComponent.showValidation()`/`isValid()` then delegate to.
+   */
+  onRegisterValidation?: (handlers: ValidationHandlers) => void;
+};
+
 export type GenericError = {
   code: string;
   message: string;
@@ -158,7 +174,8 @@ export type HostedFieldsProps = Pick<
   "options" | "enableVaulting"
 >;
 
-export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting">;
+export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting"> &
+  FormComponentProps;
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
   HostedFieldsThreeDSAuth;
