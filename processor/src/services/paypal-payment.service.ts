@@ -9,6 +9,7 @@ import {
 import {
   PaymentUpdateAction,
   TransactionState,
+  CartUpdateAction,
 } from "@commercetools/platform-sdk";
 
 import {
@@ -35,6 +36,8 @@ import {
   AuthenticateThreeDSOrderResponseSchemaDTO,
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchemaDTO,
+  UpdateShippingRequestSchemaDTO,
+  UpdateShippingResponseSchemaDTO,
   StandardPaymentMethodType,
   CustomBuilderType,
 } from "../dtos/paypal-payment.dto";
@@ -53,7 +56,6 @@ import {
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
-  mapCommercetoolsMoneyToPayPalMoney,
   createPayPalOrder,
   getPayPalOrder,
   authorizePayPalOrder,
@@ -63,6 +65,7 @@ import {
   deletePaymentToken,
   generateUserIdToken,
   getSettings,
+  updatePayPalOrder,
   Order,
   Authorization2StatusEnum,
   Capture2StatusEnum,
@@ -70,15 +73,26 @@ import {
   logger,
   CheckoutPaymentIntent,
   findMostRecentTransaction,
+  Patch,
 } from "common-connect";
 
 import { log } from "../libs/logger";
-import { errorMessage, retryCTSync } from "../utils/error.utils";
+import {
+  errorMessage,
+  errorResponseBody,
+  isPayPalInvalidPatchOperationError,
+  retryCTSync,
+} from "../utils/error.utils";
 import {
   buildOrderRequest,
+  buildPayPalAmount,
   extractPayPalPurchaseUnitTransaction,
   findAuthorizationTransactionId,
 } from "../utils/order.utils";
+import {
+  fetchPayPalShippingOptionsForCart,
+  PayPalShippingOption,
+} from "../utils/shipping.utils";
 import {
   isCardPaymentToken,
   mapPayPalPaymentTokenToStoredPaymentMethod,
@@ -102,14 +116,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     this.ctPaymentMethodService = opts.ctPaymentMethodService;
   }
 
-  /**
-   * Get configurations
-   *
-   * @remarks
-   * Implementation to provide PayPal configuration information
-   *
-   * @returns Promise with configuration containing return URL and stored payment methods settings
-   */
   public async config(): Promise<ConfigResponse> {
     const [rawSettings, cartSummary] = await Promise.all([
       getSettings(),
@@ -188,14 +194,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     }
   }
 
-  /**
-   * Get status
-   *
-   * @remarks
-   * Implementation to provide status of PayPal gateway and related services
-   *
-   * @returns Promise with status information from PayPal gateway
-   */
   public async status(): Promise<StatusResponse> {
     const requiredPermissions = [
       "manage_payments",
@@ -253,14 +251,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return handler.body;
   }
 
-  /**
-   * Get supported payment components
-   *
-   * @remarks
-   * Implementation to provide the payment components supported by the processor.
-   *
-   * @returns Promise with list of supported payment components
-   */
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
       dropins: [],
@@ -273,15 +263,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  /**
-   * Create payment
-   *
-   * @remarks
-   * Implementation to create a payment in commercetools for PayPal
-   *
-   * @param request - contains paymentMethodType and builderType
-   * @returns Promise with PayPal SDK options and payment details
-   */
   public async createPayment({
     builderType,
     paymentMethodType,
@@ -361,28 +342,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
       lastName: ctCart.billingAddress?.lastName,
       countryCode: ctCart.billingAddress?.country || ctCart.country,
       shippingAddress,
+      // for Express shipping options will be fetched on opening window when PayPal sets address
       lineItems: lineItems ?? undefined,
       priceBreakdown,
     };
   }
 
-  /**
-   * Create order
-   *
-   * @remarks
-   * Calls PayPal's Orders API to create the real PayPal order for a previously-created
-   * commercetools payment, then syncs the PayPal order id/status/method onto that payment.
-   * Deliberately does not add a commercetools transaction — see abstract-payment.service.ts's
-   * createOrder doc for why (commercetools Checkout would create a commercetools Order
-   * prematurely, before the buyer has approved on PayPal).
-   *
-   * @param request - commercetools payment ID plus optional PayPal order options
-   * @returns Promise with the PayPal order id/status for the enabler's PayPal JS SDK button
-   */
   public async createOrder({
     paymentId,
     orderData,
     payPalIntent,
+    builderType,
   }: CreateOrderRequestSchemaDTO): Promise<CreateOrderResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
 
@@ -402,7 +372,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctCart,
       orderData,
       payPalIntent,
-      existingPayPalCustomerId
+      existingPayPalCustomerId,
+      builderType === CustomBuilderType.EXPRESS
     );
 
     let response: Order;
@@ -419,6 +390,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
+    // No commercetools transaction is added here — only status/interfaceId are synced.
+    // commercetools Checkout creates the commercetools Order as soon as it sees any
+    // in-progress transaction, so adding one now would create it before the buyer has
+    // actually approved on PayPal. That happens later, in authorizeOrder()/captureOrder().
     await retryCTSync(
       () => this.syncPayPalOrderStatus(payment.id, response),
       "createOrder",
@@ -582,18 +557,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return redirectUrl.toString();
   }
 
-  /**
-   * Authorize order
-   *
-   * @remarks
-   * Calls PayPal's Orders API to authorize a previously-created, buyer-approved PayPal order.
-   * Unlike createOrder, this is the buyer-approved moment — adds a commercetools Authorization
-   * transaction so commercetools Checkout creates the commercetools Order. The authorization's
-   * interactionId is what settlement() later looks up to actually capture it.
-   *
-   * @param request - commercetools payment ID plus the approved PayPal order ID
-   * @returns Promise with the PayPal order id/status for the enabler
-   */
+  // Buyer-approved moment: applyPayPalOrderTransaction (via finalizeOrder) adds a commercetools
+  // Authorization transaction here, which is what triggers commercetools Checkout to create the
+  // commercetools Order, and whose interactionId settlement() later looks up to capture.
   public async authorizeOrder(
     request: OnApproveRequestSchemaDTO
   ): Promise<OnApproveResponseSchemaDTO> {
@@ -609,18 +575,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     });
   }
 
-  /**
-   * Capture order
-   *
-   * @remarks
-   * Calls PayPal's Orders API to capture a previously-created, buyer-approved PayPal order
-   * directly — the immediate-capture counterpart to authorizeOrder, used when the merchant's
-   * configured PayPal intent is Capture. Adds a commercetools Charge transaction, which is what
-   * triggers commercetools Checkout to create the commercetools Order for this flow.
-   *
-   * @param request - commercetools payment ID plus the approved PayPal order ID
-   * @returns Promise with the PayPal order id/status for the enabler
-   */
+  // Immediate-capture counterpart to authorizeOrder, used when the configured PayPal intent is
+  // Capture rather than Authorize. Adds a commercetools Charge transaction, which is what
+  // triggers commercetools Checkout to create the commercetools Order for this flow.
   public async captureOrder(
     request: OnApproveRequestSchemaDTO
   ): Promise<OnApproveResponseSchemaDTO> {
@@ -686,6 +643,255 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * Applies commercetools cart-update actions via the raw client call (ctCartService has no
+   * generic update method suitable for PayPal onShippingChange) and returns the updated cart.
+   */
+  private async applyCartUpdate(
+    cart: Cart,
+    actions: CartUpdateAction[]
+  ): Promise<Cart> {
+    try {
+      const updatedCart = await paymentSDK.ctAPI.client
+        .carts()
+        .withId({ ID: cart.id })
+        .post({
+          body: {
+            version: cart.version,
+            actions,
+          },
+        })
+        .execute();
+      return updatedCart.body;
+    } catch (e) {
+      log.error(
+        `updateShipping: cart update failed for cart ${
+          cart.id
+        } — ${errorMessage(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to update cart ${cart.id}: ${errorMessage(e)}`
+      );
+    }
+  }
+
+  /**
+   * Resolves the shipping method/options for updateShipping: applies whatever the request
+   * already tells the cart (address and/or an already-chosen method), then if address changes
+   * refetches available shipping methods
+   */
+  private async resolveShippingSelection(
+    ctCart: Cart,
+    {
+      address,
+      shippingMethodId,
+      clientShippingOptions,
+    }: {
+      address?: UpdateShippingRequestSchemaDTO["address"];
+      shippingMethodId?: string;
+      clientShippingOptions?: PayPalShippingOption[];
+    }
+  ): Promise<{
+    updatedCtCart: Cart;
+    shippingOptions: PayPalShippingOption[];
+  }> {
+    const initialActions: CartUpdateAction[] = [];
+    if (address) {
+      initialActions.push({
+        action: "setShippingAddress" as const,
+        address: {
+          country: address.countryCode,
+          ...(address.postalCode && { postalCode: address.postalCode }),
+          ...(address.city && { city: address.city }),
+          ...(address.state && { state: address.state }),
+        },
+      });
+    }
+    if (shippingMethodId) {
+      initialActions.push({
+        action: "setShippingMethod" as const,
+        shippingMethod: {
+          typeId: "shipping-method" as const,
+          id: shippingMethodId,
+        },
+      });
+    }
+    let updatedCtCart = await this.applyCartUpdate(ctCart, initialActions);
+
+    const hasTrustworthyClientOptions =
+      !address &&
+      !!shippingMethodId &&
+      !!clientShippingOptions?.some((opt) => opt.id === shippingMethodId);
+
+    const shippingOptions = hasTrustworthyClientOptions
+      ? clientShippingOptions!.map((opt) => ({
+          ...opt,
+          selected: opt.id === shippingMethodId,
+        }))
+      : await fetchPayPalShippingOptionsForCart({
+          ctApiClient: paymentSDK.ctAPI.client,
+          cartId: updatedCtCart.id,
+          currentMethodId: shippingMethodId,
+        });
+
+    if (!shippingOptions.length) {
+      throw new ErrorInvalidOperation(
+        `No shipping methods available for cart ${ctCart.id}`
+      );
+    }
+
+    if (!shippingMethodId) {
+      // Pure address change — the buyer hasn't picked an option yet. Resolve the default
+      // matchingCart marked as selected and assign it now, so totals below include shipping.
+      const defaultMethodId = shippingOptions.find((opt) => opt.selected)?.id;
+      if (!defaultMethodId) {
+        throw new ErrorInvalidOperation("No shipping method could be selected");
+      }
+      updatedCtCart = await this.applyCartUpdate(updatedCtCart, [
+        {
+          action: "setShippingMethod" as const,
+          shippingMethod: {
+            typeId: "shipping-method" as const,
+            id: defaultMethodId,
+          },
+        },
+      ]);
+    }
+
+    return { updatedCtCart, shippingOptions };
+  }
+
+  /**
+   * Optimistically determines from ct state if "add" or "replace" should be used to update
+   * PayPal order, if the method was wrong - retries with correct.
+   */
+  private failPatchPayPalOrderShipping(
+    e: unknown,
+    orderID: string,
+    paymentId: string,
+    context: string
+  ): never {
+    log.error(
+      `updateShipping: PayPal order update failed${context} for payment ${paymentId} — ${errorMessage(
+        e
+      )} — response body: ${JSON.stringify(errorResponseBody(e))}`
+    );
+    throw new ErrorInvalidOperation(
+      `Failed to update PayPal order ${orderID}`
+    );
+  }
+
+  private async patchPayPalOrderShipping(
+    orderID: string,
+    paymentId: string,
+    buildPatches: (shippingOptionsOp: "add" | "replace") => Patch[],
+    assumedOp: "add" | "replace"
+  ): Promise<void> {
+    try {
+      await updatePayPalOrder(orderID, buildPatches(assumedOp));
+    } catch (e) {
+      if (!isPayPalInvalidPatchOperationError(e)) {
+        this.failPatchPayPalOrderShipping(e, orderID, paymentId, "");
+      }
+
+      const correctedOp = assumedOp === "add" ? "replace" : "add";
+      log.warn(
+        `updateShipping: assumed op "${assumedOp}" was wrong for order ${orderID} (cart's shippingInfo didn't reflect the order's actual state) — retrying with "${correctedOp}"`
+      );
+      try {
+        await updatePayPalOrder(orderID, buildPatches(correctedOp));
+      } catch (retryError) {
+        this.failPatchPayPalOrderShipping(
+          retryError,
+          orderID,
+          paymentId,
+          " after op correction"
+        );
+      }
+    }
+  }
+
+  // Pre-approval cart/PayPal-order mutation only — like createOrder, must never add a
+  // commercetools transaction (see abstract-payment.service.ts).
+  public async updateShipping(
+    request: UpdateShippingRequestSchemaDTO
+  ): Promise<UpdateShippingResponseSchemaDTO> {
+    const {
+      paymentId,
+      orderID,
+      address,
+      shippingMethodId,
+      shippingOptions: clientShippingOptions,
+    } = request;
+
+    if (!address && !shippingMethodId) {
+      throw new ErrorInvalidOperation(
+        `updateShipping requires either address or shippingMethodId, neither provided for payment ${paymentId}`
+      );
+    }
+
+    const ctCart = await this.ctCartService.getCart({
+      id: getCartIdFromContext(),
+    });
+
+    const { updatedCtCart, shippingOptions } =
+      await this.resolveShippingSelection(ctCart, {
+        address,
+        shippingMethodId,
+        clientShippingOptions,
+      });
+
+    // Recompute totals and price breakdown from the final cart state
+    const amount = await this.ctCartService.getPaymentAmount({
+      cart: updatedCtCart,
+    });
+    const breakdown = mapCommercetoolsCartToPayPalPriceBreakdown(updatedCtCart);
+    const paypalAmount = buildPayPalAmount(amount);
+
+    const buildPatches = (shippingOptionsOp: "add" | "replace"): Patch[] => [
+      {
+        op: "replace",
+        path: "/purchase_units/@reference_id=='default'/amount",
+        value: {
+          ...paypalAmount,
+          ...(breakdown && { breakdown }),
+        },
+      },
+      {
+        op: shippingOptionsOp,
+        path: "/purchase_units/@reference_id=='default'/shipping/options",
+        value: shippingOptions,
+      },
+    ];
+
+    const assumedOp = ctCart.shippingInfo
+      ? ("replace" as const)
+      : ("add" as const);
+    await this.patchPayPalOrderShipping(
+      orderID,
+      paymentId,
+      buildPatches,
+      assumedOp
+    );
+
+    log.info(
+      `updateShipping: success, paymentId: ${paymentId}, cartId: ${ctCart.id}`
+    );
+    return {
+      shippingOptions,
+      amount: paypalAmount,
+      breakdown: {
+        ...(breakdown?.item_total && { item_total: breakdown.item_total }),
+        shipping: breakdown?.shipping || {
+          currency_code: amount.currencyCode,
+          value: "0",
+        },
+        ...(breakdown?.tax_total && { tax_total: breakdown.tax_total }),
+        ...(breakdown?.discount && { discount: breakdown.discount }),
+      },
+    };
+  }
+
+  /**
    * Applies setInterfaceId / setStatusInterfaceCode / setStatusInterfaceText /
    * setMethodInfoMethod via a raw CT API call — connect-payments-sdk's generic
    * updatePayment() does not expose the status actions. Re-fetches the payment
@@ -699,7 +905,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<void> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
     const actions: PaymentUpdateAction[] = [
-      ...(!payment.interfaceId && response.id
+      // A payment can get more than one PayPal order created for it across its lifetime
+      // (e.g. the buyer reopens the PayPal Express popup after an earlier
+      // attempt without a full page reload, which calls createOrder again).
+      ...(response.id && payment.interfaceId !== response.id
         ? [{ action: "setInterfaceId" as const, interfaceId: response.id }]
         : []),
       ...(response.status
@@ -733,21 +942,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       .execute();
   }
 
-  /**
-   * Settlement (Capture)
-   *
-   * @remarks
-   * Implementation to capture an authorized PayPal payment. Also handles the case where nothing
-   * has been authorized/captured yet — the state a payment is in when a merchant drives things
-   * via commercetools' Payment Intents API directly (e.g. behind the PayPal-Express legal-review
-   * redirect, see enabler/README.md), since that API has no separate "authorize" action of its
-   * own. The branch is intent-first: capture when the configured PayPal intent is Capture, or when
-   * an Authorization/Success transaction already exists (second call under Authorize intent);
-   * otherwise authorize.
-   *
-   * @param request - commercetools payment and optional amount
-   * @returns Promise with success response
-   */
   public async settlement(
     request: ModifyPaymentWithTransactionRequest
   ): Promise<PaymentUpdateResponseSchemaDTO> {
@@ -763,6 +957,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
       "Authorization",
       "Success"
     );
+    // Intent-first: capture when the configured intent is Capture, or when something's already
+    // been authorized (second call under Authorize intent). This also covers a merchant driving
+    // capturePayment directly via commercetools' Payment Intents API before anything's been
+    // authorized (e.g. behind the PayPal-Express legal-review redirect, see enabler/README.md),
+    // since that API has no separate "authorize" action of its own.
     const shouldCapture =
       intent === CheckoutPaymentIntent.Capture || !!authorizationTransaction;
 
@@ -793,15 +992,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
     if (authorizationTransaction) {
       const authorizationId = findAuthorizationTransactionId(ctPayment);
       // `amount` (from the commercetools Payment Intents request) has no fractionDigits of its own —
-      // borrow it from the payment's own amountPlanned (same currency, same precision).
-      const paypalAmount = {
-        currency_code: amount.currencyCode,
-        value: mapCommercetoolsMoneyToPayPalMoney({
-          ...amount,
-          type: "centPrecision",
-          fractionDigits: ctPayment.amountPlanned.fractionDigits,
-        }),
-      };
+      const paypalAmount = buildPayPalAmount(
+        amount,
+        ctPayment.amountPlanned.fractionDigits
+      );
 
       let response: Capture2;
       try {
@@ -862,15 +1056,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  /**
-   * Refund payment
-   *
-   * @remarks
-   * Implementation to refund a PayPal payment
-   *
-   * @param request - commercetools payment, optional refund amount, optional transaction ID
-   * @returns Promise with success response
-   */
   async refundPayment(
     request: ModifyPaymentWithTransactionRequest
   ): Promise<PaymentUpdateResponseSchemaDTO> {
@@ -887,15 +1072,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  /**
-   * Void (Cancel) payment
-   *
-   * @remarks
-   * Implementation to void/cancel an authorized PayPal payment
-   *
-   * @param request - commercetools payment
-   * @returns Promise with success response
-   */
   async void(
     request: CancelPaymentRequest
   ): Promise<PaymentUpdateResponseSchemaDTO> {
@@ -912,16 +1088,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  /**
-   * Get stored payment methods
-   *
-   * @remarks
-   * Implementation to retrieve stored payment methods from PayPal vault. commercetools is used
-   * only as a pointer (the CT customer's PayPalUserId custom field) — the actual list of stored
-   * payment methods is always read live from PayPal, which is the source of truth.
-   *
-   * @returns Promise with list of stored payment methods
-   */
   public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
@@ -989,21 +1155,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
     }
   }
 
-  /**
-   * Delete stored payment method
-   *
-   * @remarks
-   * Deletes a payment method directly from PayPal's vault by token — commercetools is not
-   * consulted to authorize this, since the PayPal token is the sole identifier the enabler has
-   * for a stored method. commercetools' cart is only fetched afterward, best-effort, to attempt
-   * a mirror cleanup of any commercetools-native PaymentMethod record.
-   *
-   * @param token - the PayPal vault payment token to delete
-   */
   public async deleteStoredPaymentMethod(token: string): Promise<void> {
     const cartId = getCartIdFromContext();
     let ctCart: Cart | undefined;
     try {
+      // PayPal deletion is authoritative and runs immediately — commercetools is not consulted
+      // to authorize it, since the PayPal token is the sole identifier the enabler has for a
+      // stored method. The cart is only fetched alongside it, best-effort, for the mirror
+      // cleanup below.
       [, ctCart] = await Promise.all([
         deletePaymentToken(token),
         this.ctCartService.getCart({ id: cartId }).catch(() => undefined),

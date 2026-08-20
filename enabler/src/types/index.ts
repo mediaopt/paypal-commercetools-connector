@@ -66,6 +66,11 @@ export type CreateOrderRequest = {
    * PayPal order with a matching intent — PayPal rejects an authorize call against an order
    * created with intent=CAPTURE, and vice versa for capture. */
   payPalIntent?: "Authorize" | "Capture";
+  /** Lets buildOrderRequest tell the PayPal Express flow apart, so it never sets
+   * experience_context.shipping_preference: "SET_PROVIDED_ADDRESS" for it — that value tells
+   * PayPal the shipping address is fixed and disables the buyer's ability to change it in the
+   * popup, which would make onShippingAddressChange/onShippingOptionsChange unreachable. */
+  builderType?: BuilderType;
 };
 
 export type CreateOrderData = {
@@ -125,6 +130,47 @@ export type OnApproveResponse = {
   merchantReturnUrl?: string;
 };
 
+// paymentId is deliberately not part of this type — usePayment.tsx's handleUpdateShipping
+// resolves it internally from paymentInfo.id
+export type UpdateShippingRequest = {
+  orderID: string;
+  shippingMethodId?: string;
+  address?: {
+    countryCode: string;
+    postalCode?: string;
+    city?: string;
+    state?: string;
+  };
+  //prevents refetching options if only method was changed for same address
+  shippingOptions?: PayPalShippingOption[];
+};
+
+export type UpdateShippingResponse = {
+  shippingOptions: PayPalShippingOption[];
+  amount: {
+    currency_code: string;
+    value: string;
+  };
+  breakdown: {
+    item_total?: {
+      currency_code: string;
+      value: string;
+    };
+    shipping: {
+      currency_code: string;
+      value: string;
+    };
+    tax_total?: {
+      currency_code: string;
+      value: string;
+    };
+    discount?: {
+      currency_code: string;
+      value: string;
+    };
+  };
+};
+
 export type LoadingOverlayType = {
   loadingText?: string;
   textStyles?: string;
@@ -139,7 +185,8 @@ export type BasicComponentProps = {
   enableVaulting?: boolean;
 };
 
-/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`. */
+/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`.
+ * will be removed, must be replaced with processorURL */
 export type LegacyEndpointUrlProps = {
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createPaymentUrl: string;
@@ -166,28 +213,30 @@ export type CheckoutOnlyProps = {
   initialUserIdToken?: string;
 };
 
-/** Category 4 — legacy fields with no `processorUrl` migration path (yet). */
-export type LegacyOnlyProps = {
-  purchaseCallback: (result: any, options?: any) => void;
-  shippingMethodId: string;
-  getSettingsUrl: string;
-  // Unlike its siblings above (now in LegacyEndpointUrlProps), this one is fully dead — no
-  // processorUrls() entry, no consumer anywhere. Kept per user decision (2026-08-05); see TODO.md.
-  getOrderUrl?: string;
-  /** Relevant to PayPal Express only — other payment methods finalize the cart before their
-   * button/fields render, so there's nothing that can drift between order-creation and approval.
-   * PayPal Express can still let the buyer change shipping inside the PayPal popup after the order
-   * was created, hence this redirect to a merchant page for a final review.
-   * @deprecated Prefer configuring `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
-   * on the processor instead — `authorizeOrder()`/`captureOrder()` responses now carry their own
-   * `merchantReturnUrl`, so the enabler doesn't need a dedicated prop for this. Still fully
-   * supported for self-hosting/legacy merchants who already pass it directly. */
-  onApproveRedirectionUrl?: string;
+/** Category 4 — legacy fields with no `processorUrl` migration path.
+ * will be kept for backward compatibility, but it is strongly suggested to
+ * use commercetools checkout for access to fast APIs or at least update the self-hosted bff
+ * to processor-like structure for support*/
+export type LegacyReplaceableProps = {
+  purchaseCallback?: (result: any, options?: any) => void; //see `MERCHANT_RETURN_URL` instead
+  shippingMethodId?: string; // see processor createPayment instead
+  getSettingsUrl: string; // see processor config instead
+  getOrderUrl?: string; //included directly where relevant in processor calls
+  onApproveRedirectionUrl?: string; //see processor `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
+} & CartInformationProps; //see enabler PaymentData instead
+
+/*will be kept at least until commercetools checkout natively supports vaulting for all methods
+for vaulting except credit card inside commercetools checkout please open an issue,
+for stored credit card see processor stored payment methods
+* */
+export type LegacyVaultProps = {
   getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;
   approveVaultSetupTokenUrl?: string;
   getClientTokenUrl?: string;
-} & CartInformationProps;
+};
+
+export type LegacyOnlyProps = LegacyReplaceableProps & LegacyVaultProps;
 
 export type GeneralComponentsProps = BasicComponentProps &
   LegacyEndpointUrlProps &
@@ -317,6 +366,36 @@ export type CartInformationProps = { cartInformation?: CartInformation };
  * `CreatePaymentResponse` (the processor's wire response) — defined once here so the two
  * don't drift apart.
  */
+/**
+ * PayPal shipping option as returned by the processor during onShippingChange flow.
+ */
+export type PayPalShippingOption = {
+  id: string;
+  label: string;
+  type: "SHIPPING";
+  amount: {
+    currency_code: string;
+    value: string;
+  };
+  selected: boolean;
+};
+
+/**
+ * Shipping address type matching mapCommercetoolsAddressToPayPalAddress's return shape.
+ */
+export type ShippingAddress = {
+  type: string;
+  name: {
+    full_name: string;
+  };
+  address: {
+    address_line_1: string;
+    admin_area_2?: string;
+    postal_code?: string;
+    country_code: string;
+  };
+};
+
 export type PaymentData = {
   id: string;
   amountPlanned: {
@@ -329,8 +408,8 @@ export type PaymentData = {
   firstName?: string;
   lastName?: string;
   countryCode?: string;
-  shippingAddress?: unknown;
-  shippingOptions?: unknown[];
+  shippingAddress?: ShippingAddress;
+  shippingOptions?: PayPalShippingOption[];
   priceBreakdown?: unknown;
   ctCustomerId?: string;
   /** Not used by the checkout. Please open an
@@ -351,10 +430,6 @@ export type CreatePaymentResponse = PaymentData & {
    * the old `paypal-commercetools-client` npm package's contract. See the processor implementation
    * (processor/src/dtos/paypal-payment.dto.ts) for the current, checkout-native contract. */
   braintreeCustomerId?: string;
-  /** TODO: not implemented in the processor yet. Meant to be superseded by
-   * shippingAddress/shippingOptions, but PayPal Express shipping hasn't been fully designed/built
-   * end-to-end there yet (see TODO.md) — keep this field until that lands. */
-  shippingMethod?: unknown;
 };
 
 export type ClientTokenResponse = {

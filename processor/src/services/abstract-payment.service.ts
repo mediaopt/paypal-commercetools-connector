@@ -22,6 +22,8 @@ import {
   AuthenticateThreeDSOrderResponseSchemaDTO,
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchemaDTO,
+  UpdateShippingRequestSchemaDTO,
+  UpdateShippingResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import { logger } from "common-connect/dist";
@@ -112,11 +114,7 @@ export abstract class AbstractPaymentService {
    * Create payment
    *
    * @remarks
-   * Abstract method to create a payment in commercetools.
-   * The actual implementation should be provided by subclasses.
-   *
-   * This method initializes a payment, fetches payment-specific cart and customer details, and returns them to the enabler.
-   * On success, the enabler renders the payment button with all necessary fields pre-filled.
+   * Creates a commercetools payment for the current cart and returns SDK options plus cart/customer details for the enabler to render the payment button.
    *
    * @param request - payment configuration including payment method type, builder type
    * @returns Promise with PayPal SDK options and payment object with cart/customer details
@@ -129,9 +127,7 @@ export abstract class AbstractPaymentService {
    * Create order
    *
    * @remarks
-   * Abstract method to create a real order with PayPal for a previously-created commercetools payment.
-   * Unlike createPayment (commercetools-only), this method calls PayPal's Orders API (`POST /v2/checkout/orders`)
-   * and returns the resulting PayPal order id/status to the enabler so it can complete the PayPal button flow.
+   * Creates the real PayPal order (`POST /v2/checkout/orders`) for a previously-created commercetools payment and returns its id/status to the enabler.
    *
    * @param request - commercetools payment ID plus optional PayPal order options (funding source, vaulting)
    * @returns Promise with the PayPal order id/status for the enabler's PayPal JS SDK button
@@ -144,12 +140,7 @@ export abstract class AbstractPaymentService {
    * Authorize order
    *
    * @remarks
-   * Abstract method to authorize a previously-created PayPal order (PayPal Orders API
-   * `POST /v2/checkout/orders/{id}/authorize`). Unlike createOrder, this is the buyer-approved
-   * moment — implementations must add a commercetools `Authorization` transaction here, since
-   * this is what commercetools Checkout expects in order to create the commercetools Order.
-   * The later capture of this authorization (once the merchant chooses to capture) goes through
-   * settlement(), via commercetools' Payment Intents `capturePayment` action.
+   * Authorizes a previously-created, buyer-approved PayPal order (`POST /v2/checkout/orders/{id}/authorize`) and must add a commercetools `Authorization` transaction.
    *
    * @param request - commercetools payment ID plus the approved PayPal order ID
    * @returns Promise with the PayPal order id/status for the enabler
@@ -162,11 +153,7 @@ export abstract class AbstractPaymentService {
    * Capture order
    *
    * @remarks
-   * Abstract method to capture a previously-created PayPal order directly (PayPal Orders API
-   * `POST /v2/checkout/orders/{id}/capture`) — the immediate-capture counterpart to
-   * authorizeOrder, used when the merchant's configured PayPal intent is Capture rather than
-   * Authorize. Like authorizeOrder, this is the buyer-approved moment and must add a
-   * commercetools `Charge` transaction.
+   * Captures a previously-created, buyer-approved PayPal order directly (`POST /v2/checkout/orders/{id}/capture`) and must add a commercetools `Charge` transaction.
    *
    * @param request - commercetools payment ID plus the approved PayPal order ID
    * @returns Promise with the PayPal order id/status for the enabler
@@ -179,10 +166,7 @@ export abstract class AbstractPaymentService {
    * Authenticate 3DS order
    *
    * @remarks
-   * Abstract method to check a PayPal order's 3D Secure authentication result. This is a read-only
-   * lookup against PayPal's Orders API (`GET /v2/checkout/orders/{id}`) — like createOrder, it must
-   * never add a transaction or otherwise mutate the commercetools payment; it exists purely to tell
-   * the enabler whether it's safe to proceed to the actual approve/capture step.
+   * Checks a PayPal order's 3D Secure authentication result (`GET /v2/checkout/orders/{id}`) — a read-only lookup that must never add a commercetools transaction.
    *
    * @param request - commercetools payment ID plus the PayPal order ID to check
    * @returns Promise with the 3DS result, if available
@@ -190,6 +174,19 @@ export abstract class AbstractPaymentService {
   abstract authenticateThreeDSOrder(
     request: AuthenticateThreeDSOrderRequestSchemaDTO
   ): Promise<AuthenticateThreeDSOrderResponseSchemaDTO>;
+
+  /**
+   * Update shipping (address/option change)
+   *
+   * @remarks
+   * Handles a shipping address or option change during the PayPal Express popup flow and must never add a commercetools transaction — a pre-approval cart/PayPal-order mutation only.
+   *
+   * @param request - payment ID, PayPal order ID, and either an address (for address changes) or shippingMethodId (for option changes)
+   * @returns Promise with the updated shipping options and totals
+   */
+  abstract updateShipping(
+    request: UpdateShippingRequestSchemaDTO
+  ): Promise<UpdateShippingResponseSchemaDTO>;
 
   /**
    * Refund payment

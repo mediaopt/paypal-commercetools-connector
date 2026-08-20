@@ -32,6 +32,8 @@ import {
   OrderDataLinks,
   OrderData,
   BuilderType,
+  UpdateShippingRequest,
+  UpdateShippingResponse,
 } from "../types";
 import { processorRequest } from "../services/processorRequest";
 import { processorUrls } from "../components/constants";
@@ -65,6 +67,10 @@ type PaymentContextT = {
     data: ApproveVaultSetupTokenData
   ) => Promise<void>;
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
+  handleUpdateShipping: (
+    request: UpdateShippingRequest
+  ) => Promise<UpdateShippingResponse>;
+  resolveShippingOptionId: (selectedOptionId: string) => string;
   orderId?: string;
   builderType?: BuilderType;
 };
@@ -95,6 +101,13 @@ const PaymentContext = createContext<PaymentContextT>({
   handleApproveVaultSetupToken: (data?: ApproveVaultSetupTokenData) =>
     Promise.resolve(),
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
+  handleUpdateShipping: (request: UpdateShippingRequest) =>
+    Promise.resolve({
+      shippingOptions: [],
+      amount: { currency_code: "", value: "" },
+      breakdown: { shipping: { currency_code: "", value: "" } },
+    }),
+  resolveShippingOptionId: (selectedOptionId: string) => selectedOptionId,
   orderDataLinks: undefined,
   orderId: undefined,
   builderType: undefined,
@@ -148,7 +161,7 @@ export const PaymentProvider: FC<
   const onSuccess = (orderData: OrderData) => {
     setShowResult(true);
     setResultSuccess(true);
-    purchaseCallback(orderData);
+    purchaseCallback?.(orderData);
   };
 
   /** @deprecated Legacy leftover from the pre-Checkout npm-client era. Always resolves to
@@ -286,7 +299,7 @@ export const PaymentProvider: FC<
         if (result) {
           setShowResult(true);
           setResultSuccess(true);
-          purchaseCallback(result);
+          purchaseCallback?.(result);
         } else {
           setShowResult(true);
           setResultSuccess(false);
@@ -322,6 +335,7 @@ export const PaymentProvider: FC<
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
           payPalIntent: settings?.payPalIntent,
+          builderType,
           orderData: {
             ...relevantOrderData,
           },
@@ -484,7 +498,7 @@ export const PaymentProvider: FC<
         if (orderData.status === "COMPLETED") {
           setShowResult(true);
           setResultSuccess(true);
-          purchaseCallback(onApproveResult);
+          purchaseCallback?.(onApproveResult);
         } else {
           setShowResult(true);
           setResultSuccess(false);
@@ -570,6 +584,66 @@ export const PaymentProvider: FC<
       }
     };
 
+    const handleUpdateShipping = async (
+      request: UpdateShippingRequest
+    ): Promise<UpdateShippingResponse> => {
+      try {
+        // No resolveEndpointUrl here — legacy way is to register onShippingChange on the component.
+        const requestUrl = derivedUrls.updateShippingUrl;
+        if (!requestUrl) {
+          console.error(
+            '[paypal-enabler] Missing configuration for "updateShippingUrl": no processorUrl was provided.'
+          );
+          throw new Error(t("interface.generalError"));
+        }
+
+        const result = await processorRequest<
+          { paymentId: string } & UpdateShippingRequest,
+          UpdateShippingResponse
+        >(requestHeader, requestUrl, {
+          paymentId: paymentInfo.id,
+          // Only relevant for an option-change call (no address) — the processor uses this
+          // cached list to skip refetching delivery options for the same address.
+          ...(!request.address && {
+            shippingOptions: paymentInfo.shippingOptions,
+          }),
+          ...request,
+        });
+
+        if (!result) {
+          throw new Error(t("interface.generalError"));
+        }
+
+        setPaymentInfo((prev) => ({
+          ...prev,
+          shippingOptions: result.shippingOptions,
+        }));
+
+        return result;
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
+        throw error;
+      }
+    };
+
+    // Validates a buyer's PayPal Express shipping-option pick against the freshest known
+    // list before handleUpdateShipping is called — kept here (not in PayPalMask) so any
+    // future component driving the same flow gets the same validation for free.
+    const resolveShippingOptionId = (selectedOptionId: string): string => {
+      const match = paymentInfo.shippingOptions?.find(
+        (option) => option.id === selectedOptionId
+      );
+      if (!match) {
+        throw new Error(
+          `Selected shipping option ${selectedOptionId} not found`
+        );
+      }
+      return match.id;
+    };
+
     return {
       requestHeader,
       paymentInfo,
@@ -580,6 +654,8 @@ export const PaymentProvider: FC<
       handleCreateVaultSetupToken,
       handleApproveVaultSetupToken,
       handleAuthenticateThreeDSOrder,
+      handleUpdateShipping,
+      resolveShippingOptionId,
       orderDataLinks,
       orderId,
       builderType,

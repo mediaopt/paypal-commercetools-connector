@@ -9,6 +9,19 @@ import { useNotifications } from "../../app/useNotifications";
 import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
 
+// Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
+// SDK's own actions.reject()
+const rejectOnError =
+  (fn: (data: any, actions: any) => Promise<any> | any) =>
+  async (data: any, actions: any) => {
+    try {
+      return await fn(data, actions);
+    } catch (error) {
+      actions.reject();
+      throw error;
+    }
+  };
+
 export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
   props
 ) => {
@@ -19,6 +32,8 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     handleCreateVaultSetupToken,
     handleApproveVaultSetupToken,
     builderType,
+    handleUpdateShipping,
+    resolveShippingOptionId,
   } = usePayment();
   const { settings, paymentTokens } = useSettings();
   const isExpress = builderType === "express";
@@ -80,6 +95,29 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
       },
       onApprove: handleOnApprove,
     };
+
+    //handleUpdateShipping keeps paymentInfo.shippingOptions in sync with each response,
+    // so onShippingOptionsChange always resolves the buyer's pick against up-to-date data.
+    if (isExpress) {
+      actions.onShippingAddressChange = rejectOnError((data: any) =>
+        handleUpdateShipping({
+          orderID: data.orderID,
+          address: data.shippingAddress,
+        })
+      );
+
+      actions.onShippingOptionsChange = rejectOnError((data: any) => {
+        if (!data.selectedShippingOption) {
+          throw new Error("Missing shipping option information");
+        }
+        return handleUpdateShipping({
+          orderID: data.orderID,
+          shippingMethodId: resolveShippingOptionId(
+            data.selectedShippingOption.id
+          ),
+        });
+      });
+    }
   }
 
   return (

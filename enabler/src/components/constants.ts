@@ -20,6 +20,7 @@ export const processorUrls = (processorUrl: string) => {
     createOrderUrl: `${base}/payments/createOrder`,
     authorizeOrderUrl: `${base}/payments/authorize`,
     authenticateThreeDSOrderUrl: `${base}/payments/3ds`,
+    updateShippingUrl: `${base}/payments/updateShipping`,
     getStoredPaymentMethodsURL: `${base}/stored-payment-methods`,
   };
 };

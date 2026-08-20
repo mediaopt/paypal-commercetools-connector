@@ -38,8 +38,23 @@ const PaymentRequiredFieldsSchema = Type.Object({
   }),
 });
 
+// Shipping option schema — used for both createPayment response and updateShipping flow
+export const PayPalShippingOptionSchema = Type.Object({
+  id: Type.String(),
+  label: Type.String(),
+  type: Type.Literal("SHIPPING"),
+  amount: Type.Object({
+    currency_code: Type.String(),
+    value: Type.String(),
+  }),
+  selected: Type.Boolean(),
+});
+export type PayPalShippingOptionSchemaDTO = Static<
+  typeof PayPalShippingOptionSchema
+>;
+
 const PaymentExpressShippingSchema = Type.Object({
-  shippingOptions: Type.Optional(Type.Array(Type.Any())),
+  shippingOptions: Type.Optional(Type.Array(PayPalShippingOptionSchema)),
 });
 
 const PaymentFrontendRenderingSchema = Type.Object({
@@ -109,10 +124,10 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   // Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
   // /operations/config) rather than processor re-fetching settings itself. Defaults to Capture
-  // in buildOrderRequest when absent (e.g. an older/self-hosted caller that hasn't sent it yet).
   payPalIntent: Type.Optional(
     Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
   ),
+  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
@@ -189,3 +204,60 @@ export const OnApproveResponseSchema = Type.Object({
   merchantReturnUrl: Type.Optional(Type.String()),
 });
 export type OnApproveResponseSchemaDTO = Static<typeof OnApproveResponseSchema>;
+
+// Update shipping request — used for both address and option changes
+// Field names match PayPal's OnShippingAddressChangeData.shippingAddress vocabulary exactly
+export const UpdateShippingRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  shippingMethodId: Type.Optional(Type.String()),
+  address: Type.Optional(
+    Type.Object({
+      countryCode: Type.String(),
+      postalCode: Type.Optional(Type.String()),
+      city: Type.Optional(Type.String()),
+      state: Type.Optional(Type.String()),
+    })
+  ),
+  // lets skip re-querying commercetools for the same list it already returned
+  shippingOptions: Type.Optional(Type.Array(PayPalShippingOptionSchema)),
+});
+export type UpdateShippingRequestSchemaDTO = Static<
+  typeof UpdateShippingRequestSchema
+>;
+
+// Update shipping response — returns the updated shipping options and totals
+export const UpdateShippingResponseSchema = Type.Object({
+  shippingOptions: Type.Array(PayPalShippingOptionSchema),
+  amount: Type.Object({
+    currency_code: Type.String(),
+    value: Type.String(),
+  }),
+  breakdown: Type.Object({
+    item_total: Type.Optional(
+      Type.Object({
+        currency_code: Type.String(),
+        value: Type.String(),
+      })
+    ),
+    shipping: Type.Object({
+      currency_code: Type.String(),
+      value: Type.String(),
+    }),
+    tax_total: Type.Optional(
+      Type.Object({
+        currency_code: Type.String(),
+        value: Type.String(),
+      })
+    ),
+    discount: Type.Optional(
+      Type.Object({
+        currency_code: Type.String(),
+        value: Type.String(),
+      })
+    ),
+  }),
+});
+export type UpdateShippingResponseSchemaDTO = Static<
+  typeof UpdateShippingResponseSchema
+>;
