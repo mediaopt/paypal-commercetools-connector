@@ -60,6 +60,54 @@ const PaymentInfoConsumer: FC<{
   return null;
 };
 
+// Waits for the initial createPayment call (paymentInfo.id) to resolve before calling
+// handleUpdateShipping, so the processorRequest mock queue order is deterministic
+// (createPayment always first) rather than depending on React's child-before-parent
+// effect-ordering.
+const UpdateShippingConsumer: FC<{
+  onResult?: (result: unknown) => void;
+  onError?: (error: unknown) => void;
+  request?: { orderID: string; address?: { countryCode: string }; shippingMethodId?: string };
+}> = ({
+  onResult,
+  onError,
+  request = { orderID: "order-1", address: { countryCode: "US" } },
+}) => {
+  const { handleUpdateShipping, paymentInfo } = usePayment();
+  useEffect(() => {
+    if (!paymentInfo.id) return;
+    handleUpdateShipping(request)
+      .then((result) => onResult?.(result))
+      .catch((error) => onError?.(error));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentInfo.id]);
+  return null;
+};
+
+// Waits for paymentInfo.shippingOptions to be populated before validating selectedOptionId
+// against it, so this doesn't race the initial createPayment response.
+const ResolveShippingOptionIdConsumer: FC<{
+  selectedOptionId: string;
+  onResult?: (result: string) => void;
+  onError?: (error: unknown) => void;
+}> = ({ selectedOptionId, onResult, onError }) => {
+  const { resolveShippingOptionId, paymentInfo } = usePayment();
+  useEffect(() => {
+    if (!paymentInfo.shippingOptions) return;
+    try {
+      // Resolve unconditionally before the optional onResult call — `onResult?.(fn())`
+      // would short-circuit and never invoke fn() at all when onResult is undefined,
+      // which is exactly the case in the "throws" test below.
+      const result = resolveShippingOptionId(selectedOptionId);
+      onResult?.(result);
+    } catch (error) {
+      onError?.(error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentInfo.shippingOptions]);
+  return null;
+};
+
 describe("PaymentProvider auto-triggers createPayment on mount", () => {
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
@@ -420,5 +468,270 @@ describe("PaymentProvider vaultOnly with legacy-only vault URLs", () => {
       "https://processor.test/payments",
       expect.anything()
     );
+  });
+});
+
+describe("PaymentProvider handleUpdateShipping", () => {
+  const shippingOption = {
+    id: "standard",
+    label: "Standard",
+    type: "SHIPPING" as const,
+    amount: { currency_code: "USD", value: "5.00" },
+    selected: true,
+  };
+
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("resolves with the processor's response and syncs paymentInfo.shippingOptions on success", async () => {
+    const shippingResponse = {
+      shippingOptions: [shippingOption],
+      amount: { currency_code: "USD", value: "15.00" },
+      breakdown: { shipping: { currency_code: "USD", value: "5.00" } },
+    };
+    mockedProcessorRequest
+      .mockResolvedValueOnce({
+        id: "payment-1",
+        amountPlanned: {
+          centAmount: 1000,
+          currencyCode: "USD",
+          fractionDigits: 2,
+        },
+      })
+      .mockResolvedValueOnce(shippingResponse as never);
+
+    const onResult = jest.fn();
+    const onPaymentInfo = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <PaymentInfoConsumer onPaymentInfo={onPaymentInfo} />
+        <UpdateShippingConsumer onResult={onResult} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(shippingResponse));
+
+    const [, url, body] = mockedProcessorRequest.mock.calls[1];
+    expect(url).toBe("https://processor.test/payments/updateShipping");
+    expect(body).toMatchObject({
+      orderID: "order-1",
+      address: { countryCode: "US" },
+    });
+
+    // paymentInfo.shippingOptions must reflect the fresh list from the response, so a
+    // subsequent onShippingOptionsChange call can resolve the buyer's pick correctly.
+    await waitFor(() =>
+      expect(onPaymentInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shippingOptions: shippingResponse.shippingOptions,
+        })
+      )
+    );
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("echoes paymentInfo.shippingOptions in the wire request body when already known — lets the processor skip re-querying commercetools for a pure option-change", async () => {
+    const cachedOptions = [shippingOption];
+    mockedProcessorRequest
+      .mockResolvedValueOnce({
+        id: "payment-1",
+        amountPlanned: {
+          centAmount: 1000,
+          currencyCode: "USD",
+          fractionDigits: 2,
+        },
+        shippingOptions: cachedOptions,
+      })
+      .mockResolvedValueOnce({
+        shippingOptions: cachedOptions,
+        amount: { currency_code: "USD", value: "5.00" },
+        breakdown: { shipping: { currency_code: "USD", value: "5.00" } },
+      });
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <UpdateShippingConsumer
+          onResult={jest.fn()}
+          request={{ orderID: "order-1", shippingMethodId: "standard" }}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(2));
+
+    const [, , body] = mockedProcessorRequest.mock.calls[1];
+    expect(body).toMatchObject({ shippingOptions: cachedOptions });
+  });
+
+  it("omits shippingOptions from the wire request body for an address-change call, even though it's cached", async () => {
+    const cachedOptions = [shippingOption];
+    mockedProcessorRequest
+      .mockResolvedValueOnce({
+        id: "payment-1",
+        amountPlanned: {
+          centAmount: 1000,
+          currencyCode: "USD",
+          fractionDigits: 2,
+        },
+        shippingOptions: cachedOptions,
+      })
+      .mockResolvedValueOnce({
+        shippingOptions: cachedOptions,
+        amount: { currency_code: "USD", value: "5.00" },
+        breakdown: { shipping: { currency_code: "USD", value: "5.00" } },
+      });
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <UpdateShippingConsumer onResult={jest.fn()} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(2));
+
+    const [, , body] = mockedProcessorRequest.mock.calls[1];
+    expect(body).not.toHaveProperty("shippingOptions");
+  });
+
+  it("throws and notifies when the processor call fails", async () => {
+    mockedProcessorRequest
+      .mockResolvedValueOnce({
+        id: "payment-1",
+        amountPlanned: {
+          centAmount: 1000,
+          currencyCode: "USD",
+          fractionDigits: 2,
+        },
+      })
+      .mockResolvedValueOnce(false);
+
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <UpdateShippingConsumer onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(mockNotify).toHaveBeenCalledWith("Error", expect.any(String));
+  });
+});
+
+describe("PaymentProvider resolveShippingOptionId", () => {
+  const shippingOptions = [
+    {
+      id: "standard",
+      label: "Standard",
+      type: "SHIPPING" as const,
+      amount: { currency_code: "USD", value: "5.00" },
+      selected: true,
+    },
+  ];
+
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("resolves a known shipping option id from paymentInfo.shippingOptions", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: {
+        centAmount: 1000,
+        currencyCode: "USD",
+        fractionDigits: 2,
+      },
+      shippingOptions,
+    });
+
+    const onResult = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <ResolveShippingOptionIdConsumer
+          selectedOptionId="standard"
+          onResult={onResult}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith("standard"));
+  });
+
+  it("throws for a shipping option id not present in paymentInfo.shippingOptions", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: {
+        centAmount: 1000,
+        currencyCode: "USD",
+        fractionDigits: 2,
+      },
+      shippingOptions,
+    });
+
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        processorUrl="https://processor.test"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        paymentMethodType="PayPal"
+        builderType="express"
+      >
+        <ResolveShippingOptionIdConsumer
+          selectedOptionId="unknown-option"
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onError).toHaveBeenCalled());
   });
 });
