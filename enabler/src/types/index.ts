@@ -48,10 +48,24 @@ export type ApproveVaultSetupTokenResponse = {
 
 export type ApproveVaultSetupTokenData = { vaultSetupToken: string };
 
+/**
+ * @deprecated Legacy/self-hosted-only — not used by commercetools Checkout. This processor never
+ * invents/echoes a commercetools version for an entity the fast checkout APIs already manage, so
+ * this stays undefined against it (see enabler/src/app/usePayment.tsx); only relevant for a
+ * self-hosted backend that still expects a client-tracked version. See the processor
+ * implementation (processor/src/dtos/paypal-payment.dto.ts) for how version/concurrency is
+ * actually handled instead.
+ */
+export type PaymentVersion = number;
+
 export type CreateOrderRequest = {
   paymentId: string;
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   orderData?: CreatePayPalOrderData;
+  /** The merchant's configured PayPal intent (from settings), so the processor can create the
+   * PayPal order with a matching intent — PayPal rejects an authorize call against an order
+   * created with intent=CAPTURE, and vice versa for capture. */
+  payPalIntent?: "Authorize" | "Capture";
 };
 
 export type CreateOrderData = {
@@ -91,23 +105,20 @@ export type OrderData = {
 
 export type CreateOrderResponse = {
   orderData: OrderData;
-  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
-   * expects a client-tracked version. See the processor implementation for how version/concurrency
-   * is actually handled. */
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   ok?: boolean;
 };
 
 export type OnApproveRequest = {
   paymentId: string;
-  paymentVersion?: number;
+  paymentVersion?: PaymentVersion;
   orderID: string;
   saveCard?: boolean;
 };
 
 export type OnApproveResponse = {
   orderData: { id: string; status: string; message?: string };
-  paymentVersion: number;
+  paymentVersion?: PaymentVersion;
 };
 
 export type LoadingOverlayType = {
@@ -134,6 +145,10 @@ export type LegacyEndpointUrlProps = {
   authorizeOrderUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   removePaymentTokenUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
+  createOrderUrl?: string;
+  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
+  authenticateThreeDSOrderUrl?: string;
 };
 
 /** Category 3 — Checkout-only fields, no standalone-client equivalent. */
@@ -141,16 +156,24 @@ export type CheckoutOnlyProps = {
   paymentMethodType?: string;
   builderType?: BuilderType;
   processorUrl?: string;
+  /** Seeds SettingsProvider's `settings` state from the processor's `/operations/config` response. */
+  initialSettings?: GetSettingsResponse;
+  /** Seeds SettingsProvider's `userIdToken` state from the processor's `/operations/config` response. */
+  initialUserIdToken?: string;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path (yet). */
 export type LegacyOnlyProps = {
   purchaseCallback: (result: any, options?: any) => void;
   shippingMethodId: string;
-  createOrderUrl?: string;
-  authenticateThreeDSOrderUrl?: string;
   getSettingsUrl: string;
+  // Unlike its siblings above (now in LegacyEndpointUrlProps), this one is fully dead — no
+  // processorUrls() entry, no consumer anywhere. Kept per user decision (2026-08-05); see TODO.md.
   getOrderUrl?: string;
+  /** Relevant to PayPal Express only — other payment methods finalize the cart before their
+   * button/fields render, so there's nothing that can drift between order-creation and approval.
+   * PayPal Express can still let the buyer change shipping inside the PayPal popup after the order
+   * was created, hence this redirect to a merchant page for a final review. */
   onApproveRedirectionUrl?: string;
   getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;
@@ -283,8 +306,8 @@ export type CartInformationProps = { cartInformation?: CartInformation };
 
 /**
  * Source of truth for every field shared between `PaymentInfo` (enabler state) and
- * `CreatePaymentResponse` (the processor's wire response) — defined once here so their
- * deprecation notices don't drift between the two.
+ * `CreatePaymentResponse` (the processor's wire response) — defined once here so the two
+ * don't drift apart.
  */
 export type PaymentData = {
   id: string;
@@ -305,9 +328,10 @@ export type PaymentData = {
   /** Not used by the checkout. Please open an
    * issue if you are interested in vault-based customer-version tracking. */
   customerVersion?: number;
-  /**@deprecated Not used by the checkout; only relevant for a self-hosted backend that still
-   * expects a client-tracked version. See the processor implementation for how version/concurrency
-   * is actually handled. */
+  /** @deprecated Not used by the checkout; only relevant for a self-hosted backend that still
+   * expects a client-tracked version. See the processor implementation
+   * (processor/src/dtos/paypal-payment.dto.ts) for how version/concurrency is actually handled
+   * instead. */
   version?: number;
 };
 
@@ -315,13 +339,13 @@ export type PaymentInfo = PaymentData & CartInformationProps;
 
 export type CreatePaymentResponse = PaymentData & {
   paypalData: { clientId: string; currency: string; intent: string };
-  /** @deprecated Not used by the checkout;
-   * only relevant for a self-hosted backend built against the old Braintree-style
-   * contract. */
+  /** @deprecated Not used by the checkout; only relevant for a self-hosted backend built against
+   * the old `paypal-commercetools-client` npm package's contract. See the processor implementation
+   * (processor/src/dtos/paypal-payment.dto.ts) for the current, checkout-native contract. */
   braintreeCustomerId?: string;
-  /** @deprecated Superseded by shippingAddress/shippingOptions — shipping is handled differently
-   * now. Kept only for backward compatibility
-   * with a self-hosted backend still using the old contract. */
+  /** TODO: not implemented in the processor yet. Meant to be superseded by
+   * shippingAddress/shippingOptions, but PayPal Express shipping hasn't been fully designed/built
+   * end-to-end there yet (see TODO.md) — keep this field until that lands. */
   shippingMethod?: unknown;
 };
 
@@ -413,6 +437,10 @@ export type ClientTokenRequest = {
 
 type CustomDataStringObject = { [key: string]: string };
 type PayPalButtonColors = "gold" | "blue" | "white" | "silver" | "black";
+type PayPalButtonConfig = {
+  buttonColor: PayPalButtonColors;
+  buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
+};
 
 export type GetSettingsResponse = {
   merchantId: string;
@@ -455,10 +483,11 @@ export type GetSettingsResponse = {
   ratePayCustomerServiceInstructions: CustomDataStringObject;
   paymentDescription: CustomDataStringObject;
   storeInVaultOnSuccess: boolean;
-  paypalButtonConfig: {
-    buttonColor: PayPalButtonColors;
-    buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
-  };
+  // Shared fallback used by both builder variants whenever PayPalStandard/PayPalExpress don't
+  // override a given field — see enabler/README.md's "PayPal button label/color config" section.
+  paypalButtonConfig: PayPalButtonConfig;
+  PayPalStandard?: Partial<PayPalButtonConfig>;
+  PayPalExpress?: Partial<PayPalButtonConfig>;
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, any>;
@@ -500,6 +529,9 @@ export type SettingsProviderProps = Pick<
   | "getSettingsUrl"
   | "getUserInfoUrl"
   | "removePaymentTokenUrl"
+  | "processorUrl"
+  | "initialSettings"
+  | "initialUserIdToken"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };

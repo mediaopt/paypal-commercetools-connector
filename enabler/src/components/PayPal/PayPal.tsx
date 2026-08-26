@@ -28,6 +28,8 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
   paymentMethodType,
   builderType,
   processorUrl,
+  initialSettings,
+  initialUserIdToken,
 
   ...restProps
 }) => {
@@ -52,6 +54,8 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
       paymentMethodType={paymentMethodType}
       builderType={builderType}
       processorUrl={processorUrl}
+      initialSettings={initialSettings}
+      initialUserIdToken={initialUserIdToken}
     >
       <PayPalButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>

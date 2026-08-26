@@ -18,7 +18,12 @@ import {
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
+  OnApproveRequestSchemaDTO,
+  OnApproveResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
+import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import { logger } from "common-connect/dist";
 
 /**
@@ -136,6 +141,57 @@ export abstract class AbstractPaymentService {
   ): Promise<CreateOrderResponseSchemaDTO>;
 
   /**
+   * Authorize order
+   *
+   * @remarks
+   * Abstract method to authorize a previously-created PayPal order (PayPal Orders API
+   * `POST /v2/checkout/orders/{id}/authorize`). Unlike createOrder, this is the buyer-approved
+   * moment — implementations must add a commercetools `Authorization` transaction here, since
+   * this is what commercetools Checkout expects in order to create the commercetools Order.
+   * The later capture of this authorization (once the merchant chooses to capture) goes through
+   * settlement(), via commercetools' Payment Intents `capturePayment` action.
+   *
+   * @param request - commercetools payment ID plus the approved PayPal order ID
+   * @returns Promise with the PayPal order id/status for the enabler
+   */
+  abstract authorizeOrder(
+    request: OnApproveRequestSchemaDTO
+  ): Promise<OnApproveResponseSchemaDTO>;
+
+  /**
+   * Capture order
+   *
+   * @remarks
+   * Abstract method to capture a previously-created PayPal order directly (PayPal Orders API
+   * `POST /v2/checkout/orders/{id}/capture`) — the immediate-capture counterpart to
+   * authorizeOrder, used when the merchant's configured PayPal intent is Capture rather than
+   * Authorize. Like authorizeOrder, this is the buyer-approved moment and must add a
+   * commercetools `Charge` transaction.
+   *
+   * @param request - commercetools payment ID plus the approved PayPal order ID
+   * @returns Promise with the PayPal order id/status for the enabler
+   */
+  abstract captureOrder(
+    request: OnApproveRequestSchemaDTO
+  ): Promise<OnApproveResponseSchemaDTO>;
+
+  /**
+   * Authenticate 3DS order
+   *
+   * @remarks
+   * Abstract method to check a PayPal order's 3D Secure authentication result. This is a read-only
+   * lookup against PayPal's Orders API (`GET /v2/checkout/orders/{id}`) — like createOrder, it must
+   * never add a transaction or otherwise mutate the commercetools payment; it exists purely to tell
+   * the enabler whether it's safe to proceed to the actual approve/capture step.
+   *
+   * @param request - commercetools payment ID plus the PayPal order ID to check
+   * @returns Promise with the 3DS result, if available
+   */
+  abstract authenticateThreeDSOrder(
+    request: AuthenticateThreeDSOrderRequestSchemaDTO
+  ): Promise<AuthenticateThreeDSOrderResponseSchemaDTO>;
+
+  /**
    * Refund payment
    *
    * @remarks
@@ -245,5 +301,15 @@ export abstract class AbstractPaymentService {
    *
    * @returns Promise with list of stored payment methods
    */
-  abstract getStoredPaymentMethods(): Promise<PaymentUpdateResponseSchemaDTO>;
+  abstract getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse>;
+
+  /**
+   * Delete stored payment method
+   *
+   * @remarks
+   * Abstract method to delete a stored payment method from PayPal vault by its token.
+   *
+   * @param token - the PayPal vault payment token to delete
+   */
+  abstract deleteStoredPaymentMethod(token: string): Promise<void>;
 }

@@ -12,6 +12,7 @@ import {
 } from "./interfaces/stored";
 import { BaseOptions } from "./interfaces/baseOptions";
 import { PayPalComponentBuilder } from "../components/PayPalBuilder";
+import { processorUrls } from "../components/constants";
 import { sessionHeader } from "../helpers/sessionHeader";
 
 export type PayPalPaymentMethodType =
@@ -66,6 +67,10 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
         storedPaymentMethodsEnabled:
           !!configJson.storedPaymentMethodsConfig?.isEnabled,
         enableVaulting: !!configJson.enableVaulting,
+        sdkOptions: configJson.sdkOptions,
+        clientId: configJson.clientId,
+        settings: configJson.settings,
+        userIdToken: configJson.userIdToken,
         purchaseCallback:
           configJson.purchaseCallback ||
           options.onComplete ||
@@ -119,10 +124,8 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
     const { baseOptions } = await this.setupData;
-    const url = `${baseOptions.processorUrl.replace(
-      /\/$/,
-      ""
-    )}/stored-payment-methods`;
+    const url = processorUrls(baseOptions.processorUrl)
+      .getStoredPaymentMethodsURL;
     const response = await fetch(url, {
       method: "GET",
       headers: sessionHeader(baseOptions.sessionId),

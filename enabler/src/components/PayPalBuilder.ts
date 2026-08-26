@@ -32,11 +32,48 @@ class PayPalComponent implements PaymentComponent {
 
     this.root = createRoot(element);
 
+    // Resolves to the processor-configured slice for this specific component — and, for PayPal,
+    // this specific builder variant (standard vs. express) — see BaseOptions.sdkOptions and
+    // PAYPAL_SDK_OPTIONS in processor/.env.template.
+    const componentSdkOptions =
+      this.componentType === "PayPal"
+        ? this.baseOptions.sdkOptions?.PayPal?.[
+            this.builderType === "express" ? "express" : "standard"
+          ]
+        : this.componentType === "CardFields"
+          ? this.baseOptions.sdkOptions?.CardFields
+          : undefined;
+
     const scriptOptions: ReactPayPalScriptOptions = {
-      clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "",
+      clientId: this.baseOptions.clientId || "",
       currency: "EUR",
       components: "buttons,card-fields",
-      // Add other required options as needed
+      enableFunding: "paylater",
+      ...componentSdkOptions,
+    };
+
+    // Resolves the button label/color config for this specific builder variant — PayPalStandard/
+    // PayPalExpress override the shared paypalButtonConfig fallback (see BaseOptions.settings and
+    // enabler/README.md's "PayPal button label/color config" section) — before the settings ever
+    // reach SettingsProvider, so consumers (e.g. PayPalMask) don't need to be builderType-aware.
+    const variantButtonConfig =
+      this.builderType === "express"
+        ? this.baseOptions.settings?.PayPalExpress
+        : this.baseOptions.settings?.PayPalStandard;
+    // Spreading undefined operands is a safe no-op, so this can be built unconditionally; only
+    // the emptiness check below needs to know whether there was actually anything to merge — an
+    // unconditional `paypalButtonConfig: {}` on settings with no config and no variant override
+    // would make PayPalMask.tsx's `if (settings.paypalButtonConfig)` wrongly treat it as "apply
+    // this style".
+    const mergedButtonConfig = {
+      ...this.baseOptions.settings?.paypalButtonConfig,
+      ...variantButtonConfig,
+    };
+    const initialSettings = this.baseOptions.settings && {
+      ...this.baseOptions.settings,
+      ...(Object.keys(mergedButtonConfig).length
+        ? { paypalButtonConfig: mergedButtonConfig }
+        : {}),
     };
 
     const customOptions = {
@@ -47,6 +84,8 @@ class PayPalComponent implements PaymentComponent {
       shippingMethodId: "standard",
       purchaseCallback: this.baseOptions.purchaseCallback,
       enableVaulting: this.baseOptions.enableVaulting ?? false,
+      initialSettings,
+      initialUserIdToken: this.baseOptions.userIdToken,
       showPayButton: this.config.showPayButton ?? true,
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,

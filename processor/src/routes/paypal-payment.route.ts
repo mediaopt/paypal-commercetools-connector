@@ -5,15 +5,27 @@ import {
   PaymentRequestSchemaDTO,
   InitPaymentResponseSchema,
   PaymentResponseSchemaDTO,
-  PaymentUpdateResponseSchema,
-  PaymentUpdateResponseSchemaDTO,
   CreateOrderRequestSchema,
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchema,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchema,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchema,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
+  OnApproveRequestSchema,
+  OnApproveRequestSchemaDTO,
+  OnApproveResponseSchema,
+  OnApproveResponseSchemaDTO,
 } from '../dtos/paypal-payment.dto';
+import {
+  StoredPaymentMethodsResponse,
+  StoredPaymentMethodsResponseSchema,
+} from '../dtos/stored-payment-methods.dto';
 import { PayPalPaymentService } from '../services/paypal-payment.service';
 import { Type } from '@sinclair/typebox';
+import { log } from '../libs/logger';
+import { getCartIdFromContext } from '../libs/fastify/context/context';
 
 type PaymentRoutesOptions = {
   paymentService: PayPalPaymentService;
@@ -34,6 +46,7 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
     },
     async (request, reply) => {
       const resp = await opts.paymentService.createPayment(request.body);
+      log.info(`createPayment: success, paymentId: ${resp.id}`);
       return reply.status(200).send(resp);
     },
   );
@@ -51,23 +64,108 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
     },
     async (request, reply) => {
       const resp = await opts.paymentService.createOrder(request.body);
+      log.info(
+        `createOrder: success, paymentId: ${request.body.paymentId}, orderId: ${resp.orderData.id}`
+      );
       return reply.status(200).send(resp);
     },
   );
 
-  fastify.get<{ Reply: PaymentUpdateResponseSchemaDTO }>(
+  fastify.post<{ Body: OnApproveRequestSchemaDTO; Reply: OnApproveResponseSchemaDTO }>(
+    '/payments/authorize',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: OnApproveRequestSchema,
+        response: {
+          200: OnApproveResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.authorizeOrder(request.body);
+      log.info(
+        `authorizeOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.post<{ Body: OnApproveRequestSchemaDTO; Reply: OnApproveResponseSchemaDTO }>(
+    '/payments/approve',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: OnApproveRequestSchema,
+        response: {
+          200: OnApproveResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.captureOrder(request.body);
+      log.info(
+        `captureOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.post<{ Body: AuthenticateThreeDSOrderRequestSchemaDTO; Reply: AuthenticateThreeDSOrderResponseSchemaDTO }>(
+    '/payments/3ds',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: AuthenticateThreeDSOrderRequestSchema,
+        response: {
+          200: AuthenticateThreeDSOrderResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.authenticateThreeDSOrder(request.body);
+      log.info(
+        `authenticateThreeDSOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.get<{ Reply: StoredPaymentMethodsResponse }>(
     '/stored-payment-methods',
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         response: {
-          200: PaymentUpdateResponseSchema,
+          200: StoredPaymentMethodsResponseSchema,
         },
       },
     },
     async (request, reply) => {
       const result = await opts.paymentService.getStoredPaymentMethods();
+      log.info(
+        `getStoredPaymentMethods: success, cartId: ${getCartIdFromContext()}, count: ${
+          result.storedPaymentMethods.length
+        }`
+      );
       return reply.status(200).send(result);
+    },
+  );
+
+  fastify.delete<{ Params: { id: string } }>(
+    '/stored-payment-methods/:id',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        params: Type.Object({ id: Type.String() }),
+        response: {
+          200: Type.Object({}),
+        },
+      },
+    },
+    async (request, reply) => {
+      await opts.paymentService.deleteStoredPaymentMethod(request.params.id);
+      return reply.status(200).send({});
     },
   );
 };

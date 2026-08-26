@@ -47,7 +47,7 @@ const PaymentVaultSchema = Type.Object({
   ctCustomerId: Type.Optional(Type.String()),
 });
 
-// Shape must match CreatePaymentResponse in enabler
+// Enabler's CreatePaymentResponse must match this shape.
 export const InitPaymentResponseSchema = Type.Intersect([
   Type.Object({
     paypalData: Type.Object({
@@ -94,16 +94,22 @@ const CreateOrderDataSchema = Type.Object({
   countryCode: Type.Optional(Type.String()),
 });
 
-// Shape must match CreateOrderRequest in enabler
+// Enabler's CreateOrderRequest must match this shape.
 export const CreateOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
-  paymentVersion: Type.Optional(Type.Number()), // accepted, never used — dead everywhere else in processor
   orderData: Type.Optional(CreateOrderDataSchema),
+  // Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
+  // /operations/config) rather than processor re-fetching settings itself. Defaults to Capture
+  // in buildOrderRequest when absent (e.g. an older/self-hosted caller that hasn't sent it yet).
+  payPalIntent: Type.Optional(
+    Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
+  ),
 });
-export type CreateOrderRequestSchemaDTO = Static<typeof CreateOrderRequestSchema>;
+export type CreateOrderRequestSchemaDTO = Static<
+  typeof CreateOrderRequestSchema
+>;
 
-// Shape must match CreateOrderResponse in enabler. No paymentVersion field — processor never
-// invents/echoes a commercetools version for an entity the fast checkout APIs already manage.
+// Enabler's CreateOrderResponse must match this shape.
 export const CreateOrderResponseSchema = Type.Object({
   orderData: Type.Object({
     id: Type.String(),
@@ -114,4 +120,58 @@ export const CreateOrderResponseSchema = Type.Object({
   }),
   ok: Type.Optional(Type.Boolean()),
 });
-export type CreateOrderResponseSchemaDTO = Static<typeof CreateOrderResponseSchema>;
+export type CreateOrderResponseSchemaDTO = Static<
+  typeof CreateOrderResponseSchema
+>;
+
+// Enabler's handleAuthenticateThreeDSOrder request body must match this shape (usePayment.tsx).
+// isGPay is accepted for enabler-contract compatibility but not currently branched on.
+export const AuthenticateThreeDSOrderRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  isGPay: Type.Optional(Type.Boolean()),
+});
+export type AuthenticateThreeDSOrderRequestSchemaDTO = Static<
+  typeof AuthenticateThreeDSOrderRequestSchema
+>;
+
+// Enabler's handleAuthenticateThreeDSOrder response must match this shape (usePayment.tsx).
+// `approve` is entirely absent (not just empty) when the PayPal order has no
+// authentication_result — the enabler checks for its presence via hasOwnProperty.
+export const AuthenticateThreeDSOrderResponseSchema = Type.Object({
+  approve: Type.Optional(
+    Type.Object({
+      liability_shift: Type.Optional(Type.String()),
+      three_d_secure: Type.Object({
+        enrollment_status: Type.Optional(Type.String()),
+        authentication_status: Type.Optional(Type.String()),
+      }),
+    })
+  ),
+});
+export type AuthenticateThreeDSOrderResponseSchemaDTO = Static<
+  typeof AuthenticateThreeDSOrderResponseSchema
+>;
+
+// Enabler's OnApproveRequest must match this shape (usePayment.tsx) — shared by both
+// /payments/authorize and /payments/approve, mirroring the enabler's single OnApproveRequest type
+// used for both calls.
+export const OnApproveRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  // Accepted for enabler-contract compatibility; not yet acted on — no CT-native PaymentMethod
+  // "save" flow exists yet.
+  saveCard: Type.Optional(Type.Boolean()),
+});
+export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
+
+// Enabler's OnApproveResponse.orderData must match this shape. Real PayPal status/message are
+// passed through unmodified — the enabler checks orderData.status === "COMPLETED" directly.
+export const OnApproveResponseSchema = Type.Object({
+  orderData: Type.Object({
+    id: Type.String(),
+    status: Type.String(),
+    message: Type.Optional(Type.String()),
+  }),
+});
+export type OnApproveResponseSchemaDTO = Static<typeof OnApproveResponseSchema>;

@@ -31,6 +31,7 @@ import {
   CreateInvoiceData,
   OrderDataLinks,
   OrderData,
+  BuilderType,
 } from "../types";
 import { processorRequest } from "../services/processorRequest";
 import { processorUrls } from "../components/constants";
@@ -65,6 +66,7 @@ type PaymentContextT = {
   ) => Promise<void>;
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
   orderId?: string;
+  builderType?: BuilderType;
 };
 
 const setRelevantData = (
@@ -95,6 +97,7 @@ const PaymentContext = createContext<PaymentContextT>({
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
   orderDataLinks: undefined,
   orderId: undefined,
+  builderType: undefined,
 });
 
 export const PaymentProvider: FC<
@@ -148,6 +151,10 @@ export const PaymentProvider: FC<
     purchaseCallback(orderData);
   };
 
+  /** @deprecated Legacy leftover from the pre-Checkout npm-client era. Always resolves to
+   * `undefined` against this processor (traces back to `paymentInfo.version`, itself sourced from
+   * `CreatePaymentResponse.version` — already @deprecated, never sent by this processor). Kept for
+   * now for a self-hosted backend that might still track it. */
   let latestPaymentVersion = paymentInfo.version;
 
   useEffect(() => {
@@ -314,6 +321,7 @@ export const PaymentProvider: FC<
         >(requestHeader, createOrderRequestUrl, {
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
+          payPalIntent: settings?.payPalIntent,
           orderData: {
             ...relevantOrderData,
           },
@@ -430,7 +438,8 @@ export const PaymentProvider: FC<
       const { orderID, saveCard } = data;
       isLoading(true);
 
-      if (onApproveRedirectionUrl) {
+      // Only meaningful for PayPal Express and only in legacy mode
+      if (onApproveRedirectionUrl && builderType === "express") {
         window.location.href = `${onApproveRedirectionUrl}?order_id=${orderID}`;
         return;
       }
@@ -491,53 +500,68 @@ export const PaymentProvider: FC<
       orderID: string,
       isGPay?: boolean
     ): Promise<number> => {
-      if (!authenticateThreeDSOrderUrl) {
-        return 0;
-      }
-      const result = await processorRequest<
-        {
-          orderID: string;
-          paymentVersion?: number;
-          paymentId: string;
-          isGPay: boolean;
-        },
-        {
-          version: number;
-          approve: {
-            liability_shift: string;
-            three_d_secure: {
-              enrollment_status: string;
-              authentication_status: string;
+      try {
+        const requestUrl = resolveEndpointUrl(
+          derivedUrls.authenticateThreeDSOrderUrl,
+          authenticateThreeDSOrderUrl,
+          "authenticateThreeDSOrderUrl",
+          t
+        );
+
+        const result = await processorRequest<
+          {
+            orderID: string;
+            paymentVersion?: number;
+            paymentId: string;
+            isGPay: boolean;
+          },
+          {
+            version: number;
+            approve: {
+              liability_shift: string;
+              three_d_secure: {
+                enrollment_status: string;
+                authentication_status: string;
+              };
             };
-          };
-        }
-      >(requestHeader, authenticateThreeDSOrderUrl, {
-        orderID,
-        paymentVersion: latestPaymentVersion,
-        paymentId: paymentInfo.id,
-        isGPay: isGPay ?? false,
-      });
+          }
+        >(requestHeader, requestUrl, {
+          orderID,
+          paymentVersion: latestPaymentVersion,
+          paymentId: paymentInfo.id,
+          isGPay: isGPay ?? false,
+        });
 
-      if (!result) {
+        if (!result) {
+          return 0;
+        }
+
+        latestPaymentVersion = result.version;
+
+        if (!result.hasOwnProperty("approve")) {
+          if (isGPay) {
+            return 1;
+          } else {
+            return 2;
+          }
+        }
+
+        const action = getActionIndex(
+          result.approve.three_d_secure.enrollment_status || "",
+          result.approve.three_d_secure.authentication_status || "",
+          result.approve.liability_shift || ""
+        );
+        // Falls back to 0 ("select a different method") rather than undefined when
+        // threeDSAction itself is missing — CardFieldsMask.tsx's caller does
+        // `result.toString(10)`, which would throw on undefined instead of erroring gracefully.
+        return settings?.threeDSAction?.[action] ?? 0;
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
         return 0;
       }
-
-      latestPaymentVersion = result.version;
-
-      if (!result.hasOwnProperty("approve")) {
-        if (isGPay) {
-          return 1;
-        } else {
-          return 2;
-        }
-      }
-
-      const action = getActionIndex(
-        result.approve.three_d_secure.enrollment_status || "",
-        result.approve.three_d_secure.authentication_status || "",
-        result.approve.liability_shift || ""
-      );
-      return settings?.threeDSAction[action];
     };
 
     return {
@@ -552,6 +576,7 @@ export const PaymentProvider: FC<
       handleAuthenticateThreeDSOrder,
       orderDataLinks,
       orderId,
+      builderType,
     };
   }, [
     paymentInfo,
@@ -564,6 +589,7 @@ export const PaymentProvider: FC<
     createVaultSetupTokenUrl,
     approveVaultSetupTokenUrl,
     authenticateThreeDSOrderUrl,
+    builderType,
     orderDataLinks,
     orderId,
     processorUrl,

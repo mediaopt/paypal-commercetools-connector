@@ -2,8 +2,14 @@ import {
   statusHandler,
   healthCheckCommercetoolsPermissions,
   ErrorInvalidOperation,
+  Cart,
+  Payment,
+  CommercetoolsPaymentMethodService,
 } from "@commercetools/connect-payments-sdk";
-import { PaymentUpdateAction } from "@commercetools/platform-sdk";
+import {
+  PaymentUpdateAction,
+  TransactionState,
+} from "@commercetools/platform-sdk";
 
 import {
   CancelPaymentRequest,
@@ -25,7 +31,14 @@ import {
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
   CreateOrderResponseSchemaDTO,
+  AuthenticateThreeDSOrderRequestSchemaDTO,
+  AuthenticateThreeDSOrderResponseSchemaDTO,
+  OnApproveRequestSchemaDTO,
+  OnApproveResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
+import {
+  StoredPaymentMethodsResponse,
+} from "../dtos/stored-payment-methods.dto";
 import { getCartIdFromContext } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
 import {
@@ -34,17 +47,53 @@ import {
   resolveCommercetoolsCartShippingAddress,
   mapCommercetoolsAddressToPayPalAddress,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
+  mapPayPalCaptureStatusToCommercetoolsTransactionState,
+  mapCommercetoolsMoneyToPayPalMoney,
   createPayPalOrder,
+  getPayPalOrder,
+  authorizePayPalOrder,
+  capturePayPalOrder,
+  capturePayPalAuthorization,
+  getPaymentTokens,
+  deletePaymentToken,
+  generateUserIdToken,
+  getSettings,
   Order,
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
+  Capture2,
+  logger,
 } from "common-connect";
 
 import { log } from "../libs/logger";
-import { retryCTSync } from "../utils/error.utils";
-import { buildOrderRequest } from "../utils/order.utils";
+import { errorMessage, retryCTSync } from "../utils/error.utils";
+import {
+  buildOrderRequest,
+  extractPayPalPurchaseUnitTransaction,
+  findAuthorizationTransactionId,
+} from "../utils/order.utils";
+import {
+  isCardPaymentToken,
+  mapPayPalPaymentTokenToStoredPaymentMethod,
+  resolveStoredPaymentMethodCreatedAt,
+} from "../utils/storedPaymentMethod.utils";
+import {
+  isStoredPaymentMethodsEnabled,
+  buildSdkOptions,
+} from "../utils/config.utils";
+import { PayPalCustomerService } from "./paypal-customer.service";
 
 export class PayPalPaymentService extends AbstractPaymentService {
+  private payPalCustomerService: PayPalCustomerService;
+  private ctPaymentMethodService: CommercetoolsPaymentMethodService;
+
   constructor(opts: PayPalPaymentServiceOptions) {
     super(opts.ctCartService, opts.ctPaymentService);
+    this.payPalCustomerService = new PayPalCustomerService({
+      ctAPI: opts.ctAPI,
+    });
+    this.ctPaymentMethodService = opts.ctPaymentMethodService;
   }
 
   /**
@@ -56,30 +105,81 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * @returns Promise with configuration containing return URL and stored payment methods settings
    */
   public async config(): Promise<ConfigResponse> {
+    const [rawSettings, cartSummary] = await Promise.all([
+      getSettings(),
+      this.ctCartService
+        .getCart({ id: getCartIdFromContext() })
+        .then((ctCart) => ({
+          customerId: ctCart.customerId,
+          country: ctCart.country,
+          currency: ctCart.totalPrice?.currencyCode,
+        }))
+        .catch((e) => {
+          log.warn(
+            `config: failed to fetch cart for sdkOptions/stored-payment-methods derivation — ${errorMessage(
+              e
+            )}`
+          );
+          return undefined;
+        }),
+    ]);
+    const settings = rawSettings ?? getConfig().settingsFallback;
+
+    // Only worth resolving when vaulting is actually enabled — otherwise nothing uses the token
+    // and it's not worth an extra PayPal OAuth call on every enabler mount.
+    const userIdToken = getConfig().enableVaulting
+      ? await this.resolveUserIdToken(cartSummary?.customerId)
+      : undefined;
+
     return {
+      clientId: getConfig().paypalClientId ?? "",
       returnUrl: getConfig().returnUrl,
       environment: getConfig().paypalEnvironment,
       storedPaymentMethodsConfig: {
-        isEnabled: await this.isStoredPaymentMethodsEnabled(),
+        isEnabled: isStoredPaymentMethodsEnabled(cartSummary),
       },
+      enableVaulting: getConfig().enableVaulting,
       perMethodConfig: getConfig().perMethodConfig,
+      settings,
+      userIdToken,
+      sdkOptions: buildSdkOptions(cartSummary),
     };
   }
 
   /**
-   * Indicates if the feature stored payment methods is enabled/available.
-   * It can be enhanced with further checks if so required.
+   * Resolves the CT customer's linked PayPal customer id (custom.fields.PayPalUserId) — the same
+   * pointer getStoredPaymentMethods()/deleteStoredPaymentMethod() use. commercetools is only a
+   * reference here; PayPal remains the source of truth for everything downstream of this id.
    */
-  async isStoredPaymentMethodsEnabled(): Promise<boolean> {
-    if (!getStoredPaymentMethodsConfig().enabled) {
-      return false;
+  private async resolvePayPalCustomerId(
+    ctCustomerId?: string
+  ): Promise<string | undefined> {
+    if (!ctCustomerId) {
+      return undefined;
     }
+    const ctCustomer = await this.payPalCustomerService.getCtCustomer(
+      ctCustomerId
+    );
+    return ctCustomer?.custom?.fields?.PayPalUserId;
+  }
 
-    const ctCart = await this.ctCartService.getCart({
-      id: getCartIdFromContext(),
-    });
-
-    return ctCart.customerId !== undefined;
+  private async resolveUserIdToken(
+    ctCustomerId?: string
+  ): Promise<string | undefined> {
+    const paypalCustomerId = await this.resolvePayPalCustomerId(ctCustomerId);
+    if (!paypalCustomerId) {
+      return undefined;
+    }
+    try {
+      return await generateUserIdToken(paypalCustomerId);
+    } catch (e) {
+      log.warn(
+        `config: failed to generate PayPal userIdToken for customer ${paypalCustomerId} — ${errorMessage(
+          e
+        )}`
+      );
+      return undefined;
+    }
   }
 
   /**
@@ -276,6 +376,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
   public async createOrder({
     paymentId,
     orderData,
+    payPalIntent,
   }: CreateOrderRequestSchemaDTO): Promise<CreateOrderResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
 
@@ -283,7 +384,20 @@ export class PayPalPaymentService extends AbstractPaymentService {
       id: getCartIdFromContext(),
     });
 
-    const orderRequest = buildOrderRequest(payment, ctCart, orderData);
+    // So a returning customer's newly-vaulted payment source gets attached to their existing
+    // PayPal customer id instead of a brand-new, disconnected one — see buildOrderRequest. Only
+    // worth the extra CT customer lookup when actually vaulting something.
+    const existingPayPalCustomerId = orderData?.storeInVault
+      ? await this.resolvePayPalCustomerId(ctCart.customerId)
+      : undefined;
+
+    const orderRequest = buildOrderRequest(
+      payment,
+      ctCart,
+      orderData,
+      payPalIntent,
+      existingPayPalCustomerId
+    );
 
     let response: Order;
     try {
@@ -313,6 +427,201 @@ export class PayPalPaymentService extends AbstractPaymentService {
         payment_source: response.payment_source,
         links: response.links,
       },
+    };
+  }
+
+  /**
+   * Persists the PayPal customer id a card vault produced (buildOrderRequest's
+   * payment_source.card.attributes.vault.store_in_vault) onto the CT customer's PayPalUserId
+   * custom field, so getStoredPaymentMethods()/deleteStoredPaymentMethod() can find it later —
+   * same pointer they already resolve via resolvePayPalCustomerId. No-ops when the order wasn't a
+   * vaulted card payment, the payment has no CT customer, or a PayPalUserId is already set
+   * (linkPayPalCustomerId itself handles that last case).
+   */
+  private async linkVaultedCardCustomer(
+    payment: Payment,
+    response: Order
+  ): Promise<void> {
+    const vaultCustomerId =
+      response.payment_source?.card?.attributes?.vault?.customer?.id;
+    if (!vaultCustomerId || !payment.customer?.id) {
+      return;
+    }
+    await this.payPalCustomerService.linkPayPalCustomerId(
+      payment.customer.id,
+      vaultCustomerId
+    );
+  }
+
+  /**
+   * Shared by authorizeOrder()/captureOrder() — both call a PayPal API, add the matching CT
+   * transaction, sync order status, and link a vaulted card's customer id, differing only in
+   * which PayPal call/purchase-unit key/transaction type/status mapper applies.
+   */
+  private async finalizeOrder(
+    { paymentId, orderID }: OnApproveRequestSchemaDTO,
+    config: {
+      operation: "authorizeOrder" | "captureOrder";
+      callPayPal: (orderID: string) => Promise<Order>;
+      purchaseUnitKey: "authorizations" | "captures";
+      transactionType: "Authorization" | "Charge";
+      mapStatus: (status?: string) => TransactionState;
+    }
+  ): Promise<OnApproveResponseSchemaDTO> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    if (payment.interfaceId && payment.interfaceId !== orderID) {
+      throw new ErrorInvalidOperation(
+        `Order ${orderID} does not belong to payment ${paymentId}`
+      );
+    }
+
+    let response: Order;
+    try {
+      response = await config.callPayPal(orderID);
+    } catch (e) {
+      log.error(
+        `${config.operation}: PayPal call failed for payment ${
+          payment.id
+        } — ${errorMessage(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to ${config.operation === "authorizeOrder" ? "authorize" : "capture"} PayPal order ${orderID}`
+      );
+    }
+
+    const transaction = extractPayPalPurchaseUnitTransaction(
+      response.purchase_units,
+      config.purchaseUnitKey
+    );
+
+    // updatePayment (Payment resource) and syncPayPalOrderStatus (same Payment resource, via a
+    // raw CT call) both retry on a version conflict with a fresh refetch, so running them
+    // alongside linkVaultedCardCustomer (Customer resource) here is safe, not just faster.
+    await Promise.all([
+      this.ctPaymentService.updatePayment({
+        id: paymentId,
+        transaction: {
+          type: config.transactionType,
+          amount: payment.amountPlanned,
+          interactionId: transaction?.id,
+          state: config.mapStatus(transaction?.status),
+        },
+      }),
+      retryCTSync(
+        () => this.syncPayPalOrderStatus(paymentId, response),
+        config.operation,
+        paymentId,
+        response.status ?? ""
+      ),
+      this.linkVaultedCardCustomer(payment, response),
+    ]);
+
+    return {
+      orderData: { id: response.id ?? "", status: response.status ?? "" },
+    };
+  }
+
+  /**
+   * Authorize order
+   *
+   * @remarks
+   * Calls PayPal's Orders API to authorize a previously-created, buyer-approved PayPal order.
+   * Unlike createOrder, this is the buyer-approved moment — adds a commercetools Authorization
+   * transaction so commercetools Checkout creates the commercetools Order. The authorization's
+   * interactionId is what settlement() later looks up to actually capture it.
+   *
+   * @param request - commercetools payment ID plus the approved PayPal order ID
+   * @returns Promise with the PayPal order id/status for the enabler
+   */
+  public async authorizeOrder(
+    request: OnApproveRequestSchemaDTO
+  ): Promise<OnApproveResponseSchemaDTO> {
+    return this.finalizeOrder(request, {
+      operation: "authorizeOrder",
+      callPayPal: (orderID) => authorizePayPalOrder(orderID, {}),
+      purchaseUnitKey: "authorizations",
+      transactionType: "Authorization",
+      mapStatus: (status) =>
+        mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+          status as Authorization2StatusEnum | undefined
+        ),
+    });
+  }
+
+  /**
+   * Capture order
+   *
+   * @remarks
+   * Calls PayPal's Orders API to capture a previously-created, buyer-approved PayPal order
+   * directly — the immediate-capture counterpart to authorizeOrder, used when the merchant's
+   * configured PayPal intent is Capture. Adds a commercetools Charge transaction, which is what
+   * triggers commercetools Checkout to create the commercetools Order for this flow.
+   *
+   * @param request - commercetools payment ID plus the approved PayPal order ID
+   * @returns Promise with the PayPal order id/status for the enabler
+   */
+  public async captureOrder(
+    request: OnApproveRequestSchemaDTO
+  ): Promise<OnApproveResponseSchemaDTO> {
+    return this.finalizeOrder(request, {
+      operation: "captureOrder",
+      callPayPal: (orderID) => capturePayPalOrder(orderID, {}),
+      purchaseUnitKey: "captures",
+      transactionType: "Charge",
+      mapStatus: (status) =>
+        mapPayPalCaptureStatusToCommercetoolsTransactionState(
+          status as Capture2StatusEnum | undefined
+        ),
+    });
+  }
+
+  /**
+   * Read-only lookup — does not add a transaction or otherwise mutate the commercetools payment,
+   * same lifecycle constraint as createOrder (see the class-level doc comment). Only fetches the
+   * payment to sanity-check that the caller-supplied orderID actually belongs to it.
+   */
+  public async authenticateThreeDSOrder({
+    paymentId,
+    orderID,
+  }: AuthenticateThreeDSOrderRequestSchemaDTO): Promise<AuthenticateThreeDSOrderResponseSchemaDTO> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    if (payment.interfaceId && payment.interfaceId !== orderID) {
+      throw new ErrorInvalidOperation(
+        `Order ${orderID} does not belong to payment ${paymentId}`
+      );
+    }
+
+    let order: Order;
+    try {
+      order = await getPayPalOrder(orderID);
+    } catch (e) {
+      log.error(
+        `authenticateThreeDSOrder: PayPal order lookup failed for payment ${
+          payment.id
+        } — ${errorMessage(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to look up PayPal order ${orderID}`
+      );
+    }
+
+    const authenticationResult =
+      order.payment_source?.card?.authentication_result;
+
+    return {
+      ...(authenticationResult && {
+        approve: {
+          liability_shift: authenticationResult.liability_shift,
+          three_d_secure: {
+            enrollment_status:
+              authenticationResult.three_d_secure?.enrollment_status,
+            authentication_status:
+              authenticationResult.three_d_secure?.authentication_status,
+          },
+        },
+      }),
     };
   }
 
@@ -378,9 +687,45 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment, amount } = request;
 
-    // TODO: Implement PayPal capture logic using common-connect functions
-    // This would involve calling capturePayPalOrder from common-connect
-    // For now, return a stub response
+    const authorizationId = findAuthorizationTransactionId(ctPayment);
+    // `amount` (from the commercetools Payment Intents request) has no fractionDigits of its own —
+    // borrow it from the payment's own amountPlanned (same currency, same precision).
+    const paypalAmount = {
+      currency_code: amount.currencyCode,
+      value: mapCommercetoolsMoneyToPayPalMoney({
+        ...amount,
+        type: "centPrecision",
+        fractionDigits: ctPayment.amountPlanned.fractionDigits,
+      }),
+    };
+
+    let response: Capture2;
+    try {
+      response = await capturePayPalAuthorization(authorizationId, {
+        amount: paypalAmount,
+      });
+    } catch (e) {
+      log.error(
+        `settlement: PayPal capture failed for payment ${
+          ctPayment.id
+        } — ${errorMessage(e)}`
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to capture PayPal authorization ${authorizationId}`
+      );
+    }
+
+    await this.ctPaymentService.updatePayment({
+      id: ctPayment.id,
+      transaction: {
+        type: "Charge",
+        amount,
+        interactionId: response.id,
+        state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
+          response.status
+        ),
+      },
+    });
 
     return {
       success: true,
@@ -443,11 +788,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * Get stored payment methods
    *
    * @remarks
-   * Implementation to retrieve stored payment methods from PayPal vault
+   * Implementation to retrieve stored payment methods from PayPal vault. commercetools is used
+   * only as a pointer (the CT customer's PayPalUserId custom field) — the actual list of stored
+   * payment methods is always read live from PayPal, which is the source of truth.
    *
    * @returns Promise with list of stored payment methods
    */
-  public async getStoredPaymentMethods(): Promise<PaymentUpdateResponseSchemaDTO> {
+  public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
     });
@@ -456,13 +803,119 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.warn(
         "getStoredPaymentMethods: cart has no customerId, returning empty"
       );
-      return { message: "success", success: true };
+      return { storedPaymentMethods: [] };
     }
 
-    // TODO: Implement PayPal vault retrieval using common-connect functions
-    // This would involve calling getPaymentTokens from common-connect
-    // For now, return an empty list
+    const paypalCustomerId = await this.resolvePayPalCustomerId(
+      ctCart.customerId
+    );
+    if (!paypalCustomerId) {
+      log.warn(
+        `getStoredPaymentMethods: CT customer ${ctCart.customerId} has no PayPalUserId, returning empty`
+      );
+      return { storedPaymentMethods: [] };
+    }
 
-    return { message: "success", success: true };
+    try {
+      const { payment_tokens: paymentTokens = [] } = await getPaymentTokens(
+        paypalCustomerId
+      );
+      // Restrict to card tokens before looking anything up in commercetools — only credit card tokens are supported in checkout now.
+      const cardTokens = paymentTokens.filter(isCardPaymentToken);
+      if (paymentTokens.length !== cardTokens.length)
+        log.warn(
+          `token(s) not supported by checkout exist(s) for ${paypalCustomerId}`
+        );
+
+      // Fetched once for all of this customer's card tokens (rather than per-token) since
+      // getByTokenValue itself just fetches this same customer+paymentInterface list and
+      // filters client-side — one query does the work of N.
+      const ctPaymentMethods = cardTokens.length
+        ? await this.ctPaymentMethodService
+            .find({
+              customerId: ctCart.customerId,
+              paymentInterface: getStoredPaymentMethodsConfig().config.paymentInterface,
+            })
+            .then((result) => result.results)
+            .catch(() => [])
+        : [];
+
+      const storedPaymentMethods = cardTokens.map((token) => {
+        const createdAt = resolveStoredPaymentMethodCreatedAt(
+          ctCart.customerId as string,
+          token.id,
+          ctPaymentMethods
+        );
+        return mapPayPalPaymentTokenToStoredPaymentMethod(token, createdAt);
+      });
+
+      return { storedPaymentMethods };
+    } catch (e) {
+      log.warn(
+        `getStoredPaymentMethods: could not list PayPal payment tokens for customer ${paypalCustomerId} — ${errorMessage(
+          e
+        )}`
+      );
+      return { storedPaymentMethods: [] };
+    }
+  }
+
+  /**
+   * Delete stored payment method
+   *
+   * @remarks
+   * Deletes a payment method directly from PayPal's vault by token — commercetools is not
+   * consulted to authorize this, since the PayPal token is the sole identifier the enabler has
+   * for a stored method. commercetools' cart is only fetched afterward, best-effort, to attempt
+   * a mirror cleanup of any commercetools-native PaymentMethod record.
+   *
+   * @param token - the PayPal vault payment token to delete
+   */
+  public async deleteStoredPaymentMethod(token: string): Promise<void> {
+    const cartId = getCartIdFromContext();
+    let ctCart: Cart | undefined;
+    try {
+      [, ctCart] = await Promise.all([
+        deletePaymentToken(token),
+        this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
+      ]);
+      log.info(
+        `deleteStoredPaymentMethod: success, cartId: ${
+          ctCart?.id ?? cartId ?? "unavailable"
+        }`
+      );
+    } catch (e) {
+      log.error(
+        `deleteStoredPaymentMethod: failed, cartId: ${
+          cartId ?? "unavailable"
+        } — ${errorMessage(e)}`
+      );
+      throw e;
+    }
+
+    // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one exists.
+    // The PayPal deletion above already succeeded and is the authoritative action; this fire-and-
+    // forget cleanup just keeps commercetools from holding a stale reference.
+    if (ctCart?.customerId) {
+      const customerId = ctCart.customerId;
+      void this.ctPaymentMethodService
+        .getByTokenValue({
+          customerId,
+          tokenValue: token,
+          paymentInterface: getStoredPaymentMethodsConfig().config.paymentInterface,
+        })
+        .then((ctPaymentMethod) =>
+          this.ctPaymentMethodService.delete({
+            customerId,
+            id: ctPaymentMethod.id,
+            version: ctPaymentMethod.version,
+          })
+        )
+        .catch((e) =>
+          log.warn(
+            `deleteStoredPaymentMethod: no matching commercetools PaymentMethod record: ${errorMessage(e)}`
+          )
+        );
+    }
   }
 }
