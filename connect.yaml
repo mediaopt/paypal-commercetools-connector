@@ -39,6 +39,13 @@ deployAs:
         - key: MERCHANT_RETURN_URL
           description: Merchant website return URL for redirect-based payment methods
           required: false
+        - key: PAYPAL_ONAPPROVE_PREFIX
+          description: PayPal-Express-only override for the buyer redirect after approval, falling back to MERCHANT_RETURN_URL when unset
+          required: false
+        - key: PAYPAL_REDIRECT_ON_APPROVE
+          description: For PayPal Express (Authorize or Capture intent), redirect to PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL on approval instead of finalizing the payment immediately (true OR false). REQUIRED to be true, with that review page actually built, for PayPal Express in Germany.
+          required: false
+          default: "false"
         - key: PAYPAL_PER_METHOD_CONFIG
           description: Per-method required config (non-style identifiers, unique per payment method), as a JSON object
           required: false

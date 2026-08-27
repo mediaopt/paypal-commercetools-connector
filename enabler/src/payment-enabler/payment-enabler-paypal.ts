@@ -60,6 +60,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
         storedPaymentMethodsEnabled:
           !!configJson.storedPaymentMethodsConfig?.isEnabled,
         enableVaulting: !!configJson.enableVaulting,
+        redirectOnApprove: !!configJson.redirectOnApprove,
         sdkOptions: configJson.sdkOptions,
         clientId: configJson.clientId,
         settings: configJson.settings,

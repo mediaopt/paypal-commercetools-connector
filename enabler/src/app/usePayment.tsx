@@ -20,6 +20,8 @@ import {
   CustomOnApproveData,
   OnApproveRequest,
   OnApproveResponse,
+  ExpressApproveRequest,
+  ExpressApproveResponse,
   CustomOrderData,
   CreateOrderRequest,
   CreateOrderResponse,
@@ -140,6 +142,7 @@ export const PaymentProvider: FC<
   paymentMethodType,
   builderType,
   processorUrl,
+  redirectOnApprove,
 }) => {
   const [clientToken, setClientToken] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -452,7 +455,42 @@ export const PaymentProvider: FC<
       const { orderID, saveCard } = data;
       isLoading(true);
 
-      // Only meaningful for PayPal Express and only in legacy mode
+      // PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE
+      // (off by default, required on for Germany — see enabler/README.md). Calls the processor's
+      // expressApprove — which adds a placeholder transaction so commercetools optimistically creates the
+      // Order, then builds the redirect URL — instead of authorizing/capturing immediately here.
+      // Takes priority over the legacy onApproveRedirectionUrl prop below since it needs no
+      // enabler-side configuration.
+      if (builderType === "express" && redirectOnApprove) {
+        const expressApproveUrl = derivedUrls.expressApproveUrl;
+        if (!expressApproveUrl) {
+          console.error(
+            '[paypal-enabler] Missing configuration for "expressApproveUrl": no processorUrl was provided.'
+          );
+        } else {
+          const expressApproveResult = await processorRequest<
+            ExpressApproveRequest,
+            ExpressApproveResponse
+          >(requestHeader, expressApproveUrl, {
+            paymentId: paymentInfo.id,
+            orderID,
+            payPalIntent: settings?.payPalIntent,
+          });
+          if (
+            expressApproveResult &&
+            expressApproveResult.onApproveRedirectionUrl
+          ) {
+            window.location.href = expressApproveResult.onApproveRedirectionUrl;
+            return;
+          }
+          // No merchantReturnUrl configured anywhere (session or static) — falls through to the
+          // legacy prop check, then the immediate authorize/capture path below, as a last-resort
+          // degrade.
+        }
+      }
+
+      // Legacy prop (self-hosted merchants) — only meaningful for PayPal Express, needs
+      // ?order_id= appended since it's a bare merchant-supplied prefix, not a complete URL.
       if (onApproveRedirectionUrl && builderType === "express") {
         window.location.href = `${onApproveRedirectionUrl}?order_id=${orderID}`;
         return;

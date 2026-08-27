@@ -7,8 +7,16 @@ import {
   PaymentComponentBuilder,
 } from "../payment-enabler/interfaces/enabler";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
-import { ValidationHandlers } from "../types";
+import { GetSettingsResponse, ValidationHandlers } from "../types";
 import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
+
+// Fixed settings for specific payment methods that the method itself requires, not something the
+// merchant should be able to configure — e.g. Pay Upon Invoice must always use Capture intent
+const FIXED_SETTINGS_OVERRIDES_BY_COMPONENT: Partial<
+  Record<string, Partial<GetSettingsResponse>>
+> = {
+  // PayUponInvoice: { payPalIntent: "Capture" },
+};
 
 class PayPalComponent implements PaymentComponent {
   private root: Root | null = null;
@@ -41,8 +49,8 @@ class PayPalComponent implements PaymentComponent {
             this.builderType === "express" ? "express" : "standard"
           ]
         : this.componentType === "CardFields"
-          ? this.baseOptions.sdkOptions?.CardFields
-          : undefined;
+        ? this.baseOptions.sdkOptions?.CardFields
+        : undefined;
 
     const scriptOptions: ReactPayPalScriptOptions = {
       clientId: this.baseOptions.clientId || "",
@@ -69,11 +77,14 @@ class PayPalComponent implements PaymentComponent {
       ...this.baseOptions.settings?.paypalButtonConfig,
       ...variantButtonConfig,
     };
+    const fixedOverrides =
+      FIXED_SETTINGS_OVERRIDES_BY_COMPONENT[this.componentType] ?? {};
     const initialSettings = this.baseOptions.settings && {
       ...this.baseOptions.settings,
       ...(Object.keys(mergedButtonConfig).length
         ? { paypalButtonConfig: mergedButtonConfig }
         : {}),
+      ...fixedOverrides,
     };
 
     const customOptions = {
@@ -84,6 +95,7 @@ class PayPalComponent implements PaymentComponent {
       shippingMethodId: "standard",
       purchaseCallback: this.baseOptions.purchaseCallback,
       enableVaulting: this.baseOptions.enableVaulting ?? false,
+      redirectOnApprove: this.baseOptions.redirectOnApprove,
       initialSettings,
       initialUserIdToken: this.baseOptions.userIdToken,
       showPayButton: this.config.showPayButton ?? true,

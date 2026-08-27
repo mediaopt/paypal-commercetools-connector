@@ -32,4 +32,8 @@ export type BaseOptions = {
   settings?: GetSettingsResponse;
   /** PayPal SDK identity token from `/operations/config`, when a vaulted PayPal customer exists. */
   userIdToken?: string;
+  /** PayPal Express only, from `/operations/config`'s `redirectOnApprove` (processor's
+   * PAYPAL_REDIRECT_ON_APPROVE) — when true, `handleOnApprove` calls `expressApprove` and
+   * redirects instead of authorizing/capturing immediately. */
+  redirectOnApprove?: boolean;
 };

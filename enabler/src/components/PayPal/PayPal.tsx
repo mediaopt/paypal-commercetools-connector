@@ -30,6 +30,7 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
   processorUrl,
   initialSettings,
   initialUserIdToken,
+  redirectOnApprove,
 
   ...restProps
 }) => {
@@ -56,6 +57,7 @@ export const PayPal: React.FC<SmartComponentsProps> = ({
       processorUrl={processorUrl}
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
+      redirectOnApprove={redirectOnApprove}
     >
       <PayPalButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>

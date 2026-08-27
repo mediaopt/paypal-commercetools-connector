@@ -17,6 +17,10 @@ import {
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchema,
   OnApproveResponseSchemaDTO,
+  ExpressApproveRequestSchema,
+  ExpressApproveRequestSchemaDTO,
+  ExpressApproveResponseSchema,
+  ExpressApproveResponseSchemaDTO,
   UpdateShippingRequestSchema,
   UpdateShippingRequestSchemaDTO,
   UpdateShippingResponseSchema,
@@ -110,6 +114,26 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
       const resp = await opts.paymentService.captureOrder(request.body);
       log.info(
         `captureOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.post<{ Body: ExpressApproveRequestSchemaDTO; Reply: ExpressApproveResponseSchemaDTO }>(
+    '/payments/expressApprove',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: ExpressApproveRequestSchema,
+        response: {
+          200: ExpressApproveResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.expressApprove(request.body);
+      log.info(
+        `expressApprove: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     },

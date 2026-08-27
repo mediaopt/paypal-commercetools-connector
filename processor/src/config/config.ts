@@ -1,3 +1,8 @@
+import {
+  PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+} from "common-connect";
+
 // PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding,
 // buyerCountry, locale, vault, etc.) — previously supplied directly by the merchant's own frontend
 // code when mounting <PayPal/>/<CreditCard/> outside commercetools Checkout, not something the
@@ -56,6 +61,9 @@ export const config = {
   // different page for that one flow. Falls back to the generic MERCHANT_RETURN_URL/session return
   // url when unset.
   onApprovePrefix: process.env.PAYPAL_ONAPPROVE_PREFIX || undefined,
+  // Master switch for PayPal Express's pre-finalize redirect
+  // (see enabler/README.md's "PayPal-Express/ legal-review requirement" section).
+  redirectOnApprove: process.env.PAYPAL_REDIRECT_ON_APPROVE === "true",
   paymentInterface: PAYMENT_INTERFACE_NAME,
 
   // env variables related to stored payment methods feature
@@ -69,6 +77,14 @@ export const config = {
 
   // General feature flags
   enableVaulting: process.env.STORED_PAYMENT_METHODS_ENABLED === "true",
+
+  // Custom type keys for processor-owned audit logging (see utils/processorInteraction.utils.ts
+  // and connectors/post-deploy.ts) — same env-override/fallback resolution as
+  // paypal-commercetools-extension's own PAYMENT_TYPE_KEY/PAYMENT_INTERACTION_TYPE_KEY, so both
+  // modules resolve to the same custom types when both are installed on the same project.
+  paymentTypeKey: process.env.PAYMENT_TYPE_KEY || PAYPAL_PAYMENT_TYPE_KEY,
+  interactionTypeKey:
+    process.env.PAYMENT_INTERACTION_TYPE_KEY || PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
 
   // Per-method required config (non-style, method-specific identifiers)
   // Format: JSON object, e.g. {"creditCard":{"someConfig":"..."}}

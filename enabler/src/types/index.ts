@@ -130,6 +130,18 @@ export type OnApproveResponse = {
   merchantReturnUrl?: string;
 };
 
+// PayPal Express only (both Authorize and Capture intent), gated by PAYPAL_REDIRECT_ON_APPROVE —
+// see usePayment.tsx's handleOnApprove and the processor's expressApprove().
+export type ExpressApproveRequest = {
+  paymentId: string;
+  orderID: string;
+  payPalIntent?: "Authorize" | "Capture";
+};
+
+export type ExpressApproveResponse = {
+  onApproveRedirectionUrl?: string;
+};
+
 // paymentId is deliberately not part of this type — usePayment.tsx's handleUpdateShipping
 // resolves it internally from paymentInfo.id
 export type UpdateShippingRequest = {
@@ -211,6 +223,9 @@ export type CheckoutOnlyProps = {
   initialSettings?: GetSettingsResponse;
   /** Seeds SettingsProvider's `userIdToken` state from the processor's `/operations/config` response. */
   initialUserIdToken?: string;
+  /** PayPal Express only, from the processor's `/operations/config` `redirectOnApprove` (its
+   * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
+  redirectOnApprove?: boolean;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
@@ -425,7 +440,7 @@ export type PaymentData = {
 export type PaymentInfo = PaymentData & CartInformationProps;
 
 export type CreatePaymentResponse = PaymentData & {
-  paypalData: { clientId: string; currency: string; intent: string };
+  paypalData: { clientId: string; currency: string };
   /** @deprecated Not used by the checkout; only relevant for a self-hosted backend built against
    * the old `paypal-commercetools-client` npm package's contract. See the processor implementation
    * (processor/src/dtos/paypal-payment.dto.ts) for the current, checkout-native contract. */

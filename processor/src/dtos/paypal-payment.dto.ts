@@ -77,7 +77,6 @@ export const InitPaymentResponseSchema = Type.Intersect([
     paypalData: Type.Object({
       clientId: Type.String(),
       currency: Type.String(),
-      intent: Type.String(),
     }),
   }),
   PaymentRequiredFieldsSchema,
@@ -85,6 +84,12 @@ export const InitPaymentResponseSchema = Type.Intersect([
   PaymentFrontendRenderingSchema,
   PaymentVaultSchema,
 ]);
+
+// Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
+// /operations/config) rather than processor re-fetching settings itself. Defaults to Capture.
+const PayPalIntentSchema = Type.Optional(
+  Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
+);
 
 export const InitPaymentRequestSchema = Type.Object({
   paymentMethodType: Type.Enum(PaymentMethodType),
@@ -122,11 +127,7 @@ const CreateOrderDataSchema = Type.Object({
 export const CreateOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderData: Type.Optional(CreateOrderDataSchema),
-  // Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
-  // /operations/config) rather than processor re-fetching settings itself. Defaults to Capture
-  payPalIntent: Type.Optional(
-    Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
-  ),
+  payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.Enum(CustomBuilderType)),
 });
 export type CreateOrderRequestSchemaDTO = Static<
@@ -204,6 +205,27 @@ export const OnApproveResponseSchema = Type.Object({
   merchantReturnUrl: Type.Optional(Type.String()),
 });
 export type OnApproveResponseSchemaDTO = Static<typeof OnApproveResponseSchema>;
+
+// PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE —
+// see expressApprove() in paypal-payment.service.ts.
+// Called from handleOnApprove at approval time,
+export const ExpressApproveRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  // Decides the placeholder transaction's type (Authorization vs Charge) — see
+  // expressApprove()'s docblock for why this must match the eventual real transaction's type.
+  payPalIntent: PayPalIntentSchema,
+});
+export type ExpressApproveRequestSchemaDTO = Static<
+  typeof ExpressApproveRequestSchema
+>;
+
+export const ExpressApproveResponseSchema = Type.Object({
+  onApproveRedirectionUrl: Type.Optional(Type.String()),
+});
+export type ExpressApproveResponseSchemaDTO = Static<
+  typeof ExpressApproveResponseSchema
+>;
 
 // Update shipping request — used for both address and option changes
 // Field names match PayPal's OnShippingAddressChangeData.shippingAddress vocabulary exactly

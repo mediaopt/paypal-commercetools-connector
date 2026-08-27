@@ -182,14 +182,23 @@ approving no longer needs to configure anything on the enabler side at all.
 configuring `PAYPAL_ONAPPROVE_PREFIX`/`MERCHANT_RETURN_URL` on the processor for new integrations.
 It's still fully supported, unchanged, for self-hosting/legacy merchants who already pass it.
 
-### `onApproveRedirectionUrl` and the PayPal-Express legal-review requirement
+### PayPal-Express legal-review requirement (`PAYPAL_REDIRECT_ON_APPROVE`, legacy `onApproveRedirectionUrl`)
 
-Separately from the convenience above: some jurisdictions (Germany, for PayPal Express) legally
-require the buyer to see a final review page before the payment settles, even after already
-approving in the PayPal popup. `onApproveRedirectionUrl` exists for exactly this — set, it redirects
-the buyer to a merchant-owned page (`?order_id=...`) *instead of* calling this connector's own
-approve/authorize routes at all, so the merchant's own backend decides when/whether to actually
-finish the payment.
+Some jurisdictions (Germany, for PayPal Express) legally require the buyer to see a final review
+page before the payment settles, even after already approving in the PayPal popup. Setting the
+processor's `PAYPAL_REDIRECT_ON_APPROVE=true` (off by default — **required true, with that review
+page actually built, for PayPal Express in Germany**) redirects the buyer there immediately on
+approval — for both Authorize and Capture intent — _instead of_ this connector ever calling its own
+`authorizeOrder()`/`captureOrder()`, so the merchant's own backend decides when/whether to actually
+finish the payment. The target URL is `PAYPAL_ONAPPROVE_PREFIX` if set, else the same
+session/static `MERCHANT_RETURN_URL` fallback `merchantReturnUrl` above uses — built once, during
+`createPayment`, and returned to the enabler ready to use, so nothing needs configuring on the
+enabler/component side at all.
+
+The older `onApproveRedirectionUrl` component prop (see `LegacyOnlyProps` below) does the same
+thing but requires the merchant to pass it in themselves — still fully supported for self-hosting/
+legacy merchants, but `PAYPAL_REDIRECT_ON_APPROVE`'s target takes priority when both are somehow
+set, since it's the recommended, no-enabler-configuration path for anyone integrated with Checkout.
 
 Once the buyer has left the live Checkout session, the only sanctioned way back into this
 connector is commercetools' **Payment Intents API** (`capturePayment`, authenticated with the
@@ -200,6 +209,7 @@ already has an approved authorization; otherwise it authorizes, and its response
 to call `capturePayment` again once ready to actually collect funds.
 
 **Two different "own backend" cases, don't conflate them:**
+
 - A merchant running their own backend **outside** commercetools Checkout should use
   `paypal-commercetools-extension`'s existing custom-field-driven API instead — nothing here is
   relevant to that deployment.
