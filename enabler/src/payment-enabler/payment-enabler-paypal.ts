@@ -14,19 +14,12 @@ import { BaseOptions } from "./interfaces/baseOptions";
 import { PayPalComponentBuilder } from "../components/PayPalBuilder";
 import { processorUrls } from "../components/constants";
 import { sessionHeader } from "../helpers/sessionHeader";
+import { toPayPalPaymentMethodType } from "../components/paymentMethodTypeMapping";
 
-export type PayPalPaymentMethodType =
-  | "PayPal"
-  | "CardFields"
-  | "ApplePay"
-  | "GooglePay"
-  | "PayUponInvoice"
-  | "PaymentTokens";
-
-export type PayPalPaymentMethodExpressType = Extract<
+export type {
   PayPalPaymentMethodType,
-  "PayPal"
->;
+  PayPalPaymentMethodExpressType,
+} from "../components/types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
   setupData: Promise<{ baseOptions: BaseOptions }>;
@@ -85,7 +78,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     type: string
   ): Promise<PaymentComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
-    return Promise.resolve(new PayPalComponentBuilder(type, baseOptions));
+    return Promise.resolve(
+      new PayPalComponentBuilder(toPayPalPaymentMethodType(type), baseOptions)
+    );
   }
 
   async createDropinBuilder(
@@ -99,7 +94,11 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   ): Promise<PaymentComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
     return Promise.resolve(
-      new PayPalComponentBuilder(type, baseOptions, "express")
+      new PayPalComponentBuilder(
+        toPayPalPaymentMethodType(type),
+        baseOptions,
+        "express"
+      )
     );
   }
 
@@ -107,9 +106,10 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     type: string
   ): Promise<StoredComponentBuilder | never> {
     const { baseOptions } = await this.setupData;
+    const normalizedType = toPayPalPaymentMethodType(type);
 
     // For PayPal, we support card tokens
-    if (type === "card") {
+    if (normalizedType === "CardFields") {
       // Return a builder for stored card payment methods
       // This would be implemented similar to payment component builder
       throw new Error("Stored payment method builder not yet implemented");

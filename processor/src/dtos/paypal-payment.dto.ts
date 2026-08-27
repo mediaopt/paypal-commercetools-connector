@@ -5,6 +5,15 @@ type ValuesOf<T extends object> = T[keyof T];
 export const StandardPaymentMethodType = {
   CREDIT_CARD: "CardFields",
   PAYPAL: "PayPal",
+
+  // TODO: implement ApplePay support once this connector is fully Checkout-compatible.
+  // APPLE_PAY: "ApplePay",
+  // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
+  // GOOGLE_PAY: "GooglePay",
+  // Venmo has no commercetools Checkout equivalent — not available in commercetools itself.
+  // VENMO: "Venmo",
+  // PayUponInvoice has no commercetools Checkout equivalent — not available in commercetools itself.
+  // PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
 export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType
