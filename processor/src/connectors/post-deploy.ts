@@ -3,14 +3,7 @@ dotenv.config();
 
 import { paymentSDK } from '../payment-sdk';
 import { getConfig } from '../config/config';
-
-// Only the PayPal API calls processor itself makes on the buyer's behalf — matches
-// utils/processorInteraction.utils.ts's ProcessorApiCallName / current logging scope.
-const PROCESSOR_ENDPOINTS = [
-  'createPayPalOrder',
-  'authorizePayPalOrder',
-  'capturePayPalOrder',
-] as const;
+import { PROCESSOR_API_CALL_NAMES } from '../utils/processorInteraction.utils';
 
 // Only the request side needs its own field — "${apiCallName}ProcessorRequest", distinct from the
 // extension's own "${apiCallName}Request" (see utils/processorInteraction.utils.ts for why).
@@ -19,7 +12,7 @@ const PROCESSOR_ENDPOINTS = [
 // extension's connector/actions.ts already includes all 3 of these endpoints), so a payment
 // processor touched can still be read/fine-tuned via the extension afterward from one unified
 // response field, not two different ones depending on which module produced it.
-const processorRequestFieldNames = PROCESSOR_ENDPOINTS.map(
+const processorRequestFieldNames = PROCESSOR_API_CALL_NAMES.map(
   (apiCallName) => `${apiCallName}ProcessorRequest`
 );
 

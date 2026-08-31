@@ -111,6 +111,13 @@ import {
 } from "../utils/processorInteraction.utils";
 import { PayPalCustomerService } from "./paypal-customer.service";
 
+const buildSetShippingMethodAction = (
+  shippingMethodId: string
+): CartUpdateAction => ({
+  action: "setShippingMethod" as const,
+  shippingMethod: { typeId: "shipping-method" as const, id: shippingMethodId },
+});
+
 export class PayPalPaymentService extends AbstractPaymentService {
   private payPalCustomerService: PayPalCustomerService;
   private ctPaymentMethodService: CommercetoolsPaymentMethodService;
@@ -329,32 +336,34 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // Best-effort: a failure here shouldn't block payment creation.
     // Unlike extension this is not required for checkout functioning in best case scenario
     // But it provides traceable logs for any miscommunication between ct and PayPal APIs
-    try {
-      await this.ctPaymentService.updatePayment({
+    //
+    // Runs alongside "add payment to cart" below — independent CT resources (Payment vs. Cart).
+    const assignCustomTypePromise = this.ctPaymentService
+      .updatePayment({
         id: newPayment.id,
         customFields: {
           type: { typeId: "type", key: getConfig().paymentTypeKey },
           fields: {},
         },
+      })
+      .catch((e) => {
+        log.warn(
+          `createPayment: failed to assign ${
+            getConfig().paymentTypeKey
+          } custom type to payment ${newPayment.id} — ${errorMessage(e)}`
+        );
       });
-    } catch (e) {
-      log.warn(
-        `createPayment: failed to assign ${
-          getConfig().paymentTypeKey
-        } custom type to payment ${newPayment.id} — ${errorMessage(e)}`
-      );
-    }
 
-    // Add payment to cart
-    if (
+    const addPaymentPromise =
       ctCart.paymentInfo?.payments === undefined ||
       ctCart.paymentInfo.payments.length === 0
-    ) {
-      await this.ctCartService.addPayment({
-        resource: { id: ctCart.id, version: ctCart.version },
-        paymentId: newPayment.id,
-      });
-    }
+        ? this.ctCartService.addPayment({
+            resource: { id: ctCart.id, version: ctCart.version },
+            paymentId: newPayment.id,
+          })
+        : Promise.resolve();
+
+    await Promise.all([assignCustomTypePromise, addPaymentPromise]);
 
     // Gather additional cart data for the response
     const isShipped =
@@ -929,13 +938,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       });
     }
     if (shippingMethodId) {
-      initialActions.push({
-        action: "setShippingMethod" as const,
-        shippingMethod: {
-          typeId: "shipping-method" as const,
-          id: shippingMethodId,
-        },
-      });
+      initialActions.push(buildSetShippingMethodAction(shippingMethodId));
     }
     let updatedCtCart = await this.applyCartUpdate(ctCart, initialActions);
 
@@ -969,13 +972,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         throw new ErrorInvalidOperation("No shipping method could be selected");
       }
       updatedCtCart = await this.applyCartUpdate(updatedCtCart, [
-        {
-          action: "setShippingMethod" as const,
-          shippingMethod: {
-            typeId: "shipping-method" as const,
-            id: defaultMethodId,
-          },
-        },
+        buildSetShippingMethodAction(defaultMethodId),
       ]);
     }
 

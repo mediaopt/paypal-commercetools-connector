@@ -1,8 +1,8 @@
 import { ShippingMethod, ShippingRate } from "@commercetools/platform-sdk";
 import { CommercetoolsClient } from "@commercetools/connect-payments-sdk/dist/commercetools/types/api.type";
-import { mapCommercetoolsMoneyToPayPalMoney } from "common-connect";
 import { PayPalShippingOptionSchemaDTO } from "../dtos/paypal-payment.dto";
 import { log } from "../libs/logger";
+import { buildPayPalAmount } from "./order.utils";
 
 export type PayPalShippingOption = PayPalShippingOptionSchemaDTO; //Mirrors PayPal's own shipping_option schema
 
@@ -34,10 +34,7 @@ export const mapCommercetoolsShippingMethodToPayPalShippingOption = (
       ? Object.values(method.localizedName)[0]
       : method.name,
     type: "SHIPPING",
-    amount: {
-      currency_code: matchingRate.price.currencyCode,
-      value: mapCommercetoolsMoneyToPayPalMoney(matchingRate.price),
-    },
+    amount: buildPayPalAmount(matchingRate.price),
     selected,
   };
 };

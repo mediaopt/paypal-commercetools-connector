@@ -40,15 +40,17 @@ const PaymentRequiredFieldsSchema = Type.Object({
   }),
 });
 
+export const PayPalMoneySchema = Type.Object({
+  currency_code: Type.String(),
+  value: Type.String(),
+});
+
 // Shipping option schema — used for both createPayment response and updateShipping flow
 export const PayPalShippingOptionSchema = Type.Object({
   id: Type.String(),
   label: Type.String(),
   type: Type.Literal("SHIPPING"),
-  amount: Type.Object({
-    currency_code: Type.String(),
-    value: Type.String(),
-  }),
+  amount: PayPalMoneySchema,
   selected: Type.Boolean(),
 });
 export type PayPalShippingOptionSchemaDTO = Static<
@@ -95,7 +97,7 @@ const PayPalIntentSchema = Type.Optional(
 
 export const InitPaymentRequestSchema = Type.Object({
   paymentMethodType: Type.Enum(PaymentMethodType),
-  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
+  builderType: Type.Optional(Type.String()),
 });
 
 export type PaymentRequestSchemaDTO = Static<typeof InitPaymentRequestSchema>;
@@ -130,7 +132,7 @@ export const CreateOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
-  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
+  builderType: Type.Optional(Type.String()),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
@@ -191,7 +193,7 @@ export const OnApproveRequestSchema = Type.Object({
   saveCard: Type.Optional(Type.Boolean()),
   // Lets finalizeOrder tell the PayPal Express flow apart, to decide whether to use
   // onApprovePrefix for the response's merchantReturnUrl.
-  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
+  builderType: Type.Optional(Type.String()),
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
 
@@ -253,33 +255,12 @@ export type UpdateShippingRequestSchemaDTO = Static<
 // Update shipping response — returns the updated shipping options and totals
 export const UpdateShippingResponseSchema = Type.Object({
   shippingOptions: Type.Array(PayPalShippingOptionSchema),
-  amount: Type.Object({
-    currency_code: Type.String(),
-    value: Type.String(),
-  }),
+  amount: PayPalMoneySchema,
   breakdown: Type.Object({
-    item_total: Type.Optional(
-      Type.Object({
-        currency_code: Type.String(),
-        value: Type.String(),
-      })
-    ),
-    shipping: Type.Object({
-      currency_code: Type.String(),
-      value: Type.String(),
-    }),
-    tax_total: Type.Optional(
-      Type.Object({
-        currency_code: Type.String(),
-        value: Type.String(),
-      })
-    ),
-    discount: Type.Optional(
-      Type.Object({
-        currency_code: Type.String(),
-        value: Type.String(),
-      })
-    ),
+    item_total: Type.Optional(PayPalMoneySchema),
+    shipping: PayPalMoneySchema,
+    tax_total: Type.Optional(PayPalMoneySchema),
+    discount: Type.Optional(PayPalMoneySchema),
   }),
 });
 export type UpdateShippingResponseSchemaDTO = Static<

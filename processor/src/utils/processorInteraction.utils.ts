@@ -2,11 +2,14 @@ import { CustomFieldsDraft } from "@commercetools/platform-sdk";
 import { getConfig } from "../config/config";
 
 // Only the PayPal API calls processor itself makes on the buyer's behalf — matches the current
-// logging scope (createOrder/authorizeOrder/captureOrder).
-export type ProcessorApiCallName =
-  | "createPayPalOrder"
-  | "authorizePayPalOrder"
-  | "capturePayPalOrder";
+// logging scope (createOrder/authorizeOrder/captureOrder). Also consumed by connectors/post-deploy.ts
+// to provision the matching "${apiCallName}ProcessorRequest" field definitions.
+export const PROCESSOR_API_CALL_NAMES = [
+  "createPayPalOrder",
+  "authorizePayPalOrder",
+  "capturePayPalOrder",
+] as const;
+export type ProcessorApiCallName = (typeof PROCESSOR_API_CALL_NAMES)[number];
 
 // Requests use a name distinct from paypal-commercetools-extension's own "${apiCallName}Request"
 // — the extension's CT Extension triggers on exactly that field being defined
@@ -17,14 +20,13 @@ export type ProcessorApiCallName =
 // it, so a payment processor touched can still be picked up and fine-tuned via the extension
 // afterward, reading the same field either way.
 const buildInteractionDraft = (
-  apiCallName: ProcessorApiCallName,
   fieldName: string,
-  message: unknown
+  serializedMessage: string
 ): CustomFieldsDraft => ({
   type: { typeId: "type", key: getConfig().interactionTypeKey },
   fields: {
     type: fieldName,
-    data: JSON.stringify(message),
+    data: serializedMessage,
     timestamp: new Date().toISOString(),
   },
 });
@@ -47,14 +49,16 @@ export const buildProcessorLogging = (
 } => {
   const requestFieldName = `${apiCallName}ProcessorRequest`;
   const responseFieldName = `${apiCallName}Response`;
+  const serializedRequest = JSON.stringify(request);
+  const serializedResponse = JSON.stringify(response);
   return {
     pspInteractions: [
-      buildInteractionDraft(apiCallName, requestFieldName, request),
-      buildInteractionDraft(apiCallName, responseFieldName, response),
+      buildInteractionDraft(requestFieldName, serializedRequest),
+      buildInteractionDraft(responseFieldName, serializedResponse),
     ],
     customFieldValues: {
-      [requestFieldName]: JSON.stringify(request),
-      [responseFieldName]: JSON.stringify(response),
+      [requestFieldName]: serializedRequest,
+      [responseFieldName]: serializedResponse,
     },
   };
 };
