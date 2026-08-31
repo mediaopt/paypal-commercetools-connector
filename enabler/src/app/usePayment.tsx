@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
 
+import { redirectTo } from "../helpers/redirectTo";
 import { Result } from "../components/Result";
 import {
   GeneralComponentsProps,
@@ -480,7 +481,7 @@ export const PaymentProvider: FC<
             expressApproveResult &&
             expressApproveResult.onApproveRedirectionUrl
           ) {
-            window.location.href = expressApproveResult.onApproveRedirectionUrl;
+            redirectTo(expressApproveResult.onApproveRedirectionUrl);
             return;
           }
           // No merchantReturnUrl configured anywhere (session or static) — falls through to the
@@ -492,7 +493,7 @@ export const PaymentProvider: FC<
       // Legacy prop (self-hosted merchants) — only meaningful for PayPal Express, needs
       // ?order_id= appended since it's a bare merchant-supplied prefix, not a complete URL.
       if (onApproveRedirectionUrl && builderType === "express") {
-        window.location.href = `${onApproveRedirectionUrl}?order_id=${orderID}`;
+        redirectTo(`${onApproveRedirectionUrl}?order_id=${orderID}`);
         return;
       }
 
@@ -530,7 +531,7 @@ export const PaymentProvider: FC<
         const { orderData, merchantReturnUrl } =
           onApproveResult as OnApproveResponse;
         if (merchantReturnUrl) {
-          window.location.href = merchantReturnUrl;
+          redirectTo(merchantReturnUrl);
           return;
         }
         if (orderData.status === "COMPLETED") {

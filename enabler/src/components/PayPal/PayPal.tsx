@@ -1,11 +1,11 @@
-import React from "react";
+import { FC } from "react";
 
 import { PayPalContextProvider } from "../PayPalContextProvider";
 import { PayPalButton } from "./PayPalButton";
 
 import { SmartComponentsProps } from "../../types";
 
-export const PayPal: React.FC<SmartComponentsProps> = ({
+export const PayPal: FC<SmartComponentsProps> = ({
   options,
 
   createPaymentUrl,
