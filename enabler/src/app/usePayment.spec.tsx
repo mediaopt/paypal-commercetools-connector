@@ -13,13 +13,18 @@ const mockNotify = jest.fn();
 jest.mock("./useNotifications", () => ({
   useNotifications: () => ({ notify: mockNotify }),
 }));
+jest.mock("../helpers/redirectTo", () => ({
+  redirectTo: jest.fn(),
+}));
 
 import { processorRequest } from "../services/processorRequest";
+import { redirectTo } from "../helpers/redirectTo";
 import { PaymentProvider, usePayment } from "./usePayment";
 
 const mockedProcessorRequest = processorRequest as jest.MockedFunction<
   typeof processorRequest
 >;
+const mockedRedirectTo = redirectTo as jest.MockedFunction<typeof redirectTo>;
 
 const CreateOrderConsumer: FC = () => {
   const { handleCreateOrder } = usePayment();
@@ -260,6 +265,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
     mockNotify.mockReset();
+    mockedRedirectTo.mockClear();
     consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
   });
 
@@ -352,10 +358,12 @@ describe("PaymentProvider missing endpoint configuration", () => {
       </PaymentProvider>
     );
 
-    // jsdom doesn't allow asserting on window.location.href directly (its Location setter is
-    // non-configurable and navigation is a no-op) — the reliable, DOM-independent signal that this
-    // branch ran is that it never calls the processor at all, same as before this change.
-    await waitFor(() => expect(mockedProcessorRequest).not.toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockedRedirectTo).toHaveBeenCalledWith(
+        "https://merchant.example.com/review?order_id=order-1"
+      )
+    );
+    expect(mockedProcessorRequest).not.toHaveBeenCalled();
   });
 
   it("handleOnApprove short-circuits to the redirect when the response has a merchantReturnUrl, without running the normal success handling", async () => {
@@ -379,7 +387,11 @@ describe("PaymentProvider missing endpoint configuration", () => {
       </PaymentProvider>
     );
 
-    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockedRedirectTo).toHaveBeenCalledWith(
+        "https://merchant.example.com/approve?paymentReference=payment-1"
+      )
+    );
     // If the merchantReturnUrl branch didn't return early, orderData.status === "COMPLETED" would
     // have triggered purchaseCallback — asserting it never fires confirms the early return.
     expect(purchaseCallback).not.toHaveBeenCalled();
@@ -406,6 +418,150 @@ describe("PaymentProvider missing endpoint configuration", () => {
     );
     expect(consoleErrorSpy).toHaveBeenCalled();
     expect(mockedProcessorRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprove)", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+    mockedRedirectTo.mockClear();
+  });
+
+  it("calls the processor's expressApprove (not authorize/capture) and short-circuits when builderType is express and redirectOnApprove is true", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("expressApprove")
+        ? Promise.resolve({
+            onApproveRedirectionUrl: "https://merchant.example.com/review",
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            paypalData: { clientId: "client-1", currency: "EUR" },
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const purchaseCallback = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={purchaseCallback}
+        processorUrl="https://processor.test"
+        builderType="express"
+        redirectOnApprove={true}
+      >
+        <OnApproveConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledWith(
+        {},
+        "https://processor.test/payments/expressApprove",
+        expect.objectContaining({ orderID: "order-1" })
+      )
+    );
+    await waitFor(() =>
+      expect(mockedRedirectTo).toHaveBeenCalledWith(
+        "https://merchant.example.com/review"
+      )
+    );
+    // Same signal as the legacy-redirect test above: the normal success handling (which would call
+    // purchaseCallback) never runs, confirming the early return after redirect.
+    expect(purchaseCallback).not.toHaveBeenCalled();
+  });
+
+  it("prefers expressApprove over the legacy onApproveRedirectionUrl prop when both are configured", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("expressApprove")
+        ? Promise.resolve({
+            onApproveRedirectionUrl: "https://merchant.example.com/review",
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            paypalData: { clientId: "client-1", currency: "EUR" },
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        processorUrl="https://processor.test"
+        builderType="express"
+        redirectOnApprove={true}
+        onApproveRedirectionUrl="https://legacy.example.com/review"
+      >
+        <OnApproveConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledWith(
+        {},
+        "https://processor.test/payments/expressApprove",
+        expect.anything()
+      )
+    );
+    // Confirms the actual navigation target is expressApprove's result, not just that its endpoint
+    // was called — the legacy onApproveRedirectionUrl prop's URL must never be used here.
+    await waitFor(() =>
+      expect(mockedRedirectTo).toHaveBeenCalledWith(
+        "https://merchant.example.com/review"
+      )
+    );
+  });
+
+  it("logs and falls through to the normal missing-config handling when redirectOnApprove is true but no processorUrl is configured", async () => {
+    const consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation();
+    mockedProcessorRequest.mockResolvedValue({
+      id: "payment-1",
+      paypalData: { clientId: "client-1", currency: "EUR" },
+      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+    } as never);
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        createPaymentUrl="https://processor.test/payments"
+        builderType="express"
+        redirectOnApprove={true}
+      >
+        <OnApproveConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith(
+        "Error",
+        "Something went wrong. Please try again later."
+      )
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("expressApproveUrl")
+    );
+    consoleErrorSpy.mockRestore();
   });
 });
 
