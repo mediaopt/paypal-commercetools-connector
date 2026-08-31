@@ -166,12 +166,12 @@ describe("PayPalMask button style (paypalButtonConfig) — standard builder", ()
     });
   });
 
-  it("omits color (but still applies label) when no fundingSource prop is passed", () => {
+  it("applies color and label when no fundingSource prop is passed (auto-render defaults to PayPal's own branding)", () => {
     render(<PayPalMask />);
 
     expect(capturedCalls).toHaveLength(1);
     expect(capturedProps.style.label).toBe("buynow");
-    expect(capturedProps.style.color).toBeUndefined();
+    expect(capturedProps.style.color).toBe("blue");
   });
 
   it("applies buttonColor when fundingSource is 'paypal' (as PayPalBuilder passes by default)", () => {
