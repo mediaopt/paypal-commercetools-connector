@@ -157,29 +157,19 @@ export type UpdateShippingRequest = {
   shippingOptions?: PayPalShippingOption[];
 };
 
+export type PayPalMoney = {
+  currency_code: string;
+  value: string;
+};
+
 export type UpdateShippingResponse = {
   shippingOptions: PayPalShippingOption[];
-  amount: {
-    currency_code: string;
-    value: string;
-  };
+  amount: PayPalMoney;
   breakdown: {
-    item_total?: {
-      currency_code: string;
-      value: string;
-    };
-    shipping: {
-      currency_code: string;
-      value: string;
-    };
-    tax_total?: {
-      currency_code: string;
-      value: string;
-    };
-    discount?: {
-      currency_code: string;
-      value: string;
-    };
+    item_total?: PayPalMoney;
+    shipping: PayPalMoney;
+    tax_total?: PayPalMoney;
+    discount?: PayPalMoney;
   };
 };
 
@@ -313,8 +303,16 @@ export type CustomPayPalButtonsComponentProps = Omit<
   | "onClick"
   | "onError"
   | "onInit"
+  | "fundingSource"
 > & {
   paypalMessages?: PayPalMessagesComponentProps;
+  // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
+  // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
+  fundingSource?: FUNDING_SOURCE[];
+  // Which PayPal funding-source identity this mounted component's createOrder call should use —
+  // see PayPalBuilder.ts's DEFAULT_PAYMENT_SOURCE_BY_COMPONENT and PayPalMask.tsx's
+  // handleCreateOrder. Falls back to "paypal" when absent.
+  paymentSource?: FUNDING_SOURCE;
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -388,10 +386,7 @@ export type PayPalShippingOption = {
   id: string;
   label: string;
   type: "SHIPPING";
-  amount: {
-    currency_code: string;
-    value: string;
-  };
+  amount: PayPalMoney;
   selected: boolean;
 };
 
@@ -540,7 +535,28 @@ type PayPalButtonConfig = {
   buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
 };
 
-export type GetSettingsResponse = {
+// One PayPal builder variant's fully-resolved style — mirrors the PayPal JS SDK's own `style`
+// prop shape (color/label/shape together), so it can be applied to <PayPalButtons/> as one unit.
+type PayPalVariantStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
+
+// A component/variant's processor-configured override (PAYPAL_BUTTON_CONFIG in
+// processor/.env.template, keyed by component then, for PayPal, variant) — see PayPalBuilder.ts's
+// 4-layer resolution. Every field is wholesale-replace when present, not merged field-by-field
+// with whatever a lower-priority layer already resolved. Not every component uses every field —
+// e.g. CardFields has no button style/funding sources, only `components`.
+export type PayPalVariantConfig = {
+  style?: PayPalVariantStyle;
+  fundingSources?: FUNDING_SOURCE[];
+  // PayPal JS SDK script `components` list for this component/variant (e.g. "buttons,card-fields")
+  // — same concern as PAYPAL_SDK_OPTIONS.<component>.components, but resolved through this 4-layer
+  // chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see PayPalBuilder.ts).
+  components?: string;
+};
+
+// Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
+// custom object shape, read via getSettings()). Duplicated here rather than imported since the
+// enabler doesn't depend on common-connect — keep field names in sync with that type by hand.
+type PayPalLegacySettings = {
   merchantId: string;
   email: string;
   acceptPayPal: boolean;
@@ -581,15 +597,23 @@ export type GetSettingsResponse = {
   ratePayCustomerServiceInstructions: CustomDataStringObject;
   paymentDescription: CustomDataStringObject;
   storeInVaultOnSuccess: boolean;
-  // Shared fallback used by both builder variants whenever PayPalStandard/PayPalExpress don't
-  // override a given field — see enabler/README.md's "PayPal button label/color config" section.
   paypalButtonConfig: PayPalButtonConfig;
-  PayPalStandard?: Partial<PayPalButtonConfig>;
-  PayPalExpress?: Partial<PayPalButtonConfig>;
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, any>;
 };
+
+// New — processor-only per-component overrides (PAYPAL_BUTTON_CONFIG in
+// processor/.env.template), not part of the CT custom object/PayPalLegacySettings above.
+// Has higher priority for relevant component. Keyed by componentType directly (e.g. "PayPal",
+// "CardFields", a future "Venmo") — PayPalExpress is the one dedicated exception, since only
+// PayPal's own express builder variant needs a config slot separate from its own componentType
+// entry (see PayPalBuilder.ts's express-first resolution).
+type PayPalComponentOverrides = Partial<Record<string, PayPalVariantConfig>> & {
+  PayPalExpress?: PayPalVariantConfig;
+};
+
+export type GetSettingsResponse = PayPalLegacySettings & PayPalComponentOverrides;
 
 export type CustomOnApproveData = {
   orderID: string;

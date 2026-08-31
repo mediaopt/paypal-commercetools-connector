@@ -149,13 +149,13 @@ on the cart).
 This is a stopgap, not the final shape — richer configuration is expected in future versions. **If
 you need something this doesn't yet cover, please open an issue.**
 
-### PayPal button label/color config (`paypalButtonConfig`) per variant
+### PayPal button label/color config (`paypalButtonConfig`) per component
 
 Similarly to the SDK script options above, the PayPal button's `style.label`/`style.color`
-(`GetSettingsResponse.paypalButtonConfig`) can be overridden per builder variant via
-`PayPalStandard`/`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
-`{...paypalButtonConfig, ...(builderType === "express" ? PayPalExpress : PayPalStandard)}` before
-the settings ever reach `SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
+(`GetSettingsResponse.paypalButtonConfig`) can be overridden per component via `PayPal`/
+`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
+`{...paypalButtonConfig, ...(isExpress ? PayPalExpress : PayPal)}` before the settings ever reach
+`SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
 
 **The settings-providing app currently only supplies the single, shared `paypalButtonConfig`** —
 `PayPalStandard`/`PayPalExpress` aren't populated yet, so that shared config is used as the

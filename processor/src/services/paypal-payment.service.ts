@@ -76,6 +76,7 @@ import {
   CheckoutPaymentIntent,
   findMostRecentTransaction,
   Patch,
+  PayPalSettings,
 } from "common-connect";
 
 import { log } from "../libs/logger";
@@ -122,9 +123,19 @@ export class PayPalPaymentService extends AbstractPaymentService {
     this.ctPaymentMethodService = opts.ctPaymentMethodService;
   }
 
+  // Merges the CT custom object (mc app's saved settings, when available) over processor's own
+  // config-tier base (env-configured PAYPAL_SETTINGS layered over common-connect's
+  // CUSTOM_OBJECT_DEFAULT_VALUES — see getConfig().settingsFallback) field-by-field, rather than
+  // wholesale-replacing it — so a custom object missing a field (e.g. not yet resaved after a new
+  // field was added) still falls back to processor's base instead of leaving it undefined.
+  private async resolveSettings(): Promise<Partial<PayPalSettings>> {
+    const rawSettings = await getSettings();
+    return { ...getConfig().settingsFallback, ...rawSettings };
+  }
+
   public async config(): Promise<ConfigResponse> {
-    const [rawSettings, cartSummary] = await Promise.all([
-      getSettings(),
+    const [settings, cartSummary] = await Promise.all([
+      this.resolveSettings(),
       this.ctCartService
         .getCart({ id: getCartIdFromContext() })
         .then((ctCart) => ({
@@ -141,7 +152,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
           return undefined;
         }),
     ]);
-    const settings = rawSettings ?? getConfig().settingsFallback;
 
     // Only worth resolving when vaulting is actually enabled — otherwise nothing uses the token
     // and it's not worth an extra PayPal OAuth call on every enabler mount.
@@ -158,8 +168,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
       },
       enableVaulting: getConfig().enableVaulting,
       redirectOnApprove: getConfig().redirectOnApprove,
-      perMethodConfig: getConfig().perMethodConfig,
-      settings,
+      // Per-component overrides (style/fundingSources/components), sourced from
+      // PAYPAL_BUTTON_CONFIG — already componentType-keyed (plus the dedicated PayPalExpress
+      // slot), passed through as-is; the enabler merges these over its own defaults and the
+      // general settings above (see PayPalBuilder.ts's 4-layer resolution).
+      settings: {
+        ...settings,
+        ...getConfig().buttonConfig,
+      },
       userIdToken,
       sdkOptions: buildSdkOptions(cartSummary),
     };
@@ -1151,7 +1167,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment, amount } = request;
 
-    const settings = (await getSettings()) ?? getConfig().settingsFallback;
+    const settings = await this.resolveSettings();
     const intent =
       settings?.payPalIntent === "Authorize"
         ? CheckoutPaymentIntent.Authorize

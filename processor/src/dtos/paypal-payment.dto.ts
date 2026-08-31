@@ -24,9 +24,11 @@ export const PaymentMethodType = {
 } as const;
 export type PaymentMethodType = StandardPaymentMethodType;
 
-export enum CustomBuilderType {
-  EXPRESS = "express",
-}
+export const CustomBuilderType = {
+  EXPRESS: "express",
+} as const;
+export type CustomBuilderType =
+  (typeof CustomBuilderType)[keyof typeof CustomBuilderType];
 
 // Payment schema groups
 const PaymentRequiredFieldsSchema = Type.Object({
