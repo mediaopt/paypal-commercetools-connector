@@ -1,10 +1,11 @@
-import React from "react";
 import { render } from "@testing-library/react";
 
 let capturedProps: any;
+let capturedCalls: any[];
 jest.mock("@paypal/react-paypal-js", () => ({
   PayPalButtons: (props: any) => {
     capturedProps = props;
+    capturedCalls.push(props);
     return null;
   },
   PayPalMessages: () => null,
@@ -13,21 +14,24 @@ jest.mock("@paypal/react-paypal-js", () => ({
 const mockHandleUpdateShipping = jest.fn();
 const mockResolveShippingOptionId = jest.fn((id: string) => id);
 
+const mockUsePayment = jest.fn();
 jest.mock("../../app/usePayment", () => ({
-  usePayment: () => ({
-    handleCreateOrder: jest.fn(),
-    handleOnApprove: jest.fn(),
-    vaultOnly: false,
-    handleCreateVaultSetupToken: jest.fn(),
-    handleApproveVaultSetupToken: jest.fn(),
-    builderType: "express",
-    handleUpdateShipping: mockHandleUpdateShipping,
-    resolveShippingOptionId: mockResolveShippingOptionId,
-  }),
+  usePayment: () => mockUsePayment(),
 }));
 
+const basePaymentMock = {
+  handleCreateOrder: jest.fn(),
+  handleOnApprove: jest.fn(),
+  vaultOnly: false,
+  handleCreateVaultSetupToken: jest.fn(),
+  handleApproveVaultSetupToken: jest.fn(),
+  handleUpdateShipping: mockHandleUpdateShipping,
+  resolveShippingOptionId: mockResolveShippingOptionId,
+};
+
+const mockUseSettings = jest.fn();
 jest.mock("../../app/useSettings", () => ({
-  useSettings: () => ({ settings: undefined, paymentTokens: undefined }),
+  useSettings: () => mockUseSettings(),
 }));
 jest.mock("../../app/useLoader", () => ({
   useLoader: () => ({ isLoading: jest.fn() }),
@@ -44,8 +48,19 @@ import { PayPalMask } from "./PayPalMask";
 describe("PayPalMask shipping handlers (PayPal Express)", () => {
   beforeEach(() => {
     capturedProps = undefined;
+    capturedCalls = [];
     mockHandleUpdateShipping.mockReset();
-    mockResolveShippingOptionId.mockReset().mockImplementation((id: string) => id);
+    mockResolveShippingOptionId
+      .mockReset()
+      .mockImplementation((id: string) => id);
+    mockUsePayment.mockReset().mockReturnValue({
+      ...basePaymentMock,
+      builderType: "express",
+    });
+    mockUseSettings.mockReset().mockReturnValue({
+      settings: undefined,
+      paymentTokens: undefined,
+    });
   });
 
   it("onShippingAddressChange calls handleUpdateShipping with the buyer's address and does not reject on success", async () => {
@@ -118,12 +133,103 @@ describe("PayPalMask shipping handlers (PayPal Express)", () => {
     const actions = { reject: jest.fn() };
     await expect(
       capturedProps.onShippingOptionsChange(
-        { orderID: "order-1", selectedShippingOption: { id: "unknown-option" } },
+        {
+          orderID: "order-1",
+          selectedShippingOption: { id: "unknown-option" },
+        },
         actions
       )
     ).rejects.toThrow();
 
     expect(actions.reject).toHaveBeenCalled();
     expect(mockHandleUpdateShipping).not.toHaveBeenCalled();
+  });
+});
+
+describe("PayPalMask button style (paypalButtonConfig) — standard builder", () => {
+  beforeEach(() => {
+    capturedProps = undefined;
+    capturedCalls = [];
+    mockHandleUpdateShipping.mockReset();
+    mockResolveShippingOptionId
+      .mockReset()
+      .mockImplementation((id: string) => id);
+    mockUsePayment.mockReset().mockReturnValue({
+      ...basePaymentMock,
+      builderType: "standard",
+    });
+    mockUseSettings.mockReset().mockReturnValue({
+      settings: {
+        paypalButtonConfig: { buttonColor: "blue", buttonLabel: "buynow" },
+      },
+      paymentTokens: undefined,
+    });
+  });
+
+  it("omits color (but still applies label) when no fundingSource prop is passed", () => {
+    render(<PayPalMask />);
+
+    expect(capturedCalls).toHaveLength(1);
+    expect(capturedProps.style.label).toBe("buynow");
+    expect(capturedProps.style.color).toBeUndefined();
+  });
+
+  it("applies buttonColor when fundingSource is 'paypal' (as PayPalBuilder passes by default)", () => {
+    render(<PayPalMask fundingSource="paypal" />);
+
+    expect(capturedProps.style).toMatchObject({ color: "blue" });
+  });
+
+  it("applies buttonColor when fundingSource is 'paylater'", () => {
+    render(<PayPalMask fundingSource="paylater" />);
+
+    expect(capturedProps.style).toMatchObject({ color: "blue" });
+  });
+
+  it("omits color for a fundingSource incompatible with the PayPal color palette", () => {
+    render(<PayPalMask fundingSource="venmo" />);
+
+    expect(capturedProps.style.color).toBeUndefined();
+  });
+
+  it("renders exactly one <PayPalButtons/> when no fundingSource is passed, letting the SDK auto-render every eligible funding source itself", () => {
+    render(<PayPalMask />);
+
+    // fundingSource must be a single FUNDING_SOURCE, not an array (see
+    // @paypal/paypal-js's PayPalButtonFundingSource) — PayPalMask itself never fans out
+    // multiple <PayPalButtons/> instances; showing more than one button from a single mount
+    // relies entirely on the PayPal JS SDK's own auto-detection when fundingSource is omitted
+    // (see PayPalBuilder.ts's ENABLER_DEFAULT_CONFIG).
+    expect(capturedCalls).toHaveLength(1);
+    expect(capturedProps.fundingSource).toBeUndefined();
+  });
+});
+
+describe("PayPalMask button style — express builder always collapses to a single 'paypal' button", () => {
+  beforeEach(() => {
+    capturedProps = undefined;
+    capturedCalls = [];
+    mockHandleUpdateShipping.mockReset();
+    mockResolveShippingOptionId
+      .mockReset()
+      .mockImplementation((id: string) => id);
+    mockUsePayment.mockReset().mockReturnValue({
+      ...basePaymentMock,
+      builderType: "express",
+    });
+    mockUseSettings.mockReset().mockReturnValue({
+      settings: {
+        paypalButtonConfig: { buttonColor: "blue", buttonLabel: "buynow" },
+      },
+      paymentTokens: undefined,
+    });
+  });
+
+  it("renders exactly one button for the express builder's default fundingSource", () => {
+    render(<PayPalMask fundingSource="paypal" />);
+
+    expect(capturedCalls).toHaveLength(1);
+    expect(capturedProps.fundingSource).toBe("paypal");
+    expect(capturedProps.style).toMatchObject({ color: "blue" });
   });
 });

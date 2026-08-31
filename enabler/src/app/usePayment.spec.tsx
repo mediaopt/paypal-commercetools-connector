@@ -170,7 +170,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
 
   it("populates paymentInfo.id/amountPlanned from a real processor-shaped response — regression test for the amountPlanned-undefined crash", async () => {
     mockedProcessorRequest.mockResolvedValue({
-      paypalData: { clientId: "client-1", currency: "EUR", intent: "CAPTURE" },
+      paypalData: { clientId: "client-1", currency: "EUR" },
       id: "payment-1",
       amountPlanned: {
         centAmount: 1000,
