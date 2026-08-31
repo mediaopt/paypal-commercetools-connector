@@ -61,7 +61,14 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     let styles: Record<string, string | boolean> = {};
     if (settings.paypalButtonConfig) {
       styles.label = settings.paypalButtonConfig.buttonLabel;
-      styles.color = settings.paypalButtonConfig.buttonColor;
+      // Only apply the merchant's configured brand color to PayPal's own funding sources — a
+      // fixed color could clash with another funding source's own branding (e.g. Venmo blue).
+      if (!restprops.fundingSource||
+        (restprops.fundingSource &&
+        ["paypal", "paylater"].includes(restprops.fundingSource))
+      ) {
+        styles.color = settings.paypalButtonConfig.buttonColor;
+      }
     }
     if (settings.buttonShape) {
       styles.shape = settings.buttonShape;

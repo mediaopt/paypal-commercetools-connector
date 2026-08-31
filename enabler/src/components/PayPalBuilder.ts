@@ -31,8 +31,11 @@ const FIXED_SETTINGS_OVERRIDES_BY_COMPONENT: Partial<
 // resolution). Not folded into a generic per-component variant map, since no other component is
 // ever expected to need a second config slot like this.
 const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<PayPalVariantConfig> = {
+  // buttonLabel here is only the pre-override default — it's forced back to "buynow"
+  // unconditionally in mount() below regardless of what variantOverride/generalStyle supply, so
+  // this value never actually changes in practice; kept for a type-required field's sake.
   style: { buttonColor: "blue", buttonLabel: "buynow", buttonShape: "rect" },
-  fundingSources: ["paypal"],
+  fundingSource: "paypal",
   components: "buttons,card-fields",
 };
 // Enabler's own built-in default, lowest-priority tier: what renders when the processor sends
@@ -40,9 +43,13 @@ const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<PayPalVariantConfig> = {
 // single-variant component (CardFields has no button style/funding sources of its own — only
 // `components` applies to it).
 const ENABLER_DEFAULT_CONFIG: Partial<Record<string, PayPalVariantConfig>> = {
+  // No fundingSource default — a single FUNDING_SOURCE value renders exactly one standalone
+  // button (see @paypal/paypal-js's PayPalButtonFundingSource); omitting it lets <PayPalButtons/>
+  // auto-render every currently-eligible funding source instead (PayPal + Pay Later via
+  // enableFunding: "paylater" below; SEPA excluded via disableFunding below
+  //TODO - clarify if Sepa should be included by default
   PayPal: {
     style: { buttonColor: "blue", buttonLabel: "paypal", buttonShape: "rect" },
-    fundingSources: ["paypal", "paylater"],
     components: "buttons,card-fields",
   },
   CardFields: {
@@ -112,7 +119,7 @@ class PayPalComponent implements PaymentComponent {
     const resolvedStyle =
       variantOverride?.style ?? generalStyle ?? variantDefaults?.style;
     const fundingSource =
-      variantOverride?.fundingSources ?? variantDefaults?.fundingSources;
+      variantOverride?.fundingSource ?? variantDefaults?.fundingSource;
     // Same concern as PAYPAL_SDK_OPTIONS.<componentType>.components (componentSdkOptions, spread
     // into scriptOptions below) — PAYPAL_SDK_OPTIONS still wins if it also sets `components`,
     // since it's spread after scriptOptions.components here.
@@ -124,6 +131,12 @@ class PayPalComponent implements PaymentComponent {
       currency: "EUR",
       components: resolvedComponents,
       enableFunding: "paylater",
+      // TODO: placeholder default, not a final decision — see the "SEPA" entry in TODO.md. Without
+      // an explicit fundingSource, <PayPalButtons/> auto-renders every eligible funding source,
+      // which for some merchant accounts includes SEPA; excluded here so the default PayPal button
+      // doesn't unexpectedly grow a SEPA button until it's decided whether SEPA should be offered
+      // as its own separate named button instead. Override via PAYPAL_SDK_OPTIONS if needed sooner.
+      disableFunding: "sepa",
       ...componentSdkOptions,
     };
 
@@ -134,7 +147,13 @@ class PayPalComponent implements PaymentComponent {
       ...(resolvedStyle && {
         paypalButtonConfig: {
           buttonColor: resolvedStyle.buttonColor,
-          buttonLabel: resolvedStyle.buttonLabel,
+          // Category 1 — hardcoded, non-overridable for the express variant specifically: PayPal
+          // Express is the Buy-Now/one-click flow, so its label must always read "buynow"
+          // regardless of merchant config. Can't live in FIXED_SETTINGS_OVERRIDES_BY_COMPONENT
+          // (keyed by componentType, which is "PayPal" for both standard and express) or in
+          // ENABLER_DEFAULT_EXPRESS_CONFIG alone (variantOverride's style, if set at all, would
+          // otherwise replace it wholesale — see the 4-layer resolution comment above).
+          buttonLabel: isExpress ? "buynow" : resolvedStyle.buttonLabel,
         },
         buttonShape: resolvedStyle.buttonShape,
       }),

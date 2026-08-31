@@ -308,7 +308,7 @@ export type CustomPayPalButtonsComponentProps = Omit<
   paypalMessages?: PayPalMessagesComponentProps;
   // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
   // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
-  fundingSource?: FUNDING_SOURCE[];
+  fundingSource?: FUNDING_SOURCE;
   // Which PayPal funding-source identity this mounted component's createOrder call should use —
   // see PayPalBuilder.ts's DEFAULT_PAYMENT_SOURCE_BY_COMPONENT and PayPalMask.tsx's
   // handleCreateOrder. Falls back to "paypal" when absent.
@@ -546,7 +546,7 @@ type PayPalVariantStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
 // e.g. CardFields has no button style/funding sources, only `components`.
 export type PayPalVariantConfig = {
   style?: PayPalVariantStyle;
-  fundingSources?: FUNDING_SOURCE[];
+  fundingSource?: FUNDING_SOURCE;
   // PayPal JS SDK script `components` list for this component/variant (e.g. "buttons,card-fields")
   // — same concern as PAYPAL_SDK_OPTIONS.<component>.components, but resolved through this 4-layer
   // chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see PayPalBuilder.ts).
