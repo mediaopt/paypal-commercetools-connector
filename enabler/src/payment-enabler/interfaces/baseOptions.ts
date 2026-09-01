@@ -5,9 +5,10 @@ type ComponentSdkOptions = Record<string, unknown>;
 
 /**
  * PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding, etc.),
- * keyed by componentType — sourced from the processor's `/operations/config` response, see
+ * keyed by paymentMethodType — sourced from the processor's `/operations/config` response, see
  * PAYPAL_SDK_OPTIONS in processor/.env.template. PayPalExpress is the one dedicated exception,
- * since only PayPal's own express builder variant needs its own slot — see PayPalBuilder.ts.
+ * since only PayPal's own component with builderType: "express" needs its own slot — see
+ * PayPalBuilder.ts.
  */
 export type PayPalSdkOptions = Partial<Record<string, ComponentSdkOptions>> & {
   PayPalExpress?: ComponentSdkOptions;

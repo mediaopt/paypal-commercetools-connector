@@ -9,14 +9,22 @@ import { CardFields } from "../CardFields";
 // } from "paypal-commercetools-client";
 
 import { RenderPurchase } from "../RenderPurchase/RenderPurchase";
+import { BuilderType, PayPalPaymentMethodType } from "../../types";
 
 /**
  * Maps PayPal payment method types to their corresponding components —
  * this is our equivalent of the reference project's `ComponentWithCustomOptions` dispatch switch.
  */
-export function getPayPalComponent(type: string): ComponentType<any> {
+export function getPayPalComponent(
+  type: PayPalPaymentMethodType
+): ComponentType<any> {
   switch (type) {
     case "PayPal":
+    case "Sepa":
+    case "PayLater":
+    case "PayPalCreditCard":
+    case "AllButtons":
+    case "Venmo":
       return PayPal;
     case "CardFields":
       return CardFields;
@@ -34,9 +42,9 @@ export function getPayPalComponent(type: string): ComponentType<any> {
 }
 
 type RenderTemplateProps = {
-  paymentMethodType: string;
+  paymentMethodType: PayPalPaymentMethodType;
   customOptions: Record<string, unknown>;
-  builderType?: string;
+  builderType?: BuilderType;
   processorUrl?: string;
 };
 

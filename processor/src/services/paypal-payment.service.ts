@@ -411,8 +411,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
     orderData,
     payPalIntent,
     builderType,
+    paymentMethodType,
   }: CreateOrderRequestSchemaDTO): Promise<CreateOrderResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
+      this.validateVenmoOrderParams(payment);
+    }
 
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
@@ -475,6 +480,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
         links: response.links,
       },
     };
+  }
+
+  // PayPal's Venmo funding source only supports USD-denominated orders.
+  private validateVenmoOrderParams(payment: Payment): void {
+    if (payment.amountPlanned.currencyCode !== "USD") {
+      throw new ErrorInvalidOperation(
+        `Venmo requires a USD-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
+      );
+    }
   }
 
   /**
