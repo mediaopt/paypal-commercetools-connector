@@ -70,7 +70,7 @@ For the methods that interact with PayPal API this documentation includes "Conne
      - [Card](#iv-example-request-card)
      - [Google Pay](#v-example-request-google-pay)
      - [Apple Pay](#vi-example-request-apple-pay)
-     - [Legal Notice: Final Amount Confirmation (e.g. Germany)](#legal-notice-final-amount-confirmation-eg-germany)
+     - [Important Notice](#important-notice)
   2. [getClientToken](#2-getclienttoken)
   3. [CaptureOrder](#3-captureorder)
   4. [CaptureAuthorization](#4-captureauthorization)
@@ -559,38 +559,30 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 
 <br>
 
-### Legal Notice: Final Amount Confirmation (e.g. Germany)
+### Important Notice
 
-Some jurisdictions — Germany is the primary example — legally require that the buyer sees and
-explicitly confirms the **exact final payment amount** before the purchase is completed. A PayPal
-popup/Express window alone does not reliably satisfy this: if the cart, address, or delivery method
-changes inside the PayPal window, the amount shown there may not match what is ultimately charged.
-This is most relevant when the merchant's configured payment intent is **Authorize** (see `intent` in
-[CreateOrder](#1-createorder) and the [AuthorizeOrder](#6-authorizeorder)/[CaptureAuthorization](#4-captureauthorization)
-endpoints above), since the final capture there can happen after the buyer has already moved on from
-the PayPal window.
+In some countries, the buyer must approve the order/final amount with a button or final confirmation
+action on the merchant's own website before the purchase is completed, rather than relying only on
+approval inside the PayPal popup/window. **Implementing this redirection to the merchant's website is the merchant's responsibility.** The connector does not
+implement this redirection; it only provides the methods to complete the
+order once the buyer has confirmed.
 
-To meet this requirement, the buyer must be redirected back to the merchant's own site to review and
-confirm the final total before the order is completed.
+What the connector provides is two ways to complete the order at that point: the
+[Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api)
+(via `capturePayment`), or direct PayPal API calls through this connector's own endpoints.
 
-> **Building and hosting this confirmation/redirect page is the merchant's responsibility.** The
-> connector and client provide the necessary data (order details, approval link, final amount) via the
-> standard API responses described in this document, but do not provide this confirmation page itself.
-> Merchants operating in jurisdictions with this requirement need to implement it on their own
-> storefront.
+- **Authorize now, capture later** — authorize the order ([AuthorizeOrder](#6-authorizeorder)), then
+  capture it separately once the merchant is ready ([CaptureAuthorization](#4-captureauthorization)).
+- **Capture directly** — capture the order immediately after approval ([CaptureOrder](#3-captureorder)).
 
-This confirmation step is separate from PayPal's own buyer-approval step (most methods already require
-the buyer to approve the order via the link returned by PayPal in the `CreateOrder` response — see the
-[workflow documentation](workflows/README.md) for the full call sequence). The merchant-side redirect
-described here is an *additional* step on top of that, required specifically to satisfy local law
-around final price transparency — not a replacement for the PayPal approval step.
+If an order was authorized but then cannot be fulfilled (e.g. the order is cancelled), the
+authorization should be released instead of captured, using [VoidAuthorization](#5-voidauthorization).
 
-<!-- (?) CONFIRM WITH DEV before merging:
-  1. Does this final-amount confirmation redirect apply only to the Authorize intent, or to Capture
-     as well?
-  2. Is there a specific "complete order" button/action the merchant's redirect page is expected to
-     call, beyond just displaying the total?
--->
+For details on PayPal's own approval/redirect mechanism referenced above, see
+[Step 2: Buyer approval](https://developer.paypal.com/api/rest/integration/orders-api/api-use-cases/standard#step-2-buyer-approval)
+in PayPal's official documentation, which describes the `return_url` and `user_action` parameters
+that control whether the buyer is sent back to review the final amount (`CONTINUE`, the default) or
+not (`PAY_NOW`).
 
 <br>
 
