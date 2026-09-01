@@ -1,4 +1,60 @@
 deployAs:
+  - name: enabler
+    applicationType: assets
+  - name: processor
+    applicationType: service
+    endpoint: /
+    scripts:
+      postDeploy: npm install && npm run connector:post-deploy
+      preUndeploy: npm install && npm run connector:pre-undeploy
+    configuration:
+      standardConfiguration:
+        - key: CTP_AUTH_URL
+          description: commercetools Auth URL
+          required: true
+          default: https://auth.europe-west1.gcp.commercetools.com
+        - key: CTP_API_URL
+          description: commercetools API URL
+          required: true
+          default: https://api.europe-west1.gcp.commercetools.com
+        - key: CTP_SESSION_URL
+          description: commercetools Session API URL
+          required: true
+          default: https://session.europe-west1.gcp.commercetools.com
+        - key: CTP_CHECKOUT_URL
+          description: commercetools Checkout API URL
+          required: true
+          default: https://checkout.europe-west1.gcp.commercetools.com
+        - key: CTP_JWKS_URL
+          description: JWKs URL for JWT validation
+          required: true
+          default: https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json
+        - key: CTP_JWT_ISSUER
+          description: JWT issuer for JWT validation
+          required: true
+          default: https://mc-api.europe-west1.gcp.commercetools.com
+        - key: STORED_PAYMENT_METHODS_ENABLED
+          description: Enable vault payment methods (true OR false)
+          required: false
+        - key: MERCHANT_RETURN_URL
+          description: Merchant website return URL for redirect-based payment methods
+          required: false
+        - key: PAYPAL_ONAPPROVE_PREFIX
+          description: PayPal-Express-only override for the buyer redirect after approval, falling back to MERCHANT_RETURN_URL when unset
+          required: false
+        - key: PAYPAL_REDIRECT_ON_APPROVE
+          description: For PayPal Express (Authorize or Capture intent), redirect to PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL on approval instead of finalizing the payment immediately (true OR false). REQUIRED to be true, with that review page actually built, for PayPal Express in Germany.
+          required: false
+          default: "false"
+        - key: PAYPAL_PER_METHOD_CONFIG
+          description: Per-method required config (non-style identifiers, unique per payment method), as a JSON object
+          required: false
+        - key: PAYPAL_SETTINGS
+          description: Fallback merchant settings (button style, PayLater messaging, 3DS option, etc.) as a JSON object, used only when the paypal-commercetools-connector/settings custom object isn't available
+          required: false
+        - key: PAYPAL_SDK_OPTIONS
+          description: PayPal JS SDK script options (currency, funding sources, etc.) per component/builder variant, as a JSON object
+          required: false
   - name: paypal-commercetools-extension
     applicationType: service
     endpoint: /paypal-commercetools-extension
@@ -7,13 +63,6 @@ deployAs:
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
-        - key: CTP_REGION
-          description: commercetools Composable Commerce API region
-        - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
-        - key: PAYPAL_ENVIRONMENT
-          description: PayPal environment (Sandbox or Production)
         - key: PAYMENT_TYPE_KEY
           description: key for commercetools custom type for payment
           default: paypal-payment-type
@@ -32,17 +81,6 @@ deployAs:
         - key: SMTP_SENDER
           description: SMTP Sender for sending pay upon invoice mail
       securedConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools Composable Commerce project key
-        - key: CTP_CLIENT_ID
-          description: commercetools Composable Commerce client ID
-        - key: CTP_CLIENT_SECRET
-          description: commercetools Composable Commerce client secret
-        - key: CTP_SCOPE
-          description: commercetools Composable Commerce client scope
-        - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
         - key: SMTP_PASSWORD
           description: SMTP Password for sending pay upon invoice mail
   - name: paypal-commercetools-custom-application
@@ -65,24 +103,25 @@ deployAs:
     scripts:
       postDeploy: npm install && npm run build && npm run connector:post-deploy
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
-    configuration:
-      standardConfiguration:
-        - key: CTP_REGION
-          description: commercetools Composable Commerce API region
-        - key: PAYPAL_CLIENT_ID
-          description: PayPal Client Id
-          required: true
-        - key: PAYPAL_ENVIRONMENT
-          description: PayPal environment (Sandbox or Production)
-      securedConfiguration:
-        - key: CTP_PROJECT_KEY
-          description: commercetools Composable Commerce project key
-        - key: CTP_CLIENT_ID
-          description: commercetools Composable Commerce client ID
-        - key: CTP_CLIENT_SECRET
-          description: commercetools Composable Commerce client secret
-        - key: CTP_SCOPE
-          description: commercetools Composable Commerce client scope
-        - key: PAYPAL_CLIENT_SECRET
-          description: PayPal Client Secret
-          required: true
+inheritAs:
+  configuration:
+    standardConfiguration:
+      - key: CTP_REGION
+        description: commercetools Composable Commerce API region
+      - key: PAYPAL_CLIENT_ID
+        description: PayPal Client Id
+        required: true
+      - key: PAYPAL_ENVIRONMENT
+        description: PayPal environment (Sandbox or Production)
+    securedConfiguration:
+      - key: CTP_PROJECT_KEY
+        description: commercetools Composable Commerce project key
+      - key: CTP_CLIENT_ID
+        description: commercetools Composable Commerce client ID
+      - key: CTP_CLIENT_SECRET
+        description: commercetools Composable Commerce client secret
+      - key: CTP_SCOPE
+        description: commercetools Composable Commerce client scope
+      - key: PAYPAL_CLIENT_SECRET
+        description: PayPal Client Secret
+        required: true

@@ -16,14 +16,12 @@ import {
   PAYPAL_PAYMENT_EXTENSION_KEY,
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   PAYPAL_PAYMENT_TYPE_KEY,
-} from '../constants';
-import { findMatchingExtension } from '../service/commercetools.service';
-import {
-  deleteAccessToken,
+  logger,
   getCachedAccessToken,
-} from '../service/config.service';
-import { logger } from '../utils/logger.utils';
+} from 'common-connect/dist';
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
+import { deleteAccessToken } from '../service/config.service';
+import { findMatchingExtension } from '../service/commercetools.service';
 
 const PAYPAL_API_PAYMENT_ENDPOINTS = [
   'createPayPalOrder',

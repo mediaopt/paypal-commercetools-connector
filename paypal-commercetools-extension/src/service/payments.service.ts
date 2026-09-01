@@ -3,50 +3,18 @@ import {
   Payment,
   PaymentAddTransactionAction,
   PaymentUpdateAction,
-  Transaction,
   TransactionDraft,
   TransactionState,
   TransactionType,
 } from '@commercetools/platform-sdk';
-import CustomError from '../errors/custom.error';
-import {
-  CheckoutPaymentIntent,
-  Order,
-  OrderAuthorizeRequest,
-  OrderCaptureRequest,
-  OrderRequest,
-  Patch,
-  PurchaseUnit,
-} from '../paypal/checkout_api';
-import {
-  Authorization2StatusEnum,
-  Capture2StatusEnum,
-  CaptureRequest,
-} from '../paypal/payments_api';
+
+import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
+import { getSettings } from './config.service';
 import {
   ClientTokenRequest,
   EntityResponse,
   PayPalSettings,
   UpdateActions,
-} from '../types/index.types';
-import { getCurrentTimestamp } from '../utils/data.utils';
-import {
-  mapCommercetoolsAddressToPayPalAddress,
-  mapCommercetoolsCarrierToPayPalCarrier,
-  mapCommercetoolsCartToPayPalPriceBreakdown,
-  mapValidCommercetoolsLineItemsToPayPalItems,
-  mapCommercetoolsMoneyToPayPalMoney,
-  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
-  mapPayPalCaptureStatusToCommercetoolsTransactionState,
-  mapPayPalMoneyToCommercetoolsMoney,
-  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
-  mapPayPalRefundStatusToCommercetoolsTransactionState,
-  resolveCommercetoolsCartShippingAddress,
-} from '../utils/map.utils';
-import { handleEntityActions, handleError } from '../utils/response.utils';
-import { getCart, getOrder, getPayPalUserId } from './commercetools.service';
-import { getSettings } from './config.service';
-import {
   addDeliveryData,
   authorizePayPalOrder,
   capturePayPalAuthorization,
@@ -59,8 +27,33 @@ import {
   refundPayPalOrder,
   updateDeliveryData,
   updatePayPalOrder,
-} from './paypal.service';
-import customError from '../errors/custom.error';
+  mapCommercetoolsAddressToPayPalAddress,
+  mapCommercetoolsCarrierToPayPalCarrier,
+  mapCommercetoolsCartToPayPalPriceBreakdown,
+  mapCommercetoolsMoneyToPayPalMoney,
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
+  mapPayPalCaptureStatusToCommercetoolsTransactionState,
+  mapPayPalMoneyToCommercetoolsMoney,
+  mapPayPalPaymentSourceToCommercetoolsMethodInfo,
+  mapPayPalRefundStatusToCommercetoolsTransactionState,
+  mapValidCommercetoolsLineItemsToPayPalItems,
+  resolveCommercetoolsCartShippingAddress,
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
+  CaptureRequest,
+  CheckoutPaymentIntent,
+  CustomError,
+  Order,
+  OrderAuthorizeRequest,
+  OrderCaptureRequest,
+  OrderRequest,
+  Patch,
+  PurchaseUnit,
+  extractPayPalPurchaseUnitTransaction,
+  findMostRecentTransaction,
+} from 'common-connect/dist';
+import { handleEntityActions, handleError } from '../utils/response.utils';
+import { getCurrentTimestamp } from '../utils/data.utils';
 
 type PayPalTransaction = 'captures' | 'authorizations';
 
@@ -245,11 +238,7 @@ async function prepareCreateOrderRequest(
 const relevantTransaction = (
   paymentType: PayPalTransaction,
   purchase_units?: PurchaseUnit[]
-) => {
-  const relevantPayment =
-    purchase_units && purchase_units[0].payments?.[paymentType];
-  return relevantPayment?.length ? relevantPayment[0] : undefined;
-};
+) => extractPayPalPurchaseUnitTransaction(purchase_units, paymentType);
 
 const actualTransactionStatus = (
   relevantTransactionType: PayPalTransaction,
@@ -260,7 +249,7 @@ const actualTransactionStatus = (
     purchase_units
   );
   if (!relevantPayPalPayment)
-    throw new customError(500, 'No relevant PayPal payment found');
+    throw new CustomError(500, 'No relevant PayPal payment found');
   else
     return relevantTransactionType === 'authorizations'
       ? mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
@@ -713,17 +702,14 @@ function findSuitableTransactionId(
   type: TransactionType,
   status?: TransactionState
 ) {
-  const transactions = payment?.transactions.filter(
-    (transaction: Transaction): boolean =>
-      transaction.type === type && (!status || status === transaction.state)
-  );
-  if (!transactions || transactions.length === 0) {
+  const transaction = findMostRecentTransaction(payment, type, status);
+  if (!transaction) {
     throw new CustomError(
       500,
       `The payment ${payment.id} has no suitable transaction (type ${type}, state: ${status} or none)`
     );
   }
-  return transactions[transactions.length - 1].interactionId;
+  return transaction.interactionId;
 }
 
 export const handleCreateTrackingInformation = async (payment: Payment) => {

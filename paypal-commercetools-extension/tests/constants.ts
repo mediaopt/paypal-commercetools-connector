@@ -11,7 +11,7 @@ import {
   TaxedPrice,
   TaxRate,
 } from '@commercetools/platform-sdk';
-import { UpdateActions } from '../src/types/index.types';
+import { UpdateActions } from 'common-connect/dist';
 
 type TestUpdateAction = { action: string; [key: string]: unknown };
 

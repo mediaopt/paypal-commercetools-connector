@@ -1,18 +1,17 @@
 import { Customer, CustomerUpdateAction } from '@commercetools/platform-sdk';
+
 import {
-  PaymentTokenRequest,
-  SetupTokenRequest,
-  TokenIdRequestTypeEnum,
-} from '../paypal/vault_api';
-import { UpdateActions } from '../types/index.types';
-import { handleEntityActions } from '../utils/response.utils';
-import {
+  UpdateActions,
   createPaymentToken,
   createVaultSetupToken,
   deletePaymentToken,
   generateUserIdToken,
   getPaymentTokens,
-} from './paypal.service';
+  PaymentTokenRequest,
+  SetupTokenRequest,
+  TokenIdRequestTypeEnum,
+} from 'common-connect/dist';
+import { handleEntityActions } from '../utils/response.utils';
 
 export async function handleGetUserIDTokenRequest(customer: Customer) {
   const request = customer?.custom?.fields?.getUserIDTokenRequest;
