@@ -111,6 +111,13 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 | 3    | Get payment by id, to update the payment version, as the correct version is needed for next step    | Get Payment By Id                                                                    |
 | 4    | Capture the order                                                                                   | CaptureOrder                                                                         |
 
+> **Note:** step 2 above (approving the order via the link returned by PayPal) is PayPal's own
+> buyer-approval step. This is separate from an additional merchant-built confirmation/redirect page
+> required in some jurisdictions (e.g. Germany) to show the buyer the exact final amount before
+> completing the purchase — building that page is the merchant's responsibility. See
+> [Legal Notice: Final Amount Confirmation](../PayPal.md#legal-notice-final-amount-confirmation-eg-germany)
+> for details.
+
 ### Card payment
 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
