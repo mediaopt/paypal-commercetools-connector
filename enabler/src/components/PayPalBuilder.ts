@@ -14,6 +14,7 @@ import {
   ValidationHandlers,
 } from "../types";
 import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
+import { isVenmoSupported } from "./venmoAvailability";
 import {
   FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE,
   ENABLER_DEFAULT_EXPRESS_CONFIG,
@@ -45,6 +46,13 @@ class PayPalComponent implements PaymentComponent {
     }
 
     this.root = createRoot(element);
+
+    // Vaulting is only genuinely supported end-to-end for CardFields today — commercetools
+    // Checkout's own stored-payment-methods feature only ever surfaces card tokens back (see
+    // storedPaymentMethod.utils.ts), so vaulting via any other payment method is a dead end right
+    // now regardless of merchant config. If a merchant needs vaulting for another payment method,
+    // please open an issue.
+    const canVault = this.paymentMethodType === "CardFields";
 
     // Only PayPal's own component with builderType: "express" ever sets this — see
     // createExpressBuilder in payment-enabler-paypal.ts. Checked first/unconditionally (not
@@ -131,6 +139,7 @@ class PayPalComponent implements PaymentComponent {
         buttonShape: resolvedStyle.buttonShape,
       }),
       ...fixedOverrides,
+      ...(!canVault && { storeInVaultOnSuccess: false }),
     };
 
     const customOptions = {
@@ -141,7 +150,7 @@ class PayPalComponent implements PaymentComponent {
       },
       shippingMethodId: "standard",
       purchaseCallback: this.baseOptions.purchaseCallback,
-      enableVaulting: this.baseOptions.enableVaulting ?? false,
+      enableVaulting: canVault ? this.baseOptions.enableVaulting ?? false : false,
       redirectOnApprove: this.baseOptions.redirectOnApprove,
       initialSettings,
       initialUserIdToken: this.baseOptions.userIdToken,
@@ -193,6 +202,11 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
+    // Only Venmo has a device/browser-capability precondition today — checked directly rather
+    // than through a per-payment-method lookup map for just one entry.
+    if (this.paymentMethodType === "Venmo") {
+      return isVenmoSupported();
+    }
     return true;
   }
 }
