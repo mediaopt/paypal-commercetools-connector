@@ -54,7 +54,10 @@ describe("RenderTemplate", () => {
   it("throws for an unsupported payment method type", () => {
     expect(() =>
       render(
-        <RenderTemplate paymentMethodType="Invalid Method" customOptions={{}} />
+        <RenderTemplate
+          paymentMethodType={"Invalid Method" as any}
+          customOptions={{}}
+        />
       )
     ).toThrow("Unsupported payment method type: Invalid Method");
   });
