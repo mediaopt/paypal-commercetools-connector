@@ -49,7 +49,7 @@ export const CUSTOM_OBJECT_DEFAULT_VALUES = {
   ratePayCustomerServiceInstructions: { de: "" },
   paymentDescription: { en: "" },
   storeInVaultOnSuccess: false,
-  paypalButtonConfig: { buttonColor: "gold", buttonLabel: "buynow" },
+  paypalButtonConfig: { buttonColor: "blue", buttonLabel: "paypal" },
   hostedFieldsPayButtonClasses: "",
   hostedFieldsInputFieldClasses: "",
   threeDSAction: {

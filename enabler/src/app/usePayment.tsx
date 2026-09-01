@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
 
+import { redirectTo } from "../helpers/redirectTo";
 import { Result } from "../components/Result";
 import {
   GeneralComponentsProps,
@@ -20,6 +21,8 @@ import {
   CustomOnApproveData,
   OnApproveRequest,
   OnApproveResponse,
+  ExpressApproveRequest,
+  ExpressApproveResponse,
   CustomOrderData,
   CreateOrderRequest,
   CreateOrderResponse,
@@ -32,6 +35,8 @@ import {
   OrderDataLinks,
   OrderData,
   BuilderType,
+  UpdateShippingRequest,
+  UpdateShippingResponse,
 } from "../types";
 import { processorRequest } from "../services/processorRequest";
 import { processorUrls } from "../components/constants";
@@ -65,6 +70,10 @@ type PaymentContextT = {
     data: ApproveVaultSetupTokenData
   ) => Promise<void>;
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise<number>;
+  handleUpdateShipping: (
+    request: UpdateShippingRequest
+  ) => Promise<UpdateShippingResponse>;
+  resolveShippingOptionId: (selectedOptionId: string) => string;
   orderId?: string;
   builderType?: BuilderType;
 };
@@ -95,6 +104,13 @@ const PaymentContext = createContext<PaymentContextT>({
   handleApproveVaultSetupToken: (data?: ApproveVaultSetupTokenData) =>
     Promise.resolve(),
   handleAuthenticateThreeDSOrder: (orderID: string) => Promise.resolve(0),
+  handleUpdateShipping: (request: UpdateShippingRequest) =>
+    Promise.resolve({
+      shippingOptions: [],
+      amount: { currency_code: "", value: "" },
+      breakdown: { shipping: { currency_code: "", value: "" } },
+    }),
+  resolveShippingOptionId: (selectedOptionId: string) => selectedOptionId,
   orderDataLinks: undefined,
   orderId: undefined,
   builderType: undefined,
@@ -127,6 +143,7 @@ export const PaymentProvider: FC<
   paymentMethodType,
   builderType,
   processorUrl,
+  redirectOnApprove,
 }) => {
   const [clientToken, setClientToken] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -148,7 +165,7 @@ export const PaymentProvider: FC<
   const onSuccess = (orderData: OrderData) => {
     setShowResult(true);
     setResultSuccess(true);
-    purchaseCallback(orderData);
+    purchaseCallback?.(orderData);
   };
 
   /** @deprecated Legacy leftover from the pre-Checkout npm-client era. Always resolves to
@@ -286,7 +303,7 @@ export const PaymentProvider: FC<
         if (result) {
           setShowResult(true);
           setResultSuccess(true);
-          purchaseCallback(result);
+          purchaseCallback?.(result);
         } else {
           setShowResult(true);
           setResultSuccess(false);
@@ -322,6 +339,7 @@ export const PaymentProvider: FC<
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
           payPalIntent: settings?.payPalIntent,
+          builderType,
           orderData: {
             ...relevantOrderData,
           },
@@ -438,9 +456,44 @@ export const PaymentProvider: FC<
       const { orderID, saveCard } = data;
       isLoading(true);
 
-      // Only meaningful for PayPal Express and only in legacy mode
+      // PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE
+      // (off by default, required on for Germany — see enabler/README.md). Calls the processor's
+      // expressApprove — which adds a placeholder transaction so commercetools optimistically creates the
+      // Order, then builds the redirect URL — instead of authorizing/capturing immediately here.
+      // Takes priority over the legacy onApproveRedirectionUrl prop below since it needs no
+      // enabler-side configuration.
+      if (builderType === "express" && redirectOnApprove) {
+        const expressApproveUrl = derivedUrls.expressApproveUrl;
+        if (!expressApproveUrl) {
+          console.error(
+            '[paypal-enabler] Missing configuration for "expressApproveUrl": no processorUrl was provided.'
+          );
+        } else {
+          const expressApproveResult = await processorRequest<
+            ExpressApproveRequest,
+            ExpressApproveResponse
+          >(requestHeader, expressApproveUrl, {
+            paymentId: paymentInfo.id,
+            orderID,
+            payPalIntent: settings?.payPalIntent,
+          });
+          if (
+            expressApproveResult &&
+            expressApproveResult.onApproveRedirectionUrl
+          ) {
+            redirectTo(expressApproveResult.onApproveRedirectionUrl);
+            return;
+          }
+          // No merchantReturnUrl configured anywhere (session or static) — falls through to the
+          // legacy prop check, then the immediate authorize/capture path below, as a last-resort
+          // degrade.
+        }
+      }
+
+      // Legacy prop (self-hosted merchants) — only meaningful for PayPal Express, needs
+      // ?order_id= appended since it's a bare merchant-supplied prefix, not a complete URL.
       if (onApproveRedirectionUrl && builderType === "express") {
-        window.location.href = `${onApproveRedirectionUrl}?order_id=${orderID}`;
+        redirectTo(`${onApproveRedirectionUrl}?order_id=${orderID}`);
         return;
       }
 
@@ -468,17 +521,23 @@ export const PaymentProvider: FC<
           paymentVersion: latestPaymentVersion,
           orderID,
           saveCard,
+          builderType,
         });
 
         //@ts-ignore
         if (onApproveResult.ok === false) {
           throw new Error(t("payPal.generalError"));
         }
-        const { orderData } = onApproveResult as OnApproveResponse;
+        const { orderData, merchantReturnUrl } =
+          onApproveResult as OnApproveResponse;
+        if (merchantReturnUrl) {
+          redirectTo(merchantReturnUrl);
+          return;
+        }
         if (orderData.status === "COMPLETED") {
           setShowResult(true);
           setResultSuccess(true);
-          purchaseCallback(onApproveResult);
+          purchaseCallback?.(onApproveResult);
         } else {
           setShowResult(true);
           setResultSuccess(false);
@@ -564,6 +623,66 @@ export const PaymentProvider: FC<
       }
     };
 
+    const handleUpdateShipping = async (
+      request: UpdateShippingRequest
+    ): Promise<UpdateShippingResponse> => {
+      try {
+        // No resolveEndpointUrl here — legacy way is to register onShippingChange on the component.
+        const requestUrl = derivedUrls.updateShippingUrl;
+        if (!requestUrl) {
+          console.error(
+            '[paypal-enabler] Missing configuration for "updateShippingUrl": no processorUrl was provided.'
+          );
+          throw new Error(t("interface.generalError"));
+        }
+
+        const result = await processorRequest<
+          { paymentId: string } & UpdateShippingRequest,
+          UpdateShippingResponse
+        >(requestHeader, requestUrl, {
+          paymentId: paymentInfo.id,
+          // Only relevant for an option-change call (no address) — the processor uses this
+          // cached list to skip refetching delivery options for the same address.
+          ...(!request.address && {
+            shippingOptions: paymentInfo.shippingOptions,
+          }),
+          ...request,
+        });
+
+        if (!result) {
+          throw new Error(t("interface.generalError"));
+        }
+
+        setPaymentInfo((prev) => ({
+          ...prev,
+          shippingOptions: result.shippingOptions,
+        }));
+
+        return result;
+      } catch (error) {
+        notify(
+          "Error",
+          error instanceof Error ? error.message : t("interface.generalError")
+        );
+        throw error;
+      }
+    };
+
+    // Validates a buyer's PayPal Express shipping-option pick against the freshest known
+    // list before handleUpdateShipping is called — kept here (not in PayPalMask) so any
+    // future component driving the same flow gets the same validation for free.
+    const resolveShippingOptionId = (selectedOptionId: string): string => {
+      const match = paymentInfo.shippingOptions?.find(
+        (option) => option.id === selectedOptionId
+      );
+      if (!match) {
+        throw new Error(
+          `Selected shipping option ${selectedOptionId} not found`
+        );
+      }
+      return match.id;
+    };
+
     return {
       requestHeader,
       paymentInfo,
@@ -574,6 +693,8 @@ export const PaymentProvider: FC<
       handleCreateVaultSetupToken,
       handleApproveVaultSetupToken,
       handleAuthenticateThreeDSOrder,
+      handleUpdateShipping,
+      resolveShippingOptionId,
       orderDataLinks,
       orderId,
       builderType,

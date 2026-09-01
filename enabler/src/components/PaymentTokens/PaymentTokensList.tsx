@@ -1,11 +1,11 @@
-import React from "react";
+import { FC } from "react";
 
 import { Card } from "./Card";
 import { PayPal } from "./PayPal";
 
 import { useSettings } from "../../app/useSettings";
 
-export const PaymentTokensList: React.FC = () => {
+export const PaymentTokensList: FC = () => {
   const { paymentTokens, handleRemovePaymentToken } = useSettings();
 
   return paymentTokens && paymentTokens.payment_tokens ? (

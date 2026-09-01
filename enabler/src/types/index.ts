@@ -66,6 +66,11 @@ export type CreateOrderRequest = {
    * PayPal order with a matching intent — PayPal rejects an authorize call against an order
    * created with intent=CAPTURE, and vice versa for capture. */
   payPalIntent?: "Authorize" | "Capture";
+  /** Lets buildOrderRequest tell the PayPal Express flow apart, so it never sets
+   * experience_context.shipping_preference: "SET_PROVIDED_ADDRESS" for it — that value tells
+   * PayPal the shipping address is fixed and disables the buyer's ability to change it in the
+   * popup, which would make onShippingAddressChange/onShippingOptionsChange unreachable. */
+  builderType?: BuilderType;
 };
 
 export type CreateOrderData = {
@@ -114,11 +119,58 @@ export type OnApproveRequest = {
   paymentVersion?: PaymentVersion;
   orderID: string;
   saveCard?: boolean;
+  builderType?: BuilderType;
 };
 
 export type OnApproveResponse = {
   orderData: { id: string; status: string; message?: string };
   paymentVersion?: PaymentVersion;
+  /** Buyer redirect target built by the processor (see PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL) — when
+   * present, the enabler navigates there instead of showing the normal result UI. */
+  merchantReturnUrl?: string;
+};
+
+// PayPal Express only (both Authorize and Capture intent), gated by PAYPAL_REDIRECT_ON_APPROVE —
+// see usePayment.tsx's handleOnApprove and the processor's expressApprove().
+export type ExpressApproveRequest = {
+  paymentId: string;
+  orderID: string;
+  payPalIntent?: "Authorize" | "Capture";
+};
+
+export type ExpressApproveResponse = {
+  onApproveRedirectionUrl?: string;
+};
+
+// paymentId is deliberately not part of this type — usePayment.tsx's handleUpdateShipping
+// resolves it internally from paymentInfo.id
+export type UpdateShippingRequest = {
+  orderID: string;
+  shippingMethodId?: string;
+  address?: {
+    countryCode: string;
+    postalCode?: string;
+    city?: string;
+    state?: string;
+  };
+  //prevents refetching options if only method was changed for same address
+  shippingOptions?: PayPalShippingOption[];
+};
+
+export type PayPalMoney = {
+  currency_code: string;
+  value: string;
+};
+
+export type UpdateShippingResponse = {
+  shippingOptions: PayPalShippingOption[];
+  amount: PayPalMoney;
+  breakdown: {
+    item_total?: PayPalMoney;
+    shipping: PayPalMoney;
+    tax_total?: PayPalMoney;
+    discount?: PayPalMoney;
+  };
 };
 
 export type LoadingOverlayType = {
@@ -135,7 +187,8 @@ export type BasicComponentProps = {
   enableVaulting?: boolean;
 };
 
-/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`. */
+/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`.
+ * will be removed, must be replaced with processorURL */
 export type LegacyEndpointUrlProps = {
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createPaymentUrl: string;
@@ -160,26 +213,35 @@ export type CheckoutOnlyProps = {
   initialSettings?: GetSettingsResponse;
   /** Seeds SettingsProvider's `userIdToken` state from the processor's `/operations/config` response. */
   initialUserIdToken?: string;
+  /** PayPal Express only, from the processor's `/operations/config` `redirectOnApprove` (its
+   * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
+  redirectOnApprove?: boolean;
 };
 
-/** Category 4 — legacy fields with no `processorUrl` migration path (yet). */
-export type LegacyOnlyProps = {
-  purchaseCallback: (result: any, options?: any) => void;
-  shippingMethodId: string;
-  getSettingsUrl: string;
-  // Unlike its siblings above (now in LegacyEndpointUrlProps), this one is fully dead — no
-  // processorUrls() entry, no consumer anywhere. Kept per user decision (2026-08-05); see TODO.md.
-  getOrderUrl?: string;
-  /** Relevant to PayPal Express only — other payment methods finalize the cart before their
-   * button/fields render, so there's nothing that can drift between order-creation and approval.
-   * PayPal Express can still let the buyer change shipping inside the PayPal popup after the order
-   * was created, hence this redirect to a merchant page for a final review. */
-  onApproveRedirectionUrl?: string;
+/** Category 4 — legacy fields with no `processorUrl` migration path.
+ * will be kept for backward compatibility, but it is strongly suggested to
+ * use commercetools checkout for access to fast APIs or at least update the self-hosted bff
+ * to processor-like structure for support*/
+export type LegacyReplaceableProps = {
+  purchaseCallback?: (result: any, options?: any) => void; //see `MERCHANT_RETURN_URL` instead
+  shippingMethodId?: string; // see processor createPayment instead
+  getSettingsUrl: string; // see processor config instead
+  getOrderUrl?: string; //included directly where relevant in processor calls
+  onApproveRedirectionUrl?: string; //see processor `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
+} & CartInformationProps; //see enabler PaymentData instead
+
+/*will be kept at least until commercetools checkout natively supports vaulting for all methods
+for vaulting except credit card inside commercetools checkout please open an issue,
+for stored credit card see processor stored payment methods
+* */
+export type LegacyVaultProps = {
   getUserInfoUrl?: string;
   createVaultSetupTokenUrl?: string;
   approveVaultSetupTokenUrl?: string;
   getClientTokenUrl?: string;
-} & CartInformationProps;
+};
+
+export type LegacyOnlyProps = LegacyReplaceableProps & LegacyVaultProps;
 
 export type GeneralComponentsProps = BasicComponentProps &
   LegacyEndpointUrlProps &
@@ -241,8 +303,16 @@ export type CustomPayPalButtonsComponentProps = Omit<
   | "onClick"
   | "onError"
   | "onInit"
+  | "fundingSource"
 > & {
   paypalMessages?: PayPalMessagesComponentProps;
+  // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
+  // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
+  fundingSource?: FUNDING_SOURCE;
+  // Which PayPal funding-source identity this mounted component's createOrder call should use —
+  // see PayPalBuilder.ts's DEFAULT_PAYMENT_SOURCE_BY_COMPONENT and PayPalMask.tsx's
+  // handleCreateOrder. Falls back to "paypal" when absent.
+  paymentSource?: FUNDING_SOURCE;
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -309,6 +379,33 @@ export type CartInformationProps = { cartInformation?: CartInformation };
  * `CreatePaymentResponse` (the processor's wire response) — defined once here so the two
  * don't drift apart.
  */
+/**
+ * PayPal shipping option as returned by the processor during onShippingChange flow.
+ */
+export type PayPalShippingOption = {
+  id: string;
+  label: string;
+  type: "SHIPPING";
+  amount: PayPalMoney;
+  selected: boolean;
+};
+
+/**
+ * Shipping address type matching mapCommercetoolsAddressToPayPalAddress's return shape.
+ */
+export type ShippingAddress = {
+  type: string;
+  name: {
+    full_name: string;
+  };
+  address: {
+    address_line_1: string;
+    admin_area_2?: string;
+    postal_code?: string;
+    country_code: string;
+  };
+};
+
 export type PaymentData = {
   id: string;
   amountPlanned: {
@@ -321,8 +418,8 @@ export type PaymentData = {
   firstName?: string;
   lastName?: string;
   countryCode?: string;
-  shippingAddress?: unknown;
-  shippingOptions?: unknown[];
+  shippingAddress?: ShippingAddress;
+  shippingOptions?: PayPalShippingOption[];
   priceBreakdown?: unknown;
   ctCustomerId?: string;
   /** Not used by the checkout. Please open an
@@ -338,15 +435,11 @@ export type PaymentData = {
 export type PaymentInfo = PaymentData & CartInformationProps;
 
 export type CreatePaymentResponse = PaymentData & {
-  paypalData: { clientId: string; currency: string; intent: string };
+  paypalData: { clientId: string; currency: string };
   /** @deprecated Not used by the checkout; only relevant for a self-hosted backend built against
    * the old `paypal-commercetools-client` npm package's contract. See the processor implementation
    * (processor/src/dtos/paypal-payment.dto.ts) for the current, checkout-native contract. */
   braintreeCustomerId?: string;
-  /** TODO: not implemented in the processor yet. Meant to be superseded by
-   * shippingAddress/shippingOptions, but PayPal Express shipping hasn't been fully designed/built
-   * end-to-end there yet (see TODO.md) — keep this field until that lands. */
-  shippingMethod?: unknown;
 };
 
 export type ClientTokenResponse = {
@@ -442,7 +535,28 @@ type PayPalButtonConfig = {
   buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
 };
 
-export type GetSettingsResponse = {
+// One PayPal builder variant's fully-resolved style — mirrors the PayPal JS SDK's own `style`
+// prop shape (color/label/shape together), so it can be applied to <PayPalButtons/> as one unit.
+type PayPalVariantStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
+
+// A component/variant's processor-configured override (PAYPAL_BUTTON_CONFIG in
+// processor/.env.template, keyed by component then, for PayPal, variant) — see PayPalBuilder.ts's
+// 4-layer resolution. Every field is wholesale-replace when present, not merged field-by-field
+// with whatever a lower-priority layer already resolved. Not every component uses every field —
+// e.g. CardFields has no button style/funding sources, only `components`.
+export type PayPalVariantConfig = {
+  style?: PayPalVariantStyle;
+  fundingSource?: FUNDING_SOURCE;
+  // PayPal JS SDK script `components` list for this component/variant (e.g. "buttons,card-fields")
+  // — same concern as PAYPAL_SDK_OPTIONS.<component>.components, but resolved through this 4-layer
+  // chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see PayPalBuilder.ts).
+  components?: string;
+};
+
+// Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
+// custom object shape, read via getSettings()). Duplicated here rather than imported since the
+// enabler doesn't depend on common-connect — keep field names in sync with that type by hand.
+type PayPalLegacySettings = {
   merchantId: string;
   email: string;
   acceptPayPal: boolean;
@@ -483,15 +597,23 @@ export type GetSettingsResponse = {
   ratePayCustomerServiceInstructions: CustomDataStringObject;
   paymentDescription: CustomDataStringObject;
   storeInVaultOnSuccess: boolean;
-  // Shared fallback used by both builder variants whenever PayPalStandard/PayPalExpress don't
-  // override a given field — see enabler/README.md's "PayPal button label/color config" section.
   paypalButtonConfig: PayPalButtonConfig;
-  PayPalStandard?: Partial<PayPalButtonConfig>;
-  PayPalExpress?: Partial<PayPalButtonConfig>;
   hostedFieldsPayButtonClasses: string;
   hostedFieldsInputFieldClasses: string;
   threeDSAction: Record<string, any>;
 };
+
+// New — processor-only per-component overrides (PAYPAL_BUTTON_CONFIG in
+// processor/.env.template), not part of the CT custom object/PayPalLegacySettings above.
+// Has higher priority for relevant component. Keyed by componentType directly (e.g. "PayPal",
+// "CardFields", a future "Venmo") — PayPalExpress is the one dedicated exception, since only
+// PayPal's own express builder variant needs a config slot separate from its own componentType
+// entry (see PayPalBuilder.ts's express-first resolution).
+type PayPalComponentOverrides = Partial<Record<string, PayPalVariantConfig>> & {
+  PayPalExpress?: PayPalVariantConfig;
+};
+
+export type GetSettingsResponse = PayPalLegacySettings & PayPalComponentOverrides;
 
 export type CustomOnApproveData = {
   orderID: string;

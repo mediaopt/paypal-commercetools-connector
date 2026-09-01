@@ -1,9 +1,8 @@
-import React from "react";
 import { visaImage } from "./visa";
 import { pPImage } from "./pp";
 import { masterCardImage } from "./masterCard";
-
-export const brandToLogo = (brand: string) => {
+7
+export const brandToLogo = (brand: string)=> {
   //h*4+my*8=40
   switch (brand.toLowerCase()) {
     case "visa":

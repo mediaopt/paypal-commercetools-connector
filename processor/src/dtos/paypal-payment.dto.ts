@@ -24,9 +24,11 @@ export const PaymentMethodType = {
 } as const;
 export type PaymentMethodType = StandardPaymentMethodType;
 
-export enum CustomBuilderType {
-  EXPRESS = "express",
-}
+export const CustomBuilderType = {
+  EXPRESS: "express",
+} as const;
+export type CustomBuilderType =
+  (typeof CustomBuilderType)[keyof typeof CustomBuilderType];
 
 // Payment schema groups
 const PaymentRequiredFieldsSchema = Type.Object({
@@ -38,8 +40,25 @@ const PaymentRequiredFieldsSchema = Type.Object({
   }),
 });
 
+export const PayPalMoneySchema = Type.Object({
+  currency_code: Type.String(),
+  value: Type.String(),
+});
+
+// Shipping option schema — used for both createPayment response and updateShipping flow
+export const PayPalShippingOptionSchema = Type.Object({
+  id: Type.String(),
+  label: Type.String(),
+  type: Type.Literal("SHIPPING"),
+  amount: PayPalMoneySchema,
+  selected: Type.Boolean(),
+});
+export type PayPalShippingOptionSchemaDTO = Static<
+  typeof PayPalShippingOptionSchema
+>;
+
 const PaymentExpressShippingSchema = Type.Object({
-  shippingOptions: Type.Optional(Type.Array(Type.Any())),
+  shippingOptions: Type.Optional(Type.Array(PayPalShippingOptionSchema)),
 });
 
 const PaymentFrontendRenderingSchema = Type.Object({
@@ -62,7 +81,6 @@ export const InitPaymentResponseSchema = Type.Intersect([
     paypalData: Type.Object({
       clientId: Type.String(),
       currency: Type.String(),
-      intent: Type.String(),
     }),
   }),
   PaymentRequiredFieldsSchema,
@@ -71,9 +89,15 @@ export const InitPaymentResponseSchema = Type.Intersect([
   PaymentVaultSchema,
 ]);
 
+// Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
+// /operations/config) rather than processor re-fetching settings itself. Defaults to Capture.
+const PayPalIntentSchema = Type.Optional(
+  Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
+);
+
 export const InitPaymentRequestSchema = Type.Object({
   paymentMethodType: Type.Enum(PaymentMethodType),
-  builderType: Type.Optional(Type.Enum(CustomBuilderType)),
+  builderType: Type.Optional(Type.String()),
 });
 
 export type PaymentRequestSchemaDTO = Static<typeof InitPaymentRequestSchema>;
@@ -107,12 +131,8 @@ const CreateOrderDataSchema = Type.Object({
 export const CreateOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderData: Type.Optional(CreateOrderDataSchema),
-  // Sourced from the enabler's own settings.payPalIntent (already fetched client-side via
-  // /operations/config) rather than processor re-fetching settings itself. Defaults to Capture
-  // in buildOrderRequest when absent (e.g. an older/self-hosted caller that hasn't sent it yet).
-  payPalIntent: Type.Optional(
-    Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
-  ),
+  payPalIntent: PayPalIntentSchema,
+  builderType: Type.Optional(Type.String()),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
@@ -171,6 +191,9 @@ export const OnApproveRequestSchema = Type.Object({
   // Accepted for enabler-contract compatibility; not yet acted on — no CT-native PaymentMethod
   // "save" flow exists yet.
   saveCard: Type.Optional(Type.Boolean()),
+  // Lets finalizeOrder tell the PayPal Express flow apart, to decide whether to use
+  // onApprovePrefix for the response's merchantReturnUrl.
+  builderType: Type.Optional(Type.String()),
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
 
@@ -182,5 +205,64 @@ export const OnApproveResponseSchema = Type.Object({
     status: Type.String(),
     message: Type.Optional(Type.String()),
   }),
+  // Buyer redirect target — see buildRedirectMerchantUrl in paypal-payment.service.ts.
+  merchantReturnUrl: Type.Optional(Type.String()),
 });
 export type OnApproveResponseSchemaDTO = Static<typeof OnApproveResponseSchema>;
+
+// PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE —
+// see expressApprove() in paypal-payment.service.ts.
+// Called from handleOnApprove at approval time,
+export const ExpressApproveRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  // Decides the placeholder transaction's type (Authorization vs Charge) — see
+  // expressApprove()'s docblock for why this must match the eventual real transaction's type.
+  payPalIntent: PayPalIntentSchema,
+});
+export type ExpressApproveRequestSchemaDTO = Static<
+  typeof ExpressApproveRequestSchema
+>;
+
+export const ExpressApproveResponseSchema = Type.Object({
+  onApproveRedirectionUrl: Type.Optional(Type.String()),
+});
+export type ExpressApproveResponseSchemaDTO = Static<
+  typeof ExpressApproveResponseSchema
+>;
+
+// Update shipping request — used for both address and option changes
+// Field names match PayPal's OnShippingAddressChangeData.shippingAddress vocabulary exactly
+export const UpdateShippingRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  orderID: Type.String(),
+  shippingMethodId: Type.Optional(Type.String()),
+  address: Type.Optional(
+    Type.Object({
+      countryCode: Type.String(),
+      postalCode: Type.Optional(Type.String()),
+      city: Type.Optional(Type.String()),
+      state: Type.Optional(Type.String()),
+    })
+  ),
+  // lets skip re-querying commercetools for the same list it already returned
+  shippingOptions: Type.Optional(Type.Array(PayPalShippingOptionSchema)),
+});
+export type UpdateShippingRequestSchemaDTO = Static<
+  typeof UpdateShippingRequestSchema
+>;
+
+// Update shipping response — returns the updated shipping options and totals
+export const UpdateShippingResponseSchema = Type.Object({
+  shippingOptions: Type.Array(PayPalShippingOptionSchema),
+  amount: PayPalMoneySchema,
+  breakdown: Type.Object({
+    item_total: Type.Optional(PayPalMoneySchema),
+    shipping: PayPalMoneySchema,
+    tax_total: Type.Optional(PayPalMoneySchema),
+    discount: Type.Optional(PayPalMoneySchema),
+  }),
+});
+export type UpdateShippingResponseSchemaDTO = Static<
+  typeof UpdateShippingResponseSchema
+>;

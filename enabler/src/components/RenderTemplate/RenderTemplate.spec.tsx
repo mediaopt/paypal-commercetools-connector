@@ -1,4 +1,3 @@
-import React from "react";
 import { render, screen } from "@testing-library/react";
 
 jest.mock("../PayPal", () => ({
@@ -37,7 +36,10 @@ describe("RenderTemplate", () => {
 
   it("dispatches to CardFields for paymentMethodType=CardFields", () => {
     render(
-      <RenderTemplate paymentMethodType="CardFields" customOptions={{ foo: "bar" }} />
+      <RenderTemplate
+        paymentMethodType="CardFields"
+        customOptions={{ foo: "bar" }}
+      />
     );
 
     const probe = screen.getByTestId("cardfields-probe");
@@ -52,10 +54,7 @@ describe("RenderTemplate", () => {
   it("throws for an unsupported payment method type", () => {
     expect(() =>
       render(
-        <RenderTemplate
-          paymentMethodType="Invalid Method"
-          customOptions={{}}
-        />
+        <RenderTemplate paymentMethodType="Invalid Method" customOptions={{}} />
       )
     ).toThrow("Unsupported payment method type: Invalid Method");
   });

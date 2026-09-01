@@ -1,17 +1,11 @@
-import React from "react";
-import { PayPalButtonsComponentProps } from "@paypal/react-paypal-js";
+import { FC } from "react";
 
 import { usePayment } from "../../app/usePayment";
+import { CustomPayPalButtonsComponentProps } from "../../types";
 
 import { PayPalMask } from "./PayPalMask";
 
-type CustomPayPalButtonsComponentProps = PayPalButtonsComponentProps & {
-  enableVaulting?: boolean;
-};
-
-export const PayPalButton: React.FC<CustomPayPalButtonsComponentProps> = (
-  props
-) => {
+export const PayPalButton: FC<CustomPayPalButtonsComponentProps> = (props) => {
   const { paymentInfo, vaultOnly } = usePayment();
   return paymentInfo.id || vaultOnly ? <PayPalMask {...props} /> : <></>;
 };

@@ -1,6 +1,7 @@
 import { getConfig } from "../config/config";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
 import { ConfigResponse } from "../services/types/operation.type";
+import { StandardPaymentMethodType } from "../dtos/paypal-payment.dto";
 
 /**
  * Indicates if the feature stored payment methods is enabled/available.
@@ -40,12 +41,18 @@ export const buildSdkOptions = (cartSummary?: {
     return configured;
   }
 
+  // Every componentType (PayPal, CardFields, and any future member) gets the overlay generically;
+  // PayPalExpress is the one dedicated exception — see PayPalBuilder.ts's express-first resolution.
+  const overlaid = Object.fromEntries(
+    Object.values(StandardPaymentMethodType).map((componentType) => [
+      componentType,
+      { ...configured[componentType], ...cartOptions },
+    ])
+  );
+
   return {
     ...configured,
-    PayPal: {
-      standard: { ...configured.PayPal?.standard, ...cartOptions },
-      express: { ...configured.PayPal?.express, ...cartOptions },
-    },
-    CardFields: { ...configured.CardFields, ...cartOptions },
+    ...overlaid,
+    PayPalExpress: { ...configured.PayPalExpress, ...cartOptions },
   };
 };

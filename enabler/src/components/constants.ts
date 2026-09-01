@@ -19,7 +19,9 @@ export const processorUrls = (processorUrl: string) => {
     onApproveUrl: `${base}/payments/approve`,
     createOrderUrl: `${base}/payments/createOrder`,
     authorizeOrderUrl: `${base}/payments/authorize`,
+    expressApproveUrl: `${base}/payments/expressApprove`,
     authenticateThreeDSOrderUrl: `${base}/payments/3ds`,
+    updateShippingUrl: `${base}/payments/updateShipping`,
     getStoredPaymentMethodsURL: `${base}/stored-payment-methods`,
   };
 };

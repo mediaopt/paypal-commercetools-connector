@@ -17,6 +17,14 @@ import {
   OnApproveRequestSchemaDTO,
   OnApproveResponseSchema,
   OnApproveResponseSchemaDTO,
+  ExpressApproveRequestSchema,
+  ExpressApproveRequestSchemaDTO,
+  ExpressApproveResponseSchema,
+  ExpressApproveResponseSchemaDTO,
+  UpdateShippingRequestSchema,
+  UpdateShippingRequestSchemaDTO,
+  UpdateShippingResponseSchema,
+  UpdateShippingResponseSchemaDTO,
 } from '../dtos/paypal-payment.dto';
 import {
   StoredPaymentMethodsResponse,
@@ -111,6 +119,26 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
     },
   );
 
+  fastify.post<{ Body: ExpressApproveRequestSchemaDTO; Reply: ExpressApproveResponseSchemaDTO }>(
+    '/payments/expressApprove',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: ExpressApproveRequestSchema,
+        response: {
+          200: ExpressApproveResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.expressApprove(request.body);
+      log.info(
+        `expressApprove: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
   fastify.post<{ Body: AuthenticateThreeDSOrderRequestSchemaDTO; Reply: AuthenticateThreeDSOrderResponseSchemaDTO }>(
     '/payments/3ds',
     {
@@ -126,6 +154,26 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
       const resp = await opts.paymentService.authenticateThreeDSOrder(request.body);
       log.info(
         `authenticateThreeDSOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+      );
+      return reply.status(200).send(resp);
+    },
+  );
+
+  fastify.post<{ Body: UpdateShippingRequestSchemaDTO; Reply: UpdateShippingResponseSchemaDTO }>(
+    '/payments/updateShipping',
+    {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
+      schema: {
+        body: UpdateShippingRequestSchema,
+        response: {
+          200: UpdateShippingResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const resp = await opts.paymentService.updateShipping(request.body);
+      log.info(
+        `updateShipping: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     },

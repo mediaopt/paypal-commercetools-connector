@@ -1,10 +1,10 @@
-import React from "react";
+import { FC } from "react";
 
 import { usePayment } from "../../app/usePayment";
 import { CardFieldsMask } from "./CardFieldsMask";
 import { CardFieldsProps } from "../../types";
 
-export const CardFieldsButton: React.FC<CardFieldsProps> = ({
+export const CardFieldsButton: FC<CardFieldsProps> = ({
   enableVaulting,
   onRegisterSubmit,
   onRegisterValidation,

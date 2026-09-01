@@ -149,13 +149,13 @@ on the cart).
 This is a stopgap, not the final shape — richer configuration is expected in future versions. **If
 you need something this doesn't yet cover, please open an issue.**
 
-### PayPal button label/color config (`paypalButtonConfig`) per variant
+### PayPal button label/color config (`paypalButtonConfig`) per component
 
 Similarly to the SDK script options above, the PayPal button's `style.label`/`style.color`
-(`GetSettingsResponse.paypalButtonConfig`) can be overridden per builder variant via
-`PayPalStandard`/`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
-`{...paypalButtonConfig, ...(builderType === "express" ? PayPalExpress : PayPalStandard)}` before
-the settings ever reach `SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
+(`GetSettingsResponse.paypalButtonConfig`) can be overridden per component via `PayPal`/
+`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
+`{...paypalButtonConfig, ...(isExpress ? PayPalExpress : PayPal)}` before the settings ever reach
+`SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
 
 **The settings-providing app currently only supplies the single, shared `paypalButtonConfig`** —
 `PayPalStandard`/`PayPalExpress` aren't populated yet, so that shared config is used as the
@@ -168,3 +168,51 @@ form-based components (`CardFields` today). If a self-hosting merchant mounts a 
 component (e.g. `<PayPal/>`) and accidentally passes one of these props anyway, nothing breaks:
 they simply aren't consumed by that component and have no effect — `<PayPal/>`'s own button keeps
 rendering and working exactly as before.
+
+### Buyer redirect after approval (`merchantReturnUrl`, `PAYPAL_ONAPPROVE_PREFIX`)
+
+`authorizeOrder()`/`captureOrder()` responses can now carry an optional `merchantReturnUrl` — when
+present, the enabler navigates the buyer there instead of showing the normal result UI. The
+processor builds this from, in priority order: `PAYPAL_ONAPPROVE_PREFIX` (PayPal Express only), the
+current commercetools Checkout session's own return url, or the static `MERCHANT_RETURN_URL`
+env var. This is a plain convenience — a merchant who wants the buyer sent somewhere specific after
+approving no longer needs to configure anything on the enabler side at all.
+
+`onApproveRedirectionUrl` (see `LegacyOnlyProps` below) is `@deprecated` in favor of this — prefer
+configuring `PAYPAL_ONAPPROVE_PREFIX`/`MERCHANT_RETURN_URL` on the processor for new integrations.
+It's still fully supported, unchanged, for self-hosting/legacy merchants who already pass it.
+
+### PayPal-Express legal-review requirement (`PAYPAL_REDIRECT_ON_APPROVE`, legacy `onApproveRedirectionUrl`)
+
+Some jurisdictions (Germany, for PayPal Express) legally require the buyer to see a final review
+page before the payment settles, even after already approving in the PayPal popup. Setting the
+processor's `PAYPAL_REDIRECT_ON_APPROVE=true` (off by default — **required true, with that review
+page actually built, for PayPal Express in Germany**) redirects the buyer there immediately on
+approval — for both Authorize and Capture intent — _instead of_ this connector ever calling its own
+`authorizeOrder()`/`captureOrder()`, so the merchant's own backend decides when/whether to actually
+finish the payment. The target URL is `PAYPAL_ONAPPROVE_PREFIX` if set, else the same
+session/static `MERCHANT_RETURN_URL` fallback `merchantReturnUrl` above uses — built once, during
+`createPayment`, and returned to the enabler ready to use, so nothing needs configuring on the
+enabler/component side at all.
+
+The older `onApproveRedirectionUrl` component prop (see `LegacyOnlyProps` below) does the same
+thing but requires the merchant to pass it in themselves — still fully supported for self-hosting/
+legacy merchants, but `PAYPAL_REDIRECT_ON_APPROVE`'s target takes priority when both are somehow
+set, since it's the recommended, no-enabler-configuration path for anyone integrated with Checkout.
+
+Once the buyer has left the live Checkout session, the only sanctioned way back into this
+connector is commercetools' **Payment Intents API** (`capturePayment`, authenticated with the
+merchant's own commercetools API credentials) — it has no separate "authorize" action, only
+`capturePayment`/`cancelPayment`/`refundPayment`. `settlement()` (bound to `capturePayment`) handles
+this: it captures directly when the configured PayPal intent is Capture, or when the payment
+already has an approved authorization; otherwise it authorizes, and its response tells the merchant
+to call `capturePayment` again once ready to actually collect funds.
+
+**Two different "own backend" cases, don't conflate them:**
+
+- A merchant running their own backend **outside** commercetools Checkout should use
+  `paypal-commercetools-extension`'s existing custom-field-driven API instead — nothing here is
+  relevant to that deployment.
+- A merchant **integrated with Checkout** should stay on Checkout's own native Payment Intents API
+  rather than reach for the extension — it's faster and native to the architecture they're already
+  using.

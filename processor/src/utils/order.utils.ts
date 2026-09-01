@@ -29,20 +29,25 @@ import { ErrorInvalidOperation } from "@commercetools/connect-payments-sdk";
 // Shared by the paypal/card vault branches below — see buildOrderRequest's docblock for why
 // existingPayPalCustomerId matters.
 const buildVaultCustomerAttributes = (existingPayPalCustomerId?: string) =>
-  existingPayPalCustomerId ? { customer: { id: existingPayPalCustomerId } } : {};
+  existingPayPalCustomerId
+    ? { customer: { id: existingPayPalCustomerId } }
+    : {};
 
 export const buildOrderRequest = (
   payment: Payment,
   ctCart: Cart,
   orderData?: CreateOrderRequestSchemaDTO["orderData"],
   payPalIntent?: CreateOrderRequestSchemaDTO["payPalIntent"],
-  existingPayPalCustomerId?: string
+  existingPayPalCustomerId?: string,
+  isExpress?: boolean
 ): OrderRequest => {
   const { address: resolvedShippingAddress } =
     resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
-  const shipping = resolvedShippingAddress
-    ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
-    : undefined;
+  // if shipping address is provided PayPal express doesn't allow to change it
+  const shipping =
+    resolvedShippingAddress && !isExpress
+      ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
+      : undefined;
   const isShipped =
     !!ctCart.shippingAddress || (ctCart.shipping && ctCart.shipping.length > 0);
   const relevantCartCost = ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice;
@@ -54,8 +59,7 @@ export const buildOrderRequest = (
   // lives with for this helper; cast at the edge like the extension does.
   const purchaseUnit = {
     amount: {
-      currency_code: payment.amountPlanned.currencyCode,
-      value: mapCommercetoolsMoneyToPayPalMoney(payment.amountPlanned),
+      ...buildPayPalAmount(payment.amountPlanned),
       breakdown: matchingAmounts
         ? mapCommercetoolsCartToPayPalPriceBreakdown(ctCart)
         : undefined,
@@ -83,7 +87,8 @@ export const buildOrderRequest = (
       ? {
           payment_source: {
             paypal: {
-              ...(shipping
+              // SET_PROVIDED_ADDRESS forbids changing shipping required for express
+              ...(shipping && !isExpress
                 ? {
                     experience_context: {
                       shipping_preference: "SET_PROVIDED_ADDRESS" as const,
@@ -130,6 +135,19 @@ export const buildOrderRequest = (
       : {}),
   };
 };
+
+export const buildPayPalAmount = (
+  amount: { currencyCode: string; centAmount: number; fractionDigits?: number },
+  fallbackFractionDigits?: number //fallbackFractionDigits` is for Payment Intents API
+): { currency_code: string; value: string } => ({
+  currency_code: amount.currencyCode,
+  value: mapCommercetoolsMoneyToPayPalMoney({
+    type: "centPrecision",
+    currencyCode: amount.currencyCode,
+    centAmount: amount.centAmount,
+    fractionDigits: amount.fractionDigits ?? fallbackFractionDigits ?? 0,
+  }),
+});
 
 // Extracts the authorization/capture sub-object PayPal attaches to an Order response's first
 // purchase unit — shared with paypal-commercetools-extension, see common-connect's map.utils.ts.
