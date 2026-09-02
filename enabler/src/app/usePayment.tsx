@@ -340,6 +340,7 @@ export const PaymentProvider: FC<
           paymentVersion: latestPaymentVersion,
           payPalIntent: settings?.payPalIntent,
           builderType,
+          paymentMethodType,
           orderData: {
             ...relevantOrderData,
           },

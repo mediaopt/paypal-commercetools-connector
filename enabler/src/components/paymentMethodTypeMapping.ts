@@ -1,4 +1,4 @@
-import { PayPalPaymentMethodType } from "./types";
+import { PayPalPaymentMethodType } from "../types";
 
 const CT_ICON_KEY_TO_PAYMENT_METHOD_TYPE: Record<string, PayPalPaymentMethodType> = {
   card: "CardFields",
