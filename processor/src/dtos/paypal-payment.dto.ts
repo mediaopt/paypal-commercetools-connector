@@ -7,7 +7,7 @@ export const StandardPaymentMethodType = {
   PAYPAL: "PayPal",
 
   // Funding-source variants of the standard PayPal smart button (see enabler's PayPalBuilder.ts
-  // FIXED_SETTINGS_OVERRIDES_BY_COMPONENT) — none of these have a commercetools icon-key
+  // FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE) — none of these have a commercetools icon-key
   // equivalent, see paymentMethodIcon.utils.ts.
   SEPA: "Sepa",
   PAY_LATER: "PayLater",

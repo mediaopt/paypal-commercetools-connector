@@ -5,6 +5,7 @@ import {
   PayPalMessagesComponentProps,
 } from "@paypal/react-paypal-js";
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
+import { CTAmount } from "../payment-enabler/interfaces/general";
 
 export type ValidationHandlers = {
   isValid: () => Promise<boolean>;
@@ -561,19 +562,60 @@ type PayPalMethodStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
 
 // A payment method's processor-configured override (PAYPAL_BUTTON_CONFIG in
 // processor/.env.template), keyed by paymentMethodType, with a dedicated PayPalExpress slot for
-// builderType: "express" — see PayPalBuilder.ts's 4-layer resolution. Every field is
-// wholesale-replace when present, not merged field-by-field with whatever a lower-priority layer
-// already resolved. Not every payment method uses every field — e.g. CardFields has no button
-// style/funding sources, only `components`.
+// builderType: "express" — see RenderTemplate/resolveOptions.ts's 4-layer resolution. Every field
+// is wholesale-replace when present, not merged field-by-field with whatever a lower-priority
+// layer already resolved. Not every payment method uses every field — e.g. CardFields has no
+// button style/funding sources, only `components`.
 export type PayPalMethodConfig = {
   style?: PayPalMethodStyle;
   fundingSource?: FUNDING_SOURCE;
   // PayPal JS SDK script `components` list for this payment method (e.g. "buttons,card-fields") —
   // same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components, but resolved through this
   // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
-  // PayPalBuilder.ts).
+  // RenderTemplate/resolveOptions.ts).
   components?: string;
 };
+
+/** Method-independent props every mounted component receives — assembled once by
+ * PayPalComponent.mount() from BaseOptions/ComponentOptions, with zero per-payment-method
+ * branching. Handed to RenderTemplate as-is and merged with whichever resolved options
+ * RenderTemplate/resolveOptions.ts produces for the given paymentMethodType. */
+export type GenericMountProps = FormComponentProps & {
+  requestHeader: RequestHeader;
+  shippingMethodId?: string;
+  purchaseCallback?: (result: any, options?: any) => void;
+  redirectOnApprove?: boolean;
+  initialUserIdToken?: string;
+  showPayButton?: boolean;
+  fullWidth?: boolean;
+  buttonText?: string;
+  onError?: (error: GenericError) => void;
+  initialAmount?: CTAmount;
+};
+
+type BaseResolvedMethodOptions = {
+  options: ReactPayPalScriptOptions;
+  // BaseOptions.settings is guaranteed present by the time mount() runs (see its own comment) —
+  // spreading it here can safely be typed as the full GetSettingsResponse, not a Partial.
+  initialSettings: GetSettingsResponse;
+  enableVaulting: boolean;
+};
+
+/** Resolved options for the shared <PayPal/> smart-button component (PayPal, Sepa, PayLater,
+ * PayPalCreditCard, AllButtons, Venmo). */
+export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
+  fundingSource?: FUNDING_SOURCE;
+};
+
+/** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
+ * PayPalBrandResolvedOptions. */
+export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
+
+/** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
+export type PayPalBrandButtonType = Extract<
+  PayPalPaymentMethodType,
+  "PayPal" | "Sepa" | "PayLater" | "PayPalCreditCard" | "AllButtons" | "Venmo"
+>;
 
 // Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
 // custom object shape, read via getSettings()). Duplicated here rather than imported since the
@@ -628,12 +670,15 @@ type PayPalLegacySettings = {
 // New — processor-only per-payment-method overrides (PAYPAL_BUTTON_CONFIG in
 // processor/.env.template), not part of the CT custom object/PayPalLegacySettings above.
 // Has higher priority for relevant payment method. Keyed by paymentMethodType directly (e.g.
-// "PayPal", "CardFields", "Venmo") — PayPalExpress is the one dedicated exception, since only
+// "PayPal", "CardFields", "Venmo") — "PayPalExpress" is the one dedicated addition, since only
 // PayPal's own component with builderType: "express" needs a config slot separate from its own
-// paymentMethodType entry (see PayPalBuilder.ts's express-first resolution).
-type PayPalComponentOverrides = Partial<Record<string, PayPalMethodConfig>> & {
-  PayPalExpress?: PayPalMethodConfig;
-};
+// paymentMethodType entry (see RenderTemplate/resolveOptions.ts's express-first resolution). A
+// closed union of literal keys, not a generic `string` index signature — the latter would force
+// every other GetSettingsResponse field (e.g. storeInVaultOnSuccess: boolean) to also satisfy
+// PayPalMethodConfig wherever an object literal is checked against GetSettingsResponse.
+type PayPalComponentOverrides = Partial<
+  Record<PayPalPaymentMethodType | "PayPalExpress", PayPalMethodConfig>
+>;
 
 export type GetSettingsResponse = PayPalLegacySettings & PayPalComponentOverrides;
 

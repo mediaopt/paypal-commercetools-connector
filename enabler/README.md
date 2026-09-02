@@ -183,7 +183,7 @@ Two things the connector *does* enforce in code, both browser/device-side rather
 
 Similarly to the SDK script options above, the PayPal button's `style.label`/`style.color`
 (`GetSettingsResponse.paypalButtonConfig`) can be overridden per component via `PayPal`/
-`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
+`PayPalExpress` on the settings object — resolved in `RenderTemplate/resolveOptions.ts` as
 `{...paypalButtonConfig, ...(isExpress ? PayPalExpress : PayPal)}` before the settings ever reach
 `SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
 

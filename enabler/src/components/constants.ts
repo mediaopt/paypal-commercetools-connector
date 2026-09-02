@@ -4,6 +4,7 @@ import {
   PayPalMethodConfig,
   PayPalPaymentMethodType,
 } from "../types";
+import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 
 /*
 IMPORTANT — if you deploy these payment components yourself, outside commercetools Checkout
@@ -37,8 +38,8 @@ export const processorUrls = (processorUrl: string) => {
 export const storedPaymentMethodUrl = (processorUrl: string, id: string) =>
   `${stripTrailingSlash(processorUrl)}/stored-payment-methods/${id}`;
 
-// PayPalBuilder.ts's mount() resolution config — see that file's 4-layer resolution comment for
-// how these fit together.
+// RenderTemplate/resolveOptions.ts's resolution config — see that file's 4-layer resolution
+// comment for how these fit together.
 
 // Category 1 — hardcoded, non-overridable: something the merchant/processor should not be able to configure —
 // e.g. Pay Upon Invoice must always use Capture intent. Applied last, unconditionally, per mounted component
@@ -108,7 +109,7 @@ export const ENABLER_DEFAULT_CONFIG: Partial<
   },
 };
 
-// PayPalBuilder.ts's mount() scriptOptions — plain defaults applied to every payment method.
+// RenderTemplate/resolveOptions.ts's scriptOptions — plain defaults applied to every payment method.
 export const DEFAULT_SCRIPT_CURRENCY = "EUR";
 export const DEFAULT_SCRIPT_ENABLE_FUNDING: ReactPayPalScriptOptions["enableFunding"] =
   "paylater";
@@ -144,3 +145,24 @@ export const FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE: Partial<
   // regardless of merchant PAYPAL_SDK_OPTIONS or the actual cart's country.
   Venmo: { buyerCountry: "US" },
 };
+
+// Shared by RenderTemplate/resolveOptions.ts's PayPal-brand and CardFields resolvers — merges the
+// plain defaults, the three lookup tables above, and the processor-configured componentSdkOptions
+// slice for this specific payment method (see BaseOptions.sdkOptions and PAYPAL_SDK_OPTIONS in
+// processor/.env.template) into the PayPal JS SDK script options.
+export function buildScriptOptions(
+  paymentMethodType: PayPalPaymentMethodType,
+  baseOptions: BaseOptions,
+  componentSdkOptions: Record<string, unknown> | undefined,
+  resolvedComponents: string | undefined
+): ReactPayPalScriptOptions {
+  return {
+    clientId: baseOptions.clientId || "",
+    currency: DEFAULT_SCRIPT_CURRENCY,
+    components: resolvedComponents,
+    enableFunding: DEFAULT_SCRIPT_ENABLE_FUNDING,
+    ...DEFAULT_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE[paymentMethodType],
+    ...componentSdkOptions,
+    ...FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE[paymentMethodType],
+  };
+}
