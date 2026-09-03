@@ -32,7 +32,11 @@ import {
   resolvePayPalBrandOptions,
 } from "./resolveOptions";
 
-const baseOptions = { sdkOptions: {}, settings: {} } as any;
+const baseOptions = {
+  processorUrl: "https://processor.example",
+  sdkOptions: {},
+  settings: {},
+} as any;
 const genericOptions = { requestHeader: { "X-Session-Id": "session-id" } } as any;
 
 describe("RenderTemplate", () => {
@@ -45,7 +49,6 @@ describe("RenderTemplate", () => {
       <RenderTemplate
         paymentMethodType="Sepa"
         builderType="express"
-        processorUrl="https://processor.example"
         baseOptions={baseOptions}
         genericOptions={genericOptions}
       />

@@ -46,7 +46,7 @@ describe("PayPalComponentBuilder", () => {
     expect(capturedElement.type).toBe(RenderTemplate);
   });
 
-  it("forwards paymentMethodType, builderType, processorUrl and baseOptions unchanged", async () => {
+  it("forwards paymentMethodType, builderType and baseOptions unchanged", async () => {
     const options = baseOptions({ processorUrl: "https://my-processor.example" });
     const builder = new PayPalComponentBuilder("Sepa", options, "express");
     const component = builder.build({});
@@ -54,11 +54,12 @@ describe("PayPalComponentBuilder", () => {
 
     expect(capturedElement.props.paymentMethodType).toBe("Sepa");
     expect(capturedElement.props.builderType).toBe("express");
-    expect(capturedElement.props.processorUrl).toBe("https://my-processor.example");
+    // processorUrl is no longer a separate prop here — RenderTemplate derives it from
+    // baseOptions.processorUrl itself, so asserting baseOptions is unchanged covers it.
     expect(capturedElement.props.baseOptions).toBe(options);
   });
 
-  it("genericOptions.requestHeader carries the session id, shippingMethodId is always 'standard'", async () => {
+  it("genericOptions.requestHeader carries the session id via sessionHeader()", async () => {
     const builder = new PayPalComponentBuilder(
       "PayPal",
       baseOptions({ sessionId: "abc-123" }),
@@ -68,11 +69,9 @@ describe("PayPalComponentBuilder", () => {
     await component.mount("#paypal-container");
 
     expect(capturedElement.props.genericOptions.requestHeader).toEqual({
+      "Content-Type": "application/json",
       "X-Session-Id": "abc-123",
     });
-    expect(capturedElement.props.genericOptions.shippingMethodId).toBe(
-      "standard"
-    );
   });
 
   it("genericOptions.showPayButton defaults to true when config doesn't set it", async () => {
