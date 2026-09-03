@@ -1,4 +1,5 @@
 import { Cart, Payment } from "@commercetools/connect-payments-sdk";
+import { Transaction } from "@commercetools/platform-sdk";
 import {
   mapValidCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsCartToPayPalPriceBreakdown,
@@ -39,7 +40,7 @@ export const buildOrderRequest = (
   orderData?: CreateOrderRequestSchemaDTO["orderData"],
   payPalIntent?: CreateOrderRequestSchemaDTO["payPalIntent"],
   existingPayPalCustomerId?: string,
-  isExpress?: boolean
+  isExpress?: boolean,
 ): OrderRequest => {
   const { address: resolvedShippingAddress } =
     resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
@@ -73,7 +74,7 @@ export const buildOrderRequest = (
         ctCart.taxCalculationMode,
         false, // TODO: make configurable when working on PUI
         ctCart.lineItems,
-        ctCart.locale
+        ctCart.locale,
       ) ?? undefined,
   } as PurchaseUnitRequest;
 
@@ -138,7 +139,7 @@ export const buildOrderRequest = (
 
 export const buildPayPalAmount = (
   amount: { currencyCode: string; centAmount: number; fractionDigits?: number },
-  fallbackFractionDigits?: number //fallbackFractionDigits` is for Payment Intents API
+  fallbackFractionDigits?: number, //fallbackFractionDigits` is for Payment Intents API
 ): { currency_code: string; value: string } => ({
   currency_code: amount.currencyCode,
   value: mapCommercetoolsMoneyToPayPalMoney({
@@ -164,17 +165,144 @@ export const findAuthorizationTransactionId = (payment: Payment): string => {
   const transaction = findMostRecentTransaction(
     payment,
     "Authorization",
-    "Success"
+    "Success",
   );
   if (!transaction) {
     throw new ErrorInvalidOperation(
-      `Payment ${payment.id} has no Authorization/Success transaction to capture`
+      `Payment ${payment.id} has no Authorization/Success transaction to capture`,
     );
   }
   if (!transaction.interactionId) {
     throw new ErrorInvalidOperation(
-      `Payment ${payment.id}'s Authorization transaction has no interactionId`
+      `Payment ${payment.id}'s Authorization transaction has no interactionId`,
     );
   }
   return transaction.interactionId;
+};
+
+/**
+ * Resolves the interactionId (PayPal capture id) of the Charge transaction to refund, and throws
+ * the appropriate ErrorInvalidOperation when none qualifies.
+ *
+ * - With a transactionId: that exact transaction must exist and be a successful Charge.
+ * - Without one: falls back to the most recent successful Charge. This codebase only ever creates
+ *   a single Charge per payment, so this doesn't distinguish "never refunded" from "partially
+ *   refunded" — callers that need to stop at a remaining balance (e.g. a full reversal) should use
+ *   findCapturedChargeBalance() instead, which does track that.
+ *
+ * Used by refundPayment().
+ */
+export const findRefundableTransactionId = (
+  payment: Payment,
+  transactionId?: string,
+): string => {
+  if (transactionId) {
+    const transaction = payment.transactions.find(
+      (t) => t.id === transactionId,
+    );
+    if (!transaction) {
+      throw new ErrorInvalidOperation(
+        `TransactionId ${transactionId} is not found.`,
+      );
+    }
+    if (transaction.type !== "Charge" || transaction.state !== "Success") {
+      throw new ErrorInvalidOperation(
+        `TransactionId ${transactionId} is not refundable`,
+      );
+    }
+    if (!transaction.interactionId) {
+      throw new ErrorInvalidOperation(
+        `No refundable transaction found for payment ${payment.id}`,
+      );
+    }
+    return transaction.interactionId;
+  }
+
+  const transaction = findMostRecentTransaction(payment, "Charge", "Success");
+  if (!transaction || !transaction.interactionId) {
+    throw new ErrorInvalidOperation(
+      `No refundable transaction found for payment ${payment.id}`,
+    );
+  }
+  return transaction.interactionId;
+};
+
+// Shared by findVoidableTransaction()'s alreadyCaptured check and findCapturedChargeBalance()
+// below — capture creates a Charge with its own PayPal capture id, not the authorization's
+// interactionId, so there's no direct reference from an Authorization to check; a successful
+// Charge existing at all is what "the authorization behind it is gone" is based on.
+const hasCapturedCharge = (payment: Payment): boolean =>
+  payment.transactions.some((t) => t.type === "Charge" && t.state === "Success");
+
+/**
+ * Resolves the payment's captured Charge together with how much of it hasn't been refunded yet
+ * (its amount minus any successful Refunds already applied). Returns undefined when the payment
+ * hasn't been captured at all.
+ *
+ * settlement() supports capturing an authorization in installments (PayPal captures default to
+ * final_capture: false), so a payment can end up with more than one successful Charge — this
+ * function only knows how to reverse a single capture (PayPal's refund call targets one specific
+ * capture id), so it throws rather than silently refunding just one of several captures while
+ * reporting the payment as fully reversed. Used by reversePayment's void-vs-refund routing
+ * (abstract-payment.service.ts).
+ */
+export const findCapturedChargeBalance = (
+  payment: Payment,
+): { transaction: Transaction; remainingAmount: number } | undefined => {
+  const chargeTransactions = payment.transactions.filter(
+    (t) => t.type === "Charge" && t.state === "Success",
+  );
+  if (chargeTransactions.length === 0) {
+    return undefined;
+  }
+  if (chargeTransactions.length > 1) {
+    throw new ErrorInvalidOperation(
+      `Payment ${payment.id} has more than one captured Charge — reversePayment doesn't support reversing multiple captures; refund each one individually via refundPayment with its transactionId`,
+    );
+  }
+  const [transaction] = chargeTransactions;
+  const refundedCentAmount = payment.transactions
+    .filter((t) => t.type === "Refund" && t.state === "Success")
+    .reduce((sum, t) => sum + t.amount.centAmount, 0);
+  return {
+    transaction,
+    remainingAmount: transaction.amount.centAmount - refundedCentAmount,
+  };
+};
+
+/**
+ * Finds the Authorization transaction to void — the most recent successful Authorization,
+ * excluding one that's already been voided (its own CT state stays "Success" even after voiding,
+ * since CancelAuthorization is recorded as a separate transaction) or already captured (see
+ * hasCapturedCharge above). Throws ErrorInvalidOperation when none qualifies. Used by void().
+ */
+export const findVoidableTransaction = (
+  payment: Payment,
+): Transaction & { interactionId: string } => {
+  if (hasCapturedCharge(payment)) {
+    throw new ErrorInvalidOperation(
+      `No voidable transaction found for payment ${payment.id}`,
+    );
+  }
+
+  const voidedInteractionIds = new Set(
+    payment.transactions
+      .filter((t) => t.type === "CancelAuthorization" && t.state === "Success")
+      .map((t) => t.interactionId),
+  );
+  const transaction = payment.transactions
+    .filter(
+      (t) =>
+        t.type === "Authorization" &&
+        t.state === "Success" &&
+        !voidedInteractionIds.has(t.interactionId),
+    )
+    .at(-1);
+
+  if (!transaction || !transaction.interactionId) {
+    throw new ErrorInvalidOperation(
+      `No voidable transaction found for payment ${payment.id}`,
+    );
+  }
+  return transaction as Transaction & { interactionId: string };
 };
