@@ -13,6 +13,7 @@ import {
   Applepay,
 } from "../../types";
 import { BUTTON, CARD_FIELDS, DEVICE_ERROR } from "./constants";
+import { isApplePaySupported } from "../applePayAvailability";
 
 declare const window: any;
 declare const paypal: any;
@@ -49,13 +50,10 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
   useEffect(() => {
     loadScript("https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js").then(
       async () => {
-        const applePaySession: ApplePaySession = window.ApplePaySession;
-        if (!applePaySession) {
+        // Reuses the same device/browser-capability check PayPalBuilder.ts's isAvailable()
+        // already consulted before this component was even mounted — see applePayAvailability.ts.
+        if (!isApplePaySupported()) {
           setError(DEVICE_ERROR);
-          return;
-        }
-        if (!applePaySession.canMakePayments()) {
-          setError("This device is not capable of making Apple Pay payments");
           return;
         }
         try {

@@ -13,7 +13,17 @@ import {
 } from "../types";
 import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { isVenmoSupported } from "./venmoAvailability";
+import { isApplePaySupported } from "./applePayAvailability";
 import { sessionHeader } from "../helpers/sessionHeader";
+
+// Browser/device-capability preconditions, checked before mounting so commercetools Checkout can
+// skip listing an unavailable method entirely.
+const AVAILABILITY_CHECKS: Partial<
+  Record<PayPalPaymentMethodType, () => boolean>
+> = {
+  Venmo: isVenmoSupported,
+  ApplePay: isApplePaySupported,
+};
 
 class PayPalComponent implements PaymentComponent {
   private root: Root | null = null;
@@ -84,12 +94,7 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    // Only Venmo has a device/browser-capability precondition today — checked directly rather
-    // than through a per-payment-method lookup map for just one entry.
-    if (this.paymentMethodType === "Venmo") {
-      return isVenmoSupported();
-    }
-    return true;
+    return AVAILABILITY_CHECKS[this.paymentMethodType]?.() ?? true;
   }
 
   unmount(): void {
