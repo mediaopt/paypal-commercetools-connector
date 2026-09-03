@@ -1,60 +1,142 @@
 import { createElement, ComponentType, FC } from "react";
+import { createRoot, Root } from "react-dom/client";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
+import { CardFieldsStored } from "../CardFields/CardFieldsStored";
+import { ApplePay } from "../ApplePay";
 // import {
-//   ApplePay,
 //   GooglePay,
 //   PayUponInvoice,
 //   PaymentTokens,
 // } from "paypal-commercetools-client";
 
 import { RenderPurchase } from "../RenderPurchase/RenderPurchase";
+import {
+  ApplePayResolvedOptions,
+  BuilderType,
+  CardFieldsResolvedOptions,
+  GenericMountProps,
+  PayPalBrandResolvedOptions,
+  PayPalPaymentMethodType,
+} from "../../types";
+import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
+import {
+  resolveApplePayOptions,
+  resolveCardFieldsOptions,
+  resolvePayPalBrandOptions,
+} from "./resolveOptions";
+import { processorUrls } from "../constants";
 
 /**
- * Maps PayPal payment method types to their corresponding components —
+ * Maps a payment method type to its concrete component and resolved options —
  * this is our equivalent of the reference project's `ComponentWithCustomOptions` dispatch switch.
  */
-export function getPayPalComponent(type: string): ComponentType<any> {
-  switch (type) {
+export function resolvePayPalComponent(
+  paymentMethodType: PayPalPaymentMethodType,
+  baseOptions: BaseOptions,
+  builderType?: BuilderType
+): {
+  Component: ComponentType<any>;
+  options:
+    | PayPalBrandResolvedOptions
+    | CardFieldsResolvedOptions
+    | ApplePayResolvedOptions;
+} {
+  switch (paymentMethodType) {
     case "PayPal":
-      return PayPal;
+    case "Sepa":
+    case "PayLater":
+    case "PayPalCreditCard":
+    case "AllButtons":
+    case "Venmo":
+      return {
+        Component: PayPal,
+        options: resolvePayPalBrandOptions(
+          paymentMethodType,
+          baseOptions,
+          builderType
+        ),
+      };
     case "CardFields":
-      return CardFields;
-    // case "ApplePay":
-    //   return ApplePay;
+      return {
+        Component: CardFields,
+        options: resolveCardFieldsOptions(baseOptions),
+      };
+    case "CardFieldsStored":
+      // No own script/style
+      return {
+        Component: CardFieldsStored,
+        options: resolveCardFieldsOptions(baseOptions),
+      };
+    case "ApplePay":
+      return {
+        Component: ApplePay,
+        options: resolveApplePayOptions(baseOptions),
+      };
     // case "GooglePay":
-    //   return GooglePay;
+    //   return { Component: GooglePay, options: ... };
     // case "PayUponInvoice":
-    //   return PayUponInvoice;
+    //   return { Component: PayUponInvoice, options: ... };
     // case "PaymentTokens":
-    //   return PaymentTokens;
+    //   return { Component: PaymentTokens, options: ... };
     default:
-      throw new Error(`Unsupported payment method type: ${type}`);
+      throw new Error(`Unsupported payment method type: ${paymentMethodType}`);
   }
 }
 
-type RenderTemplateProps = {
-  paymentMethodType: string;
-  customOptions: Record<string, unknown>;
-  builderType?: string;
-  processorUrl?: string;
+export type RenderTemplateProps = {
+  paymentMethodType: PayPalPaymentMethodType;
+  builderType?: BuilderType;
+  baseOptions: BaseOptions;
+  genericOptions: GenericMountProps;
 };
 
 export const RenderTemplate: FC<RenderTemplateProps> = ({
   paymentMethodType,
-  customOptions,
   builderType,
-  processorUrl,
+  baseOptions,
+  genericOptions,
 }) => {
-  const ComponentClass = getPayPalComponent(paymentMethodType);
+  const { Component, options } = resolvePayPalComponent(
+    paymentMethodType,
+    baseOptions,
+    builderType
+  );
   return (
     <RenderPurchase>
-      {createElement(ComponentClass, {
-        ...customOptions,
+      {createElement(Component, {
+        ...genericOptions,
+        ...options,
         paymentMethodType,
         builderType,
-        processorUrl,
+        // baseOptions.processorUrl is the single source of truth — callers used to also pass a
+        // separate processorUrl prop duplicating this same value.
+        processorUrl: baseOptions.processorUrl,
+        // Injects createPaymentUrl/createOrderUrl/authorizeOrderUrl/onApproveUrl/
+        // authenticateThreeDSOrderUrl (plus expressApproveUrl/updateShippingUrl/
+        // getStoredPaymentMethodsURL, unused as props but harmless) into the same named slots a
+        // self-hosted merchant would otherwise fill in directly — RenderTemplate only ever runs in
+        // Checkout mode, so this never runs for self-hosted deployments.
+        ...processorUrls(baseOptions.processorUrl),
       })}
     </RenderPurchase>
   );
+};
+
+/**
+ * Shared by PayPalComponent.mount()/PayPalStoredComponent.mount() — finds the target element,
+ * creates a React root, and renders RenderTemplate into it. Both builders otherwise only differ
+ * in how they build `props`.
+ */
+export const mountRenderTemplate = (
+  selector: string,
+  props: RenderTemplateProps
+): Root => {
+  const element = document.querySelector(selector);
+  if (!element) {
+    throw new Error(`Element not found for selector: ${selector}`);
+  }
+  const root = createRoot(element);
+  root.render(createElement(RenderTemplate, props));
+  return root;
 };

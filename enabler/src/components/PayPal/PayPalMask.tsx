@@ -1,5 +1,9 @@
-import React, { useMemo, useRef } from "react";
-import { PayPalButtons, PayPalMessages } from "@paypal/react-paypal-js";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  PayPalButtons,
+  PayPalMessages,
+  usePayPalScriptReducer,
+} from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
 
 import { usePayment } from "../../app/usePayment";
@@ -8,6 +12,7 @@ import { useLoader } from "../../app/useLoader";
 import { useNotifications } from "../../app/useNotifications";
 import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
+import { isVenmoSupported } from "../venmoAvailability";
 
 // Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
 // SDK's own actions.reject()
@@ -42,8 +47,26 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
   const { t } = useTranslation();
   const { enableVaulting, paypalMessages, ...restprops } = props;
   const save = useRef<HTMLInputElement>(null);
+  const [{ isResolved }] = usePayPalScriptReducer();
 
   const storeInVaultOnSuccess = settings?.storeInVaultOnSuccess;
+
+  // Silent-render safety net: a funding-source-restricted button (Sepa/PayLater/PayPalCreditCard/
+  // Venmo) renders nothing at all when PayPal's own SDK decides the buyer/cart isn't eligible for
+  // it (e.g. Venmo for a EUR cart) — this notifies the buyer instead of leaving an unexplained gap.
+  useEffect(() => {
+    if (!isResolved || !restprops.fundingSource || !window.paypal?.Buttons) {
+      return;
+    }
+    // Only Venmo has an extra constraint beyond PayPal's own eligibility check — checked directly
+    // rather than through a per-funding-source lookup map for just one entry.
+    const isEligible =
+      window.paypal.Buttons({ fundingSource: restprops.fundingSource }).isEligible() &&
+      (restprops.fundingSource !== "venmo" || isVenmoSupported());
+    if (!isEligible) {
+      notify("Error", t("interface.generalError"));
+    }
+  }, [isResolved, restprops.fundingSource]);
 
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {

@@ -1221,8 +1221,14 @@ describe("paypal-payment.service", () => {
       // Flat per-componentType overlay (StandardPaymentMethodType's members) plus the dedicated
       // PayPalExpress slot — see config.utils.ts's buildSdkOptions().
       expect(result.sdkOptions).toEqual({
-        PayPal: { currency: "USD", buyerCountry: "US" },
         CardFields: { currency: "USD", buyerCountry: "US" },
+        PayPal: { currency: "USD", buyerCountry: "US" },
+        Sepa: { currency: "USD", buyerCountry: "US" },
+        PayLater: { currency: "USD", buyerCountry: "US" },
+        PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
+        AllButtons: { currency: "USD", buyerCountry: "US" },
+        Venmo: { currency: "USD", buyerCountry: "US" },
+        ApplePay: { currency: "USD", buyerCountry: "US" },
         PayPalExpress: { currency: "USD", buyerCountry: "US" },
       });
     });
@@ -1254,6 +1260,12 @@ describe("paypal-payment.service", () => {
           buyerCountry: "US",
         },
         CardFields: { currency: "USD", buyerCountry: "US" },
+        Sepa: { currency: "USD", buyerCountry: "US" },
+        PayLater: { currency: "USD", buyerCountry: "US" },
+        PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
+        AllButtons: { currency: "USD", buyerCountry: "US" },
+        Venmo: { currency: "USD", buyerCountry: "US" },
+        ApplePay: { currency: "USD", buyerCountry: "US" },
         PayPalExpress: {
           enableFunding: "venmo",
           currency: "USD",

@@ -6,12 +6,20 @@ export const StandardPaymentMethodType = {
   CREDIT_CARD: "CardFields",
   PAYPAL: "PayPal",
 
-  // TODO: implement ApplePay support once this connector is fully Checkout-compatible.
-  // APPLE_PAY: "ApplePay",
+  // Funding-source variants of the standard PayPal smart button (see enabler's PayPalBuilder.ts
+  // FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE) — none of these have a commercetools icon-key
+  // equivalent, see paymentMethodIcon.utils.ts.
+  SEPA: "Sepa",
+  PAY_LATER: "PayLater",
+  PAYPAL_CREDIT_CARD: "PayPalCreditCard",
+  ALL_BUTTONS: "AllButtons",
+  // Venmo has no commercetools icon-key equivalent — see paymentMethodIcon.utils.ts. PayPal's
+  // Venmo funding source is USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
+  VENMO: "Venmo",
+
+  APPLE_PAY: "ApplePay",
   // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
   // GOOGLE_PAY: "GooglePay",
-  // Venmo has no commercetools Checkout equivalent — not available in commercetools itself.
-  // VENMO: "Venmo",
   // PayUponInvoice has no commercetools Checkout equivalent — not available in commercetools itself.
   // PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
@@ -19,10 +27,20 @@ export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType
 >;
 
+// Exists only so createPayment/createOrder's paymentMethodType schema accepts it,
+// since PayPalStoredBuilder.mount() sets this paymentMethodType when charging a stored card.
+export const StoredPaymentMethodType = {
+  CREDIT_CARD_STORED: "CardFieldsStored",
+} as const;
+export type StoredPaymentMethodType = ValuesOf<typeof StoredPaymentMethodType>;
+
 export const PaymentMethodType = {
   ...StandardPaymentMethodType,
+  ...StoredPaymentMethodType,
 } as const;
-export type PaymentMethodType = StandardPaymentMethodType;
+export type PaymentMethodType =
+  | StandardPaymentMethodType
+  | StoredPaymentMethodType;
 
 export const CustomBuilderType = {
   EXPRESS: "express",
@@ -133,6 +151,9 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.String()),
+  // Lets createOrder() apply payment-method-specific order constraints (e.g. Venmo's USD-only
+  // requirement) — see paypal-payment.service.ts's validateVenmoOrderParams.
+  paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
