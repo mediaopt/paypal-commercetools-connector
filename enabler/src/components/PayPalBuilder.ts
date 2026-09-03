@@ -1,5 +1,4 @@
-import { createElement } from "react";
-import { createRoot, Root } from "react-dom/client";
+import { Root } from "react-dom/client";
 import {
   ComponentOptions,
   PaymentComponent,
@@ -12,8 +11,9 @@ import {
   PayPalPaymentMethodType,
   ValidationHandlers,
 } from "../types";
-import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
+import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { isVenmoSupported } from "./venmoAvailability";
+import { sessionHeader } from "../helpers/sessionHeader";
 
 class PayPalComponent implements PaymentComponent {
   private root: Root | null = null;
@@ -30,21 +30,11 @@ class PayPalComponent implements PaymentComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
-    const element = document.querySelector(selector);
-    if (!element) {
-      throw new Error(`Element not found for selector: ${selector}`);
-    }
-
-    this.root = createRoot(element);
-
     // Method-independent — every mounted component gets the same shape here, regardless of
     // paymentMethodType. Method-specific resolution (style/fundingSource/script-options/
     // initialSettings) happens in RenderTemplate/resolveOptions.ts instead, at render time.
     const genericOptions: GenericMountProps = {
-      requestHeader: {
-        "X-Session-Id": this.baseOptions.sessionId,
-      },
-      shippingMethodId: "standard",
+      requestHeader: sessionHeader(this.baseOptions.sessionId),
       purchaseCallback: this.baseOptions.purchaseCallback,
       redirectOnApprove: this.baseOptions.redirectOnApprove,
       initialUserIdToken: this.baseOptions.userIdToken,
@@ -63,15 +53,12 @@ class PayPalComponent implements PaymentComponent {
       },
     };
 
-    this.root.render(
-      createElement(RenderTemplate, {
-        paymentMethodType: this.paymentMethodType,
-        builderType: this.builderType,
-        processorUrl: this.baseOptions.processorUrl,
-        baseOptions: this.baseOptions,
-        genericOptions,
-      })
-    );
+    this.root = mountRenderTemplate(selector, {
+      paymentMethodType: this.paymentMethodType,
+      builderType: this.builderType,
+      baseOptions: this.baseOptions,
+      genericOptions,
+    });
   }
 
   async submit({
@@ -103,6 +90,13 @@ class PayPalComponent implements PaymentComponent {
       return isVenmoSupported();
     }
     return true;
+  }
+
+  unmount(): void {
+    if (this.root) {
+      this.root.unmount();
+      this.root = null;
+    }
   }
 }
 

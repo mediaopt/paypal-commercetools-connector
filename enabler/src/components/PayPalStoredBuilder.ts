@@ -1,5 +1,4 @@
-import { createElement } from "react";
-import { createRoot, Root } from "react-dom/client";
+import { Root } from "react-dom/client";
 import {
   StoredComponent,
   StoredComponentBuilder,
@@ -7,9 +6,10 @@ import {
 } from "../payment-enabler/interfaces/stored";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 import { GenericMountProps } from "../types";
-import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
+import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { processorRequest } from "../services/processorRequest";
 import { storedPaymentMethodUrl } from "./constants";
+import { sessionHeader } from "../helpers/sessionHeader";
 
 class PayPalStoredComponent implements StoredComponent {
   private root: Root | null = null;
@@ -23,19 +23,10 @@ class PayPalStoredComponent implements StoredComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
-    const element = document.querySelector(selector);
-    if (!element) {
-      throw new Error(`Element not found for selector: ${selector}`);
-    }
-
-    this.root = createRoot(element);
-
     // Method-independent shape, same as PayPalComponent.mount() — the id of the stored
     // PayPal payment token is the one piece of information specific to this mount.
     const genericOptions: GenericMountProps = {
-      requestHeader: {
-        "X-Session-Id": this.baseOptions.sessionId,
-      },
+      requestHeader: sessionHeader(this.baseOptions.sessionId),
       initialUserIdToken: this.baseOptions.userIdToken,
       onRegisterSubmit: (
         handler: (storePaymentDetails?: boolean) => Promise<void>
@@ -44,14 +35,11 @@ class PayPalStoredComponent implements StoredComponent {
       },
     };
 
-    this.root.render(
-      createElement(RenderTemplate, {
-        paymentMethodType: "CardFieldsStored",
-        processorUrl: this.baseOptions.processorUrl,
-        baseOptions: this.baseOptions,
-        genericOptions: { ...genericOptions, ppVaultTokenId: this.config.id },
-      })
-    );
+    this.root = mountRenderTemplate(selector, {
+      paymentMethodType: "CardFieldsStored",
+      baseOptions: this.baseOptions,
+      genericOptions: { ...genericOptions, ppVaultTokenId: this.config.id },
+    });
   }
 
   async submit(): Promise<void> {
@@ -64,7 +52,7 @@ class PayPalStoredComponent implements StoredComponent {
     // which throws on a non-ok response. Checkout only has this promise to tell success from
     // failure; silently resolving on a failed delete would misreport the token as removed.
     const result = await processorRequest(
-      { "X-Session-Id": this.baseOptions.sessionId },
+      sessionHeader(this.baseOptions.sessionId),
       storedPaymentMethodUrl(this.baseOptions.processorUrl, this.config.id),
       undefined,
       "DELETE"
@@ -78,6 +66,13 @@ class PayPalStoredComponent implements StoredComponent {
 
   async isAvailable(): Promise<boolean> {
     return true;
+  }
+
+  unmount(): void {
+    if (this.root) {
+      this.root.unmount();
+      this.root = null;
+    }
   }
 }
 

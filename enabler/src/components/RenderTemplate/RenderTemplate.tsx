@@ -1,4 +1,5 @@
 import { createElement, ComponentType, FC } from "react";
+import { createRoot, Root } from "react-dom/client";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
 import { CardFieldsStored } from "../CardFields/CardFieldsStored";
@@ -22,6 +23,7 @@ import {
   resolveCardFieldsOptions,
   resolvePayPalBrandOptions,
 } from "./resolveOptions";
+import { processorUrls } from "../constants";
 
 /**
  * Maps a payment method type to its concrete component and resolved options —
@@ -74,10 +76,9 @@ export function resolvePayPalComponent(
   }
 }
 
-type RenderTemplateProps = {
+export type RenderTemplateProps = {
   paymentMethodType: PayPalPaymentMethodType;
   builderType?: BuilderType;
-  processorUrl?: string;
   baseOptions: BaseOptions;
   genericOptions: GenericMountProps;
 };
@@ -85,7 +86,6 @@ type RenderTemplateProps = {
 export const RenderTemplate: FC<RenderTemplateProps> = ({
   paymentMethodType,
   builderType,
-  processorUrl,
   baseOptions,
   genericOptions,
 }) => {
@@ -101,8 +101,34 @@ export const RenderTemplate: FC<RenderTemplateProps> = ({
         ...options,
         paymentMethodType,
         builderType,
-        processorUrl,
+        // baseOptions.processorUrl is the single source of truth — callers used to also pass a
+        // separate processorUrl prop duplicating this same value.
+        processorUrl: baseOptions.processorUrl,
+        // Injects createPaymentUrl/createOrderUrl/authorizeOrderUrl/onApproveUrl/
+        // authenticateThreeDSOrderUrl (plus expressApproveUrl/updateShippingUrl/
+        // getStoredPaymentMethodsURL, unused as props but harmless) into the same named slots a
+        // self-hosted merchant would otherwise fill in directly — RenderTemplate only ever runs in
+        // Checkout mode, so this never runs for self-hosted deployments.
+        ...processorUrls(baseOptions.processorUrl),
       })}
     </RenderPurchase>
   );
+};
+
+/**
+ * Shared by PayPalComponent.mount()/PayPalStoredComponent.mount() — finds the target element,
+ * creates a React root, and renders RenderTemplate into it. Both builders otherwise only differ
+ * in how they build `props`.
+ */
+export const mountRenderTemplate = (
+  selector: string,
+  props: RenderTemplateProps
+): Root => {
+  const element = document.querySelector(selector);
+  if (!element) {
+    throw new Error(`Element not found for selector: ${selector}`);
+  }
+  const root = createRoot(element);
+  root.render(createElement(RenderTemplate, props));
+  return root;
 };

@@ -212,20 +212,20 @@ export type BasicComponentProps = {
   enableVaulting?: boolean;
 };
 
-/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`.
- * will be removed, must be replaced with processorURL */
+/** Category 2 — per-endpoint URLs. In Checkout mode, RenderTemplate injects all of these (via
+ * processorUrls()) into the same named props a self-hosted merchant would otherwise fill in
+ * directly — the two deployment modes converge on identical prop names, just from different
+ * sources. `createPaymentUrl` is the one field the standalone client always required; the other 4
+ * were always optional there too, and usePayment.tsx restores that same required/optional split
+ * and its original silent-no-op-when-missing behavior (no `@deprecated` marking needed — nothing
+ * here is being phased out, it's just populated one way or the other). */
 export type LegacyEndpointUrlProps = {
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
-  createPaymentUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
+  createPaymentUrl: string;
   onApproveUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   authorizeOrderUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   removePaymentTokenUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createOrderUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   authenticateThreeDSOrderUrl?: string;
 };
 
@@ -249,7 +249,8 @@ export type CheckoutOnlyProps = {
  * to processor-like structure for support*/
 export type LegacyReplaceableProps = {
   purchaseCallback?: (result: any, options?: any) => void; //see `MERCHANT_RETURN_URL` instead
-  shippingMethodId?: string; // see processor createPayment instead
+  // deprecated, see processor module for recommended bff handling
+  shippingMethodId?: string;
   getSettingsUrl?: string; // see processor config instead
   getOrderUrl?: string; //included directly where relevant in processor calls
   onApproveRedirectionUrl?: string; //see processor `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
@@ -584,6 +585,7 @@ export type PayPalMethodConfig = {
  * RenderTemplate/resolveOptions.ts produces for the given paymentMethodType. */
 export type GenericMountProps = FormComponentProps & {
   requestHeader: RequestHeader;
+  // deprecated, see processor module for recommended bff handling
   shippingMethodId?: string;
   purchaseCallback?: (result: any, options?: any) => void;
   redirectOnApprove?: boolean;
