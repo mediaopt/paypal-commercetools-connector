@@ -25,6 +25,17 @@ const AVAILABILITY_CHECKS: Partial<
   ApplePay: isApplePaySupported,
 };
 
+// Form-like components that use onRegisterSubmit instead of an internal pay button — Checkout
+// calls component.submit() to trigger payment for these types. Every other paymentMethodType
+// dispatched through this builder (PayPal, Sepa, PayLater, PayPalCreditCard, AllButtons, Venmo,
+// ApplePay) renders its own self-driving button and must NOT have this set, or Checkout will
+// expect a submit button/behavior these components never provide. Matches the braintree reference
+// project's own BraintreeBuilder.SUBMIT_HAS_CALLBACK allowlist for the same distinction.
+const FORM_LIKE_PAYMENT_METHOD_TYPES: PayPalPaymentMethodType[] = [
+  "CardFields",
+  "PayUponInvoice",
+];
+
 class PayPalComponent implements PaymentComponent {
   private root: Root | null = null;
   private submitHandler:
@@ -109,13 +120,16 @@ class PayPalComponent implements PaymentComponent {
  * Builder for PayPal payment components
  */
 export class PayPalComponentBuilder implements PaymentComponentBuilder {
-  componentHasSubmit = true;
+  componentHasSubmit: boolean;
 
   constructor(
     private paymentMethodType: PayPalPaymentMethodType,
     private baseOptions: BaseOptions,
     private builderType?: BuilderType
-  ) {}
+  ) {
+    this.componentHasSubmit =
+      FORM_LIKE_PAYMENT_METHOD_TYPES.includes(paymentMethodType);
+  }
 
   build(config: ComponentOptions): PaymentComponent {
     return new PayPalComponent(
