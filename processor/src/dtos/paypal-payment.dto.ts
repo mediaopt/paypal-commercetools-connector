@@ -28,10 +28,20 @@ export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType
 >;
 
+// Exists only so createPayment/createOrder's paymentMethodType schema accepts it,
+// since PayPalStoredBuilder.mount() sets this paymentMethodType when charging a stored card.
+export const StoredPaymentMethodType = {
+  CREDIT_CARD_STORED: "CardFieldsStored",
+} as const;
+export type StoredPaymentMethodType = ValuesOf<typeof StoredPaymentMethodType>;
+
 export const PaymentMethodType = {
   ...StandardPaymentMethodType,
+  ...StoredPaymentMethodType,
 } as const;
-export type PaymentMethodType = StandardPaymentMethodType;
+export type PaymentMethodType =
+  | StandardPaymentMethodType
+  | StoredPaymentMethodType;
 
 export const CustomBuilderType = {
   EXPRESS: "express",

@@ -12,6 +12,7 @@ import {
 } from "./interfaces/stored";
 import { BaseOptions } from "./interfaces/baseOptions";
 import { PayPalComponentBuilder } from "../components/PayPalBuilder";
+import { PayPalStoredBuilder } from "../components/PayPalStoredBuilder";
 import { processorUrls } from "../components/constants";
 import { sessionHeader } from "../helpers/sessionHeader";
 import { toPayPalPaymentMethodType } from "../components/paymentMethodTypeMapping";
@@ -109,11 +110,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     const { baseOptions } = await this.setupData;
     const normalizedType = toPayPalPaymentMethodType(type);
 
-    // For PayPal, we support card tokens
+    // Only credit cards are vaulted/stored — see Checkout-mode scope.
     if (normalizedType === "CardFields") {
-      // Return a builder for stored card payment methods
-      // This would be implemented similar to payment component builder
-      throw new Error("Stored payment method builder not yet implemented");
+      return new PayPalStoredBuilder(baseOptions);
     }
 
     throw new Error(`Unsupported stored payment method type: ${type}`);
@@ -125,8 +124,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
     const { baseOptions } = await this.setupData;
-    const url = processorUrls(baseOptions.processorUrl)
-      .getStoredPaymentMethodsURL;
+    const url = processorUrls(
+      baseOptions.processorUrl
+    ).getStoredPaymentMethodsURL;
     const response = await fetch(url, {
       method: "GET",
       headers: sessionHeader(baseOptions.sessionId),

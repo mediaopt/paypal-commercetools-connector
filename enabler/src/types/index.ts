@@ -38,6 +38,7 @@ export type BuilderType = "dropin" | "express" | undefined;
 export type PayPalPaymentMethodType =
   | "PayPal"
   | "CardFields"
+  | "CardFieldsStored"
   | "ApplePay"
   | "GooglePay"
   | "PayUponInvoice"
@@ -215,7 +216,7 @@ export type BasicComponentProps = {
  * will be removed, must be replaced with processorURL */
 export type LegacyEndpointUrlProps = {
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
-  createPaymentUrl: string;
+  createPaymentUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   onApproveUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
@@ -249,7 +250,7 @@ export type CheckoutOnlyProps = {
 export type LegacyReplaceableProps = {
   purchaseCallback?: (result: any, options?: any) => void; //see `MERCHANT_RETURN_URL` instead
   shippingMethodId?: string; // see processor createPayment instead
-  getSettingsUrl: string; // see processor config instead
+  getSettingsUrl?: string; // see processor config instead
   getOrderUrl?: string; //included directly where relevant in processor calls
   onApproveRedirectionUrl?: string; //see processor `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
 } & CartInformationProps; //see enabler PaymentData instead
@@ -427,6 +428,7 @@ export type ShippingAddress = {
 };
 
 export type PaymentData = {
+  /** For this connector: the commercetools Payment id, from createPayment()'s response. */
   id: string;
   amountPlanned: {
     centAmount: number;
@@ -591,6 +593,9 @@ export type GenericMountProps = FormComponentProps & {
   buttonText?: string;
   onError?: (error: GenericError) => void;
   initialAmount?: CTAmount;
+  /** only for a stored-payment-method component (PayPalStoredBuilder) — PayPal's
+   * vault payment-token id of the saved card */
+  ppVaultTokenId?: string;
 };
 
 type BaseResolvedMethodOptions = {
@@ -607,8 +612,9 @@ export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
   fundingSource?: FUNDING_SOURCE;
 };
 
-/** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
- * PayPalBrandResolvedOptions. */
+/** Resolved options for <CardFields/> and <CardFieldsStored/>  — no style/fundingSource concept at all,
+ * unlikePayPalBrandResolvedOptions
+ */
 export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
 
 /** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
@@ -680,7 +686,8 @@ type PayPalComponentOverrides = Partial<
   Record<PayPalPaymentMethodType | "PayPalExpress", PayPalMethodConfig>
 >;
 
-export type GetSettingsResponse = PayPalLegacySettings & PayPalComponentOverrides;
+export type GetSettingsResponse = PayPalLegacySettings &
+  PayPalComponentOverrides;
 
 export type CustomOnApproveData = {
   orderID: string;

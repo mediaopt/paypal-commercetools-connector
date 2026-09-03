@@ -1,6 +1,7 @@
 import { createElement, ComponentType, FC } from "react";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
+import { CardFieldsStored } from "../CardFields/CardFieldsStored";
 // import {
 //   ApplePay,
 //   GooglePay,
@@ -52,6 +53,12 @@ export function resolvePayPalComponent(
     case "CardFields":
       return {
         Component: CardFields,
+        options: resolveCardFieldsOptions(baseOptions),
+      };
+    case "CardFieldsStored":
+      // No own script/style
+      return {
+        Component: CardFieldsStored,
         options: resolveCardFieldsOptions(baseOptions),
       };
     // case "ApplePay":

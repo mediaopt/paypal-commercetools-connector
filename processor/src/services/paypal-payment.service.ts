@@ -537,15 +537,40 @@ export class PayPalPaymentService extends AbstractPaymentService {
     payment: Payment,
     response: Order
   ): Promise<void> {
-    const vaultCustomerId =
-      response.payment_source?.card?.attributes?.vault?.customer?.id;
+    const vault = response.payment_source?.card?.attributes?.vault;
+    const vaultCustomerId = vault?.customer?.id;
     if (!vaultCustomerId || !payment.customer?.id) {
       return;
     }
-    await this.payPalCustomerService.linkPayPalCustomerId(
-      payment.customer.id,
-      vaultCustomerId
-    );
+    const customerId = payment.customer.id;
+
+    // Two independent, best-effort writes to two different CT resources (Customer vs.
+    // PaymentMethod) — no data dependency between them, so they run in parallel rather than one
+    // gating the other, and neither is awaited here: — to prevent slow down users experience.
+    //The more important link customer thou has 3 retries, the less important token can be fetched from PayPal.
+    void Promise.all([
+      this.payPalCustomerService.linkPayPalCustomerId(
+        customerId,
+        vaultCustomerId
+      ),
+      vault?.id
+        ? this.ctPaymentMethodService
+            .save({
+              customerId,
+              token: vault.id,
+              method: StandardPaymentMethodType.CREDIT_CARD,
+              paymentInterface:
+                getStoredPaymentMethodsConfig().config.paymentInterface,
+            })
+            .catch((e) =>
+              log.warn(
+                `linkVaultedCardCustomer: could not save commercetools PaymentMethod record for customer ${customerId} — ${errorMessage(
+                  e
+                )}`
+              )
+            )
+        : Promise.resolve(),
+    ]);
   }
 
   /**
