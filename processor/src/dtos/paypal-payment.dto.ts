@@ -17,8 +17,7 @@ export const StandardPaymentMethodType = {
   // Venmo funding source is USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
   VENMO: "Venmo",
 
-  // TODO: implement ApplePay support once this connector is fully Checkout-compatible.
-  // APPLE_PAY: "ApplePay",
+  APPLE_PAY: "ApplePay",
   // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
   // GOOGLE_PAY: "GooglePay",
   // PayUponInvoice has no commercetools Checkout equivalent — not available in commercetools itself.

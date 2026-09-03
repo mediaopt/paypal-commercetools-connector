@@ -577,6 +577,8 @@ export type PayPalMethodConfig = {
   // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
   // RenderTemplate/resolveOptions.ts).
   components?: string;
+  // ApplePay only — the merchant-facing store name shown in Apple's native payment sheet.
+  applePayDisplayName?: string;
 };
 
 /** Method-independent props every mounted component receives — assembled once by
@@ -600,7 +602,7 @@ export type GenericMountProps = FormComponentProps & {
   ppVaultTokenId?: string;
 };
 
-type BaseResolvedMethodOptions = {
+export type BaseResolvedMethodOptions = {
   options: ReactPayPalScriptOptions;
   // BaseOptions.settings is guaranteed present by the time mount() runs (see its own comment) —
   // spreading it here can safely be typed as the full GetSettingsResponse, not a Partial.
@@ -618,6 +620,12 @@ export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
  * unlikePayPalBrandResolvedOptions
  */
 export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
+
+/** Resolved options for <ApplePay/> — no style/fundingSource concept either, plus the one field
+ * unique to it: the merchant store name shown in the native Apple Pay sheet. */
+export type ApplePayResolvedOptions = BaseResolvedMethodOptions & {
+  applePayDisplayName: string;
+};
 
 /** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
 export type PayPalBrandButtonType = Extract<

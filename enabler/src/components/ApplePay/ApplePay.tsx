@@ -23,6 +23,12 @@ export const ApplePay: FC<ApplePayComponentsProps> = ({
   cartInformation,
   purchaseCallback,
   enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
+  initialSettings,
+  initialUserIdToken,
+  redirectOnApprove,
 
   ...restProps
 }) => {
@@ -44,6 +50,12 @@ export const ApplePay: FC<ApplePayComponentsProps> = ({
       createVaultSetupTokenUrl={createVaultSetupTokenUrl}
       approveVaultSetupTokenUrl={approveVaultSetupTokenUrl}
       onApproveRedirectionUrl={onApproveRedirectionUrl}
+      paymentMethodType={paymentMethodType}
+      builderType={builderType}
+      processorUrl={processorUrl}
+      initialSettings={initialSettings}
+      initialUserIdToken={initialUserIdToken}
+      redirectOnApprove={redirectOnApprove}
     >
       <ApplePayButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>

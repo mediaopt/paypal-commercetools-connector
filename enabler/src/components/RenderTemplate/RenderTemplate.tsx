@@ -3,8 +3,8 @@ import { createRoot, Root } from "react-dom/client";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
 import { CardFieldsStored } from "../CardFields/CardFieldsStored";
+import { ApplePay } from "../ApplePay";
 // import {
-//   ApplePay,
 //   GooglePay,
 //   PayUponInvoice,
 //   PaymentTokens,
@@ -12,6 +12,7 @@ import { CardFieldsStored } from "../CardFields/CardFieldsStored";
 
 import { RenderPurchase } from "../RenderPurchase/RenderPurchase";
 import {
+  ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
   GenericMountProps,
@@ -20,6 +21,7 @@ import {
 } from "../../types";
 import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
+  resolveApplePayOptions,
   resolveCardFieldsOptions,
   resolvePayPalBrandOptions,
 } from "./resolveOptions";
@@ -35,7 +37,10 @@ export function resolvePayPalComponent(
   builderType?: BuilderType
 ): {
   Component: ComponentType<any>;
-  options: PayPalBrandResolvedOptions | CardFieldsResolvedOptions;
+  options:
+    | PayPalBrandResolvedOptions
+    | CardFieldsResolvedOptions
+    | ApplePayResolvedOptions;
 } {
   switch (paymentMethodType) {
     case "PayPal":
@@ -63,8 +68,11 @@ export function resolvePayPalComponent(
         Component: CardFieldsStored,
         options: resolveCardFieldsOptions(baseOptions),
       };
-    // case "ApplePay":
-    //   return { Component: ApplePay, options: ... };
+    case "ApplePay":
+      return {
+        Component: ApplePay,
+        options: resolveApplePayOptions(baseOptions),
+      };
     // case "GooglePay":
     //   return { Component: GooglePay, options: ... };
     // case "PayUponInvoice":

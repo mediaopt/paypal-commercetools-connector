@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, FC } from "react";
 
 import { useSettings } from "../../app/useSettings";
 import loadScript from "../../app/loadScript";
@@ -20,7 +20,7 @@ declare const paypal: any;
 type ApplePayMaskComponentProps = ApplePayProps &
   CustomPayPalButtonsComponentProps;
 
-export const ApplePayMask: React.FC<ApplePayMaskComponentProps> = (props) => {
+export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
   const [error, setError] = useState<string>();
   const [isEligible, setIsEligible] = useState<boolean>(false);
   const [payConfig, setPayConfig] = useState<ApplepayConfig>();
@@ -81,16 +81,22 @@ export const ApplePayMask: React.FC<ApplePayMaskComponentProps> = (props) => {
       return;
     }
 
+    // Apple Pay requires total.amount as a decimal string (e.g. "12.00"), not commercetools'
+    // integer minor-unit centAmount.
+    const { centAmount, currencyCode, fractionDigits } =
+      paymentInfo.amountPlanned;
+    const amount = (centAmount / 10 ** fractionDigits).toFixed(fractionDigits);
+
     const paymentRequest = {
       countryCode: payConfig.countryCode,
       merchantCapabilities: payConfig.merchantCapabilities,
       supportedNetworks: payConfig.supportedNetworks,
-      currencyCode: paymentInfo.amountPlanned.currencyCode,
+      currencyCode,
       requiredBillingContactFields: ["postalAddress"],
       total: {
         label: applePayDisplayName,
         type: "final",
-        amount: paymentInfo.amountPlanned.centAmount,
+        amount,
       },
     };
     const session = new applePaySession(4, paymentRequest);
@@ -138,6 +144,12 @@ export const ApplePayMask: React.FC<ApplePayMaskComponentProps> = (props) => {
 
   return (
     <>
+      {/* Vaulted-card UI is legacy/self-hosted-only — no guard needed here: applepayPaymentTokens
+      can only be non-empty if useSettings.tsx's paymentTokens was populated, which only happens
+      via getUserInfoUrl (see useSettings.tsx's handleGetSettings). getUserInfoUrl is a
+      LegacyVaultProps-only field — RenderTemplate.tsx/processorUrls() never set it in Checkout
+      mode, and SettingsProvider has no initialPaymentTokens-style seed for it either — so
+      paymentTokens, and therefore this branch, is always empty under Checkout regardless. */}
       {applepayPaymentTokens &&
       applepayPaymentTokens.length > 0 &&
       addNew === false ? (

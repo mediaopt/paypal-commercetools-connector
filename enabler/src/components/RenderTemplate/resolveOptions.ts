@@ -1,5 +1,6 @@
 import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
+  ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
   PayPalBrandButtonType,
@@ -121,7 +122,8 @@ export function resolveCardFieldsOptions(
   const resolvedComponents =
     baseOptions.settings.CardFields?.components ??
     ENABLER_DEFAULT_CONFIG.CardFields?.components;
-  const fixedOverrides = FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
+  const fixedOverrides =
+    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
 
   const options = buildScriptOptions(
     "CardFields",
@@ -134,5 +136,37 @@ export function resolveCardFieldsOptions(
     options,
     initialSettings: { ...baseOptions.settings, ...fixedOverrides },
     enableVaulting: baseOptions.enableVaulting ?? false,
+  };
+}
+
+export function resolveApplePayOptions(
+  baseOptions: BaseOptions
+): ApplePayResolvedOptions {
+  // ApplePay has no button style/fundingSource concept, but `components` and applePayDisplayName
+  // both go through the same processor-override chain as CardFields' `components`
+  const resolvedComponents =
+    baseOptions.settings.ApplePay?.components ??
+    ENABLER_DEFAULT_CONFIG.ApplePay.components;
+
+  const options = buildScriptOptions(
+    "ApplePay",
+    baseOptions,
+    baseOptions.sdkOptions?.ApplePay,
+    resolvedComponents
+  );
+
+  const applePayDisplayName =
+    baseOptions.settings.ApplePay?.applePayDisplayName ??
+    ENABLER_DEFAULT_CONFIG.ApplePay.applePayDisplayName ??
+    "";
+
+  // Vaulting is off unconditionally in Checkout mode for Apple Pay — not merchant-configurable
+  // here. The legacy self-hosted vaulted-card UI in ApplePayMask.tsx is naturally never reached
+  // under Checkout regardless (see its own comment), so no gate is needed on this side either.
+  return {
+    options,
+    initialSettings: baseOptions.settings,
+    enableVaulting: false,
+    applePayDisplayName,
   };
 }

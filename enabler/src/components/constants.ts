@@ -18,7 +18,8 @@ since that data is instead handled by the processor and/or have limited support 
 getSettingsUrl, createVaultSetupTokenUrl, approveVaultSetupTokenUrl
  */
 
-const stripTrailingSlash = (processorUrl: string) => processorUrl.replace(/\/$/, "");
+const stripTrailingSlash = (processorUrl: string) =>
+  processorUrl.replace(/\/$/, "");
 
 export const processorUrls = (processorUrl: string) => {
   const base = stripTrailingSlash(processorUrl);
@@ -63,7 +64,11 @@ export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
 // config distinct from its own paymentMethodType entry (see ENABLER_DEFAULT_CONFIG below and
 // mount()'s express-first resolution). Not folded into the generic per-payment-method config map
 // below, since no other payment method is ever expected to need a second config slot like this.
-export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<PayPalMethodConfig> = {
+// Required over only PayPal-brand's own 3 fields — not the full PayPalMethodConfig — since
+// applePayDisplayName has nothing to do with PayPal Express.
+export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<
+  Pick<PayPalMethodConfig, "style" | "fundingSource" | "components">
+> = {
   // buttonLabel here is only the pre-override default — it's forced back to "buynow"
   // unconditionally in mount() below regardless of what resolvedOverride/generalStyle supply, so
   // this value never actually changes in practice; kept for a type-required field's sake.
@@ -75,8 +80,9 @@ export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<PayPalMethodConfig> = {
 // nothing at all for this payment method. Flat, keyed by paymentMethodType — add a row here for a
 // future payment method needing only `components` (CardFields has no button style/funding
 // sources of its own — only `components` applies to it).
-export const ENABLER_DEFAULT_CONFIG: Partial<
-  Record<PayPalPaymentMethodType, PayPalMethodConfig>
+export const ENABLER_DEFAULT_CONFIG: Record<
+  PayPalPaymentMethodType,
+  PayPalMethodConfig
 > = {
   // No fundingSource default — a single FUNDING_SOURCE value renders exactly one standalone
   // button (see @paypal/paypal-js's PayPalButtonFundingSource); omitting it lets <PayPalButtons/>
@@ -107,6 +113,18 @@ export const ENABLER_DEFAULT_CONFIG: Partial<
   AllButtons: {
     components: "buttons",
   },
+  // No style/fundingSource. `components` overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.ApplePay.components, same chain as every other method's `components`.
+  ApplePay: {
+    components: "applepay,buttons",
+    applePayDisplayName: "My Store",
+  },
+  //no config needed, added for consistency
+  CardFieldsStored: {},
+  Venmo: {},
+  //not implemented yet, added for consistency
+  GooglePay: {},
+  PayUponInvoice: {},
 };
 
 // RenderTemplate/resolveOptions.ts's scriptOptions — plain defaults applied to every payment method.
