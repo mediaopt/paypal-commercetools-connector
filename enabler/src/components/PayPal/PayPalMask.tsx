@@ -58,10 +58,14 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     if (!isResolved || !restprops.fundingSource || !window.paypal?.Buttons) {
       return;
     }
-    // Only Venmo has an extra constraint beyond PayPal's own eligibility check — checked directly
-    // rather than through a per-funding-source lookup map for just one entry.
+    const paypalEligible = window.paypal
+      .Buttons({ fundingSource: restprops.fundingSource })
+      .isEligible();
+    if (!paypalEligible) {
+      console.warn(`"${restprops.fundingSource}" not eligible`);
+    }
     const isEligible =
-      window.paypal.Buttons({ fundingSource: restprops.fundingSource }).isEligible() &&
+      paypalEligible &&
       (restprops.fundingSource !== "venmo" || isVenmoSupported());
     if (!isEligible) {
       notify("Error", t("interface.generalError"));

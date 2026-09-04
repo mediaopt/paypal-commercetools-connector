@@ -17,8 +17,13 @@ export const isVenmoSupported = (): boolean => {
     const isSafari =
       /Safari/i.test(userAgent) &&
       !/Chrome|CriOS|Edg|OPR|SamsungBrowser|FxiOS/i.test(userAgent);
-    return (isIOS && isSafari) || (isAndroid && isChrome);
-  } catch {
+    const supported = (isIOS && isSafari) || (isAndroid && isChrome);
+    if (!supported) {
+      console.warn("Venmo browser not supported");
+    }
+    return supported;
+  } catch (error) {
+    console.warn("Venmo availability check threw", error);
     return false;
   }
 };

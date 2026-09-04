@@ -105,7 +105,18 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    return AVAILABILITY_CHECKS[this.paymentMethodType]?.() ?? true;
+    const check = AVAILABILITY_CHECKS[this.paymentMethodType];
+    if (!check) {
+      return true;
+    }
+    // This is the gate Checkout consults before ever mounting the component — if it returns
+    // false here, Checkout silently skips listing the method with no further trace anywhere
+    // else in this codebase, so log the exclusion.
+    const supported = check();
+    if (!supported) {
+      console.warn(`${this.paymentMethodType} not available`);
+    }
+    return supported;
   }
 
   unmount(): void {

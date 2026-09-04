@@ -63,8 +63,11 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
             setIsEligible(true);
             setPayConfig(applepayConfig);
             setPay(applepay);
+          } else {
+            console.warn("[ApplePay: not eligible");
           }
         } catch (error) {
+          console.warn("ApplePay: failed to fetch configuration", error);
           setError("Error while fetching Apple Pay configuration.");
           return;
         }
@@ -75,6 +78,7 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
   const onApplePayButtonClicked = () => {
     const applePaySession: ApplePaySession = window.ApplePaySession;
     if (!applePaySession || !payConfig || !paymentInfo || !pay) {
+      console.warn("ApplePay: cannot start session — not ready");
       setError("Apple Pay session, config, pay or payment info not available");
       return;
     }

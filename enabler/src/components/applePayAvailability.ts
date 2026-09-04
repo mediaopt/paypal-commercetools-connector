@@ -8,8 +8,14 @@ declare const window: any;
 
 export const isApplePaySupported = (): boolean => {
   try {
-    return !!window.ApplePaySession && window.ApplePaySession.canMakePayments();
-  } catch {
+    const supported =
+      !!window.ApplePaySession && window.ApplePaySession.canMakePayments();
+    if (!supported) {
+      console.warn("ApplePay: browser/device not supported");
+    }
+    return supported;
+  } catch (error) {
+    console.warn("ApplePay: availability check threw", error);
     return false;
   }
 };
