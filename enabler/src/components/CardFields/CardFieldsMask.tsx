@@ -295,7 +295,11 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
         className={hostedFieldClasses.hostedFieldsInputFieldClasses}
       />
 
-      {enableVaulting && !vaultOnly && (
+      {/* Checkout mode (onRegisterSubmit supplied) already has its own native "save payment
+      method" checkbox, driving the storePaymentDetails flag combined into shouldStoreInVault()
+      below — showing this one too would duplicate it. Self-hosted mode has no such native UI, so
+      this stays the only way to offer vaulting there. */}
+      {enableVaulting && !vaultOnly && !onRegisterSubmit && (
         <label className="p-1.5">
           <input
             type="checkbox"
