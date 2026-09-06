@@ -83,7 +83,10 @@ describe("RenderTemplate", () => {
       />
     );
 
-    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(baseOptions);
+    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(
+      baseOptions,
+      "CardFields"
+    );
     expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("cardfields-probe");

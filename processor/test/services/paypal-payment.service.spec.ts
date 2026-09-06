@@ -6,7 +6,11 @@ import {
   afterEach,
   jest,
 } from "@jest/globals";
-import { Cart, Payment } from "@commercetools/connect-payments-sdk";
+import {
+  Cart,
+  Payment,
+  ErrorInvalidOperation,
+} from "@commercetools/connect-payments-sdk";
 
 // createPayPalOrder is exported as a non-configurable ES module binding; jest.spyOn cannot
 // replace it. Use jest.mock with a factory so Jest swaps the module before imports run —
@@ -126,11 +130,9 @@ describe("paypal-payment.service", () => {
         withId: jest.fn().mockReturnValue({ post: mockClientPost }),
       }),
       customers: jest.fn().mockReturnValue({
-        withId: jest
-          .fn()
-          .mockReturnValue({
-            get: jest.fn().mockReturnValue({ execute: mockCustomerGetExecute }),
-          }),
+        withId: jest.fn().mockReturnValue({
+          get: jest.fn().mockReturnValue({ execute: mockCustomerGetExecute }),
+        }),
       }),
     };
   });
@@ -736,7 +738,11 @@ describe("paypal-payment.service", () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
         transactions: [
-          { type: "Charge", state: "Initial", amount: mockPayment.amountPlanned },
+          {
+            type: "Charge",
+            state: "Initial",
+            amount: mockPayment.amountPlanned,
+          },
         ],
       } as unknown as Payment);
 
@@ -1102,7 +1108,9 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      expect(result.settings).toEqual(CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES);
+      expect(result.settings).toEqual(
+        CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES
+      );
     });
 
     test("resolves userIdToken when vaulting is enabled and the CT customer has a linked PayPal customer id", async () => {
@@ -1219,7 +1227,8 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       // Flat per-componentType overlay (StandardPaymentMethodType's members) plus the dedicated
-      // PayPalExpress slot — see config.utils.ts's buildSdkOptions().
+      // PayPalExpress slot — see config.utils.ts's buildSdkOptions(). Includes the active
+      // local-payment-method (APM) subset (Credit, Ideal, Bancontact, Eps, MyBank, P24, Blik)
       expect(result.sdkOptions).toEqual({
         CardFields: { currency: "USD", buyerCountry: "US" },
         PayPal: { currency: "USD", buyerCountry: "US" },
@@ -1228,8 +1237,18 @@ describe("paypal-payment.service", () => {
         PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
         AllButtons: { currency: "USD", buyerCountry: "US" },
         Venmo: { currency: "USD", buyerCountry: "US" },
+        Credit: { currency: "USD", buyerCountry: "US" },
+        Ideal: { currency: "USD", buyerCountry: "US" },
+        Bancontact: { currency: "USD", buyerCountry: "US" },
+        Eps: { currency: "USD", buyerCountry: "US" },
+        MyBank: { currency: "USD", buyerCountry: "US" },
+        P24: { currency: "USD", buyerCountry: "US" },
+        Blik: { currency: "USD", buyerCountry: "US" },
         ApplePay: { currency: "USD", buyerCountry: "US" },
-        PayPalExpress: { currency: "USD", buyerCountry: "US" },
+        // PayPalExpress is a different page/script than the standard components — it gets the
+        // cart's currency but never buyerCountry (sandbox-only, standard-only — see
+        // config.utils.ts's buildSdkOptions()).
+        PayPalExpress: { currency: "USD" },
       });
     });
 
@@ -1265,11 +1284,17 @@ describe("paypal-payment.service", () => {
         PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
         AllButtons: { currency: "USD", buyerCountry: "US" },
         Venmo: { currency: "USD", buyerCountry: "US" },
+        Credit: { currency: "USD", buyerCountry: "US" },
+        Ideal: { currency: "USD", buyerCountry: "US" },
+        Bancontact: { currency: "USD", buyerCountry: "US" },
+        Eps: { currency: "USD", buyerCountry: "US" },
+        MyBank: { currency: "USD", buyerCountry: "US" },
+        P24: { currency: "USD", buyerCountry: "US" },
+        Blik: { currency: "USD", buyerCountry: "US" },
         ApplePay: { currency: "USD", buyerCountry: "US" },
         PayPalExpress: {
           enableFunding: "venmo",
           currency: "USD",
-          buyerCountry: "US",
         },
       });
     });
@@ -1283,6 +1308,47 @@ describe("paypal-payment.service", () => {
 
       expect(result.storedPaymentMethodsConfig).toEqual({ isEnabled: false });
       expect(result.sdkOptions).toEqual({});
+    });
+
+    test("throws ErrorInvalidOperation when standardScriptOptions.enableFunding and disableFunding both list the same funding source", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        standardScriptOptions: {
+          ...ConfigModule.getConfig().standardScriptOptions,
+          enableFunding: ["paylater", "venmo"],
+          disableFunding: ["paylater"],
+        },
+      });
+
+      await expect(paypalPaymentService.config()).rejects.toThrow(
+        ErrorInvalidOperation
+      );
+      await expect(paypalPaymentService.config()).rejects.toThrow(/paylater/);
+    });
+
+    test("resolves normally when enableFunding is unset, even if disableFunding lists the same source elsewhere used as a default", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        standardScriptOptions: {
+          ...ConfigModule.getConfig().standardScriptOptions,
+          disableFunding: ["paylater"],
+        },
+      });
+
+      await expect(paypalPaymentService.config()).resolves.toBeDefined();
+    });
+
+    test("resolves normally when enableFunding and disableFunding are both set without overlapping", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        standardScriptOptions: {
+          ...ConfigModule.getConfig().standardScriptOptions,
+          enableFunding: ["venmo"],
+          disableFunding: ["paylater"],
+        },
+      });
+
+      await expect(paypalPaymentService.config()).resolves.toBeDefined();
     });
   });
 
