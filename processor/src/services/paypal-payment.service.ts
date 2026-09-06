@@ -166,6 +166,64 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolveUserIdToken(cartSummary?.customerId)
       : undefined;
 
+    // Per-component overrides (style/fundingSources/components), sourced from PAYPAL_BUTTON_CONFIG
+    // — already componentType-keyed (plus the dedicated PayPalExpress slot), passed through as-is;
+    // the enabler merges these over its own defaults and the general settings above (see
+    // PayPalBuilder.ts's 4-layer resolution).
+    const mergedSettings = {
+      ...settings,
+      ...getConfig().buttonConfig,
+    };
+
+    // Shared script options for every *standard* and stored component (PayPal Express is configured independently).
+    // `components` is narrowed here by settings.acceptCredit — the only accept* flag with a real
+    // components-level effect (card-fields); acceptPayPal/acceptPayLater/acceptVenmo/acceptLocal
+    // are funding-source/method-availability concerns handled elsewhere (Checkout's own predicate,
+    // getSupportedPaymentComponents()), not reasons to drop a script component every button-based
+    // method still needs. No settings flag exists for "applepay", so its inclusion is controlled by
+    // this env var alone.
+    const standardScriptOptions = {
+      ...getConfig().standardScriptOptions,
+      components: getConfig().standardScriptOptions.components.filter(
+        (component) =>
+          component !== "card-fields" || settings.acceptCredit !== false
+      ),
+    };
+
+    // PAYPAL_STANDARD_SCRIPT_OPTIONS.enableFunding is optional — an unset/empty value means "no
+    // connector-invented restriction beyond disableFunding," not "nothing is allowed." Only when
+    // the merchant explicitly sets it do we need to guard against a self-contradictory script
+    // (the same source force-enabled and force-disabled at once) — fail fast here rather than
+    // silently sending PayPal a contradictory request. TODO: consider moving this to
+    // connectors/post-deploy.ts as a one-time env-var validation instead of per-request.
+    const conflictingFundingSources = (
+      standardScriptOptions.enableFunding ?? []
+    ).filter((source) =>
+      standardScriptOptions.disableFunding?.includes(source)
+    );
+    if (conflictingFundingSources.length > 0) {
+      throw new ErrorInvalidOperation(
+        `PAYPAL_STANDARD_SCRIPT_OPTIONS: enableFunding and disableFunding both list ${conflictingFundingSources.join(
+          ", "
+        )} — remove the contradiction from one of them.`
+      );
+    }
+
+    // Not a hard requirement (Apple Pay works fine with the generic default), but a merchant who
+    // never customized this will show real shoppers a literal "My Store" in Apple's native payment
+    // sheet — worth a loud, dev-facing signal to catch during setup. Checked here (once configs
+    // from the processor and getSettings are merged, and only when Apple Pay is actually enabled)
+    // rather than in the enabler, so this stays the one place to update if Apple Pay ever becomes
+    // configurable via the mc app instead of PAYPAL_BUTTON_CONFIG.
+    if (
+      standardScriptOptions.components.includes("applepay") &&
+      !mergedSettings.ApplePay?.applePayDisplayName
+    ) {
+      log.warn(
+        'ApplePay is using the default applePayDisplayName ("My Store") — set PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName to your store\'s real name.'
+      );
+    }
+
     return {
       clientId: getConfig().paypalClientId ?? "",
       returnUrl: getConfig().returnUrl,
@@ -175,16 +233,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
       },
       enableVaulting: getConfig().enableVaulting,
       redirectOnApprove: getConfig().redirectOnApprove,
-      // Per-component overrides (style/fundingSources/components), sourced from
-      // PAYPAL_BUTTON_CONFIG — already componentType-keyed (plus the dedicated PayPalExpress
-      // slot), passed through as-is; the enabler merges these over its own defaults and the
-      // general settings above (see PayPalBuilder.ts's 4-layer resolution).
-      settings: {
-        ...settings,
-        ...getConfig().buttonConfig,
-      },
+      settings: mergedSettings,
       userIdToken,
       sdkOptions: buildSdkOptions(cartSummary),
+      standardScriptOptions,
     };
   }
 

@@ -15,6 +15,7 @@ import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { isVenmoSupported } from "./venmoAvailability";
 import { isApplePaySupported } from "./applePayAvailability";
 import { sessionHeader } from "../helpers/sessionHeader";
+import { FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE } from "./constants";
 
 // Browser/device-capability preconditions, checked before mounting so commercetools Checkout can
 // skip listing an unavailable method entirely.
@@ -23,6 +24,15 @@ const AVAILABILITY_CHECKS: Partial<
 > = {
   Venmo: isVenmoSupported,
   ApplePay: isApplePaySupported,
+};
+
+// SDK "components" (not funding sources) each of these payment methods needs present in the
+// shared standardScriptOptions.components list to function at all.
+const REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE: Partial<
+  Record<PayPalPaymentMethodType, string>
+> = {
+  CardFields: "card-fields",
+  ApplePay: "applepay",
 };
 
 // Form-like components that use onRegisterSubmit instead of an internal pay button — Checkout
@@ -105,18 +115,43 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    const check = AVAILABILITY_CHECKS[this.paymentMethodType];
-    if (!check) {
-      return true;
-    }
-    // This is the gate Checkout consults before ever mounting the component — if it returns
-    // false here, Checkout silently skips listing the method with no further trace anywhere
-    // else in this codebase, so log the exclusion.
-    const supported = check();
-    if (!supported) {
+    // Browser/device-capability precondition (Venmo/ApplePay) — checked first, unrelated to the
+    // merchant's shared script config.
+    const browserCheck = AVAILABILITY_CHECKS[this.paymentMethodType];
+    if (browserCheck && !browserCheck()) {
       console.warn(`${this.paymentMethodType} not available`);
+      return false;
     }
-    return supported;
+
+    // Every individual funding-source button must reflect the merchant's one shared
+    // standardScriptOptions.disableFunding — reuses FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE
+    // directly (same nested lookup resolveOptions.ts already uses) rather than a second map, so
+    // there's one source of truth for "this type's fixed funding source."
+    const fixedFundingSource =
+      FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType]?.[
+        this.paymentMethodType
+      ]?.fundingSource;
+    if (
+      fixedFundingSource &&
+      this.baseOptions.standardScriptOptions?.disableFunding?.includes(fixedFundingSource)
+    ) {
+      console.warn(`${this.paymentMethodType} not available`);
+      return false;
+    }
+
+    // CardFields/ApplePay are separate SDK components, not funding sources — gated by the shared
+    // standardScriptOptions.components list instead.
+    const requiredComponent =
+      REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType];
+    if (
+      requiredComponent &&
+      !this.baseOptions.standardScriptOptions?.components?.includes(requiredComponent)
+    ) {
+      console.warn(`${this.paymentMethodType} not available`);
+      return false;
+    }
+
+    return true;
   }
 
   unmount(): void {

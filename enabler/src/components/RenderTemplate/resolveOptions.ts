@@ -5,6 +5,7 @@ import {
   CardFieldsResolvedOptions,
   PayPalBrandButtonType,
   PayPalBrandResolvedOptions,
+  PayPalPaymentMethodType,
 } from "../../types";
 import {
   buildScriptOptions,
@@ -44,7 +45,10 @@ export function resolvePayPalBrandOptions(
     : ENABLER_DEFAULT_CONFIG[paymentMethodType];
   const fixedOverrides =
     FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
-  const resolvedFixedConfig = fixedOverrides?.[paymentMethodType];
+  // PayPal Express keeps its existing overridable fundingSource (settings.PayPalExpress.fundingSource)
+  const resolvedFixedConfig = isExpress
+    ? undefined
+    : fixedOverrides?.[paymentMethodType];
   const generalStyle =
     baseOptions.settings.paypalButtonConfig && baseOptions.settings.buttonShape
       ? {
@@ -66,17 +70,10 @@ export function resolvePayPalBrandOptions(
     resolvedFixedConfig?.fundingSource ??
     resolvedOverride?.fundingSource ??
     resolvedDefaults?.fundingSource;
-  // Same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components (componentSdkOptions,
-  // spread after scriptOptions.components inside buildScriptOptions) — PAYPAL_SDK_OPTIONS still
-  // wins if it also sets `components`.
-  const resolvedComponents =
-    resolvedOverride?.components ?? resolvedDefaults?.components;
-
   const options = buildScriptOptions(
-    paymentMethodType,
     baseOptions,
     componentSdkOptions,
-    resolvedComponents
+    isExpress
   );
 
   const initialSettings = {
@@ -113,23 +110,22 @@ export function resolvePayPalBrandOptions(
 }
 
 export function resolveCardFieldsOptions(
-  baseOptions: BaseOptions
+  baseOptions: BaseOptions,
+  paymentMethodType: Extract<
+    PayPalPaymentMethodType,
+    "CardFields" | "CardFieldsStored"
+  >
 ): CardFieldsResolvedOptions {
-  // CardFields has no button style/fundingSource of its own (ENABLER_DEFAULT_CONFIG.CardFields
-  // has neither, and nothing in CardFields.tsx's render tree ever reads
-  // initialSettings.paypalButtonConfig/buttonShape or a fundingSource prop) — only `components`
-  // goes through the same processor-override chain as the PayPal-brand types.
-  const resolvedComponents =
-    baseOptions.settings.CardFields?.components ??
-    ENABLER_DEFAULT_CONFIG.CardFields?.components;
+  // CardFields/CardFieldsStored have no button style/fundingSource of their own (nothing in
+  // CardFields.tsx's render tree ever reads initialSettings.paypalButtonConfig/buttonShape or a
+  // fundingSource prop). `components` for CardFields comes from baseOptions.standardScriptOptions
+  // (see constants.ts's buildScriptOptions()) same as every other standard component;
   const fixedOverrides =
-    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
+    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
 
   const options = buildScriptOptions(
-    "CardFields",
     baseOptions,
-    baseOptions.sdkOptions?.CardFields,
-    resolvedComponents
+    baseOptions.sdkOptions?.[paymentMethodType]
   );
 
   return {
@@ -142,19 +138,15 @@ export function resolveCardFieldsOptions(
 export function resolveApplePayOptions(
   baseOptions: BaseOptions
 ): ApplePayResolvedOptions {
-  // ApplePay has no button style/fundingSource concept, but `components` and applePayDisplayName
-  // both go through the same processor-override chain as CardFields' `components`
-  const resolvedComponents =
-    baseOptions.settings.ApplePay?.components ??
-    ENABLER_DEFAULT_CONFIG.ApplePay.components;
-
+  // ApplePay has no button style/fundingSource concept. `components` comes from
+  // baseOptions.standardScriptOptions (see constants.ts's buildScriptOptions()) same as every
+  // other standard component; only applePayDisplayName goes through its own settings chain.
   const options = buildScriptOptions(
-    "ApplePay",
     baseOptions,
-    baseOptions.sdkOptions?.ApplePay,
-    resolvedComponents
+    baseOptions.sdkOptions?.ApplePay
   );
 
+  // Missing-config warning for this lives in the processor's config()
   const applePayDisplayName =
     baseOptions.settings.ApplePay?.applePayDisplayName ??
     ENABLER_DEFAULT_CONFIG.ApplePay.applePayDisplayName ??

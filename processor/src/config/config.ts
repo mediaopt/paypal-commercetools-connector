@@ -22,6 +22,22 @@ const configuredSdkOptions = process.env.PAYPAL_SDK_OPTIONS
   ? JSON.parse(process.env.PAYPAL_SDK_OPTIONS)
   : {};
 
+// Shared script options for every *standard* component (see PAYPAL_STANDARD_SCRIPT_OPTIONS
+// comment in .env.template) — layered over this connector's own built-in default the same way
+// PAYPAL_SETTINGS layers over CUSTOM_OBJECT_DEFAULT_VALUES below, so an unset/{} env value keeps
+// the default rather than wiping it out. `components` is narrowed further per request in
+// PayPalPaymentService.config() by settings.acceptCredit.
+const configuredStandardScriptOptions: {
+  components: string[];
+  disableFunding?: string[];
+  enableFunding?: string[];
+} = {
+  components: ["buttons", "card-fields", "applepay"],
+  ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
+    ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
+    : {}),
+};
+
 // PayPal button config overrides (style/funding sources), keyed by componentType, plus a
 // dedicated PayPalExpress slot (see configuredSdkOptions above) — passed through as-is; the
 // enabler owns merging this over its own built-in defaults and the general settings below (see
@@ -95,7 +111,8 @@ export const config = {
   // modules resolve to the same custom types when both are installed on the same project.
   paymentTypeKey: process.env.PAYMENT_TYPE_KEY || PAYPAL_PAYMENT_TYPE_KEY,
   interactionTypeKey:
-    process.env.PAYMENT_INTERACTION_TYPE_KEY || PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+    process.env.PAYMENT_INTERACTION_TYPE_KEY ||
+    PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
 
   // Per-component overrides, keyed by componentType (plus the dedicated PayPalExpress slot) — see
   // PAYPAL_BUTTON_CONFIG in processor/.env.template
@@ -108,11 +125,16 @@ export const config = {
   // fallback — format: JSON object matching (a subset of) common-connect's PayPalSettings shape.
   settingsFallback: {
     ...CUSTOM_OBJECT_DEFAULT_VALUES,
-    ...(process.env.PAYPAL_SETTINGS ? JSON.parse(process.env.PAYPAL_SETTINGS) : {}),
+    ...(process.env.PAYPAL_SETTINGS
+      ? JSON.parse(process.env.PAYPAL_SETTINGS)
+      : {}),
   } as Partial<PayPalSettings>,
 
   // See the configuredSdkOptions comment above — passed through as-is, no processor-side defaulting.
   sdkOptions: configuredSdkOptions,
+
+  // See the configuredStandardScriptOptions comment above.
+  standardScriptOptions: configuredStandardScriptOptions,
 };
 
 export const getConfig = () => {

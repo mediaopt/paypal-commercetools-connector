@@ -49,6 +49,16 @@ export function resolvePayPalComponent(
     case "PayPalCreditCard":
     case "AllButtons":
     case "Venmo":
+    case "Credit":
+    // Local payment methods (APMs) — active only, see PayPalPaymentMethodType's own comment
+    // (types/index.ts) for the not-supported-yet/obsolete groups, commented out of that union
+    // entirely so they can't reach this switch.
+    case "Ideal":
+    case "Bancontact":
+    case "Eps":
+    case "MyBank":
+    case "P24":
+    case "Blik":
       return {
         Component: PayPal,
         options: resolvePayPalBrandOptions(
@@ -60,13 +70,12 @@ export function resolvePayPalComponent(
     case "CardFields":
       return {
         Component: CardFields,
-        options: resolveCardFieldsOptions(baseOptions),
+        options: resolveCardFieldsOptions(baseOptions, "CardFields"),
       };
     case "CardFieldsStored":
-      // No own script/style
       return {
         Component: CardFieldsStored,
-        options: resolveCardFieldsOptions(baseOptions),
+        options: resolveCardFieldsOptions(baseOptions, "CardFieldsStored"),
       };
     case "ApplePay":
       return {

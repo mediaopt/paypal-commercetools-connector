@@ -16,6 +16,15 @@ export const StandardPaymentMethodType = {
   // Venmo has no commercetools icon-key equivalent — see paymentMethodIcon.utils.ts. PayPal's
   // Venmo funding source is USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
   VENMO: "Venmo",
+  CREDIT: "Credit",
+
+  // Local payment methods (APMs) — active only.
+  IDEAL: "Ideal",
+  BANCONTACT: "Bancontact",
+  EPS: "Eps",
+  MYBANK: "MyBank",
+  P24: "P24",
+  BLIK: "Blik",
 
   APPLE_PAY: "ApplePay",
   // TODO: implement GooglePay support once this connector is fully Checkout-compatible.

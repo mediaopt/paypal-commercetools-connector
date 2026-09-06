@@ -18,8 +18,12 @@ export const isStoredPaymentMethodsEnabled = (cartSummary?: {
 };
 
 /**
- * Overlays cart-derived currency/buyerCountry onto every component's PayPal SDK script
- * options — cart data wins when available, PAYPAL_SDK_OPTIONS/defaults stay as the fallback.
+ * Overlays cart-derived currency onto every component's PayPal SDK script options (standard and
+ * PayPalExpress alike) — cart data wins when available, PAYPAL_SDK_OPTIONS/defaults stay as the
+ * fallback. buyerCountry is additionally overlaid, but only onto the standard components, and only
+ * in sandbox — PayPal's own docs say not to pass it in production at all ("used only in the
+ * sandbox"), and Express is a separate page/script with no reason to share this. Not merchant-
+ * configurable: applied last, after `configured[componentType]`, same as currency always was.
  */
 export const buildSdkOptions = (cartSummary?: {
   country?: string;
@@ -30,14 +34,18 @@ export const buildSdkOptions = (cartSummary?: {
     return configured;
   }
 
-  const cartOptions: Record<string, unknown> = {};
-  if (cartSummary.currency) {
-    cartOptions.currency = cartSummary.currency;
-  }
-  if (cartSummary.country) {
-    cartOptions.buyerCountry = cartSummary.country;
-  }
-  if (!Object.keys(cartOptions).length) {
+  const currencyOption: Record<string, unknown> = cartSummary.currency
+    ? { currency: cartSummary.currency }
+    : {};
+  const isSandbox = getConfig().paypalEnvironment.toLowerCase() === "sandbox";
+  const standardOptions: Record<string, unknown> = {
+    ...currencyOption,
+    ...(isSandbox && cartSummary.country
+      ? { buyerCountry: cartSummary.country }
+      : {}),
+  };
+
+  if (!Object.keys(currencyOption).length && !Object.keys(standardOptions).length) {
     return configured;
   }
 
@@ -46,13 +54,13 @@ export const buildSdkOptions = (cartSummary?: {
   const overlaid = Object.fromEntries(
     Object.values(StandardPaymentMethodType).map((componentType) => [
       componentType,
-      { ...configured[componentType], ...cartOptions },
+      { ...configured[componentType], ...standardOptions },
     ])
   );
 
   return {
     ...configured,
     ...overlaid,
-    PayPalExpress: { ...configured.PayPalExpress, ...cartOptions },
+    PayPalExpress: { ...configured.PayPalExpress, ...currencyOption },
   };
 };

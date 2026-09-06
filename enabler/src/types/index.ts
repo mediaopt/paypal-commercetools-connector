@@ -46,7 +46,31 @@ export type PayPalPaymentMethodType =
   | "Sepa"
   | "PayLater"
   | "PayPalCreditCard"
-  | "AllButtons";
+  | "AllButtons"
+  | "Credit"
+  // Local payment methods (APMs) — active.Supported by previous iteration of his connector and not deprecated per PayPal's own payment-methods documentation.
+  | "Ideal"
+  | "Bancontact"
+  | "Eps"
+  | "MyBank"
+  | "P24"
+  | "Blik";
+// Local payment methods (APMs) — not supported yet: were not offered and configured for previous connector edition
+// can be included upon merchant request after minimal test phase due to shared local mechanism
+// | "Verkkopankki"
+// | "PayU"
+// | "Trustly"
+// | "Zimpler"
+// | "Maxima"
+// | "Oxxo"
+// | "BoletoBancario"
+// | "WeChatPay"
+// | "MercadoPago"
+// | "Multibanco"
+// | "Itau"
+// Local payment methods (APMs) — obsolete, discontinued by PayPal
+// | "Giropay"
+// | "Sofort"
 // Not "PaymentTokens" — stored/vaulted payment methods have their own separate interface
 // (StoredComponentBuilder / createStoredPaymentMethodBuilder), not this one.
 
@@ -630,7 +654,20 @@ export type ApplePayResolvedOptions = BaseResolvedMethodOptions & {
 /** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
 export type PayPalBrandButtonType = Extract<
   PayPalPaymentMethodType,
-  "PayPal" | "Sepa" | "PayLater" | "PayPalCreditCard" | "AllButtons" | "Venmo"
+  | "PayPal"
+  | "Sepa"
+  | "PayLater"
+  | "PayPalCreditCard"
+  | "AllButtons"
+  | "Venmo"
+  | "Credit"
+  // Local payment methods (APMs)
+  | "Ideal"
+  | "Bancontact"
+  | "Eps"
+  | "MyBank"
+  | "P24"
+  | "Blik"
 >;
 
 // Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings

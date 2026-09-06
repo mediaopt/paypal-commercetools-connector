@@ -30,6 +30,14 @@ export type BaseOptions = {
   settings: GetSettingsResponse;
   /** PayPal SDK identity token from `/operations/config`, when a vaulted PayPal customer exists. */
   userIdToken?: string;
+  /** Shared PayPal JS SDK script options for every *standard* component (PayPal, Sepa, PayLater,
+   * PayPalCreditCard, AllButtons, Venmo, CardFields, ApplePay) — computed server-side, in
+   * PayPalPaymentService.config(), from PAYPAL_STANDARD_SCRIPT_OPTIONS narrowed by
+   * settings.acceptCredit. Used by every non-express resolver's buildScriptOptions()  and stored payment methods call so every
+   * concurrently-mounted standard component's PayPalScriptProvider requests the identical SDK
+   * script, avoiding a window.paypal race across separately-mounted components. PayPal Express
+   * (a different page) don't use this. */
+  standardScriptOptions: { components?: string[]; disableFunding?: string[] };
   /** PayPal Express only, from `/operations/config`'s `redirectOnApprove` (processor's
    * PAYPAL_REDIRECT_ON_APPROVE) — when true, `handleOnApprove` calls `expressApprove` and
    * redirects instead of authorizing/capturing immediately. */

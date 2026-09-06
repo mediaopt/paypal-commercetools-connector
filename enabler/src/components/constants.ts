@@ -49,15 +49,25 @@ export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
   Record<PayPalPaymentMethodType, Partial<GetSettingsResponse>>
 > = {
   // PayUponInvoice: { payPalIntent: "Capture" },
-  // Sepa/PayLater/PayPalCreditCard/Venmo are funding-source-only payment methods built on the
-  // standard PayPal smart button — their funding source is a method identity, not a merchant
-  // preference, so it's fixed here rather than left to PAYPAL_BUTTON_CONFIG. AllButtons
-  // deliberately has no entry: it stays undefined by default (renders every eligible funding
-  // source) and remains overridable via the normal ENABLER_DEFAULT_CONFIG/settings chain below.
+  // Every individual funding-source button (including PayPal itself, repurposed from the old
+  // unscoped default) is built on the standard PayPal smart button — their funding source is a
+  // method identity, not a merchant preference, so it's fixed here rather than left to
+  // PAYPAL_BUTTON_CONFIG. AllButtons deliberately has no entry: it stays undefined by default
+  // (renders every eligible funding source) and remains overridable via the normal
+  // ENABLER_DEFAULT_CONFIG/settings chain below.
+  PayPal: { PayPal: { fundingSource: "paypal" } },
   Sepa: { Sepa: { fundingSource: "sepa" } },
   PayLater: { PayLater: { fundingSource: "paylater" } },
   PayPalCreditCard: { PayPalCreditCard: { fundingSource: "card" } },
   Venmo: { Venmo: { fundingSource: "venmo" } },
+  Credit: { Credit: { fundingSource: "credit" } },
+  // Local payment methods (APMs) — active only; see (enabler/src/types/index.ts) for the not-supported-yet/obsolete groups
+  Ideal: { Ideal: { fundingSource: "ideal" } },
+  Bancontact: { Bancontact: { fundingSource: "bancontact" } },
+  Eps: { Eps: { fundingSource: "eps" } },
+  MyBank: { MyBank: { fundingSource: "mybank" } },
+  P24: { P24: { fundingSource: "p24" } },
+  Blik: { Blik: { fundingSource: "blik" } },
 };
 
 // The one true special case — only PayPal's own component with builderType: "express" needs
@@ -84,103 +94,71 @@ export const ENABLER_DEFAULT_CONFIG: Record<
   PayPalPaymentMethodType,
   PayPalMethodConfig
 > = {
-  // No fundingSource default — a single FUNDING_SOURCE value renders exactly one standalone
-  // button (see @paypal/paypal-js's PayPalButtonFundingSource); omitting it lets <PayPalButtons/>
-  // auto-render every currently-eligible funding source instead (PayPal + Pay Later via
-  // enableFunding: "paylater" below; SEPA excluded via disableFunding below
-  //TODO - clarify if Sepa should be included by default
+  // fundingSource for every individual funding-source button comes from
+  // FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE, not from here — this table only supplies the
+  // default button style. AllButtons is the one exception: no fundingSource anywhere (renders
+  // every eligible funding source the shared standardScriptOptions currently allows).
   PayPal: {
     style: { buttonColor: "blue", buttonLabel: "paypal", buttonShape: "rect" },
-    components: "buttons,card-fields",
   },
-  CardFields: {
-    components: "buttons,card-fields",
-  },
+  CardFields: {},
   Sepa: {
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
-    components: "buttons",
   },
   PayLater: {
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
-    components: "buttons",
   },
   PayPalCreditCard: {
     style: { buttonColor: "black", buttonLabel: "pay", buttonShape: "rect" },
-    components: "buttons",
   },
   // No fundingSource here — see FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE's comment on
   // AllButtons.
-  AllButtons: {
-    components: "buttons",
-  },
-  // No style/fundingSource. `components` overridable per merchant via
-  // PAYPAL_BUTTON_CONFIG.ApplePay.components, same chain as every other method's `components`.
+  AllButtons: {},
+  // No style/fundingSource. applePayDisplayName overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName.
   ApplePay: {
-    components: "applepay,buttons",
     applePayDisplayName: "My Store",
   },
   //no config needed, added for consistency
   CardFieldsStored: {},
   Venmo: {},
-  //not implemented yet, added for consistency
+  Credit: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  Ideal: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  Bancontact: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  Eps: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  MyBank: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  P24: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  Blik: {
+    style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
   GooglePay: {},
   PayUponInvoice: {},
 };
 
 // RenderTemplate/resolveOptions.ts's scriptOptions — plain defaults applied to every payment method.
 export const DEFAULT_SCRIPT_CURRENCY = "EUR";
-export const DEFAULT_SCRIPT_ENABLE_FUNDING: ReactPayPalScriptOptions["enableFunding"] =
-  "paylater";
 
-// Per-payment-method PayPal JS SDK script-option defaults (category 2 — overridable by
-// PAYPAL_SDK_OPTIONS/componentSdkOptions, same as ENABLER_DEFAULT_CONFIG above). Only the
-// standard multi-source PayPal button needs an entry: every other payment method already renders
-// exactly one funding source (its fixed fundingSource from
-// FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE above), so <PayPalButtons/> naturally excludes
-// every other source — including sepa — without any disableFunding here. AllButtons deliberately
-// has no entry either: "all" must include sepa.
-export const DEFAULT_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE: Partial<
-  Record<PayPalPaymentMethodType, Partial<ReactPayPalScriptOptions>>
-> = {
-  PayPal: {
-    // TODO: placeholder default, not a final decision — see the "SEPA" entry in TODO.md. Without
-    // an explicit fundingSource, <PayPalButtons/> auto-renders every eligible funding source,
-    // which for some merchant accounts includes SEPA; excluded here so the default PayPal button
-    // doesn't unexpectedly grow a SEPA button until it's decided whether SEPA should be offered
-    // as its own separate named button instead. Override via PAYPAL_SDK_OPTIONS if needed sooner.
-    disableFunding: "sepa",
-  },
-};
-
-// Per-payment-method PayPal JS SDK script-option overrides (category 1 — hardcoded,
-// non-overridable, same as FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE above — applied after
-// componentSdkOptions so they always win).
-export const FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE: Partial<
-  Record<PayPalPaymentMethodType, Partial<ReactPayPalScriptOptions>>
-> = {
-  // Venmo funding is US-buyer-only, and the PayPal JS SDK needs buyer-country=US to render/allow
-  // it at all (this parameter only affects sandbox testing — PayPal ignores it in production),
-  // regardless of merchant PAYPAL_SDK_OPTIONS or the actual cart's country.
-  Venmo: { buyerCountry: "US" },
-};
-
-// Shared by RenderTemplate/resolveOptions.ts's PayPal-brand and CardFields resolvers — merges the
-// plain defaults, the three lookup tables above, and the processor-configured componentSdkOptions
-// slice for this specific payment method (see BaseOptions.sdkOptions and PAYPAL_SDK_OPTIONS in
-// processor/.env.template) into the PayPal JS SDK script options.
 export function buildScriptOptions(
-  paymentMethodType: PayPalPaymentMethodType,
   baseOptions: BaseOptions,
   componentSdkOptions: Record<string, unknown> | undefined,
-  resolvedComponents: string | undefined
+  isExpress = false
 ): ReactPayPalScriptOptions {
   return {
     clientId: baseOptions.clientId || "",
     currency: DEFAULT_SCRIPT_CURRENCY,
-    components: resolvedComponents,
-    enableFunding: DEFAULT_SCRIPT_ENABLE_FUNDING,
-    ...DEFAULT_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE[paymentMethodType],
+    ...(!isExpress && baseOptions.standardScriptOptions),
     ...componentSdkOptions,
-    ...FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE[paymentMethodType],
   };
 }
