@@ -36,6 +36,7 @@ import { PayPalCustomerService } from "../../src/services/paypal-customer.servic
 import { PayPalPaymentServiceOptions } from "../../src/services/types/paypal-payment.type";
 import * as FastifyContext from "../../src/libs/fastify/context/context";
 import * as ConfigModule from "../../src/config/config";
+import { log } from "../../src/libs/logger";
 
 describe("paypal-payment.service", () => {
   const opts: PayPalPaymentServiceOptions = {
@@ -142,7 +143,7 @@ describe("paypal-payment.service", () => {
     jest.restoreAllMocks();
   });
 
-  test("creates a PayPal order and syncs interfaceId/status onto the CT payment", async () => {
+  test("creates a PayPal order and syncs PayPalOrderId/status onto the CT payment, without touching interfaceId", async () => {
     const result = await paypalPaymentService.createOrder({
       paymentId: mockPayment.id,
       orderData: { paymentSource: "paypal" },
@@ -162,7 +163,11 @@ describe("paypal-payment.service", () => {
       body: {
         version: mockPayment.version,
         actions: expect.arrayContaining([
-          { action: "setInterfaceId", interfaceId: mockPayPalOrder.id },
+          {
+            action: "setCustomField",
+            name: "PayPalOrderId",
+            value: mockPayPalOrder.id,
+          },
           {
             action: "setStatusInterfaceCode",
             interfaceCode: mockPayPalOrder.status,
@@ -174,6 +179,12 @@ describe("paypal-payment.service", () => {
         ]),
       },
     });
+    const [{ body }] = mockClientPost.mock.calls[0] as [
+      { body: { actions: { action: string }[] } }
+    ];
+    expect(
+      body.actions.some((action) => action.action === "setInterfaceId")
+    ).toBe(false);
 
     expect(result).toEqual({
       orderData: {
@@ -381,43 +392,23 @@ describe("paypal-payment.service", () => {
     expect(mockClientPost).not.toHaveBeenCalled();
   });
 
-  test("updates interfaceId to a newly created order that differs from what was already set — e.g. the buyer reopened the popup and a fresh PayPal order was created for the same payment", async () => {
+  test("throws immediately, before ever calling PayPal, when the payment already has an interfaceId — an earlier order already completed a real authorize/capture, so a new one could never be finalized against this payment either", async () => {
     jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
       ...mockPayment,
       interfaceId: "stale-earlier-order-id",
     } as Payment);
 
-    await paypalPaymentService.createOrder({
-      paymentId: mockPayment.id,
-      orderData: { paymentSource: "paypal" },
-    });
+    await expect(
+      paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "paypal" },
+      })
+    ).rejects.toThrow(
+      `Payment ${mockPayment.id} is already linked to PayPal order stale-earlier-order-id — refusing to create a new order for it`
+    );
 
-    const [{ body }] = mockClientPost.mock.calls[0] as [
-      { body: { actions: { action: string; interfaceId?: string }[] } }
-    ];
-    expect(body.actions).toContainEqual({
-      action: "setInterfaceId",
-      interfaceId: mockPayPalOrder.id,
-    });
-  });
-
-  test("does not re-set interfaceId when it already matches the created order", async () => {
-    jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
-      ...mockPayment,
-      interfaceId: mockPayPalOrder.id,
-    } as Payment);
-
-    await paypalPaymentService.createOrder({
-      paymentId: mockPayment.id,
-      orderData: { paymentSource: "paypal" },
-    });
-
-    const [{ body }] = mockClientPost.mock.calls[0] as [
-      { body: { actions: { action: string }[] } }
-    ];
-    expect(
-      body.actions.some((action) => action.action === "setInterfaceId")
-    ).toBe(false);
+    expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    expect(mockClientPost).not.toHaveBeenCalled();
   });
 
   describe("authorizeOrder", () => {
@@ -568,6 +559,62 @@ describe("paypal-payment.service", () => {
 
       expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
     }, 10000);
+
+    test("links interfaceId to the authorized order when it was previously unset", async () => {
+      await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+
+      expect(mockClientPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            actions: expect.arrayContaining([
+              { action: "setInterfaceId", interfaceId: mockAuthorizedOrder.id },
+            ]),
+          }),
+        })
+      );
+    });
+
+    test("regression: authorizes successfully against the second, actually-approved order after an earlier popup was closed without approving — no interfaceId was ever set for the first (abandoned) order, so there's nothing stale to reject", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        // interfaceId stays unset — the first, closed-without-approving order never reached
+        // authorize/capture, so (per this fix) it never got linked at all.
+        custom: { fields: { PayPalOrderId: mockAuthorizedOrder.id } },
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.authorizeOrder({
+          paymentId: mockPayment.id,
+          orderID: mockAuthorizedOrder.id,
+        })
+      ).resolves.toBeDefined();
+
+      expect(CommonConnect.authorizePayPalOrder).toHaveBeenCalledWith(
+        mockAuthorizedOrder.id,
+        {}
+      );
+    });
+
+    test("throws (double-link guard) when interfaceId is already set to a different order than the one being authorized — a prior order already completed a real authorize/capture for this payment, even when PayPalOrderId matches the new one", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        interfaceId: "already-linked-order-id",
+        custom: { fields: { PayPalOrderId: mockAuthorizedOrder.id } },
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.authorizeOrder({
+          paymentId: mockPayment.id,
+          orderID: mockAuthorizedOrder.id,
+        })
+      ).rejects.toThrow(
+        `Payment ${mockPayment.id} is already linked to a different PayPal order (already-linked-order-id)`
+      );
+      expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
+    });
   });
 
   describe("captureOrder", () => {
@@ -687,7 +734,7 @@ describe("paypal-payment.service", () => {
   });
 
   describe("expressApprove", () => {
-    test("adds an Initial Authorization placeholder transaction (no interactionId) via a raw CT call, for Authorize intent", async () => {
+    test("adds an Initial Authorization placeholder transaction (no interactionId) and links interfaceId (unset), via one raw CT call, for Authorize intent", async () => {
       await paypalPaymentService.expressApprove({
         paymentId: mockPayment.id,
         orderID: mockPayPalOrder.id,
@@ -709,6 +756,10 @@ describe("paypal-payment.service", () => {
                 },
               },
             },
+            {
+              action: "setInterfaceId",
+              interfaceId: mockPayPalOrder.id,
+            },
           ],
         },
       });
@@ -724,19 +775,46 @@ describe("paypal-payment.service", () => {
       expect(mockClientPost).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.objectContaining({
-            actions: [
+            actions: expect.arrayContaining([
               expect.objectContaining({
                 transaction: expect.objectContaining({ type: "Charge" }),
               }),
-            ],
+            ]),
           }),
         })
       );
     });
 
-    test("does not add a second placeholder when a matching Initial/no-interactionId transaction already exists", async () => {
+    test("does not add a second placeholder when a matching Initial/no-interactionId transaction already exists, but still links interfaceId if unset", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
+        transactions: [
+          {
+            type: "Charge",
+            state: "Initial",
+            amount: mockPayment.amountPlanned,
+          },
+        ],
+      } as unknown as Payment);
+
+      await paypalPaymentService.expressApprove({
+        paymentId: mockPayment.id,
+        orderID: mockPayPalOrder.id,
+        payPalIntent: "Capture",
+      });
+
+      expect(mockClientPost).toHaveBeenCalledWith({
+        body: {
+          version: mockPayment.version,
+          actions: [{ action: "setInterfaceId", interfaceId: mockPayPalOrder.id }],
+        },
+      });
+    });
+
+    test("does not attempt to set interfaceId when it's already set", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        interfaceId: mockPayPalOrder.id,
         transactions: [
           {
             type: "Charge",
@@ -755,10 +833,27 @@ describe("paypal-payment.service", () => {
       expect(mockClientPost).not.toHaveBeenCalled();
     });
 
-    test("throws when the caller-supplied orderID does not belong to the payment", async () => {
+    test("throws when the caller-supplied orderID does not match the payment's PayPalOrderId", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        custom: { fields: { PayPalOrderId: "some-other-order-id" } },
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.expressApprove({
+          paymentId: mockPayment.id,
+          orderID: mockPayPalOrder.id,
+          payPalIntent: "Capture",
+        })
+      ).rejects.toThrow();
+      expect(mockClientPost).not.toHaveBeenCalled();
+    });
+
+    test("throws when interfaceId is already set to a different order, even though PayPalOrderId matches (double-link guard)", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
         interfaceId: "some-other-order-id",
+        custom: { fields: { PayPalOrderId: mockPayPalOrder.id } },
       } as unknown as Payment);
 
       await expect(
@@ -1030,11 +1125,11 @@ describe("paypal-payment.service", () => {
       expect(mockClientPost).not.toHaveBeenCalled();
     });
 
-    test("throws when orderID does not match the payment's interfaceId", async () => {
+    test("throws when orderID does not match the payment's PayPalOrderId", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
-        interfaceId: "some-other-order-id",
-      } as Payment);
+        custom: { fields: { PayPalOrderId: "some-other-order-id" } },
+      } as unknown as Payment);
 
       await expect(
         paypalPaymentService.authenticateThreeDSOrder({
@@ -1042,13 +1137,13 @@ describe("paypal-payment.service", () => {
           orderID: mockPayPalOrder.id,
         })
       ).rejects.toThrow(
-        `Order ${mockPayPalOrder.id} does not belong to payment ${mockPayment.id}`
+        `Order ${mockPayPalOrder.id} is stale for payment ${mockPayment.id} — a newer PayPal order (some-other-order-id) has since been created for it`
       );
 
       expect(CommonConnect.getPayPalOrder).not.toHaveBeenCalled();
     });
 
-    test("does not throw when interfaceId is not set yet", async () => {
+    test("does not throw when PayPalOrderId is not set yet", async () => {
       await expect(
         paypalPaymentService.authenticateThreeDSOrder({
           paymentId: mockPayment.id,
