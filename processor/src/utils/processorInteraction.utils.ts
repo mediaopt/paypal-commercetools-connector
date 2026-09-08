@@ -1,14 +1,13 @@
 import { CustomFieldsDraft } from "@commercetools/platform-sdk";
+import {
+  apiCallNameToFieldData,
+  PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES,
+} from "common-connect";
 import { getConfig } from "../config/config";
 
-// Only the PayPal API calls processor itself makes on the buyer's behalf — matches the current
-// logging scope (createOrder/authorizeOrder/captureOrder). Also consumed by connectors/post-deploy.ts
-// to provision the matching "${apiCallName}ProcessorRequest" field definitions.
-export const PROCESSOR_API_CALL_NAMES = [
-  "createPayPalOrder",
-  "authorizePayPalOrder",
-  "capturePayPalOrder",
-] as const;
+// Every PayPal API call processor's own audit logging covers — same full list common-connect
+// already provisions custom fields for (see connectors/post-deploy.ts).
+export const PROCESSOR_API_CALL_NAMES = PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES;
 export type ProcessorApiCallName = (typeof PROCESSOR_API_CALL_NAMES)[number];
 
 // Requests use a name distinct from paypal-commercetools-extension's own "${apiCallName}Request"
@@ -47,8 +46,8 @@ export const buildProcessorLogging = (
   pspInteractions: CustomFieldsDraft[];
   customFieldValues: Record<string, string>;
 } => {
-  const requestFieldName = `${apiCallName}ProcessorRequest`;
-  const responseFieldName = `${apiCallName}Response`;
+  const [{ name: requestFieldName }, { name: responseFieldName }] =
+    apiCallNameToFieldData(apiCallName, true);
   const serializedRequest = JSON.stringify(request);
   const serializedResponse = JSON.stringify(response);
   return {

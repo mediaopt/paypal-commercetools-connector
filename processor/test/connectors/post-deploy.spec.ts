@@ -1,0 +1,104 @@
+import { describe, test, expect, beforeEach, jest } from "@jest/globals";
+
+import { getConfig } from "../../src/config/config";
+
+const paymentTypeKey = getConfig().paymentTypeKey;
+const customerTypeKey = getConfig().customerTypeKey;
+const interactionTypeKey = getConfig().interactionTypeKey;
+
+const PAYMENT_TYPE_FULL_FIELD_NAMES = [
+  "PayPalOrderId",
+  "createPayPalOrderProcessorRequest",
+  "createPayPalOrderResponse",
+  "authorizePayPalOrderProcessorRequest",
+  "authorizePayPalOrderResponse",
+  "capturePayPalOrderProcessorRequest",
+  "capturePayPalOrderResponse",
+  "capturePayPalAuthorizationProcessorRequest",
+  "capturePayPalAuthorizationResponse",
+  "getPayPalOrderProcessorRequest",
+  "getPayPalOrderResponse",
+  "updatePayPalOrderProcessorRequest",
+  "updatePayPalOrderResponse",
+];
+
+const CUSTOMER_TYPE_FULL_FIELD_NAMES = [
+  "PayPalUserId",
+  "getPaymentTokensProcessorRequest",
+  "getPaymentTokensResponse",
+  "deletePaymentTokenProcessorRequest",
+  "deletePaymentTokenResponse",
+  "getUserIDTokenProcessorRequest",
+  "getUserIDTokenResponse",
+];
+
+const INTERACTION_TYPE_FULL_FIELD_NAMES = ["type", "data", "timestamp"];
+
+// post-deploy.ts now delegates the actual create-if-missing/add-missing-fields orchestration to
+// paymentSDK.ctCustomTypeService.createOrUpdate() (built into @commercetools/connect-payments-sdk)
+// — so this only needs to assert post-deploy builds and passes the right TypeDraft per type, not
+// simulate the underlying CT HTTP calls itself (that's the SDK's own, separately-tested concern).
+describe("connectors/post-deploy", () => {
+  const runPostDeploy = async () => {
+    jest.resetModules();
+    const { paymentSDK } = require("../../src/payment-sdk");
+    const createOrUpdate = jest
+      .spyOn(paymentSDK.ctCustomTypeService, "createOrUpdate")
+      .mockResolvedValue({} as never);
+    require("../../src/connectors/post-deploy");
+    // The module's own runPostDeployScripts() is async but not awaited by require() itself —
+    // flush microtasks so its internal awaits have a chance to settle before assertions run.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    return createOrUpdate;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("provisions paypal-payment-type with processor's own 6 endpoints plus PayPalOrderId", async () => {
+    const createOrUpdate = await runPostDeploy();
+
+    expect(createOrUpdate).toHaveBeenCalledWith({
+      key: paymentTypeKey,
+      name: { en: "Custom payment type to PayPal fields" },
+      resourceTypeIds: ["payment"],
+      fieldDefinitions: PAYMENT_TYPE_FULL_FIELD_NAMES.map((name) =>
+        expect.objectContaining({ name })
+      ),
+    });
+  });
+
+  test("provisions paypal-customer-type with processor's own 3 endpoints plus PayPalUserId", async () => {
+    const createOrUpdate = await runPostDeploy();
+
+    expect(createOrUpdate).toHaveBeenCalledWith({
+      key: customerTypeKey,
+      name: { en: "Custom customer type for PayPal fields" },
+      resourceTypeIds: ["customer"],
+      fieldDefinitions: CUSTOMER_TYPE_FULL_FIELD_NAMES.map((name) =>
+        expect.objectContaining({ name })
+      ),
+    });
+  });
+
+  test("provisions paypal-payment-interaction-type with its 3 fixed fields", async () => {
+    const createOrUpdate = await runPostDeploy();
+
+    expect(createOrUpdate).toHaveBeenCalledWith({
+      key: interactionTypeKey,
+      name: { en: "Custom payment interaction type to PayPal fields" },
+      resourceTypeIds: ["payment-interface-interaction"],
+      fieldDefinitions: INTERACTION_TYPE_FULL_FIELD_NAMES.map((name) =>
+        expect.objectContaining({ name })
+      ),
+    });
+  });
+
+  test("provisions all 3 types independently, in parallel", async () => {
+    const createOrUpdate = await runPostDeploy();
+
+    expect(createOrUpdate).toHaveBeenCalledTimes(3);
+  });
+});
