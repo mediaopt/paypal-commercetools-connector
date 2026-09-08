@@ -231,7 +231,10 @@ export type RequestHeader = { [key: string]: string };
 
 /** Category 1 — basic data every payment component needs. */
 export type BasicComponentProps = {
-  options: ReactPayPalScriptOptions;
+  // Optional since stored payment components never load the PayPal JS SDK script at all (charging a saved
+  // method is a plain processor HTTP call — see useSettings.tsx's skipsPayPalScript) and so has no
+  // script options to receive; every other component still always supplies a real value.
+  options?: ReactPayPalScriptOptions;
   requestHeader: RequestHeader;
   enableVaulting?: boolean;
 };
@@ -265,6 +268,11 @@ export type CheckoutOnlyProps = {
   /** PayPal Express only, from the processor's `/operations/config` `redirectOnApprove` (its
    * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
   redirectOnApprove?: boolean;
+  /** Set only by PayPalStoredBuilder-produced mounts (see PayPalStoredBuilder.ts/RenderTemplate.tsx)
+   * — true for any component the stored builder builds, since none of them ever render via the
+   * PayPal JS SDK client-side. Consumed by useSettings.tsx's SettingsProvider to skip
+   * <PayPalScriptProvider> entirely. */
+  skipsPayPalScript?: boolean;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
@@ -640,10 +648,18 @@ export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
   fundingSource?: FUNDING_SOURCE;
 };
 
-/** Resolved options for <CardFields/> and <CardFieldsStored/>  — no style/fundingSource concept at all,
- * unlikePayPalBrandResolvedOptions
- */
+/** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
+ * PayPalBrandResolvedOptions. */
 export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
+
+/** Resolved options for <CardFieldsStored/> — no `options` (PayPal JS SDK script options) at all,
+ * unlike every other resolved-options type: charging an already-vaulted card is a plain processor
+ * HTTP call (see usePayment.tsx's handleCreateOrder), so there's no script to configure — see
+ * useSettings.tsx's skipsPayPalScript, which skips <PayPalScriptProvider> for this type entirely. */
+export type CardFieldsStoredResolvedOptions = Pick<
+  BaseResolvedMethodOptions,
+  "initialSettings" | "enableVaulting"
+>;
 
 /** Resolved options for <ApplePay/> — no style/fundingSource concept either, plus the one field
  * unique to it: the merchant store name shown in the native Apple Pay sheet. */
@@ -775,6 +791,7 @@ export type SettingsProviderProps = Pick<
   | "processorUrl"
   | "initialSettings"
   | "initialUserIdToken"
+  | "skipsPayPalScript"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };

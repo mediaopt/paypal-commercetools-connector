@@ -3,9 +3,9 @@ import {
   ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
+  CardFieldsStoredResolvedOptions,
   PayPalBrandButtonType,
   PayPalBrandResolvedOptions,
-  PayPalPaymentMethodType,
 } from "../../types";
 import {
   buildScriptOptions,
@@ -110,26 +110,37 @@ export function resolvePayPalBrandOptions(
 }
 
 export function resolveCardFieldsOptions(
-  baseOptions: BaseOptions,
-  paymentMethodType: Extract<
-    PayPalPaymentMethodType,
-    "CardFields" | "CardFieldsStored"
-  >
+  baseOptions: BaseOptions
 ): CardFieldsResolvedOptions {
-  // CardFields/CardFieldsStored have no button style/fundingSource of their own (nothing in
-  // CardFields.tsx's render tree ever reads initialSettings.paypalButtonConfig/buttonShape or a
-  // fundingSource prop). `components` for CardFields comes from baseOptions.standardScriptOptions
-  // (see constants.ts's buildScriptOptions()) same as every other standard component;
+  // CardFields has no button style/fundingSource of its own (nothing in CardFields.tsx's render
+  // tree ever reads initialSettings.paypalButtonConfig/buttonShape or a fundingSource prop).
+  // `components` comes from baseOptions.standardScriptOptions (see constants.ts's
+  // buildScriptOptions()) same as every other standard component.
   const fixedOverrides =
-    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
+    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
 
   const options = buildScriptOptions(
     baseOptions,
-    baseOptions.sdkOptions?.[paymentMethodType]
+    baseOptions.sdkOptions?.CardFields
   );
 
   return {
     options,
+    initialSettings: { ...baseOptions.settings, ...fixedOverrides },
+    enableVaulting: baseOptions.enableVaulting ?? false,
+  };
+}
+
+export function resolveCardFieldsStoredOptions(
+  baseOptions: BaseOptions
+): CardFieldsStoredResolvedOptions {
+  // Unlike every other resolver, no buildScriptOptions()/PAYPAL_SDK_OPTIONS lookup here at all —
+  // charging an already-vaulted card never touches the PayPal JS SDK client-side (see
+  // useSettings.tsx's skipsPayPalScript), so there's no script to configure.
+  const fixedOverrides =
+    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFieldsStored;
+
+  return {
     initialSettings: { ...baseOptions.settings, ...fixedOverrides },
     enableVaulting: baseOptions.enableVaulting ?? false,
   };

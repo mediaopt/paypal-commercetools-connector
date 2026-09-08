@@ -7,7 +7,6 @@ import { GeneralComponentsProps, FormComponentProps } from "../../types";
 
 export type CardFieldsStoredProps = Pick<
   GeneralComponentsProps,
-  | "options"
   | "requestHeader"
   | "paymentMethodType"
   | "builderType"
@@ -16,13 +15,13 @@ export type CardFieldsStoredProps = Pick<
   | "initialSettings"
   | "initialUserIdToken"
   | "enableVaulting"
+  | "skipsPayPalScript"
 > &
   Pick<FormComponentProps, "onRegisterSubmit"> & {
     ppVaultTokenId: string;
   };
 
 export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
-  options,
   requestHeader,
   paymentMethodType,
   builderType,
@@ -31,12 +30,12 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
   initialSettings,
   initialUserIdToken,
   enableVaulting,
+  skipsPayPalScript,
   onRegisterSubmit,
   ppVaultTokenId,
 }) => {
   return (
     <PayPalContextProvider
-      options={options}
       requestHeader={requestHeader}
       paymentMethodType={paymentMethodType}
       builderType={builderType}
@@ -45,6 +44,7 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
       enableVaulting={enableVaulting}
+      skipsPayPalScript={skipsPayPalScript}
     >
       <CardFieldsStoredButton
         onRegisterSubmit={onRegisterSubmit}

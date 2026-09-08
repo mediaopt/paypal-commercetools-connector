@@ -15,6 +15,7 @@ import {
   ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
+  CardFieldsStoredResolvedOptions,
   GenericMountProps,
   PayPalBrandResolvedOptions,
   PayPalPaymentMethodType,
@@ -23,6 +24,7 @@ import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
   resolveApplePayOptions,
   resolveCardFieldsOptions,
+  resolveCardFieldsStoredOptions,
   resolvePayPalBrandOptions,
 } from "./resolveOptions";
 import { processorUrls } from "../constants";
@@ -40,6 +42,7 @@ export function resolvePayPalComponent(
   options:
     | PayPalBrandResolvedOptions
     | CardFieldsResolvedOptions
+    | CardFieldsStoredResolvedOptions
     | ApplePayResolvedOptions;
 } {
   switch (paymentMethodType) {
@@ -70,12 +73,12 @@ export function resolvePayPalComponent(
     case "CardFields":
       return {
         Component: CardFields,
-        options: resolveCardFieldsOptions(baseOptions, "CardFields"),
+        options: resolveCardFieldsOptions(baseOptions),
       };
     case "CardFieldsStored":
       return {
         Component: CardFieldsStored,
-        options: resolveCardFieldsOptions(baseOptions, "CardFieldsStored"),
+        options: resolveCardFieldsStoredOptions(baseOptions),
       };
     case "ApplePay":
       return {
@@ -96,6 +99,11 @@ export function resolvePayPalComponent(
 export type RenderTemplateProps = {
   paymentMethodType: PayPalPaymentMethodType;
   builderType?: BuilderType;
+  // Set only by PayPalStoredBuilder-produced mounts (see PayPalStoredBuilder.ts) — true for any
+  // component the stored builder builds, since none of them ever render via the PayPal JS SDK
+  // client-side (commercetools Checkout owns rendering for stored methods). Consumed by
+  // useSettings.tsx to skip <PayPalScriptProvider>.
+  skipsPayPalScript?: boolean;
   baseOptions: BaseOptions;
   genericOptions: GenericMountProps;
 };
@@ -103,6 +111,7 @@ export type RenderTemplateProps = {
 export const RenderTemplate: FC<RenderTemplateProps> = ({
   paymentMethodType,
   builderType,
+  skipsPayPalScript,
   baseOptions,
   genericOptions,
 }) => {
@@ -118,6 +127,7 @@ export const RenderTemplate: FC<RenderTemplateProps> = ({
         ...options,
         paymentMethodType,
         builderType,
+        skipsPayPalScript,
         // baseOptions.processorUrl is the single source of truth — callers used to also pass a
         // separate processorUrl prop duplicating this same value.
         processorUrl: baseOptions.processorUrl,

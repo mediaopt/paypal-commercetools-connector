@@ -12,6 +12,12 @@ jest.mock("../CardFields", () => ({
   ),
 }));
 
+jest.mock("../CardFields/CardFieldsStored", () => ({
+  CardFieldsStored: (props: Record<string, unknown>) => (
+    <div data-testid="cardfieldsstored-probe" data-props={JSON.stringify(props)} />
+  ),
+}));
+
 // Decouples dispatch-correctness (this file) from resolution-correctness (resolveOptions.spec.ts).
 jest.mock("./resolveOptions", () => ({
   resolvePayPalBrandOptions: jest.fn(() => ({
@@ -24,11 +30,16 @@ jest.mock("./resolveOptions", () => ({
     initialSettings: {},
     enableVaulting: true,
   })),
+  resolveCardFieldsStoredOptions: jest.fn(() => ({
+    initialSettings: {},
+    enableVaulting: false,
+  })),
 }));
 
 import { RenderTemplate } from "./RenderTemplate";
 import {
   resolveCardFieldsOptions,
+  resolveCardFieldsStoredOptions,
   resolvePayPalBrandOptions,
 } from "./resolveOptions";
 
@@ -83,10 +94,7 @@ describe("RenderTemplate", () => {
       />
     );
 
-    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(
-      baseOptions,
-      "CardFields"
-    );
+    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(baseOptions);
     expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("cardfields-probe");
@@ -97,6 +105,29 @@ describe("RenderTemplate", () => {
       enableVaulting: true,
       paymentMethodType: "CardFields",
     });
+  });
+
+  it("dispatches CardFieldsStored to resolveCardFieldsStoredOptions and renders <CardFieldsStored/> with no options prop", () => {
+    render(
+      <RenderTemplate
+        paymentMethodType="CardFieldsStored"
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
+      />
+    );
+
+    expect(resolveCardFieldsStoredOptions).toHaveBeenCalledWith(baseOptions);
+    expect(resolveCardFieldsOptions).not.toHaveBeenCalled();
+    expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
+
+    const probe = screen.getByTestId("cardfieldsstored-probe");
+    const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
+
+    expect(props).toMatchObject({
+      enableVaulting: false,
+      paymentMethodType: "CardFieldsStored",
+    });
+    expect(props.options).toBeUndefined();
   });
 
   it("throws for an unsupported payment method type", () => {

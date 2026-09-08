@@ -40,6 +40,7 @@ export const PayPalContextProvider: FC<
   initialSettings,
   initialUserIdToken,
   redirectOnApprove,
+  skipsPayPalScript,
 
   children,
 }) => {
@@ -55,6 +56,7 @@ export const PayPalContextProvider: FC<
           processorUrl={processorUrl}
           initialSettings={initialSettings}
           initialUserIdToken={initialUserIdToken}
+          skipsPayPalScript={skipsPayPalScript}
         >
           <PaymentProvider
             options={options}

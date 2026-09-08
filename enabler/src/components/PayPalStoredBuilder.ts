@@ -37,6 +37,10 @@ class PayPalStoredComponent implements StoredComponent {
 
     this.root = mountRenderTemplate(selector, {
       paymentMethodType: "CardFieldsStored",
+      // Unconditional, not keyed by paymentMethodType/config — every component this builder
+      // produces never renders via the PayPal JS SDK, commercetools Checkout owns rendering for
+      // stored methods (see useSettings.tsx's skipsPayPalScript).
+      skipsPayPalScript: true,
       baseOptions: this.baseOptions,
       genericOptions: { ...genericOptions, ppVaultTokenId: this.config.id },
     });

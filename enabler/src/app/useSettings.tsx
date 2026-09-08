@@ -47,12 +47,17 @@ export const SettingsProvider: FC<
   processorUrl,
   initialSettings,
   initialUserIdToken,
+  skipsPayPalScript,
 }) => {
   // Seeds from the processor's /operations/config response when available (Checkout mode) — in
   // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
   // otherwise never populate these at all.
-  const [settings, setSettings] = useState<GetSettingsResponse | undefined>(initialSettings);
-  const [userIdToken, setUserIdToken] = useState<string | undefined>(initialUserIdToken);
+  const [settings, setSettings] = useState<GetSettingsResponse | undefined>(
+    initialSettings
+  );
+  const [userIdToken, setUserIdToken] = useState<string | undefined>(
+    initialUserIdToken
+  );
   const [paymentTokens, setPaymentTokens] = useState<PaymentTokens>();
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
@@ -65,7 +70,12 @@ export const SettingsProvider: FC<
         const { userIdToken, paymentTokens } = (await processorRequest<
           undefined,
           GetUserInfoResponse
-        >(requestHeader, getUserInfoUrl, undefined, "GET")) as GetUserInfoResponse;
+        >(
+          requestHeader,
+          getUserInfoUrl,
+          undefined,
+          "GET"
+        )) as GetUserInfoResponse;
 
         setPaymentTokens(paymentTokens);
         setUserIdToken(userIdToken);
@@ -75,10 +85,7 @@ export const SettingsProvider: FC<
         const getSettingsResult = (await processorRequest<
           undefined,
           GetSettingsResponse
-        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<
-          any,
-          any
-        >;
+        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<any, any>;
 
         if (
           !getSettingsResult ||
@@ -139,20 +146,29 @@ export const SettingsProvider: FC<
     }
   }, [settings]);
 
+  // skipsPayPalScript is set once, at the source, by PayPalStoredBuilder (see its own comment) for
+  // every component it builds — none of them need the PayPal JS SDK to render — rather than
+  // inferred here from paymentMethodType/builderType.
   return (
     <SettingsContext.Provider value={value}>
       {settings || !getSettingsUrl ? (
-        <PayPalScriptProvider
-          options={{
-            ...options,
-            intent: settings?.payPalIntent?.toString().toLowerCase(),
-            dataUserIdToken: userIdToken,
-            dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-            merchantId: settings?.merchantId,
-          }}
-        >
-          {children}
-        </PayPalScriptProvider>
+        skipsPayPalScript ? (
+          children
+        ) : (
+          <PayPalScriptProvider
+            options={{
+              // Non-null: every mount reaching this branch (i.e. every component not built by
+              // PayPalStoredBuilder, see skipsPayPalScript above) always supplies a real `options`.
+              ...options!,
+              intent: settings?.payPalIntent?.toString().toLowerCase(),
+              dataUserIdToken: userIdToken, //todo - verify if removing this for signed in customer still provides correct PayPal button work
+              dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
+              merchantId: settings?.merchantId,
+            }}
+          >
+            {children}
+          </PayPalScriptProvider>
+        )
       ) : (
         <></>
       )}
