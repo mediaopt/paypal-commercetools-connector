@@ -8,7 +8,7 @@ export const makeRequest = <ResponseType, T>(
 ) => {
   let headers: Headers = new Headers({
     ...requestHeader,
-    "Content-Type": "application/json",
+    ...(data ? { "Content-Type": "application/json" } : {}),
   });
 
   const requestData: RequestInit = {

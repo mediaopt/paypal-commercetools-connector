@@ -61,4 +61,31 @@ describe("makeRequest", () => {
     );
     logSpy.mockRestore();
   });
+
+  test("omits Content-Type when no data is sent, e.g. a bodyless DELETE — Fastify rejects application/json with an empty body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    await makeRequest(requestHeader, "https://processor.example.com/stored-payment-methods/token-id", "DELETE");
+
+    const [, requestInit] = mockFetch.mock.calls[0];
+    expect(requestInit.body).toBeUndefined();
+    expect((requestInit.headers as Headers).has("Content-Type")).toBe(false);
+  });
+
+  test("still sends Content-Type when data is sent", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    await makeRequest(requestHeader, "https://processor.example.com/payments", "POST", { foo: "bar" });
+
+    const [, requestInit] = mockFetch.mock.calls[0];
+    expect((requestInit.headers as Headers).get("Content-Type")).toBe("application/json");
+  });
 });
