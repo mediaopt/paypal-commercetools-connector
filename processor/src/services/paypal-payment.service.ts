@@ -85,6 +85,7 @@ import {
   errorMessage,
   errorResponseBody,
   isPayPalInvalidPatchOperationError,
+  payPalDebugIdSuffix,
   retryCTSync,
 } from "../utils/error.utils";
 import {
@@ -108,7 +109,9 @@ import {
 } from "../utils/config.utils";
 import {
   buildProcessorLogging,
+  buildProcessorCustomerLogging,
   ProcessorApiCallName,
+  ProcessorCustomerApiCallName,
 } from "../utils/processorInteraction.utils";
 import { PayPalCustomerService } from "./paypal-customer.service";
 
@@ -117,6 +120,14 @@ const buildSetShippingMethodAction = (
 ): CartUpdateAction => ({
   action: "setShippingMethod" as const,
   shippingMethod: { typeId: "shipping-method" as const, id: shippingMethodId },
+});
+
+// Failure-path response payload for logProcessorCustomerInteraction() — matches the shape
+// paypal-commercetools-extension's handleError() (response.utils.ts)
+const buildErrorResponsePayload = (e: unknown) => ({
+  success: false,
+  message: `${errorMessage(e)}${payPalDebugIdSuffix(e)}`,
+  details: errorResponseBody(e),
 });
 
 export class PayPalPaymentService extends AbstractPaymentService {
@@ -266,12 +277,25 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return undefined;
     }
     try {
-      return await generateUserIdToken(paypalCustomerId);
+      const userIdToken = await generateUserIdToken(paypalCustomerId);
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId as string,
+        "getUserIDToken",
+        { customerId: paypalCustomerId },
+        userIdToken
+      );
+      return userIdToken;
     } catch (e) {
       log.warn(
         `config: failed to generate PayPal userIdToken for customer ${paypalCustomerId} — ${errorMessage(
           e
-        )}`
+        )}${payPalDebugIdSuffix(e)}`
+      );
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId as string,
+        "getUserIDToken",
+        { customerId: paypalCustomerId },
+        buildErrorResponsePayload(e)
       );
       return undefined;
     }
@@ -510,7 +534,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `createOrder: PayPal order creation failed for payment ${
           payment.id
-        } — ${e instanceof Error ? e.message : JSON.stringify(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to create PayPal order for payment ${payment.id}`
@@ -587,6 +611,37 @@ export class PayPalPaymentService extends AbstractPaymentService {
         )}`
       );
     }
+  }
+
+  /**
+   * Customer-level sibling of logProcessorInteraction() — logs a processor-owned PayPal
+   * request/response pair (see utils/processorInteraction.utils.ts) onto the CT customer, both
+   * on success and on failure (unlike the payment-side version, which is success-only), since a
+   * failed customer-level call — e.g. getStoredPaymentMethods's getPaymentTokens — otherwise
+   * leaves no commercetools-visible trace at all. Reuses PayPalCustomerService's
+   * getCtCustomer/updateCtCustomer, which already catch and log their own failures — no extra
+   * try/catch needed here.
+   *
+   * Always called fire-and-forget (`void ...`), never awaited — unlike logProcessorInteraction.
+   * These 3 calls sit on hot, customer-facing paths (getStoredPaymentMethods, and
+   * resolveUserIdToken via config(), run on essentially every signed-in checkout page load), so
+   * this audit write must never add latency to the response the shopper is waiting on.
+   */
+  private async logProcessorCustomerInteraction(
+    ctCustomerId: string,
+    apiCallName: ProcessorCustomerApiCallName,
+    request: unknown,
+    response: unknown
+  ): Promise<void> {
+    const ctCustomer = await this.payPalCustomerService.getCtCustomer(
+      ctCustomerId
+    );
+    if (!ctCustomer) return;
+    await this.payPalCustomerService.updateCtCustomer(
+      ctCustomer.id,
+      ctCustomer.version,
+      buildProcessorCustomerLogging(apiCallName, request, response)
+    );
   }
 
   /**
@@ -710,7 +765,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `${config.operation}: PayPal call failed for payment ${
           payment.id
-        } — ${errorMessage(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to ${
@@ -994,7 +1049,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `authenticateThreeDSOrder: PayPal order lookup failed for payment ${
           payment.id
-        } — ${errorMessage(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to look up PayPal order ${orderID}`
@@ -1145,7 +1200,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     log.error(
       `updateShipping: PayPal order update failed${context} for payment ${paymentId} — ${errorMessage(
         e
-      )} — response body: ${JSON.stringify(errorResponseBody(e))}`
+      )}${payPalDebugIdSuffix(e)} — response body: ${JSON.stringify(
+        errorResponseBody(e)
+      )}`
     );
     throw new ErrorInvalidOperation(`Failed to update PayPal order ${orderID}`);
   }
@@ -1408,7 +1465,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         log.error(
           `settlement: PayPal capture failed for payment ${
             ctPayment.id
-          } — ${errorMessage(e)}`
+          } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
         );
         throw new ErrorInvalidOperation(
           `Failed to capture PayPal authorization ${authorizationId}`
@@ -1520,10 +1577,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return { storedPaymentMethods: [] };
     }
 
+    const ctCustomerId = ctCart.customerId;
+
     try {
-      const { payment_tokens: paymentTokens = [] } = await getPaymentTokens(
-        paypalCustomerId
+      const paymentTokensResponse = await getPaymentTokens(paypalCustomerId);
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId,
+        "getPaymentTokens",
+        { customerId: paypalCustomerId },
+        paymentTokensResponse
       );
+      const { payment_tokens: paymentTokens = [] } = paymentTokensResponse;
       // Restrict to card tokens before looking anything up in commercetools — only credit card tokens are supported in checkout now.
       const cardTokens = paymentTokens.filter(isCardPaymentToken);
       if (paymentTokens.length !== cardTokens.length)
@@ -1559,7 +1623,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.warn(
         `getStoredPaymentMethods: could not list PayPal payment tokens for customer ${paypalCustomerId} — ${errorMessage(
           e
-        )}`
+        )}${payPalDebugIdSuffix(e)}`
+      );
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId,
+        "getPaymentTokens",
+        { customerId: paypalCustomerId },
+        buildErrorResponsePayload(e)
       );
       return { storedPaymentMethods: [] };
     }
@@ -1567,35 +1637,53 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
   public async deleteStoredPaymentMethod(token: string): Promise<void> {
     const cartId = getCartIdFromContext();
-    let ctCart: Cart | undefined;
-    try {
-      // PayPal deletion is authoritative and runs immediately — commercetools is not consulted
-      // to authorize it, since the PayPal token is the sole identifier the enabler has for a
-      // stored method. The cart is only fetched alongside it, best-effort, for the mirror
-      // cleanup below.
-      [, ctCart] = await Promise.all([
-        deletePaymentToken(token),
-        this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
-      ]);
-      log.info(
-        `deleteStoredPaymentMethod: success, cartId: ${
-          ctCart?.id ?? cartId ?? "unavailable"
-        }`
-      );
-    } catch (e) {
+    // Promise.allSettled (not Promise.all) — unlike Promise.all, this keeps the cart (and thus
+    // customerId) available below even when the PayPal delete itself rejects, so the failure can
+    // still be logged onto the CT customer. The cart is only ever used best-effort here (mirror
+    // cleanup, and now audit logging), never to authorize the deletion itself.
+    const [deleteResult, cartResult] = await Promise.allSettled([
+      deletePaymentToken(token),
+      this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
+    ]);
+    const ctCart: Cart | undefined =
+      cartResult.status === "fulfilled" ? cartResult.value : undefined;
+
+    if (deleteResult.status === "rejected") {
+      const e = deleteResult.reason;
       log.error(
         `deleteStoredPaymentMethod: failed, cartId: ${
-          cartId ?? "unavailable"
-        } — ${errorMessage(e)}`
+          ctCart?.id ?? cartId ?? "unavailable"
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
+      if (ctCart?.customerId) {
+        void this.logProcessorCustomerInteraction(
+          ctCart.customerId,
+          "deletePaymentToken",
+          { paymentToken: token },
+          buildErrorResponsePayload(e)
+        );
+      }
       throw e;
     }
 
-    // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one exists.
-    // The PayPal deletion above already succeeded and is the authoritative action; this fire-and-
-    // forget cleanup just keeps commercetools from holding a stale reference.
+    log.info(
+      `deleteStoredPaymentMethod: success, cartId: ${
+        ctCart?.id ?? cartId ?? "unavailable"
+      }`
+    );
+
     if (ctCart?.customerId) {
       const customerId = ctCart.customerId;
+      void this.logProcessorCustomerInteraction(
+        customerId,
+        "deletePaymentToken",
+        { paymentToken: token },
+        deleteResult.value
+      );
+
+      // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one
+      // exists. The PayPal deletion above already succeeded and is the authoritative action;
+      // this fire-and-forget cleanup just keeps commercetools from holding a stale reference.
       void this.ctPaymentMethodService
         .getByTokenValue({
           customerId,

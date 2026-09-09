@@ -1,6 +1,7 @@
-import { CustomFieldsDraft } from "@commercetools/platform-sdk";
+import { CustomFieldsDraft, CustomerUpdateAction } from "@commercetools/platform-sdk";
 import {
   apiCallNameToFieldData,
+  PAYPAL_PROCESSOR_CUSTOMER_API_CALL_NAMES,
   PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES,
 } from "common-connect";
 import { getConfig } from "../config/config";
@@ -9,6 +10,14 @@ import { getConfig } from "../config/config";
 // already provisions custom fields for (see connectors/post-deploy.ts).
 export const PROCESSOR_API_CALL_NAMES = PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES;
 export type ProcessorApiCallName = (typeof PROCESSOR_API_CALL_NAMES)[number];
+
+// Customer-level counterpart — same field-provisioning source (post-deploy), but these calls
+// read/write a CT Customer, not a CT Payment, so they get their own logging shape below (no
+// pspInteractions — Customer has no interface-interaction concept, only custom fields).
+export const PROCESSOR_CUSTOMER_API_CALL_NAMES =
+  PAYPAL_PROCESSOR_CUSTOMER_API_CALL_NAMES;
+export type ProcessorCustomerApiCallName =
+  (typeof PROCESSOR_CUSTOMER_API_CALL_NAMES)[number];
 
 // Requests use a name distinct from paypal-commercetools-extension's own "${apiCallName}Request"
 // — the extension's CT Extension triggers on exactly that field being defined
@@ -32,11 +41,10 @@ const buildInteractionDraft = (
 
 /**
  * Builds the pspInteractions/customFieldValues to pass into ctPaymentService.updatePayment(),
- * logging both the request processor sent PayPal (as "${apiCallName}ProcessorRequest", processor-
- * only) and the successful response it got back (as "${apiCallName}Response", shared with the
- * extension). Success only - see paypal-payment.service.ts's callers). Requires the payment to already
- * carry the paymentTypeKey custom type (see createPayment()'s setCustomType) before
- * customFieldValues can be applied.
+ * logging a processor-owned customer-level PayPal request/response pair — success only.
+ * Uses "${apiCallName}ProcessorRequest" "${apiCallName}Response" naming convention to
+ * prevent triggering extension while keeping compatibility
+ * Requires the payment to have paymentTypeKey custom type
  */
 export const buildProcessorLogging = (
   apiCallName: ProcessorApiCallName,
@@ -60,4 +68,24 @@ export const buildProcessorLogging = (
       [responseFieldName]: serializedResponse,
     },
   };
+};
+
+/**
+ * Builds the setCustomField actions to pass into PayPalCustomerService.updateCtCustomer(),
+ * logging a processor-owned customer-level PayPal request/response pair — success and failure.
+ * Failure is non-blocking for payment process.
+ * Uses "${apiCallName}ProcessorRequest" "${apiCallName}Response" naming convention to
+ * prevent triggering extension while keeping compatibility
+ */
+export const buildProcessorCustomerLogging = (
+  apiCallName: ProcessorCustomerApiCallName,
+  request: unknown,
+  response: unknown
+): CustomerUpdateAction[] => {
+  const [{ name: requestFieldName }, { name: responseFieldName }] =
+    apiCallNameToFieldData(apiCallName, true);
+  return [
+    { action: "setCustomField", name: requestFieldName, value: JSON.stringify(request) },
+    { action: "setCustomField", name: responseFieldName, value: JSON.stringify(response) },
+  ];
 };

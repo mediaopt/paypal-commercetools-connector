@@ -105,6 +105,8 @@ describe("paypal-payment.service", () => {
   const mockClientPost = jest.fn();
   const mockClientExecute = jest.fn();
   const mockCustomerGetExecute = jest.fn();
+  const mockCustomerPost = jest.fn();
+  const mockCustomerPostExecute = jest.fn();
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -126,6 +128,8 @@ describe("paypal-payment.service", () => {
     mockClientExecute.mockResolvedValue({ body: mockPayment } as never);
     mockClientPost.mockReturnValue({ execute: mockClientExecute });
     mockCustomerGetExecute.mockResolvedValue({ body: mockCtCustomer } as never);
+    mockCustomerPostExecute.mockResolvedValue({ body: mockCtCustomer } as never);
+    mockCustomerPost.mockReturnValue({ execute: mockCustomerPostExecute });
     (paymentSDK.ctAPI as any).client = {
       payments: jest.fn().mockReturnValue({
         withId: jest.fn().mockReturnValue({ post: mockClientPost }),
@@ -133,6 +137,7 @@ describe("paypal-payment.service", () => {
       customers: jest.fn().mockReturnValue({
         withId: jest.fn().mockReturnValue({
           get: jest.fn().mockReturnValue({ execute: mockCustomerGetExecute }),
+          post: mockCustomerPost,
         }),
       }),
     };
@@ -1299,6 +1304,76 @@ describe("paypal-payment.service", () => {
       expect(result.userIdToken).toBeUndefined();
     });
 
+    test("logs the getUserIDToken request/response onto the CT customer on success", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        enableVaulting: true,
+      });
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      mockCustomerGetExecute.mockResolvedValue({
+        body: mockCtCustomer,
+      } as never);
+      (CommonConnect.generateUserIdToken as jest.Mock).mockResolvedValue(
+        "id-token" as never
+      );
+
+      await paypalPaymentService.config();
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "getUserIDTokenProcessorRequest",
+              value: JSON.stringify({ customerId: "paypal-customer-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "getUserIDTokenResponse",
+              value: JSON.stringify("id-token"),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the getUserIDToken failure onto the CT customer", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        enableVaulting: true,
+      });
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      mockCustomerGetExecute.mockResolvedValue({
+        body: mockCtCustomer,
+      } as never);
+      (CommonConnect.generateUserIdToken as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await paypalPaymentService.config();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getUserIDTokenResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
+    });
+
     test("falls back to configured sdkOptions when the cart has no currency or country", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
@@ -1578,6 +1653,90 @@ describe("paypal-payment.service", () => {
 
       expect(result).toEqual({ storedPaymentMethods: [] });
     });
+
+    test("logs the getPaymentTokens request/response onto the CT customer on success", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      const response = { payment_tokens: [mockPaymentToken] };
+      (CommonConnect.getPaymentTokens as jest.Mock).mockResolvedValue(
+        response as never
+      );
+      jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "find")
+        .mockResolvedValue({ results: [] } as never);
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "getPaymentTokensProcessorRequest",
+              value: JSON.stringify({ customerId: "paypal-customer-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "getPaymentTokensResponse",
+              value: JSON.stringify(response),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the getPaymentTokens failure onto the CT customer", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getPaymentTokensResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
+    });
+
+    test("includes PayPal's debug id in the logged failure message when present, for asking PayPal to look up their own logs", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      const paypalError = Object.assign(
+        new Error("Request failed with status code 403"),
+        { response: { headers: { "paypal-debug-id": "abc123" } } }
+      );
+      (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+        paypalError as never
+      );
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getPaymentTokensResponse"
+      );
+      expect(JSON.parse(responseAction!.value).message).toBe(
+        "Request failed with status code 403 (paypalDebugId: abc123)"
+      );
+    });
   });
 
   describe("deleteStoredPaymentMethod", () => {
@@ -1649,6 +1808,67 @@ describe("paypal-payment.service", () => {
       ).rejects.toThrow("PayPal is down");
 
       expect(getByTokenValueSpy).not.toHaveBeenCalled();
+    });
+
+    test("logs the deletePaymentToken request/response onto the CT customer on success", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
+        status: "success",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
+        .mockRejectedValue(new Error("not found") as never);
+
+      await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "deletePaymentTokenProcessorRequest",
+              value: JSON.stringify({ paymentToken: "paypal-token-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "deletePaymentTokenResponse",
+              value: JSON.stringify({ status: "success" }),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the deletePaymentToken failure onto the CT customer, using the cart still fetched in parallel", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      (CommonConnect.deletePaymentToken as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await expect(
+        paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+      ).rejects.toThrow("PayPal is down");
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "deletePaymentTokenResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
     });
   });
 

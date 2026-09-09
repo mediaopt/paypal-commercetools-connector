@@ -10,6 +10,20 @@ export const errorMessage = (err: unknown): string =>
 export const errorResponseBody = (err: unknown): unknown =>
   (err as { response?: { data?: unknown } })?.response?.data;
 
+// PayPal's own support/debug identifier for a failed API call
+// Mirrors paypal-commercetools-extension's identical extraction
+export const errorPayPalDebugId = (err: unknown): string | undefined =>
+  (err as { response?: { headers?: Record<string, string> } })?.response
+    ?.headers?.["paypal-debug-id"];
+
+// Ready-to-append suffix (with its own leading space) for a log/message string, e.g.
+// `${errorMessage(e)}${payPalDebugIdSuffix(e)}` — empty string when there's no debug id to add,
+// so it never leaves a dangling "()" behind.
+export const payPalDebugIdSuffix = (err: unknown): string => {
+  const debugId = errorPayPalDebugId(err);
+  return debugId ? ` (paypalDebugId: ${debugId})` : "";
+};
+
 // True when a PayPal order-PATCH call (`updatePayPalOrder`) was rejected specifically because
 // the chosen JSON-Patch op ("add" vs "replace") didn't match the order's actual current state —
 // PayPal's error code for exactly that mismatch. Used to trigger a retry with the corrected op
