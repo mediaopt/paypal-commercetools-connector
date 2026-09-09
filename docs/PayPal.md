@@ -70,6 +70,7 @@ For the methods that interact with PayPal API this documentation includes "Conne
      - [Card](#iv-example-request-card)
      - [Google Pay](#v-example-request-google-pay)
      - [Apple Pay](#vi-example-request-apple-pay)
+     - [Important Notice](#important-notice)
   2. [getClientToken](#2-getclienttoken)
   3. [CaptureOrder](#3-captureorder)
   4. [CaptureAuthorization](#4-captureauthorization)
@@ -555,6 +556,33 @@ URL: {{host}}/{{project-key}}/payments/{{payment-id}}
 | tokenType   | Bearer               |
 
 ***Status Code:*** 0
+
+<br>
+
+### Important Notice
+
+In some countries, the buyer must approve the order/final amount with a button or final confirmation
+action on the merchant's own website before the purchase is completed, rather than relying only on
+approval inside the PayPal popup/window. **Implementing this redirection to the merchant's website is the merchant's responsibility.** The connector does not
+implement this redirection; it only provides the methods to complete the
+order once the buyer has confirmed.
+
+What the connector provides is two ways to complete the order at that point: the
+[Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api)
+(via `capturePayment`), or direct PayPal API calls through this connector's own endpoints.
+
+- **Authorize now, capture later** — authorize the order ([AuthorizeOrder](#6-authorizeorder)), then
+  capture it separately once the merchant is ready ([CaptureAuthorization](#4-captureauthorization)).
+- **Capture directly** — capture the order immediately after approval ([CaptureOrder](#3-captureorder)).
+
+If an order was authorized but then cannot be fulfilled (e.g. the order is cancelled), the
+authorization should be released instead of captured, using [VoidAuthorization](#5-voidauthorization).
+
+For details on PayPal's own approval/redirect mechanism referenced above, see
+[Step 2: Buyer approval](https://developer.paypal.com/api/rest/integration/orders-api/api-use-cases/standard#step-2-buyer-approval)
+in PayPal's official documentation, which describes the `return_url` and `user_action` parameters
+that control whether the buyer is sent back to review the final amount (`CONTINUE`, the default) or
+not (`PAY_NOW`).
 
 <br>
 

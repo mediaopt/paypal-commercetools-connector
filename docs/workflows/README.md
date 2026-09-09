@@ -111,6 +111,16 @@ Pay Upon invoice is the simplest as the payment is not processed immediately.
 | 3    | Get payment by id, to update the payment version, as the correct version is needed for next step    | Get Payment By Id                                                                    |
 | 4    | Capture the order                                                                                   | CaptureOrder                                                                         |
 
+**Note:** Step 2 above (approving the order via the link returned by PayPal) is PayPal's own
+buyer-approval step. In some countries, the buyer must also approve the order/final amount with a
+button or final confirmation action on the merchant's own website — implementing that redirection,
+and the confirmation action itself, is the merchant's responsibility, not the connector's. The
+connector only provides the methods to complete the order afterwards: the
+[Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api), or
+direct PayPal API calls through this connector's own endpoints, either authorizing now and capturing
+later, or capturing directly. See [Important Notice](../PayPal.md#important-notice) for the full
+breakdown and links to the relevant connector endpoints.
+
 ### Card payment
 
 | Step | Description                                                                                         | [Postman Collection](PayPal-commercetools-workflow.postman_collection.json) workflow |
