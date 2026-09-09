@@ -47,6 +47,7 @@ import { toPaymentMethodIconKey } from "../utils/paymentMethodIcon.utils";
 import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import {
   getCartIdFromContext,
+  getCheckoutTransactionItemIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
@@ -371,6 +372,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const newPayment = await this.ctPaymentService.createPayment({
       amountPlanned,
       paymentMethodInfo: { paymentInterface: getConfig().paymentInterface },
+      checkoutTransactionItemId: getCheckoutTransactionItemIdFromContext(),
       ...(ctCart.customerId
         ? { customer: { typeId: "customer", id: ctCart.customerId } }
         : { anonymousId: ctCart.anonymousId }),
@@ -888,33 +890,20 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE
-   * (default off; see enabler/README.md). Called from handleOnApprove at approval time, *instead of*
-   * authorizeOrder()/captureOrder() — the real authorize/capture happens later, triggered by the
+   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE (default off).
+   * Called from handleOnApprove at approval time, *instead of*
+   * authorizeOrder()/captureOrder() — the real authorize/capture can happen later, triggered by the
    * merchant's own backend via the Payment Intents API → settlement() or extension app,
    * once the buyer has reviewed on that page.
    *
-   * Without any transaction on the CT Payment, commercetools Checkout never creates the CT Order
-   * (it does so as soon as it sees one — docs.commercetools.com/checkout/payments-lifecycle), and
-   * the Payment Intents API's documented precondition is "after a Payment has been authorized and
-   * Checkout has created an Order" — so skipping straight to redirect with no transaction at all
-   * would leave the later Payment Intents API call unreachable. This adds a placeholder
-   * transaction to trigger that Order creation now, before the buyer leaves.
-   *
+   * The buyer has already approved the order on PayPal's side at this point — this triggers an
+   * optimistic CT Order creation ahead of the real authorize/capture, using PayPalOrderId (the
+   * only PayPal-side identifier available yet) as the payment's interfaceId.
    * The placeholder is added via a **raw CT API call**, not ctPaymentService.updatePayment() —
    * that wrapped helper silently discards a bare Initial-state transaction with no interactionId
-   * (its own shouldDiscardTransaction guard).
-   * This flow defers the real authorize/capture to an indefinite,
-   * merchant-controlled later point, so a silently-dropped placeholder would leave the PayPal
-   * order existing while the commercetools Order never gets created — hanging with no loggable information for
-   * however long the merchant takes to finalize.
    *
-   * Once the real authorizeOrder()/captureOrder()/settlement() transaction is added later (through
-   * the normal, unchanged, wrapped updatePayment() call in applyPayPalOrderTransaction), the SDK's
-   * own transaction-matching logic finds this same Initial/no-interactionId transaction (by
-   * matching type + amount) and closes it out in place via changeTransactionState — no duplicate.
-   * That reuse only works if the placeholder's type already matches the eventual real
-   * transaction's type, which is why this needs to know the configured intent up front.
+   * TODO: verify on server that the order is created. Otherwice backward compatibility with extension
+   * should be dropped down and interactionId set as the only available - PayPalOrderId.
    */
   public async expressApprove({
     paymentId,
