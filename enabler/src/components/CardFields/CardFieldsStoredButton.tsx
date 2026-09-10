@@ -1,6 +1,5 @@
 import { FC } from "react";
 
-import { usePayment } from "../../app/usePayment";
 import { CardFieldsStoredMask } from "./CardFieldsStoredMask";
 import { FormComponentProps } from "../../types";
 
@@ -11,17 +10,13 @@ export type CardFieldsStoredButtonProps = Pick<
   ppVaultTokenId: string;
 };
 
+//gets payment info from builder, is not available in legacy mode
 export const CardFieldsStoredButton: FC<CardFieldsStoredButtonProps> = ({
   onRegisterSubmit,
   ppVaultTokenId,
-}) => {
-  const { paymentInfo } = usePayment();
-  return paymentInfo.id ? (
-    <CardFieldsStoredMask
-      onRegisterSubmit={onRegisterSubmit}
-      ppVaultTokenId={ppVaultTokenId}
-    />
-  ) : (
-    <></>
-  );
-};
+}) => (
+  <CardFieldsStoredMask
+    onRegisterSubmit={onRegisterSubmit}
+    ppVaultTokenId={ppVaultTokenId}
+  />
+);

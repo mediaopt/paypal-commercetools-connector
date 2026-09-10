@@ -136,7 +136,7 @@ export function resolveCardFieldsStoredOptions(
 ): CardFieldsStoredResolvedOptions {
   // Unlike every other resolver, no buildScriptOptions()/PAYPAL_SDK_OPTIONS lookup here at all —
   // charging an already-vaulted card never touches the PayPal JS SDK client-side (see
-  // useSettings.tsx's skipsPayPalScript), so there's no script to configure.
+  // useSettings.tsx's isStoredCheckoutComponent), so there's no script to configure.
   const fixedOverrides =
     FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFieldsStored;
 

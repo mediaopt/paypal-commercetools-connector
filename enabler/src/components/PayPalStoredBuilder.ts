@@ -37,10 +37,8 @@ class PayPalStoredComponent implements StoredComponent {
 
     this.root = mountRenderTemplate(selector, {
       paymentMethodType: "CardFieldsStored",
-      // Unconditional, not keyed by paymentMethodType/config — every component this builder
-      // produces never renders via the PayPal JS SDK, commercetools Checkout owns rendering for
-      // stored methods (see useSettings.tsx's skipsPayPalScript).
-      skipsPayPalScript: true,
+      // stored components are rendered via ct checkout interface, not PayPal-based
+      isStoredCheckoutComponent: true,
       baseOptions: this.baseOptions,
       genericOptions: { ...genericOptions, ppVaultTokenId: this.config.id },
     });
@@ -72,7 +70,11 @@ class PayPalStoredComponent implements StoredComponent {
     // Shares the standard-component script now (see FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE
     // in constants.ts) — so "merchant doesn't accept cards" (which already strips "card-fields"
     // out of the shared components list) also disables stored/vaulted cards, no separate config.
-    return this.baseOptions.standardScriptOptions?.components?.includes("card-fields") ?? true;
+    return (
+      this.baseOptions.standardScriptOptions?.components?.includes(
+        "card-fields"
+      ) ?? true
+    );
   }
 
   unmount(): void {

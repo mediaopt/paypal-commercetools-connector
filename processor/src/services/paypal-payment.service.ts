@@ -370,23 +370,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  public async createPayment({
-    builderType,
-    paymentMethodType,
-  }: PaymentRequestSchemaDTO): Promise<PaymentResponseSchemaDTO> {
+  // Request is empty - all data retrieved from cart in session
+  public async createPayment(
+    _request: PaymentRequestSchemaDTO
+  ): Promise<PaymentResponseSchemaDTO> {
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
     });
-
-    // PayPal collects the buyer's email inside its own popup and only returns it on approval,
-    // so a fresh Express cart won't have one yet — skip the requirement in that case.
-    const isExpress =
-      paymentMethodType === StandardPaymentMethodType.PAYPAL &&
-      builderType === CustomBuilderType.EXPRESS;
-
-    if (!isExpress && !ctCart.customerEmail) {
-      throw new ErrorInvalidOperation("Required data missing: customer email");
-    }
 
     const amountPlanned = await this.ctCartService.getPaymentAmount({
       cart: ctCart,
@@ -510,6 +500,22 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
     });
+
+    // Informational only — customerEmail is never actually sent to PayPal (createOrder/
+    // buildOrderRequest never reference it), so a missing one here isn't fatal. A real standard
+    // checkout flow already forces the buyer to fill this in before the enabler even loads;
+    // the one case this can still legitimately fire is a merchant embedding only the standard payment
+    // buttons in their own custom checkout UI without collecting it first. PayPal collects the
+    // buyer's email inside its own popup for Express, so that case is excluded here — by this
+    // point paymentMethodType/builderType are the request's own real values, not a guess.
+    const isExpress =
+      paymentMethodType === StandardPaymentMethodType.PAYPAL &&
+      builderType === CustomBuilderType.EXPRESS;
+    if (!isExpress && !ctCart.customerEmail) {
+      log.warn(
+        `createOrder: cart ${ctCart.id} has no customerEmail for a non-Express order (payment ${paymentId})`
+      );
+    }
 
     // So a returning customer's newly-vaulted payment source gets attached to their existing
     // PayPal customer id instead of a brand-new, disconnected one — see buildOrderRequest. Only

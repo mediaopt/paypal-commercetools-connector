@@ -47,7 +47,7 @@ export const SettingsProvider: FC<
   processorUrl,
   initialSettings,
   initialUserIdToken,
-  skipsPayPalScript,
+  isStoredCheckoutComponent,
 }) => {
   // Seeds from the processor's /operations/config response when available (Checkout mode) — in
   // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
@@ -146,19 +146,20 @@ export const SettingsProvider: FC<
     }
   }, [settings]);
 
-  // skipsPayPalScript is set once, at the source, by PayPalStoredBuilder (see its own comment) for
-  // every component it builds — none of them need the PayPal JS SDK to render — rather than
-  // inferred here from paymentMethodType/builderType.
+  // isStoredCheckoutComponent is set once, at the source, by PayPalStoredBuilder (see its own
+  // comment) for every component it builds — none of them need the PayPal JS SDK to render —
+  // rather than inferred here from paymentMethodType/builderType.
   return (
     <SettingsContext.Provider value={value}>
       {settings || !getSettingsUrl ? (
-        skipsPayPalScript ? (
+        isStoredCheckoutComponent ? (
           children
         ) : (
           <PayPalScriptProvider
             options={{
               // Non-null: every mount reaching this branch (i.e. every component not built by
-              // PayPalStoredBuilder, see skipsPayPalScript above) always supplies a real `options`.
+              // PayPalStoredBuilder, see isStoredCheckoutComponent above) always supplies a real
+              // `options`.
               ...options!,
               intent: settings?.payPalIntent?.toString().toLowerCase(),
               dataUserIdToken: userIdToken, //todo - verify if removing this for signed in customer still provides correct PayPal button work

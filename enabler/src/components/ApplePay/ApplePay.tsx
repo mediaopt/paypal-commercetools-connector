@@ -29,6 +29,7 @@ export const ApplePay: FC<ApplePayComponentsProps> = ({
   initialSettings,
   initialUserIdToken,
   redirectOnApprove,
+  initialPayment,
 
   ...restProps
 }) => {
@@ -56,6 +57,7 @@ export const ApplePay: FC<ApplePayComponentsProps> = ({
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
       redirectOnApprove={redirectOnApprove}
+      initialPayment={initialPayment}
     >
       <ApplePayButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>

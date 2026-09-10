@@ -1,5 +1,5 @@
 import { PaymentResult } from "./enabler";
-import { GetSettingsResponse } from "../../types";
+import { CreatePaymentResponse, GetSettingsResponse } from "../../types";
 
 type ComponentSdkOptions = Record<string, unknown>;
 
@@ -42,4 +42,7 @@ export type BaseOptions = {
    * PAYPAL_REDIRECT_ON_APPROVE) — when true, `handleOnApprove` calls `expressApprove` and
    * redirects instead of authorizing/capturing immediately. */
   redirectOnApprove?: boolean;
+  /** The commercetools Payment for this checkout page load — created once in PayPalPaymentEnabler._Setup(),
+   * alongside the /operations/config fetch, and shared by every builder resolving this same BaseOptions object.*/
+  initialPayment: CreatePaymentResponse;
 };

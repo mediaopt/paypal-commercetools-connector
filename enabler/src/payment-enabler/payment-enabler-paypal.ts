@@ -16,6 +16,8 @@ import { PayPalStoredBuilder } from "../components/PayPalStoredBuilder";
 import { processorUrls } from "../components/constants";
 import { sessionHeader } from "../helpers/sessionHeader";
 import { toPayPalPaymentMethodType } from "../components/paymentMethodTypeMapping";
+import { processorRequest } from "../services/processorRequest";
+import { CreatePaymentResponse } from "../types";
 
 export type {
   PayPalPaymentMethodType,
@@ -54,10 +56,24 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
 
     const configJson = await configResponse.json();
 
+    // One commercetools Payment per checkout page load, shared by every standard/stored/express
+    // builder resolving this same setupData. Fatal on failure.
+    // No request body at all: payment is based on cart in session.
+    // If ever changed - processor's InitPaymentRequestSchema has to match exactly
+    const paymentResult = await processorRequest<{}, CreatePaymentResponse>(
+      sessionHeader(options.sessionId),
+      processorUrls(options.processorUrl).createPaymentUrl,
+      {}
+    );
+    if (!paymentResult) {
+      throw new Error("Could not create payment");
+    }
+
     return Promise.resolve({
       baseOptions: {
         processorUrl: options.processorUrl,
         sessionId: options.sessionId,
+        initialPayment: paymentResult,
         storedPaymentMethodsEnabled:
           !!configJson.storedPaymentMethodsConfig?.isEnabled,
         enableVaulting: !!configJson.enableVaulting,

@@ -122,10 +122,12 @@ const PayPalIntentSchema = Type.Optional(
   Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
 );
 
-export const InitPaymentRequestSchema = Type.Object({
-  paymentMethodType: Type.Enum(PaymentMethodType),
-  builderType: Type.Optional(Type.String()),
-});
+// Empty on purpose — creates cart-based payment same for all components on builder init.
+// If ever changed - enabler createPayment has to match the types.
+// For merchants using payment only mode and having no user email provided a log.warn
+// is at createOrder step.
+// Body kept for legacy compatibility reasons
+export const InitPaymentRequestSchema = Type.Object({});
 
 export type PaymentRequestSchemaDTO = Static<typeof InitPaymentRequestSchema>;
 export type PaymentResponseSchemaDTO = Static<typeof InitPaymentResponseSchema>;

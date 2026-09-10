@@ -15,7 +15,8 @@ export type CardFieldsStoredProps = Pick<
   | "initialSettings"
   | "initialUserIdToken"
   | "enableVaulting"
-  | "skipsPayPalScript"
+  | "isStoredCheckoutComponent"
+  | "initialPayment"
 > &
   Pick<FormComponentProps, "onRegisterSubmit"> & {
     ppVaultTokenId: string;
@@ -30,7 +31,8 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
   initialSettings,
   initialUserIdToken,
   enableVaulting,
-  skipsPayPalScript,
+  isStoredCheckoutComponent,
+  initialPayment,
   onRegisterSubmit,
   ppVaultTokenId,
 }) => {
@@ -44,7 +46,8 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
       enableVaulting={enableVaulting}
-      skipsPayPalScript={skipsPayPalScript}
+      isStoredCheckoutComponent={isStoredCheckoutComponent}
+      initialPayment={initialPayment}
     >
       <CardFieldsStoredButton
         onRegisterSubmit={onRegisterSubmit}

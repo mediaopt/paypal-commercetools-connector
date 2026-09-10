@@ -31,6 +31,7 @@ export const CardFields: FC<SmartComponentsProps & FormComponentProps> = ({
   processorUrl,
   initialSettings,
   initialUserIdToken,
+  initialPayment,
 
   onRegisterSubmit,
   onRegisterValidation,
@@ -58,6 +59,7 @@ export const CardFields: FC<SmartComponentsProps & FormComponentProps> = ({
       processorUrl={processorUrl}
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
+      initialPayment={initialPayment}
     >
       <CardFieldsButton
         enableVaulting={enableVaulting}

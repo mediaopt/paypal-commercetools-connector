@@ -232,7 +232,7 @@ export type RequestHeader = { [key: string]: string };
 /** Category 1 — basic data every payment component needs. */
 export type BasicComponentProps = {
   // Optional since stored payment components never load the PayPal JS SDK script at all (charging a saved
-  // method is a plain processor HTTP call — see useSettings.tsx's skipsPayPalScript) and so has no
+  // method is a plain processor HTTP call — see useSettings.tsx's isStoredCheckoutComponent) and so has no
   // script options to receive; every other component still always supplies a real value.
   options?: ReactPayPalScriptOptions;
   requestHeader: RequestHeader;
@@ -269,10 +269,18 @@ export type CheckoutOnlyProps = {
    * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
   redirectOnApprove?: boolean;
   /** Set only by PayPalStoredBuilder-produced mounts (see PayPalStoredBuilder.ts/RenderTemplate.tsx)
-   * — true for any component the stored builder builds, since none of them ever render via the
-   * PayPal JS SDK client-side. Consumed by useSettings.tsx's SettingsProvider to skip
-   * <PayPalScriptProvider> entirely. */
-  skipsPayPalScript?: boolean;
+   * — true for any component the stored builder builds (today just CardFieldsStored, but this is
+   * universal for ct side rendered components. Consumed by
+   * useSettings.tsx's SettingsProvider to skip <PayPalScriptProvider> entirely. */
+  isStoredCheckoutComponent?: boolean;
+  /** Injected by RenderTemplate.tsx from BaseOptions, same as `processorUrl` — the commercetools
+   * Payment for this checkout page load, already resolved (in PayPalPaymentEnabler._Setup(),
+   * alongside the /operations/config fetch) by the time any component mounts. Lets every
+   * concurrently-mounted component share one Payment instead of each
+   * creating its own, with no async fetch needed inside PaymentProvider at all. Absent for
+   * self-hosted deployments, which fall back to usePayment.tsx's own direct createPaymentUrl
+   * call. */
+  initialPayment?: CreatePaymentResponse;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
@@ -655,7 +663,7 @@ export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
 /** Resolved options for <CardFieldsStored/> — no `options` (PayPal JS SDK script options) at all,
  * unlike every other resolved-options type: charging an already-vaulted card is a plain processor
  * HTTP call (see usePayment.tsx's handleCreateOrder), so there's no script to configure — see
- * useSettings.tsx's skipsPayPalScript, which skips <PayPalScriptProvider> for this type entirely. */
+ * useSettings.tsx's isStoredCheckoutComponent, which skips <PayPalScriptProvider> for this type entirely. */
 export type CardFieldsStoredResolvedOptions = Pick<
   BaseResolvedMethodOptions,
   "initialSettings" | "enableVaulting"
@@ -791,7 +799,7 @@ export type SettingsProviderProps = Pick<
   | "processorUrl"
   | "initialSettings"
   | "initialUserIdToken"
-  | "skipsPayPalScript"
+  | "isStoredCheckoutComponent"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };

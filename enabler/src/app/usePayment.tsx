@@ -143,6 +143,7 @@ export const PaymentProvider: FC<
   builderType,
   processorUrl,
   redirectOnApprove,
+  initialPayment,
 }) => {
   const [clientToken, setClientToken] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -153,8 +154,29 @@ export const PaymentProvider: FC<
 
   const { settings } = useSettings();
 
+  // Seeded synchronously from initialPayment when present (Checkout mode — already resolved in
+  // PayPalPaymentEnabler._Setup() before this component ever mounts, see BaseOptions's own
+  // comment). Falls back to PaymentInfoInitialObject otherwise, populated by the mount effect
+  // below instead (self-hosted/legacy mode).
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>(
-    PaymentInfoInitialObject
+    initialPayment
+      ? {
+          id: initialPayment.id,
+          amountPlanned: initialPayment.amountPlanned,
+          lineItems: initialPayment.lineItems,
+          email: initialPayment.email,
+          firstName: initialPayment.firstName,
+          lastName: initialPayment.lastName,
+          countryCode: initialPayment.countryCode,
+          shippingAddress: initialPayment.shippingAddress,
+          shippingOptions: initialPayment.shippingOptions,
+          priceBreakdown: initialPayment.priceBreakdown,
+          ctCustomerId: initialPayment.ctCustomerId,
+          customerVersion: initialPayment.customerVersion,
+          version: initialPayment.version,
+          cartInformation: cartInformation,
+        }
+      : PaymentInfoInitialObject
   );
 
   const { isLoading } = useLoader();
@@ -186,8 +208,11 @@ export const PaymentProvider: FC<
     createVaultSetupTokenUrl && approveVaultSetupTokenUrl
   );
 
+  // Self-hosted/legacy mode only — Checkout mode always has initialPayment already seeded above
+  // by the time this component mounts (resolved in _Setup(), before any builder is ever
+  // constructed), so this fetch never runs there.
   useEffect(() => {
-    if (vaultOnly) return;
+    if (vaultOnly || initialPayment) return;
 
     const initPayment = async () => {
       isLoading(true);
@@ -473,7 +498,9 @@ export const PaymentProvider: FC<
       }
 
       const requestUrl =
-        settings?.payPalIntent === "Authorize" ? authorizeOrderUrl : onApproveUrl;
+        settings?.payPalIntent === "Authorize"
+          ? authorizeOrderUrl
+          : onApproveUrl;
       if (!requestUrl) {
         isLoading(false);
         return;

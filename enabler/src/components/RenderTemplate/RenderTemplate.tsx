@@ -100,10 +100,8 @@ export type RenderTemplateProps = {
   paymentMethodType: PayPalPaymentMethodType;
   builderType?: BuilderType;
   // Set only by PayPalStoredBuilder-produced mounts (see PayPalStoredBuilder.ts) — true for any
-  // component the stored builder builds, since none of them ever render via the PayPal JS SDK
-  // client-side (commercetools Checkout owns rendering for stored methods). Consumed by
-  // useSettings.tsx to skip <PayPalScriptProvider>.
-  skipsPayPalScript?: boolean;
+  // stored-payment-method component, relies on commercetools own render and processor calls only
+  isStoredCheckoutComponent?: boolean;
   baseOptions: BaseOptions;
   genericOptions: GenericMountProps;
 };
@@ -111,7 +109,7 @@ export type RenderTemplateProps = {
 export const RenderTemplate: FC<RenderTemplateProps> = ({
   paymentMethodType,
   builderType,
-  skipsPayPalScript,
+  isStoredCheckoutComponent,
   baseOptions,
   genericOptions,
 }) => {
@@ -127,10 +125,13 @@ export const RenderTemplate: FC<RenderTemplateProps> = ({
         ...options,
         paymentMethodType,
         builderType,
-        skipsPayPalScript,
+        isStoredCheckoutComponent,
         // baseOptions.processorUrl is the single source of truth — callers used to also pass a
         // separate processorUrl prop duplicating this same value.
         processorUrl: baseOptions.processorUrl,
+        // Resolved once in PayPalPaymentEnabler._Setup(), same as `settings` — already present by
+        // the time any component reaches this point.
+        initialPayment: baseOptions.initialPayment,
         // Injects createPaymentUrl/createOrderUrl/authorizeOrderUrl/onApproveUrl/
         // authenticateThreeDSOrderUrl (plus expressApproveUrl/updateShippingUrl/
         // getStoredPaymentMethodsURL, unused as props but harmless) into the same named slots a
