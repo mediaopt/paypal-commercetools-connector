@@ -244,7 +244,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
         isEnabled: isStoredPaymentMethodsEnabled(cartSummary),
       },
       enableVaulting: getConfig().enableVaulting,
-      redirectOnApprove: getConfig().redirectOnApprove,
+      // True whenever PayPal Express has an actual review step configured after buyer approval.
+      // Drives: usePayment.tsx's handleOnApprove (call expressApprove instead of
+      // authorize/capture) and buildScriptOptions()'s matching `commit: false` for the "Continue
+      // to Review Order" button text — see createOrder experience_context.user_action.
+      redirectOnApprove: this.hasExpressReviewStep(),
       settings: mergedSettings,
       userIdToken,
       sdkOptions: buildSdkOptions(cartSummary),
@@ -524,13 +528,23 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolvePayPalCustomerId(ctCart.customerId)
       : undefined;
 
+    const returnUrl = this.buildRedirectMerchantUrl(payment.id);
+    const cancelUrl = this.resolveMerchantReturnBaseUrl();
+
+    // experience_context.user_action/the matching client-side `commit`
+    const showContinueReview =
+      builderType === CustomBuilderType.EXPRESS && this.hasExpressReviewStep();
+
     const orderRequest = buildOrderRequest(
       payment,
       ctCart,
       orderData,
       payPalIntent,
       existingPayPalCustomerId,
-      builderType === CustomBuilderType.EXPRESS
+      builderType === CustomBuilderType.EXPRESS,
+      showContinueReview,
+      returnUrl,
+      cancelUrl
     );
 
     let response: Order;
@@ -889,6 +903,26 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * The CT Checkout session's own merchantReturnUrl, falling back to the static
+   * MERCHANT_RETURN_URL config — shared by buildRedirectMerchantUrl (post-approval buyer
+   * redirect) and createOrder (experience_context.return_url/cancel_url, see buildOrderRequest).
+   */
+  private resolveMerchantReturnBaseUrl(): string | undefined {
+    return getMerchantReturnUrlFromContext() || getConfig().returnUrl;
+  }
+
+  /**
+   * True whenever PayPal Express has an actual review step configured after buyer approval —
+   * either the PAYPAL_REDIRECT_ON_APPROVE master switch, or just PAYPAL_ONAPPROVE_PREFIX being
+   * set (configuring a review-page target is itself enough signal, no need to also flip a
+   * separate switch). Single source of truth for config()'s exposed `redirectOnApprove` and
+   * createOrder()'s experience_context.user_action — see both call sites' own comments.
+   */
+  private hasExpressReviewStep(): boolean {
+    return getConfig().redirectOnApprove || !!getConfig().onApprovePrefix;
+  }
+
+  /**
    * Builds a buyer-facing redirect URL, appending paymentReference/paymentStatus query params.
    * Falls back to the CT Checkout session's own merchantReturnUrl, then the static
    * MERCHANT_RETURN_URL config. `approveUrlOverride` takes priority over both when passed — today
@@ -901,10 +935,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     paymentStatus?: string,
     approveUrlOverride?: string
   ): string | undefined {
-    const baseUrl =
-      approveUrlOverride ||
-      getMerchantReturnUrlFromContext() ||
-      getConfig().returnUrl;
+    const baseUrl = approveUrlOverride || this.resolveMerchantReturnBaseUrl();
     if (!baseUrl?.length) return undefined;
     const redirectUrl = new URL(baseUrl);
     redirectUrl.searchParams.append("paymentReference", paymentReference);

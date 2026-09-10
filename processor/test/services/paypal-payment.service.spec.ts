@@ -232,7 +232,9 @@ describe("paypal-payment.service", () => {
       expect.objectContaining({
         payment_source: expect.objectContaining({
           paypal: expect.objectContaining({
-            experience_context: { shipping_preference: "SET_PROVIDED_ADDRESS" },
+            experience_context: expect.objectContaining({
+              shipping_preference: "SET_PROVIDED_ADDRESS",
+            }),
           }),
         }),
       })
@@ -254,10 +256,15 @@ describe("paypal-payment.service", () => {
     const [orderRequest] = (CommonConnect.createPayPalOrder as jest.Mock).mock
       .calls[0] as [
       {
-        payment_source?: { paypal?: { experience_context?: unknown } };
+        payment_source?: {
+          paypal?: { experience_context?: { shipping_preference?: unknown } };
+        };
         purchase_units: [{ shipping?: unknown }];
       }
     ];
+    // No return url configured and no review step configured in this test, so
+    // experience_context ends up empty and is omitted entirely (see order.utils.ts) —
+    // shipping_preference itself stays Express-excluded either way.
     expect(
       orderRequest.payment_source?.paypal?.experience_context
     ).toBeUndefined();
@@ -265,6 +272,97 @@ describe("paypal-payment.service", () => {
     // rejects a later shipping.options PATCH (SHIPPING_OPTIONS_NOT_SUPPORTED) whenever
     // shipping.type is present — so Express must never set shipping at all at creation time.
     expect(orderRequest.purchase_units[0].shipping).toBeUndefined();
+  });
+
+  test("sets experience_context.return_url/cancel_url from the merchant return url, decorated/bare respectively", async () => {
+    jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+      ...ConfigModule.getConfig(),
+      returnUrl: "https://merchant.example.com/return",
+    });
+
+    await paypalPaymentService.createOrder({
+      paymentId: mockPayment.id,
+      orderData: { paymentSource: "paypal" },
+    });
+
+    expect(CommonConnect.createPayPalOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_source: expect.objectContaining({
+          paypal: expect.objectContaining({
+            experience_context: expect.objectContaining({
+              return_url: `https://merchant.example.com/return?paymentReference=${mockPayment.id}`,
+              cancel_url: "https://merchant.example.com/return",
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
+  test("sets experience_context.user_action to CONTINUE for Express only when a review step is configured", async () => {
+    jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+      ...ConfigModule.getConfig(),
+      redirectOnApprove: true,
+    });
+
+    await paypalPaymentService.createOrder({
+      paymentId: mockPayment.id,
+      orderData: { paymentSource: "paypal" },
+      builderType: "express" as never,
+    });
+
+    expect(CommonConnect.createPayPalOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_source: expect.objectContaining({
+          paypal: expect.objectContaining({
+            experience_context: expect.objectContaining({
+              user_action: "CONTINUE",
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
+  test("does not set experience_context.user_action for Express without a review step configured, even with a return url", async () => {
+    jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+      ...ConfigModule.getConfig(),
+      returnUrl: "https://merchant.example.com/return",
+    });
+
+    await paypalPaymentService.createOrder({
+      paymentId: mockPayment.id,
+      orderData: { paymentSource: "paypal" },
+      builderType: "express" as never,
+    });
+
+    const [orderRequest] = (CommonConnect.createPayPalOrder as jest.Mock).mock
+      .calls[0] as [
+      { payment_source?: { paypal?: { experience_context?: { user_action?: unknown } } } }
+    ];
+    expect(
+      orderRequest.payment_source?.paypal?.experience_context?.user_action
+    ).toBeUndefined();
+  });
+
+  test("does not set experience_context.user_action for a standard (non-express) order, even with a review step configured", async () => {
+    jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+      ...ConfigModule.getConfig(),
+      redirectOnApprove: true,
+    });
+
+    await paypalPaymentService.createOrder({
+      paymentId: mockPayment.id,
+      orderData: { paymentSource: "paypal" },
+    });
+
+    const [orderRequest] = (CommonConnect.createPayPalOrder as jest.Mock).mock
+      .calls[0] as [
+      { payment_source?: { paypal?: { experience_context?: { user_action?: unknown } } } }
+    ];
+    expect(
+      orderRequest.payment_source?.paypal?.experience_context?.user_action
+    ).toBeUndefined();
   });
 
   test("still sets shipping (with shipping.type) for a non-express order with a shipping address on the cart", async () => {

@@ -158,6 +158,7 @@ export function buildScriptOptions(
   return {
     clientId: baseOptions.clientId || "",
     currency: DEFAULT_SCRIPT_CURRENCY,
+    ...(isExpress && baseOptions.redirectOnApprove ? { commit: false } : {}),
     ...(!isExpress && baseOptions.standardScriptOptions),
     ...componentSdkOptions,
   };

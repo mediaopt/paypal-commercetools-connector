@@ -38,9 +38,7 @@ export type BaseOptions = {
    * script, avoiding a window.paypal race across separately-mounted components. PayPal Express
    * (a different page) don't use this. */
   standardScriptOptions: { components?: string[]; disableFunding?: string[] };
-  /** PayPal Express only, from `/operations/config`'s `redirectOnApprove` (processor's
-   * PAYPAL_REDIRECT_ON_APPROVE) — when true, `handleOnApprove` calls `expressApprove` and
-   * redirects instead of authorizing/capturing immediately. */
+  /** When true express PayPal payment is redirected to merchant side for approval */
   redirectOnApprove?: boolean;
   /** The commercetools Payment for this checkout page load — created once in PayPalPaymentEnabler._Setup(),
    * alongside the /operations/config fetch, and shared by every builder resolving this same BaseOptions object.*/
