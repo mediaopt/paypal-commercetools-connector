@@ -162,7 +162,7 @@ export const SettingsProvider: FC<
               // `options`.
               ...options!,
               intent: settings?.payPalIntent?.toString().toLowerCase(),
-              dataUserIdToken: userIdToken, //todo - verify if removing this for signed in customer still provides correct PayPal button work
+              dataUserIdToken: initialSettings ? undefined : userIdToken, //only stored cards by own ct interface are permitted in checkout mode
               dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
               merchantId: settings?.merchantId,
             }}
