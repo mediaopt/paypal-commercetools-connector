@@ -1,14 +1,19 @@
 import { Cart, Payment } from "@commercetools/connect-payments-sdk";
+import { TransactionState } from "@commercetools/platform-sdk";
 import {
   mapValidCommercetoolsLineItemsToPayPalItems,
   mapCommercetoolsCartToPayPalPriceBreakdown,
   resolveCommercetoolsCartShippingAddress,
   mapCommercetoolsAddressToPayPalAddress,
   mapCommercetoolsMoneyToPayPalMoney,
+  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
+  mapPayPalCaptureStatusToCommercetoolsTransactionState,
   findMostRecentTransaction,
   CheckoutPaymentIntent,
   OrderRequest,
   PurchaseUnitRequest,
+  Authorization2StatusEnum,
+  Capture2StatusEnum,
 } from "common-connect";
 import { CreateOrderRequestSchemaDTO } from "../dtos/paypal-payment.dto";
 import { ErrorInvalidOperation } from "@commercetools/connect-payments-sdk";
@@ -168,6 +173,42 @@ export const buildPayPalAmount = (
 // Extracts the authorization/capture sub-object PayPal attaches to an Order response's first
 // purchase unit — shared with paypal-commercetools-extension, see common-connect's map.utils.ts.
 export { extractPayPalPurchaseUnitTransaction } from "common-connect";
+
+export type PayPalOrderTransactionConfig = {
+  purchaseUnitKey: "authorizations" | "captures";
+  transactionType: "Authorization" | "Charge";
+  mapStatus: (status?: string) => TransactionState;
+};
+
+// The only two fixed shapes an authorize/capture-outcome transaction can take, keyed by PayPal intent
+const PAYPAL_INTENT_TRANSACTION_CONFIG: Record<
+  "Authorize" | "Capture",
+  PayPalOrderTransactionConfig
+> = {
+  Authorize: {
+    purchaseUnitKey: "authorizations",
+    transactionType: "Authorization",
+    mapStatus: (status) =>
+      mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
+        status as Authorization2StatusEnum | undefined
+      ),
+  },
+  Capture: {
+    purchaseUnitKey: "captures",
+    transactionType: "Charge",
+    mapStatus: (status) =>
+      mapPayPalCaptureStatusToCommercetoolsTransactionState(
+        status as Capture2StatusEnum | undefined
+      ),
+  },
+};
+
+export const resolvePayPalIntentTransactionConfig = (
+  payPalIntent?: string
+): PayPalOrderTransactionConfig =>
+  PAYPAL_INTENT_TRANSACTION_CONFIG[
+    payPalIntent === "Authorize" ? "Authorize" : "Capture"
+  ];
 
 /**
  * Finds the interactionId (PayPal authorization id) of the payment's most recent Authorization/

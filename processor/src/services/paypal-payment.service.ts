@@ -57,7 +57,6 @@ import {
   resolveCommercetoolsCartShippingAddress,
   mapCommercetoolsAddressToPayPalAddress,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
-  mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   createPayPalOrder,
   getPayPalOrder,
@@ -70,8 +69,6 @@ import {
   getSettings,
   updatePayPalOrder,
   Order,
-  Authorization2StatusEnum,
-  Capture2StatusEnum,
   Capture2,
   logger,
   CheckoutPaymentIntent,
@@ -93,6 +90,7 @@ import {
   buildPayPalAmount,
   extractPayPalPurchaseUnitTransaction,
   findAuthorizationTransactionId,
+  resolvePayPalIntentTransactionConfig,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -623,10 +621,36 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
+    // vaulted payment methods are captured/authorized immediately on create order
+    if (response.status === "COMPLETED") {
+      await Promise.all([
+        this.writeSettledOrderTransaction(payment, response, {
+          operation: "createOrder",
+          ...resolvePayPalIntentTransactionConfig(payPalIntent),
+        }),
+        this.logProcessorInteraction(
+          payment.id,
+          "createPayPalOrder",
+          orderRequest,
+          response
+        ),
+      ]);
+
+      return {
+        orderData: {
+          id: response.id ?? "",
+          status: response.status ?? "",
+          payment_source: response.payment_source,
+          links: response.links,
+        },
+      };
+    }
+
     // No commercetools transaction is added here — only status/interfaceId are synced.
     // commercetools Checkout creates the commercetools Order as soon as it sees any
     // in-progress transaction, so adding one now would create it before the buyer has
-    // actually approved on PayPal. That happens later, in authorizeOrder()/captureOrder().
+    // actually approved on PayPal. That happens later, in authorizeOrder()/captureOrder() — or,
+    // when PayPal settles synchronously with no buyer-approval step, in the COMPLETED branch above.
     await Promise.all([
       retryCTSync(
         () => this.syncPayPalOrderStatus(payment.id, response, false),
@@ -856,11 +880,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    const transaction = extractPayPalPurchaseUnitTransaction(
-      response.purchase_units,
-      config.purchaseUnitKey
-    );
-
     // updatePayment (Payment resource) and syncPayPalOrderStatus (same Payment resource, via a
     // raw CT call) both retry on a version conflict with a fresh refetch, so running them
     // alongside linkVaultedCardCustomer (Customer resource) here is safe, not just faster.
@@ -868,6 +887,40 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // update — a single commercetools updatePayment() either applies its whole actions array or
     // none of it, so bundling the audit-log fields in here would let a logging-only problem (e.g.
     // a not-yet-provisioned field definition) block the real authorize/capture transaction too.
+    await Promise.all([
+      this.writeSettledOrderTransaction(payment, response, config),
+      this.logProcessorInteraction(
+        payment.id,
+        apiCallName,
+        { orderID },
+        response
+      ),
+    ]);
+
+    return response;
+  }
+
+  /**
+   * Writes the CT Authorization/Charge transaction, syncs order status (linking interfaceId),
+   * and best-effort links a vaulted card's customer id — from an Order response.
+   * Deliberately excludes logProcessorInteraction: callers log their own
+   * request/response pair, since "the request" differs per caller.
+   */
+  private async writeSettledOrderTransaction(
+    payment: Payment,
+    response: Order,
+    config: {
+      operation: "authorizeOrder" | "captureOrder" | "createOrder";
+      purchaseUnitKey: "authorizations" | "captures";
+      transactionType: "Authorization" | "Charge";
+      mapStatus: (status?: string) => TransactionState;
+    }
+  ): Promise<void> {
+    const transaction = extractPayPalPurchaseUnitTransaction(
+      response.purchase_units,
+      config.purchaseUnitKey
+    );
+
     await Promise.all([
       this.ctPaymentService.updatePayment({
         id: payment.id,
@@ -885,15 +938,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         response.status ?? ""
       ),
       this.linkVaultedCardCustomer(payment, response),
-      this.logProcessorInteraction(
-        payment.id,
-        apiCallName,
-        { orderID },
-        response
-      ),
     ]);
-
-    return response;
   }
 
   /**
@@ -1016,12 +1061,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return this.finalizeOrder(request, {
       operation: "authorizeOrder",
       callPayPal: (orderID) => authorizePayPalOrder(orderID, {}),
-      purchaseUnitKey: "authorizations",
-      transactionType: "Authorization",
-      mapStatus: (status) =>
-        mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
-          status as Authorization2StatusEnum | undefined
-        ),
+      ...resolvePayPalIntentTransactionConfig("Authorize"),
     });
   }
 
@@ -1034,12 +1074,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return this.finalizeOrder(request, {
       operation: "captureOrder",
       callPayPal: (orderID) => capturePayPalOrder(orderID, {}),
-      purchaseUnitKey: "captures",
-      transactionType: "Charge",
-      mapStatus: (status) =>
-        mapPayPalCaptureStatusToCommercetoolsTransactionState(
-          status as Capture2StatusEnum | undefined
-        ),
+      ...resolvePayPalIntentTransactionConfig("Capture"),
     });
   }
 
@@ -1073,15 +1108,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // assertNotLinkedToDifferentOrder's own comment).
     this.assertNotLinkedToDifferentOrder(payment, orderID);
 
-    const transactionType =
-      payPalIntent === "Authorize" ? "Authorization" : "Charge";
+    const { transactionType } =
+      resolvePayPalIntentTransactionConfig(payPalIntent);
     const hasPlaceholder = payment.transactions.some(
       (transaction) =>
         transaction.type === transactionType && !transaction.interactionId
     );
 
-    // interfaceId is only ever set once, at a genuine approval moment — createOrder() never
-    // touches it (see syncPayPalOrderStatus), so this is the one place in the Express flow that
+    // interfaceId is only ever set once, at a genuine approval moment — createOrder() only
+    // touches it if the payment was approved (see syncPayPalOrderStatus), so this is the one place in the Express flow that
     // links it, merged into the same atomic update as the placeholder transaction.
     const actions: PaymentUpdateAction[] = [
       ...(hasPlaceholder
@@ -1533,12 +1568,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
         operation: "authorizeOrder",
         callPayPal: (id) => authorizePayPalOrder(id, {}),
-        purchaseUnitKey: "authorizations",
-        transactionType: "Authorization",
-        mapStatus: (status) =>
-          mapPayPalAuthorizationStatusToCommercetoolsTransactionState(
-            status as Authorization2StatusEnum | undefined
-          ),
+        ...resolvePayPalIntentTransactionConfig("Authorize"),
       });
       return {
         success: true,
@@ -1608,12 +1638,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
       operation: "captureOrder",
       callPayPal: (id) => capturePayPalOrder(id, {}),
-      purchaseUnitKey: "captures",
-      transactionType: "Charge",
-      mapStatus: (status) =>
-        mapPayPalCaptureStatusToCommercetoolsTransactionState(
-          status as Capture2StatusEnum | undefined
-        ),
+      ...resolvePayPalIntentTransactionConfig("Capture"),
     });
     return {
       success: true,
