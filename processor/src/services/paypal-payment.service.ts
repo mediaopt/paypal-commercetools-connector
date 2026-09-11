@@ -378,13 +378,30 @@ export class PayPalPaymentService extends AbstractPaymentService {
   public async createPayment(
     _request: PaymentRequestSchemaDTO
   ): Promise<PaymentResponseSchemaDTO> {
+    // Expanded so a still-relevant last-linked payment (i.e. if payment method change was triggered) can be reused
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
+      expand: ["paymentInfo.payments[*]"],
     });
 
     const amountPlanned = await this.ctCartService.getPaymentAmount({
       cart: ctCart,
     });
+
+    // try to reuse last payment if it is still relevant
+    const lastPayment = ctCart.paymentInfo?.payments?.at(-1)?.obj;
+    if (
+      lastPayment &&
+      this.isRelevantExistingPayment(lastPayment, ctCart, amountPlanned)
+    ) {
+      log.info(
+        `relevant existing payment found for ${ctCart.id}, returing this instead of new`
+      );
+      return this.buildPaymentResponse(ctCart, lastPayment);
+    }
+    log.info(
+      `no relevant checkout payments found for ${ctCart.id}, creating new payment`
+    );
 
     // Create a new payment in commercetools
     const newPayment = await this.ctPaymentService.createPayment({
@@ -426,17 +443,62 @@ export class PayPalPaymentService extends AbstractPaymentService {
         );
       });
 
-    const addPaymentPromise =
-      ctCart.paymentInfo?.payments === undefined ||
-      ctCart.paymentInfo.payments.length === 0
-        ? this.ctCartService.addPayment({
-            resource: { id: ctCart.id, version: ctCart.version },
-            paymentId: newPayment.id,
-          })
-        : Promise.resolve();
+    const addPaymentPromise = this.ctCartService.addPayment({
+      resource: { id: ctCart.id, version: ctCart.version },
+      paymentId: newPayment.id,
+    });
 
     await Promise.all([assignCustomTypePromise, addPaymentPromise]);
 
+    return this.buildPaymentResponse(ctCart, newPayment);
+  }
+
+  /**
+   * Whether `payment` — the cart's last linked payment — can be returned
+   * only checkout-relevant payments are considered additionally to standard possible differences
+   * */
+  private isRelevantExistingPayment(
+    payment: Payment,
+    ctCart: Cart,
+    amountPlanned: { centAmount: number; currencyCode: string }
+  ): boolean {
+    if (payment.paymentStatus?.interfaceCode !== "Initial") {
+      return false;
+    }
+
+    if (ctCart.customerId) {
+      if (payment.customer?.id !== ctCart.customerId) {
+        return false;
+      }
+    } else if (payment.anonymousId !== ctCart.anonymousId) {
+      return false;
+    }
+
+    if (
+      !payment.checkoutTransactionItemId ||
+      payment.checkoutTransactionItemId !==
+        getCheckoutTransactionItemIdFromContext()
+    ) {
+      return false;
+    }
+
+    if (
+      payment.amountPlanned.centAmount !== amountPlanned.centAmount ||
+      payment.amountPlanned.currencyCode !== amountPlanned.currencyCode
+    ) {
+      return false;
+    }
+
+    return (
+      payment.paymentMethodInfo?.paymentInterface ===
+      getConfig().paymentInterface
+    );
+  }
+
+  private buildPaymentResponse(
+    ctCart: Cart,
+    payment: Payment
+  ): PaymentResponseSchemaDTO {
     // Gather additional cart data for the response
     const isShipped =
       !!ctCart.shippingAddress ||
@@ -453,7 +515,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const priceBreakdown = mapCommercetoolsCartToPayPalPriceBreakdown(ctCart);
 
     const { address: resolvedShippingAddress } =
-      resolveCommercetoolsCartShippingAddress(ctCart, newPayment.id);
+      resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
     const shippingAddress = resolvedShippingAddress
       ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
       : undefined;
@@ -462,10 +524,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return {
       paypalData: {
         clientId: getConfig().paypalClientId ?? "",
-        currency: newPayment.amountPlanned.currencyCode,
+        currency: payment.amountPlanned.currencyCode,
       },
-      id: newPayment.id,
-      amountPlanned: newPayment.amountPlanned,
+      id: payment.id,
+      amountPlanned: payment.amountPlanned,
       email: ctCart.customerEmail,
       ctCustomerId: ctCart.customerId,
       firstName: ctCart.billingAddress?.firstName,
