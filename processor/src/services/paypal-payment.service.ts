@@ -47,6 +47,7 @@ import { toPaymentMethodIconKey } from "../utils/paymentMethodIcon.utils";
 import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import {
   getCartIdFromContext,
+  getCheckoutTransactionItemIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
@@ -84,6 +85,7 @@ import {
   errorMessage,
   errorResponseBody,
   isPayPalInvalidPatchOperationError,
+  payPalDebugIdSuffix,
   retryCTSync,
 } from "../utils/error.utils";
 import {
@@ -107,7 +109,9 @@ import {
 } from "../utils/config.utils";
 import {
   buildProcessorLogging,
+  buildProcessorCustomerLogging,
   ProcessorApiCallName,
+  ProcessorCustomerApiCallName,
 } from "../utils/processorInteraction.utils";
 import { PayPalCustomerService } from "./paypal-customer.service";
 
@@ -116,6 +120,14 @@ const buildSetShippingMethodAction = (
 ): CartUpdateAction => ({
   action: "setShippingMethod" as const,
   shippingMethod: { typeId: "shipping-method" as const, id: shippingMethodId },
+});
+
+// Failure-path response payload for logProcessorCustomerInteraction() — matches the shape
+// paypal-commercetools-extension's handleError() (response.utils.ts)
+const buildErrorResponsePayload = (e: unknown) => ({
+  success: false,
+  message: `${errorMessage(e)}${payPalDebugIdSuffix(e)}`,
+  details: errorResponseBody(e),
 });
 
 export class PayPalPaymentService extends AbstractPaymentService {
@@ -166,6 +178,64 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolveUserIdToken(cartSummary?.customerId)
       : undefined;
 
+    // Per-component overrides (style/fundingSources/components), sourced from PAYPAL_BUTTON_CONFIG
+    // — already componentType-keyed (plus the dedicated PayPalExpress slot), passed through as-is;
+    // the enabler merges these over its own defaults and the general settings above (see
+    // PayPalBuilder.ts's 4-layer resolution).
+    const mergedSettings = {
+      ...settings,
+      ...getConfig().buttonConfig,
+    };
+
+    // Shared script options for every *standard* and stored component (PayPal Express is configured independently).
+    // `components` is narrowed here by settings.acceptCredit — the only accept* flag with a real
+    // components-level effect (card-fields); acceptPayPal/acceptPayLater/acceptVenmo/acceptLocal
+    // are funding-source/method-availability concerns handled elsewhere (Checkout's own predicate,
+    // getSupportedPaymentComponents()), not reasons to drop a script component every button-based
+    // method still needs. No settings flag exists for "applepay", so its inclusion is controlled by
+    // this env var alone.
+    const standardScriptOptions = {
+      ...getConfig().standardScriptOptions,
+      components: getConfig().standardScriptOptions.components.filter(
+        (component) =>
+          component !== "card-fields" || settings.acceptCredit !== false
+      ),
+    };
+
+    // PAYPAL_STANDARD_SCRIPT_OPTIONS.enableFunding is optional — an unset/empty value means "no
+    // connector-invented restriction beyond disableFunding," not "nothing is allowed." Only when
+    // the merchant explicitly sets it do we need to guard against a self-contradictory script
+    // (the same source force-enabled and force-disabled at once) — fail fast here rather than
+    // silently sending PayPal a contradictory request. TODO: consider moving this to
+    // connectors/post-deploy.ts as a one-time env-var validation instead of per-request.
+    const conflictingFundingSources = (
+      standardScriptOptions.enableFunding ?? []
+    ).filter((source) =>
+      standardScriptOptions.disableFunding?.includes(source)
+    );
+    if (conflictingFundingSources.length > 0) {
+      throw new ErrorInvalidOperation(
+        `PAYPAL_STANDARD_SCRIPT_OPTIONS: enableFunding and disableFunding both list ${conflictingFundingSources.join(
+          ", "
+        )} — remove the contradiction from one of them.`
+      );
+    }
+
+    // Not a hard requirement (Apple Pay works fine with the generic default), but a merchant who
+    // never customized this will show real shoppers a literal "My Store" in Apple's native payment
+    // sheet — worth a loud, dev-facing signal to catch during setup. Checked here (once configs
+    // from the processor and getSettings are merged, and only when Apple Pay is actually enabled)
+    // rather than in the enabler, so this stays the one place to update if Apple Pay ever becomes
+    // configurable via the mc app instead of PAYPAL_BUTTON_CONFIG.
+    if (
+      standardScriptOptions.components.includes("applepay") &&
+      !mergedSettings.ApplePay?.applePayDisplayName
+    ) {
+      log.warn(
+        'ApplePay is using the default applePayDisplayName ("My Store") — set PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName to your store\'s real name.'
+      );
+    }
+
     return {
       clientId: getConfig().paypalClientId ?? "",
       returnUrl: getConfig().returnUrl,
@@ -174,17 +244,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
         isEnabled: isStoredPaymentMethodsEnabled(cartSummary),
       },
       enableVaulting: getConfig().enableVaulting,
-      redirectOnApprove: getConfig().redirectOnApprove,
-      // Per-component overrides (style/fundingSources/components), sourced from
-      // PAYPAL_BUTTON_CONFIG — already componentType-keyed (plus the dedicated PayPalExpress
-      // slot), passed through as-is; the enabler merges these over its own defaults and the
-      // general settings above (see PayPalBuilder.ts's 4-layer resolution).
-      settings: {
-        ...settings,
-        ...getConfig().buttonConfig,
-      },
+      // True whenever PayPal Express has an actual review step configured after buyer approval.
+      // Drives: usePayment.tsx's handleOnApprove (call expressApprove instead of
+      // authorize/capture) and buildScriptOptions()'s matching `commit: false` for the "Continue
+      // to Review Order" button text — see createOrder experience_context.user_action.
+      redirectOnApprove: this.hasExpressReviewStep(),
+      settings: mergedSettings,
       userIdToken,
       sdkOptions: buildSdkOptions(cartSummary),
+      standardScriptOptions,
     };
   }
 
@@ -213,12 +281,25 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return undefined;
     }
     try {
-      return await generateUserIdToken(paypalCustomerId);
+      const userIdToken = await generateUserIdToken(paypalCustomerId);
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId as string,
+        "getUserIDToken",
+        { customerId: paypalCustomerId },
+        userIdToken
+      );
+      return userIdToken;
     } catch (e) {
       log.warn(
         `config: failed to generate PayPal userIdToken for customer ${paypalCustomerId} — ${errorMessage(
           e
-        )}`
+        )}${payPalDebugIdSuffix(e)}`
+      );
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId as string,
+        "getUserIDToken",
+        { customerId: paypalCustomerId },
+        buildErrorResponsePayload(e)
       );
       return undefined;
     }
@@ -293,32 +374,40 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  public async createPayment({
-    builderType,
-    paymentMethodType,
-  }: PaymentRequestSchemaDTO): Promise<PaymentResponseSchemaDTO> {
+  // Request is empty - all data retrieved from cart in session
+  public async createPayment(
+    _request: PaymentRequestSchemaDTO
+  ): Promise<PaymentResponseSchemaDTO> {
+    // Expanded so a still-relevant last-linked payment (i.e. if payment method change was triggered) can be reused
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
+      expand: ["paymentInfo.payments[*]"],
     });
-
-    // PayPal collects the buyer's email inside its own popup and only returns it on approval,
-    // so a fresh Express cart won't have one yet — skip the requirement in that case.
-    const isExpress =
-      paymentMethodType === StandardPaymentMethodType.PAYPAL &&
-      builderType === CustomBuilderType.EXPRESS;
-
-    if (!isExpress && !ctCart.customerEmail) {
-      throw new ErrorInvalidOperation("Required data missing: customer email");
-    }
 
     const amountPlanned = await this.ctCartService.getPaymentAmount({
       cart: ctCart,
     });
 
+    // try to reuse last payment if it is still relevant
+    const lastPayment = ctCart.paymentInfo?.payments?.at(-1)?.obj;
+    if (
+      lastPayment &&
+      this.isRelevantExistingPayment(lastPayment, ctCart, amountPlanned)
+    ) {
+      log.info(
+        `relevant existing payment found for ${ctCart.id}, returing this instead of new`
+      );
+      return this.buildPaymentResponse(ctCart, lastPayment);
+    }
+    log.info(
+      `no relevant checkout payments found for ${ctCart.id}, creating new payment`
+    );
+
     // Create a new payment in commercetools
     const newPayment = await this.ctPaymentService.createPayment({
       amountPlanned,
       paymentMethodInfo: { paymentInterface: getConfig().paymentInterface },
+      checkoutTransactionItemId: getCheckoutTransactionItemIdFromContext(),
       ...(ctCart.customerId
         ? { customer: { typeId: "customer", id: ctCart.customerId } }
         : { anonymousId: ctCart.anonymousId }),
@@ -354,17 +443,62 @@ export class PayPalPaymentService extends AbstractPaymentService {
         );
       });
 
-    const addPaymentPromise =
-      ctCart.paymentInfo?.payments === undefined ||
-      ctCart.paymentInfo.payments.length === 0
-        ? this.ctCartService.addPayment({
-            resource: { id: ctCart.id, version: ctCart.version },
-            paymentId: newPayment.id,
-          })
-        : Promise.resolve();
+    const addPaymentPromise = this.ctCartService.addPayment({
+      resource: { id: ctCart.id, version: ctCart.version },
+      paymentId: newPayment.id,
+    });
 
     await Promise.all([assignCustomTypePromise, addPaymentPromise]);
 
+    return this.buildPaymentResponse(ctCart, newPayment);
+  }
+
+  /**
+   * Whether `payment` — the cart's last linked payment — can be returned
+   * only checkout-relevant payments are considered additionally to standard possible differences
+   * */
+  private isRelevantExistingPayment(
+    payment: Payment,
+    ctCart: Cart,
+    amountPlanned: { centAmount: number; currencyCode: string }
+  ): boolean {
+    if (payment.paymentStatus?.interfaceCode !== "Initial") {
+      return false;
+    }
+
+    if (ctCart.customerId) {
+      if (payment.customer?.id !== ctCart.customerId) {
+        return false;
+      }
+    } else if (payment.anonymousId !== ctCart.anonymousId) {
+      return false;
+    }
+
+    if (
+      !payment.checkoutTransactionItemId ||
+      payment.checkoutTransactionItemId !==
+        getCheckoutTransactionItemIdFromContext()
+    ) {
+      return false;
+    }
+
+    if (
+      payment.amountPlanned.centAmount !== amountPlanned.centAmount ||
+      payment.amountPlanned.currencyCode !== amountPlanned.currencyCode
+    ) {
+      return false;
+    }
+
+    return (
+      payment.paymentMethodInfo?.paymentInterface ===
+      getConfig().paymentInterface
+    );
+  }
+
+  private buildPaymentResponse(
+    ctCart: Cart,
+    payment: Payment
+  ): PaymentResponseSchemaDTO {
     // Gather additional cart data for the response
     const isShipped =
       !!ctCart.shippingAddress ||
@@ -381,7 +515,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const priceBreakdown = mapCommercetoolsCartToPayPalPriceBreakdown(ctCart);
 
     const { address: resolvedShippingAddress } =
-      resolveCommercetoolsCartShippingAddress(ctCart, newPayment.id);
+      resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
     const shippingAddress = resolvedShippingAddress
       ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
       : undefined;
@@ -390,10 +524,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return {
       paypalData: {
         clientId: getConfig().paypalClientId ?? "",
-        currency: newPayment.amountPlanned.currencyCode,
+        currency: payment.amountPlanned.currencyCode,
       },
-      id: newPayment.id,
-      amountPlanned: newPayment.amountPlanned,
+      id: payment.id,
+      amountPlanned: payment.amountPlanned,
       email: ctCart.customerEmail,
       ctCustomerId: ctCart.customerId,
       firstName: ctCart.billingAddress?.firstName,
@@ -411,12 +545,43 @@ export class PayPalPaymentService extends AbstractPaymentService {
     orderData,
     payPalIntent,
     builderType,
+    paymentMethodType,
   }: CreateOrderRequestSchemaDTO): Promise<CreateOrderResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    // interfaceId is set only once a real authorize/capture already succeeded, and is immutable
+    // from then on — so a payment that already has one should not create a new order
+    // This error shouldn't be reachable: if cart was changed out of selecting shipping address/method in express -
+    // opening the checkout must create a new payment. Added as precaution only
+    if (payment.interfaceId) {
+      throw new ErrorInvalidOperation(
+        `Payment ${paymentId} is already linked to PayPal order ${payment.interfaceId} — refusing to create a new order for it`
+      );
+    }
+
+    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
+      this.validateVenmoOrderParams(payment);
+    }
 
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
     });
+
+    // Informational only — customerEmail is never actually sent to PayPal (createOrder/
+    // buildOrderRequest never reference it), so a missing one here isn't fatal. A real standard
+    // checkout flow already forces the buyer to fill this in before the enabler even loads;
+    // the one case this can still legitimately fire is a merchant embedding only the standard payment
+    // buttons in their own custom checkout UI without collecting it first. PayPal collects the
+    // buyer's email inside its own popup for Express, so that case is excluded here — by this
+    // point paymentMethodType/builderType are the request's own real values, not a guess.
+    const isExpress =
+      paymentMethodType === StandardPaymentMethodType.PAYPAL &&
+      builderType === CustomBuilderType.EXPRESS;
+    if (!isExpress && !ctCart.customerEmail) {
+      log.warn(
+        `createOrder: cart ${ctCart.id} has no customerEmail for a non-Express order (payment ${paymentId})`
+      );
+    }
 
     // So a returning customer's newly-vaulted payment source gets attached to their existing
     // PayPal customer id instead of a brand-new, disconnected one — see buildOrderRequest. Only
@@ -425,13 +590,23 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolvePayPalCustomerId(ctCart.customerId)
       : undefined;
 
+    const returnUrl = this.buildRedirectMerchantUrl(payment.id);
+    const cancelUrl = this.resolveMerchantReturnBaseUrl();
+
+    // experience_context.user_action/the matching client-side `commit`
+    const showContinueReview =
+      builderType === CustomBuilderType.EXPRESS && this.hasExpressReviewStep();
+
     const orderRequest = buildOrderRequest(
       payment,
       ctCart,
       orderData,
       payPalIntent,
       existingPayPalCustomerId,
-      builderType === CustomBuilderType.EXPRESS
+      builderType === CustomBuilderType.EXPRESS,
+      showContinueReview,
+      returnUrl,
+      cancelUrl
     );
 
     let response: Order;
@@ -441,7 +616,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `createOrder: PayPal order creation failed for payment ${
           payment.id
-        } — ${e instanceof Error ? e.message : JSON.stringify(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to create PayPal order for payment ${payment.id}`
@@ -454,7 +629,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // actually approved on PayPal. That happens later, in authorizeOrder()/captureOrder().
     await Promise.all([
       retryCTSync(
-        () => this.syncPayPalOrderStatus(payment.id, response),
+        () => this.syncPayPalOrderStatus(payment.id, response, false),
         "createOrder",
         payment.id,
         response.status ?? ""
@@ -475,6 +650,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
         links: response.links,
       },
     };
+  }
+
+  // PayPal's Venmo funding source only supports USD-denominated orders.
+  private validateVenmoOrderParams(payment: Payment): void {
+    if (payment.amountPlanned.currencyCode !== "USD") {
+      throw new ErrorInvalidOperation(
+        `Venmo requires a USD-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
+      );
+    }
   }
 
   /**
@@ -512,6 +696,37 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * Customer-level sibling of logProcessorInteraction() — logs a processor-owned PayPal
+   * request/response pair (see utils/processorInteraction.utils.ts) onto the CT customer, both
+   * on success and on failure (unlike the payment-side version, which is success-only), since a
+   * failed customer-level call — e.g. getStoredPaymentMethods's getPaymentTokens — otherwise
+   * leaves no commercetools-visible trace at all. Reuses PayPalCustomerService's
+   * getCtCustomer/updateCtCustomer, which already catch and log their own failures — no extra
+   * try/catch needed here.
+   *
+   * Always called fire-and-forget (`void ...`), never awaited — unlike logProcessorInteraction.
+   * These 3 calls sit on hot, customer-facing paths (getStoredPaymentMethods, and
+   * resolveUserIdToken via config(), run on essentially every signed-in checkout page load), so
+   * this audit write must never add latency to the response the shopper is waiting on.
+   */
+  private async logProcessorCustomerInteraction(
+    ctCustomerId: string,
+    apiCallName: ProcessorCustomerApiCallName,
+    request: unknown,
+    response: unknown
+  ): Promise<void> {
+    const ctCustomer = await this.payPalCustomerService.getCtCustomer(
+      ctCustomerId
+    );
+    if (!ctCustomer) return;
+    await this.payPalCustomerService.updateCtCustomer(
+      ctCustomer.id,
+      ctCustomer.version,
+      buildProcessorCustomerLogging(apiCallName, request, response)
+    );
+  }
+
+  /**
    * Persists the PayPal customer id a card vault produced (buildOrderRequest's
    * payment_source.card.attributes.vault.store_in_vault) onto the CT customer's PayPalUserId
    * custom field, so getStoredPaymentMethods()/deleteStoredPaymentMethod() can find it later —
@@ -523,15 +738,77 @@ export class PayPalPaymentService extends AbstractPaymentService {
     payment: Payment,
     response: Order
   ): Promise<void> {
-    const vaultCustomerId =
-      response.payment_source?.card?.attributes?.vault?.customer?.id;
+    const vault = response.payment_source?.card?.attributes?.vault;
+    const vaultCustomerId = vault?.customer?.id;
     if (!vaultCustomerId || !payment.customer?.id) {
       return;
     }
-    await this.payPalCustomerService.linkPayPalCustomerId(
-      payment.customer.id,
-      vaultCustomerId
-    );
+    const customerId = payment.customer.id;
+
+    // Two independent, best-effort writes to two different CT resources (Customer vs.
+    // PaymentMethod) — no data dependency between them, so they run in parallel rather than one
+    // gating the other, and neither is awaited here: — to prevent slow down users experience.
+    //The more important link customer thou has 3 retries, the less important token can be fetched from PayPal.
+    void Promise.all([
+      this.payPalCustomerService.linkPayPalCustomerId(
+        customerId,
+        vaultCustomerId
+      ),
+      vault?.id
+        ? this.ctPaymentMethodService
+            .save({
+              customerId,
+              token: vault.id,
+              method: StandardPaymentMethodType.CREDIT_CARD,
+              paymentInterface:
+                getStoredPaymentMethodsConfig().config.paymentInterface,
+            })
+            .catch((e) =>
+              log.warn(
+                `linkVaultedCardCustomer: could not save commercetools PaymentMethod record for customer ${customerId} — ${errorMessage(
+                  e
+                )}`
+              )
+            )
+        : Promise.resolve(),
+    ]);
+  }
+
+  /**
+   * Guards against linking a second PayPal order to a payment that already has one linked
+   * (interfaceId, set once at the moment an order is actually approved — see
+   * syncPayPalOrderStatus/expressApprove). Deliberately separate from the PayPalOrderId-based
+   * ownership checks (finalizeOrder/expressApprove/authenticateThreeDSOrder): PayPalOrderId always
+   * reflects whichever order was *created* most recently, so it can't by itself catch the case
+   * where an *earlier* order already completed a real authorize/capture for this same payment.
+   * If there is a good reason for making exception extension can be used, but that is out of checkout flow scope.
+   */
+  private assertNotLinkedToDifferentOrder(
+    payment: Payment,
+    orderID: string
+  ): void {
+    if (payment.interfaceId && payment.interfaceId !== orderID) {
+      throw new ErrorInvalidOperation(
+        `Payment ${payment.id} is already linked to a different PayPal order (${payment.interfaceId}); refusing to also link ${orderID}`
+      );
+    }
+  }
+
+  /**
+   * Guards finalizeOrder/expressApprove/authenticateThreeDSOrder against acting on a stale PayPal
+   * order for this payment. PayPalOrderId is overwritten on every createOrder() call (e.g. the
+   * buyer reopens the popup after an earlier attempt — see syncPayPalOrderStatus's own comment), so
+   * a caller-supplied orderID that no longer matches it never means the order didn't belong to this
+   * payment — it did, at the time it was created — it means a newer order has since superseded it
+   * as the one actually meant to be finalized/authenticated.
+   */
+  private assertIsCurrentPayPalOrder(payment: Payment, orderID: string): void {
+    const paypalOrderId = payment.custom?.fields?.PayPalOrderId;
+    if (paypalOrderId && paypalOrderId !== orderID) {
+      throw new ErrorInvalidOperation(
+        `Order ${orderID} is stale for payment ${payment.id} — a newer PayPal order (${paypalOrderId}) has since been created for it`
+      );
+    }
   }
 
   /**
@@ -555,6 +832,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
         ? "authorizePayPalOrder"
         : "capturePayPalOrder";
 
+    // A payment already linked (via interfaceId) to a different order already had a real
+    // authorize/capture succeed once — refusing here prevents a second, superseded-but-still-valid
+    // order from also being authorized/captured against the same payment (a genuine double-charge
+    // risk, not just a data-integrity nicety). Checked before ever calling PayPal.
+    this.assertNotLinkedToDifferentOrder(payment, orderID);
+
     await this.ensureOrderApproved(orderID);
 
     let response: Order;
@@ -564,7 +847,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `${config.operation}: PayPal call failed for payment ${
           payment.id
-        } — ${errorMessage(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to ${
@@ -596,7 +879,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         },
       }),
       retryCTSync(
-        () => this.syncPayPalOrderStatus(payment.id, response),
+        () => this.syncPayPalOrderStatus(payment.id, response, true),
         config.operation,
         payment.id,
         response.status ?? ""
@@ -659,11 +942,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<OnApproveResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
 
-    if (payment.interfaceId && payment.interfaceId !== orderID) {
-      throw new ErrorInvalidOperation(
-        `Order ${orderID} does not belong to payment ${paymentId}`
-      );
-    }
+    // Ownership is checked against PayPalOrderId — unlike interfaceId, it's kept current on every
+    // createOrder() call (a payment can get more than one PayPal order across its lifetime, e.g.
+    // the buyer reopens the popup), so it always reflects the order actually meant to be finalized
+    // here. The interfaceId-based "already linked to a different order" guard runs separately,
+    // inside applyPayPalOrderTransaction.
+    this.assertIsCurrentPayPalOrder(payment, orderID);
 
     const response = await this.applyPayPalOrderTransaction(
       payment,
@@ -681,6 +965,26 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * The CT Checkout session's own merchantReturnUrl, falling back to the static
+   * MERCHANT_RETURN_URL config — shared by buildRedirectMerchantUrl (post-approval buyer
+   * redirect) and createOrder (experience_context.return_url/cancel_url, see buildOrderRequest).
+   */
+  private resolveMerchantReturnBaseUrl(): string | undefined {
+    return getMerchantReturnUrlFromContext() || getConfig().returnUrl;
+  }
+
+  /**
+   * True whenever PayPal Express has an actual review step configured after buyer approval —
+   * either the PAYPAL_REDIRECT_ON_APPROVE master switch, or just PAYPAL_ONAPPROVE_PREFIX being
+   * set (configuring a review-page target is itself enough signal, no need to also flip a
+   * separate switch). Single source of truth for config()'s exposed `redirectOnApprove` and
+   * createOrder()'s experience_context.user_action — see both call sites' own comments.
+   */
+  private hasExpressReviewStep(): boolean {
+    return getConfig().redirectOnApprove || !!getConfig().onApprovePrefix;
+  }
+
+  /**
    * Builds a buyer-facing redirect URL, appending paymentReference/paymentStatus query params.
    * Falls back to the CT Checkout session's own merchantReturnUrl, then the static
    * MERCHANT_RETURN_URL config. `approveUrlOverride` takes priority over both when passed — today
@@ -693,10 +997,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     paymentStatus?: string,
     approveUrlOverride?: string
   ): string | undefined {
-    const baseUrl =
-      approveUrlOverride ||
-      getMerchantReturnUrlFromContext() ||
-      getConfig().returnUrl;
+    const baseUrl = approveUrlOverride || this.resolveMerchantReturnBaseUrl();
     if (!baseUrl?.length) return undefined;
     const redirectUrl = new URL(baseUrl);
     redirectUrl.searchParams.append("paymentReference", paymentReference);
@@ -743,33 +1044,20 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE
-   * (default off; see enabler/README.md). Called from handleOnApprove at approval time, *instead of*
-   * authorizeOrder()/captureOrder() — the real authorize/capture happens later, triggered by the
+   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE (default off).
+   * Called from handleOnApprove at approval time, *instead of*
+   * authorizeOrder()/captureOrder() — the real authorize/capture can happen later, triggered by the
    * merchant's own backend via the Payment Intents API → settlement() or extension app,
    * once the buyer has reviewed on that page.
    *
-   * Without any transaction on the CT Payment, commercetools Checkout never creates the CT Order
-   * (it does so as soon as it sees one — docs.commercetools.com/checkout/payments-lifecycle), and
-   * the Payment Intents API's documented precondition is "after a Payment has been authorized and
-   * Checkout has created an Order" — so skipping straight to redirect with no transaction at all
-   * would leave the later Payment Intents API call unreachable. This adds a placeholder
-   * transaction to trigger that Order creation now, before the buyer leaves.
-   *
+   * The buyer has already approved the order on PayPal's side at this point — this triggers an
+   * optimistic CT Order creation ahead of the real authorize/capture, using PayPalOrderId (the
+   * only PayPal-side identifier available yet) as the payment's interfaceId.
    * The placeholder is added via a **raw CT API call**, not ctPaymentService.updatePayment() —
    * that wrapped helper silently discards a bare Initial-state transaction with no interactionId
-   * (its own shouldDiscardTransaction guard).
-   * This flow defers the real authorize/capture to an indefinite,
-   * merchant-controlled later point, so a silently-dropped placeholder would leave the PayPal
-   * order existing while the commercetools Order never gets created — hanging with no loggable information for
-   * however long the merchant takes to finalize.
    *
-   * Once the real authorizeOrder()/captureOrder()/settlement() transaction is added later (through
-   * the normal, unchanged, wrapped updatePayment() call in applyPayPalOrderTransaction), the SDK's
-   * own transaction-matching logic finds this same Initial/no-interactionId transaction (by
-   * matching type + amount) and closes it out in place via changeTransactionState — no duplicate.
-   * That reuse only works if the placeholder's type already matches the eventual real
-   * transaction's type, which is why this needs to know the configured intent up front.
+   * TODO: verify on server that the order is created. Otherwice backward compatibility with extension
+   * should be dropped down and interactionId set as the only available - PayPalOrderId.
    */
   public async expressApprove({
     paymentId,
@@ -778,11 +1066,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }: ExpressApproveRequestSchemaDTO): Promise<ExpressApproveResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
 
-    if (payment.interfaceId && payment.interfaceId !== orderID) {
-      throw new ErrorInvalidOperation(
-        `Order ${orderID} does not belong to payment ${paymentId}`
-      );
-    }
+    // Ownership check (see assertIsCurrentPayPalOrder's own comment) — PayPalOrderId, not interfaceId.
+    this.assertIsCurrentPayPalOrder(payment, orderID);
+    // This *is* the approval moment for the Express+redirect flow — refuse to link a second order
+    // to a payment that already completed a real authorize/capture via a different one (see
+    // assertNotLinkedToDifferentOrder's own comment).
+    this.assertNotLinkedToDifferentOrder(payment, orderID);
 
     const transactionType =
       payPalIntent === "Authorize" ? "Authorization" : "Charge";
@@ -790,26 +1079,38 @@ export class PayPalPaymentService extends AbstractPaymentService {
       (transaction) =>
         transaction.type === transactionType && !transaction.interactionId
     );
-    if (!hasPlaceholder) {
+
+    // interfaceId is only ever set once, at a genuine approval moment — createOrder() never
+    // touches it (see syncPayPalOrderStatus), so this is the one place in the Express flow that
+    // links it, merged into the same atomic update as the placeholder transaction.
+    const actions: PaymentUpdateAction[] = [
+      ...(hasPlaceholder
+        ? []
+        : [
+            {
+              action: "addTransaction" as const,
+              transaction: {
+                type: transactionType,
+                state: "Initial" as const,
+                amount: {
+                  centAmount: payment.amountPlanned.centAmount,
+                  currencyCode: payment.amountPlanned.currencyCode,
+                },
+              },
+            },
+          ]),
+      ...(payment.interfaceId
+        ? []
+        : [{ action: "setInterfaceId" as const, interfaceId: orderID }]),
+    ];
+    if (actions.length) {
       await paymentSDK.ctAPI.client
         .payments()
         .withId({ ID: payment.id })
         .post({
           body: {
             version: payment.version,
-            actions: [
-              {
-                action: "addTransaction",
-                transaction: {
-                  type: transactionType,
-                  state: "Initial",
-                  amount: {
-                    centAmount: payment.amountPlanned.centAmount,
-                    currencyCode: payment.amountPlanned.currencyCode,
-                  },
-                },
-              },
-            ],
+            actions,
           },
         })
         .execute();
@@ -835,11 +1136,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }: AuthenticateThreeDSOrderRequestSchemaDTO): Promise<AuthenticateThreeDSOrderResponseSchemaDTO> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
 
-    if (payment.interfaceId && payment.interfaceId !== orderID) {
-      throw new ErrorInvalidOperation(
-        `Order ${orderID} does not belong to payment ${paymentId}`
-      );
-    }
+    // Ownership check (see assertIsCurrentPayPalOrder's own comment) — PayPalOrderId, not
+    // interfaceId. Read-only otherwise, so no assertNotLinkedToDifferentOrder call — nothing gets
+    // linked here.
+    this.assertIsCurrentPayPalOrder(payment, orderID);
 
     let order: Order;
     try {
@@ -848,12 +1148,19 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.error(
         `authenticateThreeDSOrder: PayPal order lookup failed for payment ${
           payment.id
-        } — ${errorMessage(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       throw new ErrorInvalidOperation(
         `Failed to look up PayPal order ${orderID}`
       );
     }
+
+    await this.logProcessorInteraction(
+      payment.id,
+      "getPayPalOrder",
+      { orderID },
+      order
+    );
 
     const authenticationResult =
       order.payment_source?.card?.authentication_result;
@@ -992,7 +1299,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     log.error(
       `updateShipping: PayPal order update failed${context} for payment ${paymentId} — ${errorMessage(
         e
-      )} — response body: ${JSON.stringify(errorResponseBody(e))}`
+      )}${payPalDebugIdSuffix(e)} — response body: ${JSON.stringify(
+        errorResponseBody(e)
+      )}`
     );
     throw new ErrorInvalidOperation(`Failed to update PayPal order ${orderID}`);
   }
@@ -1003,8 +1312,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
     buildPatches: (shippingOptionsOp: "add" | "replace") => Patch[],
     assumedOp: "add" | "replace"
   ): Promise<void> {
+    const patches = buildPatches(assumedOp);
     try {
-      await updatePayPalOrder(orderID, buildPatches(assumedOp));
+      const response = await updatePayPalOrder(orderID, patches);
+      await this.logProcessorInteraction(
+        paymentId,
+        "updatePayPalOrder",
+        patches,
+        response
+      );
     } catch (e) {
       if (!isPayPalInvalidPatchOperationError(e)) {
         this.failPatchPayPalOrderShipping(e, orderID, paymentId, "");
@@ -1014,8 +1330,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.warn(
         `updateShipping: assumed op "${assumedOp}" was wrong for order ${orderID} (cart's shippingInfo didn't reflect the order's actual state) — retrying with "${correctedOp}"`
       );
+      const correctedPatches = buildPatches(correctedOp);
       try {
-        await updatePayPalOrder(orderID, buildPatches(correctedOp));
+        const response = await updatePayPalOrder(orderID, correctedPatches);
+        await this.logProcessorInteraction(
+          paymentId,
+          "updatePayPalOrder",
+          correctedPatches,
+          response
+        );
       } catch (retryError) {
         this.failPatchPayPalOrderShipping(
           retryError,
@@ -1109,24 +1432,42 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * Applies setInterfaceId / setStatusInterfaceCode / setStatusInterfaceText /
-   * setMethodInfoMethod via a raw CT API call — connect-payments-sdk's generic
-   * updatePayment() does not expose the status actions. Re-fetches the payment
-   * for a fresh version on every call so retryCTSync's retries avoid version
-   * conflicts. Used to sync the data with connect format to keep full
-   * compatibility with connect modules
+   * Applies setInterfaceId / setCustomField(PayPalOrderId) / setStatusInterfaceCode /
+   * setStatusInterfaceText / setMethodInfoMethod via a raw CT API call — connect-payments-sdk's
+   * generic updatePayment() does not expose the status actions. Re-fetches the payment for a fresh
+   * version on every call so retryCTSync's retries avoid version conflicts. Used to sync the data
+   * with connect format to keep full compatibility with connect modules.
+   *
+   * `linkInterfaceId` is true only when called after a confirmed successful authorize/capture
+   * (applyPayPalOrderTransaction) — never from createOrder(), since a payment can get more than one
+   * PayPal order across its lifetime (e.g. the buyer reopens the popup after an earlier attempt)
+   * and commercetools permanently rejects changing interfaceId once set. PayPalOrderId (mirrors
+   * paypal-commercetools-extension's own field) is synced unconditionally in both contexts instead —
+   * it's what the ownership checks elsewhere (finalizeOrder/expressApprove/authenticateThreeDSOrder)
+   * read, since it's always current.
    */
   private async syncPayPalOrderStatus(
     paymentId: string,
-    response: Order
+    response: Order,
+    linkInterfaceId: boolean
   ): Promise<void> {
     const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
     const actions: PaymentUpdateAction[] = [
-      // A payment can get more than one PayPal order created for it across its lifetime
-      // (e.g. the buyer reopens the PayPal Express popup after an earlier
-      // attempt without a full page reload, which calls createOrder again).
-      ...(response.id && payment.interfaceId !== response.id
+      // Only ever attempted at the moment of actual approval (linkInterfaceId: true) — never
+      // speculatively at createOrder() time. See this function's own doc comment.
+      ...(linkInterfaceId && response.id && !payment.interfaceId
         ? [{ action: "setInterfaceId" as const, interfaceId: response.id }]
+        : []),
+      // Always current, unlike interfaceId — this is what ownership checks elsewhere read.
+      ...(response.id
+        ? [
+            {
+              action: "setCustomField" as const,
+              name: "PayPalOrderId",
+              value: response.id,
+            },
+          ]
         : []),
       ...(response.status
         ? [
@@ -1223,24 +1564,32 @@ export class PayPalPaymentService extends AbstractPaymentService {
         log.error(
           `settlement: PayPal capture failed for payment ${
             ctPayment.id
-          } — ${errorMessage(e)}`
+          } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
         );
         throw new ErrorInvalidOperation(
           `Failed to capture PayPal authorization ${authorizationId}`
         );
       }
 
-      await this.ctPaymentService.updatePayment({
-        id: ctPayment.id,
-        transaction: {
-          type: "Charge",
-          amount,
-          interactionId: response.id,
-          state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
-            response.status
-          ),
-        },
-      });
+      await Promise.all([
+        this.ctPaymentService.updatePayment({
+          id: ctPayment.id,
+          transaction: {
+            type: "Charge",
+            amount,
+            interactionId: response.id,
+            state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
+              response.status
+            ),
+          },
+        }),
+        this.logProcessorInteraction(
+          ctPayment.id,
+          "capturePayPalAuthorization",
+          { authorizationId, amount: paypalAmount },
+          response
+        ),
+      ]);
 
       return {
         success: true,
@@ -1327,10 +1676,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return { storedPaymentMethods: [] };
     }
 
+    const ctCustomerId = ctCart.customerId;
+
     try {
-      const { payment_tokens: paymentTokens = [] } = await getPaymentTokens(
-        paypalCustomerId
+      const paymentTokensResponse = await getPaymentTokens(paypalCustomerId);
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId,
+        "getPaymentTokens",
+        { customerId: paypalCustomerId },
+        paymentTokensResponse
       );
+      const { payment_tokens: paymentTokens = [] } = paymentTokensResponse;
       // Restrict to card tokens before looking anything up in commercetools — only credit card tokens are supported in checkout now.
       const cardTokens = paymentTokens.filter(isCardPaymentToken);
       if (paymentTokens.length !== cardTokens.length)
@@ -1366,7 +1722,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
       log.warn(
         `getStoredPaymentMethods: could not list PayPal payment tokens for customer ${paypalCustomerId} — ${errorMessage(
           e
-        )}`
+        )}${payPalDebugIdSuffix(e)}`
+      );
+      void this.logProcessorCustomerInteraction(
+        ctCustomerId,
+        "getPaymentTokens",
+        { customerId: paypalCustomerId },
+        buildErrorResponsePayload(e)
       );
       return { storedPaymentMethods: [] };
     }
@@ -1374,35 +1736,53 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
   public async deleteStoredPaymentMethod(token: string): Promise<void> {
     const cartId = getCartIdFromContext();
-    let ctCart: Cart | undefined;
-    try {
-      // PayPal deletion is authoritative and runs immediately — commercetools is not consulted
-      // to authorize it, since the PayPal token is the sole identifier the enabler has for a
-      // stored method. The cart is only fetched alongside it, best-effort, for the mirror
-      // cleanup below.
-      [, ctCart] = await Promise.all([
-        deletePaymentToken(token),
-        this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
-      ]);
-      log.info(
-        `deleteStoredPaymentMethod: success, cartId: ${
-          ctCart?.id ?? cartId ?? "unavailable"
-        }`
-      );
-    } catch (e) {
+    // Promise.allSettled (not Promise.all) — unlike Promise.all, this keeps the cart (and thus
+    // customerId) available below even when the PayPal delete itself rejects, so the failure can
+    // still be logged onto the CT customer. The cart is only ever used best-effort here (mirror
+    // cleanup, and now audit logging), never to authorize the deletion itself.
+    const [deleteResult, cartResult] = await Promise.allSettled([
+      deletePaymentToken(token),
+      this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
+    ]);
+    const ctCart: Cart | undefined =
+      cartResult.status === "fulfilled" ? cartResult.value : undefined;
+
+    if (deleteResult.status === "rejected") {
+      const e = deleteResult.reason;
       log.error(
         `deleteStoredPaymentMethod: failed, cartId: ${
-          cartId ?? "unavailable"
-        } — ${errorMessage(e)}`
+          ctCart?.id ?? cartId ?? "unavailable"
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
+      if (ctCart?.customerId) {
+        void this.logProcessorCustomerInteraction(
+          ctCart.customerId,
+          "deletePaymentToken",
+          { paymentToken: token },
+          buildErrorResponsePayload(e)
+        );
+      }
       throw e;
     }
 
-    // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one exists.
-    // The PayPal deletion above already succeeded and is the authoritative action; this fire-and-
-    // forget cleanup just keeps commercetools from holding a stale reference.
+    log.info(
+      `deleteStoredPaymentMethod: success, cartId: ${
+        ctCart?.id ?? cartId ?? "unavailable"
+      }`
+    );
+
     if (ctCart?.customerId) {
       const customerId = ctCart.customerId;
+      void this.logProcessorCustomerInteraction(
+        customerId,
+        "deletePaymentToken",
+        { paymentToken: token },
+        deleteResult.value
+      );
+
+      // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one
+      // exists. The PayPal deletion above already succeeded and is the authoritative action;
+      // this fire-and-forget cleanup just keeps commercetools from holding a stale reference.
       void this.ctPaymentMethodService
         .getByTokenValue({
           customerId,

@@ -72,7 +72,11 @@ const PaymentInfoConsumer: FC<{
 const UpdateShippingConsumer: FC<{
   onResult?: (result: unknown) => void;
   onError?: (error: unknown) => void;
-  request?: { orderID: string; address?: { countryCode: string }; shippingMethodId?: string };
+  request?: {
+    orderID: string;
+    address?: { countryCode: string };
+    shippingMethodId?: string;
+  };
 }> = ({
   onResult,
   onError,
@@ -210,98 +214,36 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
   });
 });
 
-describe("PaymentProvider resolving URLs via processorUrl", () => {
-  beforeEach(() => {
-    mockedProcessorRequest.mockReset();
-    mockedProcessorRequest.mockResolvedValue(false);
-    mockNotify.mockReset();
-  });
-
-  it("derives createPaymentUrl from processorUrl when no legacy createPaymentUrl is passed", async () => {
-    render(
-      <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        processorUrl="https://processor.test"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
-        paymentMethodType="PayPal"
-      >
-        {null}
-      </PaymentProvider>
-    );
-
-    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
-
-    const [, url] = mockedProcessorRequest.mock.calls[0];
-    expect(url).toBe("https://processor.test/payments");
-  });
-
-  it("derives createOrderUrl from processorUrl when no legacy createOrderUrl is passed", async () => {
-    render(
-      <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        processorUrl="https://processor.test"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
-      >
-        <CreateOrderConsumer />
-      </PaymentProvider>
-    );
-
-    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
-
-    const [, url] = mockedProcessorRequest.mock.calls[0];
-    expect(url).toBe("https://processor.test/payments/createOrder");
-  });
-});
+// Deriving createPaymentUrl/createOrderUrl/etc. from processorUrl is no longer PaymentProvider's
+// job — RenderTemplate (Checkout-only) injects the already-resolved URL into these same named
+// props upstream now, so PaymentProvider just uses whatever value it's given, same as a
+// self-hosted merchant's own directly-supplied value. See "PaymentProvider auto-triggers
+// createPayment on mount" above for coverage of that straightforward pass-through.
 
 describe("PaymentProvider missing endpoint configuration", () => {
-  let consoleErrorSpy: jest.SpyInstance;
+  // createPaymentUrl is required now (matching the original standalone client), so every test
+  // here supplies one and gets a real createPayment response — each test's own focus (a *different*
+  // optional URL being unconfigured) resolves silently, with no notify/console.error, matching the
+  // original client's own behavior for these fields.
+  const validCreatePaymentResponse = {
+    id: "payment-1",
+    paypalData: { clientId: "client-1", currency: "EUR" },
+    amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+  } as never;
 
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
+    mockedProcessorRequest.mockResolvedValue(validCreatePaymentResponse);
     mockNotify.mockReset();
     mockedRedirectTo.mockClear();
-    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
   });
 
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-  });
-
-  it("handleCreatePayment logs and notifies instead of calling the processor when neither processorUrl nor createPaymentUrl is configured", async () => {
+  it("handleCreateOrder silently no-ops (no processor call, no notify) when createOrderUrl is not configured", async () => {
     render(
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
-        paymentMethodType="PayPal"
-      >
-        {null}
-      </PaymentProvider>
-    );
-
-    await waitFor(() =>
-      expect(mockNotify).toHaveBeenCalledWith(
-        "Error",
-        "Something went wrong. Please try again later."
-      )
-    );
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
-  });
-
-  it("handleCreateOrder logs and notifies instead of calling the processor when neither processorUrl nor createOrderUrl is configured", async () => {
-    render(
-      <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={() => {}}
@@ -310,21 +252,20 @@ describe("PaymentProvider missing endpoint configuration", () => {
       </PaymentProvider>
     );
 
-    await waitFor(() =>
-      expect(mockNotify).toHaveBeenCalledWith(
-        "Error",
-        "Something went wrong. Please try again later."
-      )
+    // Only the initial createPayment call ever reaches the processor — createOrder no-ops silently.
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(1));
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
     );
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it("handleOnApprove logs and notifies instead of calling the processor when no approve/authorize/redirect URL is configured", async () => {
+  it("handleOnApprove silently no-ops (no processor call, no notify) when no approve/authorize/redirect URL is configured", async () => {
     render(
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={() => {}}
@@ -333,21 +274,19 @@ describe("PaymentProvider missing endpoint configuration", () => {
       </PaymentProvider>
     );
 
-    await waitFor(() =>
-      expect(mockNotify).toHaveBeenCalledWith(
-        "Error",
-        "Something went wrong. Please try again later."
-      )
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(1));
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
     );
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it("handleOnApprove takes the legacy onApproveRedirectionUrl branch unchanged (no processor call at all)", async () => {
+  it("handleOnApprove takes the legacy onApproveRedirectionUrl branch unchanged (no approve/authorize processor call)", async () => {
     render(
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={() => {}}
@@ -363,7 +302,12 @@ describe("PaymentProvider missing endpoint configuration", () => {
         "https://merchant.example.com/review?order_id=order-1"
       )
     );
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    // Only the initial createPayment call should have reached the processor — the
+    // onApproveRedirectionUrl branch itself never calls it for approve/authorize.
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
+    );
   });
 
   it("handleOnApprove short-circuits to the redirect when the response has a merchantReturnUrl, without running the normal success handling", async () => {
@@ -378,6 +322,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         onApproveUrl="https://processor.test/payments/approve"
         shippingMethodId="standard"
@@ -397,12 +342,13 @@ describe("PaymentProvider missing endpoint configuration", () => {
     expect(purchaseCallback).not.toHaveBeenCalled();
   });
 
-  it("handleCreateVaultSetupToken logs and returns an empty string when createVaultSetupTokenUrl is not configured", async () => {
+  it("handleCreateVaultSetupToken silently returns an empty string (no processor call, no notify) when createVaultSetupTokenUrl is not configured", async () => {
     const onResult = jest.fn();
     render(
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={() => {}}
@@ -412,12 +358,11 @@ describe("PaymentProvider missing endpoint configuration", () => {
     );
 
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(""));
-    expect(mockNotify).toHaveBeenCalledWith(
-      "Error",
-      "Something went wrong. Please try again later."
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
     );
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
   });
 });
 
@@ -450,6 +395,7 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={purchaseCallback}
@@ -499,6 +445,7 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
       <PaymentProvider
         options={{} as any}
         requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
         getSettingsUrl="https://processor.test/settings"
         shippingMethodId="standard"
         purchaseCallback={() => {}}
@@ -527,14 +474,16 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
     );
   });
 
-  it("logs and falls through to the normal missing-config handling when redirectOnApprove is true but no processorUrl is configured", async () => {
-    const consoleErrorSpy = jest
-      .spyOn(console, "error")
-      .mockImplementation();
+  it("logs expressApproveUrl's missing config and silently falls through (no approve/authorize call, no notify) when redirectOnApprove is true but no processorUrl is configured", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
     mockedProcessorRequest.mockResolvedValue({
       id: "payment-1",
       paypalData: { clientId: "client-1", currency: "EUR" },
-      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+      amountPlanned: {
+        centAmount: 1000,
+        currencyCode: "EUR",
+        fractionDigits: 2,
+      },
     } as never);
 
     render(
@@ -552,15 +501,19 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
       </PaymentProvider>
     );
 
+    // expressApproveUrl itself is still unaffected by this change — still logs a console.error.
     await waitFor(() =>
-      expect(mockNotify).toHaveBeenCalledWith(
-        "Error",
-        "Something went wrong. Please try again later."
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("expressApproveUrl")
       )
     );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("expressApproveUrl")
+    // No legacy onApproveRedirectionUrl, and no authorizeOrderUrl/onApproveUrl configured either —
+    // falls through to the silent no-op restored from the original client, not a notify.
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(1));
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
     );
+    expect(mockNotify).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
 });
@@ -676,7 +629,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
       </PaymentProvider>
     );
 
-    await waitFor(() => expect(onResult).toHaveBeenCalledWith(shippingResponse));
+    await waitFor(() =>
+      expect(onResult).toHaveBeenCalledWith(shippingResponse)
+    );
 
     const [, url, body] = mockedProcessorRequest.mock.calls[1];
     expect(url).toBe("https://processor.test/payments/updateShipping");
@@ -727,12 +682,14 @@ describe("PaymentProvider handleUpdateShipping", () => {
       >
         <UpdateShippingConsumer
           onResult={jest.fn()}
-          request={{ orderID: "order-1", shippingMethodId: "standard" }}
+          request={{ orderID: "order-1" }}
         />
       </PaymentProvider>
     );
 
-    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledTimes(2)
+    );
 
     const [, , body] = mockedProcessorRequest.mock.calls[1];
     expect(body).toMatchObject({ shippingOptions: cachedOptions });
@@ -770,7 +727,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
       </PaymentProvider>
     );
 
-    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledTimes(2)
+    );
 
     const [, , body] = mockedProcessorRequest.mock.calls[1];
     expect(body).not.toHaveProperty("shippingOptions");

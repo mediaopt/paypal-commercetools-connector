@@ -46,14 +46,17 @@ deployAs:
           description: For PayPal Express (Authorize or Capture intent), redirect to PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL on approval instead of finalizing the payment immediately (true OR false). REQUIRED to be true, with that review page actually built, for PayPal Express in Germany.
           required: false
           default: "false"
-        - key: PAYPAL_PER_METHOD_CONFIG
-          description: Per-method required config (non-style identifiers, unique per payment method), as a JSON object
+        - key: PAYPAL_BUTTON_CONFIG
+          description: Per-component/variant style and funding-source overrides (keyed by payment method type, plus a dedicated PayPalExpress slot), as a JSON object
           required: false
         - key: PAYPAL_SETTINGS
           description: Fallback merchant settings (button style, PayLater messaging, 3DS option, etc.) as a JSON object, used only when the paypal-commercetools-connector/settings custom object isn't available
           required: false
         - key: PAYPAL_SDK_OPTIONS
           description: PayPal JS SDK script options (currency, funding sources, etc.) per component/builder variant, as a JSON object
+          required: false
+        - key: PAYPAL_STANDARD_SCRIPT_OPTIONS
+          description: PayPal JS SDK script options (components, disableFunding, enableFunding) shared by every standard PayPal-brand/CardFields/ApplePay component, as a JSON object
           required: false
   - name: paypal-commercetools-extension
     applicationType: service
@@ -63,15 +66,6 @@ deployAs:
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
-        - key: PAYMENT_TYPE_KEY
-          description: key for commercetools custom type for payment
-          default: paypal-payment-type
-        - key: CUSTOMER_TYPE_KEY
-          description: key for commercetools custom type for customer
-          default: paypal-customer-type
-        - key: PAYMENT_INTERACTION_TYPE_KEY
-          description: key for commercetools custom type for payment interaction
-          default: paypal-payment-interaction-type
         - key: SMTP_HOST
           description: SMTP Host for sending pay upon invoice mail
         - key: SMTP_PORT
@@ -113,6 +107,15 @@ inheritAs:
         required: true
       - key: PAYPAL_ENVIRONMENT
         description: PayPal environment (Sandbox or Production)
+      - key: PAYMENT_TYPE_KEY
+        description: key for commercetools custom type for payment
+        default: paypal-payment-type
+      - key: CUSTOMER_TYPE_KEY
+        description: key for commercetools custom type for customer
+        default: paypal-customer-type
+      - key: PAYMENT_INTERACTION_TYPE_KEY
+        description: key for commercetools custom type for payment interaction
+        default: paypal-payment-interaction-type
     securedConfiguration:
       - key: CTP_PROJECT_KEY
         description: commercetools Composable Commerce project key

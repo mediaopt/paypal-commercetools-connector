@@ -39,7 +39,19 @@ export const buildOrderRequest = (
   orderData?: CreateOrderRequestSchemaDTO["orderData"],
   payPalIntent?: CreateOrderRequestSchemaDTO["payPalIntent"],
   existingPayPalCustomerId?: string,
-  isExpress?: boolean
+  isExpress?: boolean,
+  // Whether to show PayPal's "Continue to Review Order" flow (see experience_context.user_action
+  // below) — must match the client-side `commit` script option the enabler actually rendered for
+  // this component (both derived from the same PayPalPaymentService.hasExpressReviewStep(), see
+  // that method's own comment). Only ever true for Express with an actual review step configured
+  // (PAYPAL_REDIRECT_ON_APPROVE/PAYPAL_ONAPPROVE_PREFIX).
+  showContinueReview = false,
+  // Same merchant-return-url chain buildRedirectMerchantUrl uses for the post-approval buyer
+  // redirect (paypal-payment.service.ts) — undefined when neither MERCHANT_RETURN_URL nor a
+  // session return url is configured, in which case the corresponding experience_context field is
+  // simply omitted below.
+  returnUrl?: string,
+  cancelUrl?: string
 ): OrderRequest => {
   const { address: resolvedShippingAddress } =
     resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
@@ -77,6 +89,15 @@ export const buildOrderRequest = (
       ) ?? undefined,
   } as PurchaseUnitRequest;
 
+  const experienceContext = {
+    ...(returnUrl ? { return_url: returnUrl } : {}),
+    ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
+    ...(showContinueReview ? { user_action: "CONTINUE" as const } : {}),
+    ...(shipping && !isExpress
+      ? { shipping_preference: "SET_PROVIDED_ADDRESS" as const }
+      : {}),
+  };
+
   return {
     intent:
       payPalIntent === "Authorize"
@@ -87,13 +108,8 @@ export const buildOrderRequest = (
       ? {
           payment_source: {
             paypal: {
-              // SET_PROVIDED_ADDRESS forbids changing shipping required for express
-              ...(shipping && !isExpress
-                ? {
-                    experience_context: {
-                      shipping_preference: "SET_PROVIDED_ADDRESS" as const,
-                    },
-                  }
+              ...(Object.keys(experienceContext).length
+                ? { experience_context: experienceContext }
                 : {}),
               ...(orderData?.storeInVault
                 ? {

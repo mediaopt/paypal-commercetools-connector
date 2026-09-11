@@ -1,8 +1,10 @@
 import {
   PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   CUSTOM_OBJECT_DEFAULT_VALUES,
   PayPalSettings,
+  resolveTypeKey,
 } from "common-connect";
 
 // PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding,
@@ -21,6 +23,22 @@ import {
 const configuredSdkOptions = process.env.PAYPAL_SDK_OPTIONS
   ? JSON.parse(process.env.PAYPAL_SDK_OPTIONS)
   : {};
+
+// Shared script options for every *standard* component (see PAYPAL_STANDARD_SCRIPT_OPTIONS
+// comment in .env.template) — layered over this connector's own built-in default the same way
+// PAYPAL_SETTINGS layers over CUSTOM_OBJECT_DEFAULT_VALUES below, so an unset/{} env value keeps
+// the default rather than wiping it out. `components` is narrowed further per request in
+// PayPalPaymentService.config() by settings.acceptCredit.
+const configuredStandardScriptOptions: {
+  components: string[];
+  disableFunding?: string[];
+  enableFunding?: string[];
+} = {
+  components: ["buttons", "card-fields", "applepay"],
+  ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
+    ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
+    : {}),
+};
 
 // PayPal button config overrides (style/funding sources), keyed by componentType, plus a
 // dedicated PayPalExpress slot (see configuredSdkOptions above) — passed through as-is; the
@@ -89,13 +107,9 @@ export const config = {
   // General feature flags
   enableVaulting: process.env.STORED_PAYMENT_METHODS_ENABLED === "true",
 
-  // Custom type keys for processor-owned audit logging (see utils/processorInteraction.utils.ts
-  // and connectors/post-deploy.ts) — same env-override/fallback resolution as
-  // paypal-commercetools-extension's own PAYMENT_TYPE_KEY/PAYMENT_INTERACTION_TYPE_KEY, so both
-  // modules resolve to the same custom types when both are installed on the same project.
-  paymentTypeKey: process.env.PAYMENT_TYPE_KEY || PAYPAL_PAYMENT_TYPE_KEY,
-  interactionTypeKey:
-    process.env.PAYMENT_INTERACTION_TYPE_KEY || PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  paymentTypeKey: resolveTypeKey(PAYPAL_PAYMENT_TYPE_KEY),
+  customerTypeKey: resolveTypeKey(PAYPAL_CUSTOMER_TYPE_KEY),
+  interactionTypeKey: resolveTypeKey(PAYPAL_PAYMENT_INTERACTION_TYPE_KEY),
 
   // Per-component overrides, keyed by componentType (plus the dedicated PayPalExpress slot) — see
   // PAYPAL_BUTTON_CONFIG in processor/.env.template
@@ -108,11 +122,16 @@ export const config = {
   // fallback — format: JSON object matching (a subset of) common-connect's PayPalSettings shape.
   settingsFallback: {
     ...CUSTOM_OBJECT_DEFAULT_VALUES,
-    ...(process.env.PAYPAL_SETTINGS ? JSON.parse(process.env.PAYPAL_SETTINGS) : {}),
+    ...(process.env.PAYPAL_SETTINGS
+      ? JSON.parse(process.env.PAYPAL_SETTINGS)
+      : {}),
   } as Partial<PayPalSettings>,
 
   // See the configuredSdkOptions comment above — passed through as-is, no processor-side defaulting.
   sdkOptions: configuredSdkOptions,
+
+  // See the configuredStandardScriptOptions comment above.
+  standardScriptOptions: configuredStandardScriptOptions,
 };
 
 export const getConfig = () => {

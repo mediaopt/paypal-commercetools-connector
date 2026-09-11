@@ -6,6 +6,11 @@ export const PAYPAL_CUSTOMER_TYPE_KEY = "paypal-customer-type";
 export const PAYPAL_PAYMENT_INTERACTION_TYPE_KEY =
   "paypal-payment-interaction-type";
 
+export const PAYPAL_ORDER_ID_FIELD = {
+  name: "PayPalOrderId",
+  label: { en: "PayPal Order Id", de: "PayPal Bestellnummer" },
+} as const;
+
 export const GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME =
   "paypal-commercetools-connector";
 

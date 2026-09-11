@@ -130,13 +130,13 @@ standalone client. In Checkout mode there's no merchant frontend code path left 
 enabler is mounted by Checkout itself — so **for now these are configured separately, from
 `processor`'s environment**: see `PAYPAL_SDK_OPTIONS` in `processor/.env.template`.
 
-They're configurable per component (`PayPal`, `CardFields`) and, for `PayPal` specifically,
-separately for the **standard** and **express** builder variants (`PayPalComponentBuilder` vs.
-`createExpressBuilder` — see `enabler/src/components/PayPalBuilder.ts`), since a merchant may want
-different funding sources/currency for a regular PayPal button versus an express-checkout one.
-`CardFields` has no standard/express split since it has no express variant. `enableFunding` defaults
-to `"paylater"` for both PayPal variants if left unset, so the PayPal Pay Later button stays enabled
-out of the box even with no configuration at all.
+They're configurable per payment method (`PayPal`, `CardFields`) and, for `PayPal` specifically,
+separately for `builderType: undefined` (standard) and `builderType: "express"`
+(`PayPalComponentBuilder` vs. `createExpressBuilder` — see `enabler/src/components/PayPalBuilder.ts`),
+since a merchant may want different funding sources/currency for a regular PayPal button versus an
+express-checkout one. `CardFields` has no standard/express split since it has no `builderType: "express"`
+mount. `enableFunding` defaults to `"paylater"` for both `PayPal` and `PayPalExpress` if left
+unset, so the PayPal Pay Later button stays enabled out of the box even with no configuration at all.
 
 `currency` and `buyerCountry` specifically are the exception to "configured from `processor`'s
 environment": `processor` derives them from the current cart on every `/operations/config` request
@@ -149,17 +149,47 @@ on the cart).
 This is a stopgap, not the final shape — richer configuration is expected in future versions. **If
 you need something this doesn't yet cover, please open an issue.**
 
+### Venmo eligibility is not enforced by the payment-method list
+
+`Venmo` only ever works for USD-denominated orders with a US buyer — `processor` enforces the
+currency requirement at order-creation time (`paypal-payment.service.ts`'s
+`validateVenmoOrderParams`, invoked from `createOrder()`), but `GET /operations/config`'s
+component/payment-method list (`getSupportedPaymentComponents()`) always advertises `Venmo` as
+available, with no cart currency/country check at all. This mirrors the braintree reference
+project's own equivalent gap for its US-only ACH method: no country/currency code is checked in
+`getSupportedPaymentComponents()` there either — the connector doesn't attempt to filter this
+discovery endpoint, since it has no cart in context (it's JWT-authenticated only). Restricting
+Venmo's visibility to eligible carts (e.g. USD-only shops) is a merchant-configured Checkout
+payment-integration predicate, not something this connector enforces in code.
+
+Two things the connector *does* enforce in code, both browser/device-side rather than cart-side:
+- **Browser support** (`components/venmoAvailability.ts`'s `isVenmoSupported()`): per
+  [PayPal's own Venmo documentation](https://developer.paypal.com/v5/venmo/overview), only Safari
+  on iOS or Chrome on Android are supported on mobile (every other mobile browser is excluded);
+  desktop is unrestricted, via a QR-code checkout instead of app-switch. This is checked both in
+  `PayPalBuilder.ts`'s `PayPalComponent.isAvailable()` — so commercetools Checkout can skip listing
+  Venmo at all on an unsupported browser, before ever mounting it — and, redundantly, inside
+  `PayPalMask.tsx`'s eligibility effect below, as a post-mount safety net.
+- **Silent-render notification** (`PayPalMask.tsx`): if a funding-source-restricted button
+  (Sepa/PayLater/PayPalCreditCard/Venmo) still ends up mounted somewhere it isn't eligible — the
+  currency/country case this section describes, or an unsupported Venmo browser — PayPal's own SDK
+  renders nothing at all, silently. A `useEffect` calls
+  `window.paypal.Buttons({ fundingSource }).isEligible()` (the same check `<PayPalButtons/>` uses
+  internally to decide rendering) once the script has loaded, and shows a generic error
+  notification if it comes back `false`, so the buyer isn't left looking at an unexplained gap.
+  This only notifies — it has no effect on whether the button itself renders.
+
 ### PayPal button label/color config (`paypalButtonConfig`) per component
 
 Similarly to the SDK script options above, the PayPal button's `style.label`/`style.color`
 (`GetSettingsResponse.paypalButtonConfig`) can be overridden per component via `PayPal`/
-`PayPalExpress` on the settings object — resolved in `PayPalBuilder.ts` as
+`PayPalExpress` on the settings object — resolved in `RenderTemplate/resolveOptions.ts` as
 `{...paypalButtonConfig, ...(isExpress ? PayPalExpress : PayPal)}` before the settings ever reach
 `SettingsProvider`, so `PayPalMask` itself stays builderType-agnostic.
 
 **The settings-providing app currently only supplies the single, shared `paypalButtonConfig`** —
-`PayPalStandard`/`PayPalExpress` aren't populated yet, so that shared config is used as the
-fallback for both variants until the settings source is extended to supply per-variant overrides.
+`PayPal`/`PayPalExpress` aren't populated yet, so that shared config is used as the fallback for
+both until the settings source is extended to supply per-component overrides.
 
 ### New props: `onRegisterSubmit` / `onRegisterValidation`
 

@@ -12,49 +12,132 @@ jest.mock("../CardFields", () => ({
   ),
 }));
 
+jest.mock("../CardFields/CardFieldsStored", () => ({
+  CardFieldsStored: (props: Record<string, unknown>) => (
+    <div data-testid="cardfieldsstored-probe" data-props={JSON.stringify(props)} />
+  ),
+}));
+
+// Decouples dispatch-correctness (this file) from resolution-correctness (resolveOptions.spec.ts).
+jest.mock("./resolveOptions", () => ({
+  resolvePayPalBrandOptions: jest.fn(() => ({
+    options: { clientId: "resolved" },
+    initialSettings: {},
+    enableVaulting: false,
+  })),
+  resolveCardFieldsOptions: jest.fn(() => ({
+    options: { clientId: "resolved-cardfields" },
+    initialSettings: {},
+    enableVaulting: true,
+  })),
+  resolveCardFieldsStoredOptions: jest.fn(() => ({
+    initialSettings: {},
+    enableVaulting: false,
+  })),
+}));
+
 import { RenderTemplate } from "./RenderTemplate";
+import {
+  resolveCardFieldsOptions,
+  resolveCardFieldsStoredOptions,
+  resolvePayPalBrandOptions,
+} from "./resolveOptions";
+
+const baseOptions = {
+  processorUrl: "https://processor.example",
+  sdkOptions: {},
+  settings: {},
+} as any;
+const genericOptions = { requestHeader: { "X-Session-Id": "session-id" } } as any;
 
 describe("RenderTemplate", () => {
-  it("forwards paymentMethodType and builderType to the rendered component, alongside customOptions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("dispatches PayPal-brand types to resolvePayPalBrandOptions and merges genericOptions + resolved options onto <PayPal/>", () => {
     render(
       <RenderTemplate
-        paymentMethodType="PayPal"
+        paymentMethodType="Sepa"
         builderType="express"
-        customOptions={{ foo: "bar" }}
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
       />
     );
+
+    expect(resolvePayPalBrandOptions).toHaveBeenCalledWith(
+      "Sepa",
+      baseOptions,
+      "express"
+    );
+    expect(resolveCardFieldsOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("probe");
     const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
 
     expect(props).toMatchObject({
-      foo: "bar",
-      paymentMethodType: "PayPal",
+      requestHeader: { "X-Session-Id": "session-id" },
+      options: { clientId: "resolved" },
+      enableVaulting: false,
+      paymentMethodType: "Sepa",
       builderType: "express",
+      processorUrl: "https://processor.example",
     });
   });
 
-  it("dispatches to CardFields for paymentMethodType=CardFields", () => {
+  it("dispatches CardFields to resolveCardFieldsOptions and renders <CardFields/>", () => {
     render(
       <RenderTemplate
         paymentMethodType="CardFields"
-        customOptions={{ foo: "bar" }}
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
       />
     );
+
+    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(baseOptions);
+    expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("cardfields-probe");
     const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
 
     expect(props).toMatchObject({
-      foo: "bar",
+      options: { clientId: "resolved-cardfields" },
+      enableVaulting: true,
       paymentMethodType: "CardFields",
     });
+  });
+
+  it("dispatches CardFieldsStored to resolveCardFieldsStoredOptions and renders <CardFieldsStored/> with no options prop", () => {
+    render(
+      <RenderTemplate
+        paymentMethodType="CardFieldsStored"
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
+      />
+    );
+
+    expect(resolveCardFieldsStoredOptions).toHaveBeenCalledWith(baseOptions);
+    expect(resolveCardFieldsOptions).not.toHaveBeenCalled();
+    expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
+
+    const probe = screen.getByTestId("cardfieldsstored-probe");
+    const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
+
+    expect(props).toMatchObject({
+      enableVaulting: false,
+      paymentMethodType: "CardFieldsStored",
+    });
+    expect(props.options).toBeUndefined();
   });
 
   it("throws for an unsupported payment method type", () => {
     expect(() =>
       render(
-        <RenderTemplate paymentMethodType="Invalid Method" customOptions={{}} />
+        <RenderTemplate
+          paymentMethodType={"Invalid Method" as any}
+          baseOptions={baseOptions}
+          genericOptions={genericOptions}
+        />
       )
     ).toThrow("Unsupported payment method type: Invalid Method");
   });

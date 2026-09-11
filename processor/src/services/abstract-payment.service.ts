@@ -116,7 +116,7 @@ export abstract class AbstractPaymentService {
    * @remarks
    * Creates a commercetools payment for the current cart and returns SDK options plus cart/customer details for the enabler to render the payment button.
    *
-   * @param request - payment configuration including payment method type, builder type
+   * @param request - empty; createPayment uses session cart and provides identical result for all components
    * @returns Promise with PayPal SDK options and payment object with cart/customer details
    */
   abstract createPayment(

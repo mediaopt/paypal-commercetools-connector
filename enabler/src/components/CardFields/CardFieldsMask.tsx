@@ -6,6 +6,7 @@ import {
   PayPalCVVField,
   PayPalExpiryField,
   usePayPalCardFields,
+  usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import type { CardFieldsOnApproveData } from "@paypal/paypal-js";
 import type {
@@ -146,6 +147,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     fields: {},
   });
   const { form: cardFieldsForm, fields: cardFields } = cardFieldsState;
+  const [{ isResolved: isCardFieldsScriptResolved }] = usePayPalScriptReducer();
 
   const threeDSAuth = settings?.threeDSOption;
 
@@ -204,6 +206,19 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardFieldsForm]);
+
+  // Traceable script-resolution visibility, mirroring PayPalMask.tsx's equivalent addition —
+  // logs when the CardFields SDK component becomes ready, and flags the case it's resolved but
+  // never becomes ready at all (today produces no output of any kind).
+  useEffect(() => {
+    if (cardFieldsForm) {
+      console.log("[paypal-enabler][CardFields] cardFieldsForm ready");
+    } else if (isCardFieldsScriptResolved) {
+      console.error(
+        "[paypal-enabler][CardFields] script resolved but cardFieldsForm never became ready"
+      );
+    }
+  }, [cardFieldsForm, isCardFieldsScriptResolved]);
 
   const handleApprove = (data: CardFieldsOnApproveData) => {
     if (vaultOnly) {
@@ -295,7 +310,11 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
         className={hostedFieldClasses.hostedFieldsInputFieldClasses}
       />
 
-      {enableVaulting && !vaultOnly && (
+      {/* Checkout mode (onRegisterSubmit supplied) already has its own native "save payment
+      method" checkbox, driving the storePaymentDetails flag combined into shouldStoreInVault()
+      below — showing this one too would duplicate it. Self-hosted mode has no such native UI, so
+      this stays the only way to offer vaulting there. */}
+      {enableVaulting && !vaultOnly && !onRegisterSubmit && (
         <label className="p-1.5">
           <input
             type="checkbox"

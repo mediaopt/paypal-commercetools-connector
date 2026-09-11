@@ -90,6 +90,34 @@ To run the connector locally for test purposes:
 
 Please set your application url (see the example in [ngrok.sh](./paypal-commercetools-extension/bin/ngrok.sh)) in the `.env` file and run post-deploy script. The url should be accessible externally.
 
+### Checkout mode installation and configuration
+
+To use the commercetools Checkout compatible track (`processor`/`enabler`), create a checkout application in the [merchant center](https://docs.commercetools.com/checkout/overview#merchant-center-configuration). In the application payment integrations you can select this connector and configure the payment methods available. **The connector does not restrict which payment methods are offered to a buyer by country or currency — this is entirely your responsibility to configure**, via a payment integration predicate, in the merchant center → checkout application → payment integration screen.
+
+#### Payment methods and their restrictions
+
+| Category | Method                                   | checkout reference  | Recommended predicate                                                                                                                                                                                                                 |
+| -------- | ---------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standard | PayPal                                   | `paypal`            | None needed                                                                                                                                                                                                                           |
+| Standard | Credit Card (`CardFields`)               | `card`              | None needed                                                                                                                                                                                                                           |
+| Standard | SEPA (`Sepa`)                            | *Sepa*¹             | must be determined based on PayPal merchant settings                                                                                                                                                                                  |
+| Standard | Pay Later (`PayLater`)                   | *PayLater*¹         | `billingAddress.country = "AU" or billingAddress.country = "US" or billingAddress.country = "FR" or billingAddress.country = "DE" or billingAddress.country = "IT" or billingAddress.country = "ES" or billingAddress.country = "GB"` |
+| Standard | Credit Card button (`PayPalCreditCard`)  | *PayPalCreditCard*¹ | None needed                                                                                                                                                                                                                           |
+| Standard | All funding sources (`AllButtons`)       | *AllButtons*¹       | None needed                                                                                                                                                                                                                           |
+| Standard | Venmo                                    | *Venmo*¹            | `billingAddress.country = "US" and totalPrice.currencyCode = "USD"`                                                                                                                                                                   |
+| Express  | PayPal Buy Now (via the express builder) | `paypal`            | None needed                                                                                                                                                                                                                           |
+| Standard | Pay Upon Invoice                         | *PayUponInvoice*²   | `billingAddress.country = "DE" and totalPrice.currencyCode = "EUR"`                                                                                                                                                                   |
+
+¹ Sepa, PayLater, PayPalCreditCard, AllButtons, and Venmo don't have a commercetools Checkout key yet, so no UI defaults are provided at the moment in merchant center. Some of these methods are supposed to be included in future commercetools releases and when the proper key will be available the merchant center reference will be set to match.
+
+² Pay Upon Invoice is not yet implemented in this connector's Checkout track (`processor`/`enabler`) — see `processor/src/dtos/paypal-payment.dto.ts`'s commented-out `PAY_UPON_INVOICE` entry. Listed here for planning purposes only.
+
+Configure these via [payment integration predicates](https://docs.commercetools.com/checkout/payment-integration-predicates#predicate-syntax). The "Recommended predicate" column above shows a starting point for each method — real-world eligibility (e.g. Pay Later's exact country/currency pairing) can vary by merchant account and change over time, so verify against your own PayPal account before relying on it in production.
+
+Venmo's browser/device support ([Safari on iOS or Chrome on Android; any browser on desktop](https://developer.paypal.com/v5/venmo/overview)) is the one exception the connector _does_ enforce itself, not something you need a predicate for — see `enabler/README.md`'s "Venmo eligibility is not enforced by the payment-method list" section for details.
+
+**A practical way to check which of PayPal buttons based methods are actually enabled for your PayPal account** is to temporarily add the `AllButtons` method to your payment integration with no predicate — PayPal's own SDK only ever renders funding sources it currently considers eligible for that account/currency, so whichever of Sepa/PayLater/PayPalCreditCard/Venmo/etc. actually show up there are the ones genuinely available; anything missing was already ineligible before any predicate could help. Keeping the payment integration accurate is your responsibility: leave out entirely any method you don't intend to accept, and use the recommended predicate above for any conditional method you do want to offer.
+
 ## Technology Stack
 
 The connector is written in TypeScript and npm is used as the package manager.

@@ -12,14 +12,17 @@ import {
 } from "./interfaces/stored";
 import { BaseOptions } from "./interfaces/baseOptions";
 import { PayPalComponentBuilder } from "../components/PayPalBuilder";
+import { PayPalStoredBuilder } from "../components/PayPalStoredBuilder";
 import { processorUrls } from "../components/constants";
 import { sessionHeader } from "../helpers/sessionHeader";
 import { toPayPalPaymentMethodType } from "../components/paymentMethodTypeMapping";
+import { processorRequest } from "../services/processorRequest";
+import { CreatePaymentResponse } from "../types";
 
 export type {
   PayPalPaymentMethodType,
   PayPalPaymentMethodExpressType,
-} from "../components/types";
+} from "../types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
   setupData: Promise<{ baseOptions: BaseOptions }>;
@@ -31,48 +34,88 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   private static _Setup = async (
     options: EnablerOptions
   ): Promise<{ baseOptions: BaseOptions }> => {
+    // Traceable per-call id: lets multiple overlapping/repeated _Setup() runs (e.g. Checkout
+    // re-triggering setup on a payment-method switch) be told apart in the console instead of
+    // their logs interleaving indistinguishably.
+    //todo - remove setup call id after live tests
+    const setupCallId = Math.random().toString(36).slice(2, 7);
+
     console.log(
-      "[paypal-enabler] processorUrl:",
+      `[paypal-enabler][setup:${setupCallId}] starting — processorUrl:`,
       options.processorUrl,
       "| sessionId:",
       options.sessionId
     );
 
-    // Fetch SDK config from processor
-    const configResponse = await fetch(
-      options.processorUrl + "/operations/config",
-      {
-        method: "GET",
-        headers: sessionHeader(options.sessionId),
+    try {
+      // Fetch SDK config from processor
+      const configResponse = await fetch(
+        options.processorUrl + "/operations/config",
+        {
+          method: "GET",
+          headers: sessionHeader(options.sessionId),
+        }
+      );
+
+      if (!configResponse.ok) {
+        throw new Error("Could not fetch config");
       }
-    );
 
-    if (!configResponse.ok) {
-      throw new Error("Could not fetch config");
+      console.log(
+        `[paypal-enabler][setup:${setupCallId}] config fetched — status:`,
+        configResponse.status
+      );
+
+      const configJson = await configResponse.json();
+
+      // One commercetools Payment per checkout page load, shared by every standard/stored/express
+      // builder resolving this same setupData. Fatal on failure.
+      // No request body at all: payment is based on cart in session.
+      // If ever changed - processor's InitPaymentRequestSchema has to match exactly
+      const paymentResult = await processorRequest<{}, CreatePaymentResponse>(
+        sessionHeader(options.sessionId),
+        processorUrls(options.processorUrl).createPaymentUrl,
+        {}
+      );
+      if (!paymentResult) {
+        throw new Error("Could not create payment");
+      }
+
+      console.log(
+        `[paypal-enabler][setup:${setupCallId}] payment created/reused — id:`,
+        paymentResult.id
+      );
+
+      return {
+        baseOptions: {
+          processorUrl: options.processorUrl,
+          sessionId: options.sessionId,
+          initialPayment: paymentResult,
+          storedPaymentMethodsEnabled:
+            !!configJson.storedPaymentMethodsConfig?.isEnabled,
+          enableVaulting: !!configJson.enableVaulting,
+          redirectOnApprove: !!configJson.redirectOnApprove,
+          sdkOptions: configJson.sdkOptions,
+          standardScriptOptions: configJson.standardScriptOptions,
+          clientId: configJson.clientId,
+          settings: configJson.settings,
+          userIdToken: configJson.userIdToken,
+          purchaseCallback:
+            configJson.purchaseCallback ||
+            options.onComplete ||
+            ((result: any, options: any) => {
+              console.log("Payment completed", result, options);
+            }),
+        },
+      };
+    } catch (err) {
+      // Rethrown unchanged; this only adds visibility.
+      console.error(
+        `[paypal-enabler][setup:${setupCallId}] _Setup failed:`,
+        err
+      );
+      throw err;
     }
-
-    const configJson = await configResponse.json();
-
-    return Promise.resolve({
-      baseOptions: {
-        processorUrl: options.processorUrl,
-        sessionId: options.sessionId,
-        storedPaymentMethodsEnabled:
-          !!configJson.storedPaymentMethodsConfig?.isEnabled,
-        enableVaulting: !!configJson.enableVaulting,
-        redirectOnApprove: !!configJson.redirectOnApprove,
-        sdkOptions: configJson.sdkOptions,
-        clientId: configJson.clientId,
-        settings: configJson.settings,
-        userIdToken: configJson.userIdToken,
-        purchaseCallback:
-          configJson.purchaseCallback ||
-          options.onComplete ||
-          ((result: any, options: any) => {
-            console.log("Payment completed", result, options);
-          }),
-      },
-    });
   };
 
   async createComponentBuilder(
@@ -109,11 +152,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     const { baseOptions } = await this.setupData;
     const normalizedType = toPayPalPaymentMethodType(type);
 
-    // For PayPal, we support card tokens
+    // Only credit cards are vaulted/stored — see Checkout-mode scope.
     if (normalizedType === "CardFields") {
-      // Return a builder for stored card payment methods
-      // This would be implemented similar to payment component builder
-      throw new Error("Stored payment method builder not yet implemented");
+      return new PayPalStoredBuilder(baseOptions);
     }
 
     throw new Error(`Unsupported stored payment method type: ${type}`);
@@ -125,8 +166,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
     const { baseOptions } = await this.setupData;
-    const url = processorUrls(baseOptions.processorUrl)
-      .getStoredPaymentMethodsURL;
+    const url = processorUrls(
+      baseOptions.processorUrl
+    ).getStoredPaymentMethodsURL;
     const response = await fetch(url, {
       method: "GET",
       headers: sessionHeader(baseOptions.sessionId),
