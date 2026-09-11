@@ -10,6 +10,11 @@ export const makeRequest = <ResponseType, T>(
     ...requestHeader,
     ...(data ? { "Content-Type": "application/json" } : {}),
   });
+  // Prevents Fastify error for the processor
+  // Content-type was kept by default for legacy compatiblity
+  if (!data) {
+    headers.delete("Content-Type");
+  }
 
   const requestData: RequestInit = {
     method: method ?? "GET",
@@ -36,7 +41,10 @@ export const makeRequest = <ResponseType, T>(
         // `error instanceof Error ? error.message : t(...)` catch throughout the enabler falls
         // through to its own already-defined, translated fallback instead of surfacing this to
         // the shopper via notify().
-        console.log(`Request to ${url} failed with status ${response.status}`, body);
+        console.log(
+          `Request to ${url} failed with status ${response.status}`,
+          body
+        );
         throw body;
       }
       return body;
