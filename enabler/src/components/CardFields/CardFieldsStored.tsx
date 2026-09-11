@@ -12,6 +12,7 @@ export type CardFieldsStoredProps = Pick<
   | "builderType"
   | "processorUrl"
   | "createPaymentUrl"
+  | "createOrderUrl"
   | "initialSettings"
   | "initialUserIdToken"
   | "enableVaulting"
@@ -28,6 +29,7 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
   builderType,
   processorUrl,
   createPaymentUrl,
+  createOrderUrl,
   initialSettings,
   initialUserIdToken,
   enableVaulting,
@@ -43,6 +45,7 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
       builderType={builderType}
       processorUrl={processorUrl}
       createPaymentUrl={createPaymentUrl}
+      createOrderUrl={createOrderUrl}
       initialSettings={initialSettings}
       initialUserIdToken={initialUserIdToken}
       enableVaulting={enableVaulting}
