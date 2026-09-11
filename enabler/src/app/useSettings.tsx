@@ -6,7 +6,10 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import { PayPalScriptProvider } from "@paypal/react-paypal-js";
+import {
+  PayPalScriptProvider,
+  usePayPalScriptReducer,
+} from "@paypal/react-paypal-js";
 
 import {
   GetSettingsResponse,
@@ -35,6 +38,60 @@ const SettingsContext = createContext<SettingsContextT>({
   paymentTokens: {},
 });
 
+// Diagnostic only — logs PayPal JS SDK script-loading state transitions, tagged with the
+// component that mounted it. Must live inside <PayPalScriptProvider> to call
+// usePayPalScriptReducer(). react-paypal-js's own PayPalScriptProvider already console.errors a
+// genuine load rejection, but that log carries no indication of which mounted component it
+// belongs to, and nothing today logs the "never resolves" case at all.
+//todo - remove excessive logs after success server tests
+const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
+  const [scriptState] = usePayPalScriptReducer();
+  const { isInitial, isPending, isResolved, isRejected, options } = scriptState;
+
+  useEffect(() => {
+    const status = isRejected
+      ? "REJECTED"
+      : isResolved
+      ? "RESOLVED"
+      : isPending
+      ? "PENDING"
+      : isInitial
+      ? "INITIAL"
+      : "UNKNOWN";
+    console.log(
+      `[paypal-enabler][script:${tag ?? "unknown"}] loadingStatus=${status}`
+    );
+    if (isRejected) {
+      // loadingStatusErrorMessage exists on the underlying reducer state at runtime (it's on
+      // ScriptContextState) but isn't part of ScriptContextDerivedState's declared type.
+      const errorMessage = (
+        scriptState as { loadingStatusErrorMessage?: string }
+      ).loadingStatusErrorMessage;
+      console.error(
+        `[paypal-enabler][script:${tag ?? "unknown"}] script load rejected:`,
+        errorMessage
+      );
+    }
+    if (isResolved && !window.paypal) {
+      console.error(
+        `[paypal-enabler][script:${
+          tag ?? "unknown"
+        }] resolved but window.paypal is missing`
+      );
+    }
+  }, [isInitial, isPending, isResolved, isRejected]);
+
+  useEffect(() => {
+    // Only meaningful to log once, when this provider instance is first created.
+    console.log(
+      `[paypal-enabler][script:${tag ?? "unknown"}] options:`,
+      options
+    );
+  }, []);
+
+  return null;
+};
+
 export const SettingsProvider: FC<
   React.PropsWithChildren<SettingsProviderProps>
 > = ({
@@ -48,7 +105,13 @@ export const SettingsProvider: FC<
   initialSettings,
   initialUserIdToken,
   isStoredCheckoutComponent,
+  paymentMethodType,
+  builderType,
 }) => {
+  // Diagnostic-only tag for ScriptLoadLogger below — not used for any settings/payment logic.
+  const scriptLogTag = builderType
+    ? `${paymentMethodType}(${builderType})`
+    : paymentMethodType;
   // Seeds from the processor's /operations/config response when available (Checkout mode) — in
   // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
   // otherwise never populate these at all.
@@ -167,6 +230,7 @@ export const SettingsProvider: FC<
               merchantId: settings?.merchantId,
             }}
           >
+            <ScriptLoadLogger tag={scriptLogTag} />
             {children}
           </PayPalScriptProvider>
         )

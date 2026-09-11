@@ -23,6 +23,17 @@ class PayPalStoredComponent implements StoredComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
+    //todo - remove after success server tests
+    console.log(`[paypal-enabler] mount CardFieldsStored -> ${selector}`);
+
+    if (this.root) {
+      console.warn(
+        "[paypal-enabler] CardFieldsStored mount() called again while a previous root was still active — unmounting it before remounting"
+      );
+      this.root.unmount();
+      this.root = null;
+    }
+
     // Method-independent shape, same as PayPalComponent.mount() — the id of the stored
     // PayPal payment token is the one piece of information specific to this mount.
     const genericOptions: GenericMountProps = {
@@ -78,9 +89,14 @@ class PayPalStoredComponent implements StoredComponent {
   }
 
   unmount(): void {
+    console.log("[paypal-enabler] unmount CardFieldsStored");
     if (this.root) {
       this.root.unmount();
       this.root = null;
+    } else {
+      console.warn(
+        "[paypal-enabler] CardFieldsStored unmount() called with no active root"
+      );
     }
   }
 }

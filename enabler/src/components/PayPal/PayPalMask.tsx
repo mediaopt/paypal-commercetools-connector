@@ -50,6 +50,19 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
   const [{ isResolved }] = usePayPalScriptReducer();
 
   const storeInVaultOnSuccess = settings?.storeInVaultOnSuccess;
+  const logTag = restprops.fundingSource ?? "PayPal";
+
+  // Traceable script-resolution visibility for this specific button
+  useEffect(() => {
+    if (!isResolved) {
+      return;
+    }
+    if (!window.paypal?.Buttons) {
+      console.error(
+        `[paypal-enabler][${logTag}] script resolved but window.paypal.Buttons is missing — the button will not render`
+      );
+    }
+  }, [isResolved]);
 
   // Silent-render safety net: a funding-source-restricted button (Sepa/PayLater/PayPalCreditCard/
   // Venmo) renders nothing at all when PayPal's own SDK decides the buyer/cart isn't eligible for

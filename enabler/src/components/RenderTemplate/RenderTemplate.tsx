@@ -152,11 +152,32 @@ export const mountRenderTemplate = (
   selector: string,
   props: RenderTemplateProps
 ): Root => {
+  //todo - remove after server tests success
+  console.log(
+    `[paypal-enabler] mountRenderTemplate ${props.paymentMethodType}${
+      props.builderType ? ` (${props.builderType})` : ""
+    } selector="${selector}"`
+  );
+
   const element = document.querySelector(selector);
   if (!element) {
     throw new Error(`Element not found for selector: ${selector}`);
   }
+
+  // Diagnostic only, not a functional guard
+  const htmlElement = element as HTMLElement;
+  if (htmlElement.dataset?.paypalEnablerMountedFor) {
+    console.warn(
+      `[paypal-enabler] selector="${selector}" previously hosted ${htmlElement.dataset.paypalEnablerMountedFor} and may not have been cleanly unmounted before mounting ${props.paymentMethodType} here`
+    );
+  }
+
   const root = createRoot(element);
   root.render(createElement(RenderTemplate, props));
+
+  if (htmlElement.dataset) {
+    htmlElement.dataset.paypalEnablerMountedFor = props.paymentMethodType;
+  }
+
   return root;
 };

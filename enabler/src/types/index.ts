@@ -800,6 +800,9 @@ export type SettingsProviderProps = Pick<
   | "initialSettings"
   | "initialUserIdToken"
   | "isStoredCheckoutComponent"
+  // Diagnostic-only, used to tag script-load logging — not used for any settings/payment logic.
+  | "paymentMethodType"
+  | "builderType"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };

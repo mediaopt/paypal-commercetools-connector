@@ -61,6 +61,21 @@ class PayPalComponent implements PaymentComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
+    //todo - remove console log after live tests success
+    console.log(
+      `[paypal-enabler] mount ${this.paymentMethodType}${
+        this.builderType ? ` (${this.builderType})` : ""
+      } -> ${selector}`
+    );
+
+    if (this.root) {
+      console.warn(
+        `[paypal-enabler] ${this.paymentMethodType} mount() called again while a previous root was still active — unmounting it before remounting`
+      );
+      this.root.unmount();
+      this.root = null;
+    }
+
     // Method-independent — every mounted component gets the same shape here, regardless of
     // paymentMethodType. Method-specific resolution (style/fundingSource/script-options/
     // initialSettings) happens in RenderTemplate/resolveOptions.ts instead, at render time.
@@ -133,7 +148,9 @@ class PayPalComponent implements PaymentComponent {
       ]?.fundingSource;
     if (
       fixedFundingSource &&
-      this.baseOptions.standardScriptOptions?.disableFunding?.includes(fixedFundingSource)
+      this.baseOptions.standardScriptOptions?.disableFunding?.includes(
+        fixedFundingSource
+      )
     ) {
       console.warn(`${this.paymentMethodType} not available`);
       return false;
@@ -145,7 +162,9 @@ class PayPalComponent implements PaymentComponent {
       REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType];
     if (
       requiredComponent &&
-      !this.baseOptions.standardScriptOptions?.components?.includes(requiredComponent)
+      !this.baseOptions.standardScriptOptions?.components?.includes(
+        requiredComponent
+      )
     ) {
       console.warn(`${this.paymentMethodType} not available`);
       return false;
@@ -155,9 +174,14 @@ class PayPalComponent implements PaymentComponent {
   }
 
   unmount(): void {
+    console.log(`[paypal-enabler] unmount ${this.paymentMethodType}`);
     if (this.root) {
       this.root.unmount();
       this.root = null;
+    } else {
+      console.warn(
+        `[paypal-enabler] ${this.paymentMethodType} unmount() called with no active root`
+      );
     }
   }
 }

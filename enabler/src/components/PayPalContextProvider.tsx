@@ -58,6 +58,8 @@ export const PayPalContextProvider: FC<
           initialSettings={initialSettings}
           initialUserIdToken={initialUserIdToken}
           isStoredCheckoutComponent={isStoredCheckoutComponent}
+          paymentMethodType={paymentMethodType}
+          builderType={builderType}
         >
           <PaymentProvider
             options={options}
