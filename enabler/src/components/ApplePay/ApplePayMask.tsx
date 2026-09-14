@@ -205,7 +205,7 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
               <button
                 onClick={onApplePayButtonClicked}
                 type="button"
-                className="w-full justify-center text-white bg-primary-900 focus:ring-4 focus:ring-[#050708]/50 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:focus:ring-gray-600 mr-2 mb-2"
+                className="w-full justify-center text-white bg-black focus:ring-4 focus:ring-[#050708]/50 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:focus:ring-gray-600 mr-2 mb-2"
               >
                 Check out with Apple Pay
                 <svg
