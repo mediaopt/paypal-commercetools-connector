@@ -162,7 +162,8 @@ discovery endpoint, since it has no cart in context (it's JWT-authenticated only
 Venmo's visibility to eligible carts (e.g. USD-only shops) is a merchant-configured Checkout
 payment-integration predicate, not something this connector enforces in code.
 
-Two things the connector *does* enforce in code, both browser/device-side rather than cart-side:
+Two things the connector _does_ enforce in code, both browser/device-side rather than cart-side:
+
 - **Browser support** (`components/venmoAvailability.ts`'s `isVenmoSupported()`): per
   [PayPal's own Venmo documentation](https://developer.paypal.com/v5/venmo/overview), only Safari
   on iOS or Chrome on Android are supported on mobile (every other mobile browser is excluded);
@@ -246,3 +247,11 @@ to call `capturePayment` again once ready to actually collect funds.
 - A merchant **integrated with Checkout** should stay on Checkout's own native Payment Intents API
   rather than reach for the extension — it's faster and native to the architecture they're already
   using.
+
+### Apple Pay: "Error validating merchant"
+
+If the Apple Pay button opens the native payment sheet but then fails with `"Error validating
+merchant"`, this is not a bug in this component — it means `session.onvalidatemerchant` →
+`pay.validateMerchant()` (`components/ApplePay/ApplePayMask.tsx`) was rejected by PayPal because the
+domain currently serving `enabler` isn't registered/verified for Apple Pay on the PayPal merchant
+account in use. Refer for Apple or PayPal documentation regarding `.well-known/apple-developer-merchantid-domain-association`.
