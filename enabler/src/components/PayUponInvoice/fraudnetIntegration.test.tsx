@@ -33,14 +33,14 @@ jest.mock("../../app/loadScript");
 test("Load script is called on fraudnetIntegration", async () => {
   (loadScript as jest.Mock).mockReturnValue(Promise.resolve());
   await embeddFraudNet(dummyMerchantId, dummyPage, dummySetId);
-  expect(loadScript).toBeCalledTimes(1);
+  expect(loadScript).toHaveBeenCalledTimes(1);
 });
 
 test("Load script is called on each fraudnet Integrarion", async () => {
   (loadScript as jest.Mock).mockReturnValue(Promise.resolve());
   await embeddFraudNet(dummyMerchantId, dummyPage, dummySetId);
   await embeddFraudNet(dummyMerchantId, dummyPage, dummySetId);
-  expect(loadScript).toBeCalledTimes(2);
+  expect(loadScript).toHaveBeenCalledTimes(2);
 });
 
 test("There is only one fncls script after multiple calls of fraudnet integration", async () => {

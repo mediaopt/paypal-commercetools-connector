@@ -92,11 +92,14 @@ test(`${validPhone} value for phone for invoice payment is valid`, () => {
   expect(phone).toBeValid();
 });
 
-test(`${wrongFormatPhone} input value for the phone is formatted to ${validPhone}`, () => {
+test(`${wrongFormatPhone} input value for the phone is formatted to ${validPhone} on blur`, () => {
   const phone = screen.getByLabelText(phoneLabel) as HTMLInputElement;
+  // Reformatting moved from onChange to onBlur — reformatting on every keystroke fought the
+  // controlled input's own cursor position and silently dropped/duplicated digits.
   fireEvent.change(phone, {
     target: { value: wrongFormatPhone },
   });
+  fireEvent.blur(phone);
   expect(phone.value).toEqual(validPhone);
 });
 

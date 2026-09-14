@@ -40,8 +40,8 @@ jest.mock("react-i18next", () => ({
   },
 }));
 
-jest.mock("../RenderTemplate", () => ({
-  RenderTemplate: ({ children }: { children: ReactNode }) => (
+jest.mock("../PayPalContextProvider", () => ({
+  PayPalContextProvider: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
 }));

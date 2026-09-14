@@ -17,7 +17,6 @@ jest.mock("react-i18next", () => ({
 }));
 jest.mock("../../app/usePayment");
 jest.mock("../../app/useSettings");
-jest.mock("../../app/useHandleCreatePayment");
 jest.mock("./PayUponInvoiceMask", () => ({
   PayUponInvoiceMask: (
     fraudNetSessionId: string,
@@ -31,15 +30,23 @@ afterEach(() => {
   cleanup();
 });
 
+// minPayableAmount/maxPayableAmount are in cents, matching PayUponInvoiceButton's own comparison
+// against paymentInfo.amountPlanned.centAmount (5-2500 EUR, same range hardcoded in
+// enabler/src/components/constants.ts).
 const testButtonProps = {
-  minPayableAmount: 5,
-  maxPayableAmount: 2500,
+  minPayableAmount: 500,
+  maxPayableAmount: 250000,
   fraudNetSessionId: "123",
 };
 
-test("Mask is shown if settings and params are valid", () => {
+const paymentInfoWithAmount = (centAmount: number) => ({
+  id: "123",
+  amountPlanned: { centAmount, currencyCode: "EUR" },
+});
+
+test("Mask is shown if settings and params are valid (legacy mode)", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "123", amount: 20 },
+    paymentInfo: paymentInfoWithAmount(2000),
     clientToken: "123",
   });
   (useSettings as jest.Mock).mockReturnValue({
@@ -51,7 +58,7 @@ test("Mask is shown if settings and params are valid", () => {
 
 test("If intent is wrong corresponding error is shown", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "123", amount: 20 },
+    paymentInfo: paymentInfoWithAmount(2000),
     clientToken: "123",
   });
   (useSettings as jest.Mock).mockReturnValue({
@@ -63,7 +70,7 @@ test("If intent is wrong corresponding error is shown", () => {
 
 test("If amount is smaller than min corresponding error is shown", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "123", amount: 1 },
+    paymentInfo: paymentInfoWithAmount(100),
     clientToken: "123",
   });
   (useSettings as jest.Mock).mockReturnValue({
@@ -75,7 +82,7 @@ test("If amount is smaller than min corresponding error is shown", () => {
 
 test("If amount is bigger than max corresponding error is shown", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "123", amount: 100500 },
+    paymentInfo: paymentInfoWithAmount(300000),
     clientToken: "123",
   });
   (useSettings as jest.Mock).mockReturnValue({
@@ -85,9 +92,9 @@ test("If amount is bigger than max corresponding error is shown", () => {
   expect(screen.getAllByText("invoice.tooBig").length).toEqual(1);
 });
 
-test("If client tocken is missing corresponding error is shown", () => {
+test("In legacy mode (no onRegisterSubmit), missing clientToken shows the third-party error", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "123", amount: 20 },
+    paymentInfo: paymentInfoWithAmount(2000),
     clientToken: "",
   });
   (useSettings as jest.Mock).mockReturnValue({
@@ -97,9 +104,27 @@ test("If client tocken is missing corresponding error is shown", () => {
   expect(screen.getAllByText("invoice.thirdPartyIssue").length).toEqual(1);
 });
 
+test("In Checkout mode (onRegisterSubmit provided), a missing clientToken does not block the mask", () => {
+  // clientToken is a Braintree-era concept never populated in Checkout mode — see
+  // PayUponInvoiceButton.tsx's own comment — so it must not gate rendering when onRegisterSubmit
+  // is set.
+  (usePayment as jest.Mock).mockReturnValue({
+    paymentInfo: paymentInfoWithAmount(2000),
+    clientToken: "",
+  });
+  (useSettings as jest.Mock).mockReturnValue({
+    settings: { payPalIntent: "Capture" },
+  });
+  render(
+    <PayUponInvoiceButton {...testButtonProps} onRegisterSubmit={() => {}} />,
+  );
+  expect(screen.getAllByText("Mocked mask").length).toEqual(1);
+  expect(screen.queryByText("invoice.thirdPartyIssue")).toEqual(null);
+});
+
 test("If payment id is missing mask and error messages are not rendered", () => {
   (usePayment as jest.Mock).mockReturnValue({
-    paymentInfo: { id: "", amount: 20 },
+    paymentInfo: { id: "", amountPlanned: { centAmount: 2000 } },
     clientToken: "123",
   });
   (useSettings as jest.Mock).mockReturnValue({
