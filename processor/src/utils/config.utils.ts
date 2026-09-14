@@ -1,7 +1,6 @@
 import { getConfig } from "../config/config";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
 import { ConfigResponse } from "../services/types/operation.type";
-import { StandardPaymentMethodType } from "../dtos/paypal-payment.dto";
 
 /**
  * Indicates if the feature stored payment methods is enabled/available.
@@ -18,41 +17,41 @@ export const isStoredPaymentMethodsEnabled = (cartSummary?: {
 };
 
 /**
- * Overlays cart-derived currency/buyerCountry onto every component's PayPal SDK script
- * options — cart data wins when available, PAYPAL_SDK_OPTIONS/defaults stay as the fallback.
+ * Cart-derived overlay for the shared standard script config (PAYPAL_STANDARD_SCRIPT_OPTIONS) —
+ * cart data wins over the configured/default values when available. currency comes from the
+ * cart's total price; buyerCountry only in sandbox — PayPal's own docs say not to pass it in
+ * production at all ("used only in the sandbox"). Express is a separate page/script with its own
+ * config (see buildExpressSdkOptions below) and doesn't share this overlay.
  */
-export const buildSdkOptions = (cartSummary?: {
+export const buildStandardScriptCartOverlay = (cartSummary?: {
   country?: string;
   currency?: string;
-}): ConfigResponse["sdkOptions"] => {
-  const configured = getConfig().sdkOptions;
+}): Record<string, unknown> => {
+  const configured = getConfig().standardScriptOptions;
   if (!cartSummary) {
     return configured;
   }
 
-  const cartOptions: Record<string, unknown> = {};
-  if (cartSummary.currency) {
-    cartOptions.currency = cartSummary.currency;
-  }
-  if (cartSummary.country) {
-    cartOptions.buyerCountry = cartSummary.country;
-  }
-  if (!Object.keys(cartOptions).length) {
-    return configured;
-  }
-
-  // Every componentType (PayPal, CardFields, and any future member) gets the overlay generically;
-  // PayPalExpress is the one dedicated exception — see PayPalBuilder.ts's express-first resolution.
-  const overlaid = Object.fromEntries(
-    Object.values(StandardPaymentMethodType).map((componentType) => [
-      componentType,
-      { ...configured[componentType], ...cartOptions },
-    ])
-  );
-
+  const isSandbox = getConfig().paypalEnvironment.toLowerCase() === "sandbox";
   return {
     ...configured,
-    ...overlaid,
-    PayPalExpress: { ...configured.PayPalExpress, ...cartOptions },
+    ...(cartSummary.currency ? { currency: cartSummary.currency } : {}),
+    ...(isSandbox && cartSummary.country
+      ? { buyerCountry: cartSummary.country }
+      : {}),
   };
+};
+
+/**
+ * PayPal Express's own PayPal JS SDK script options (PAYPAL_EXPRESS_SDK_OPTIONS) — kept separate
+ * from the shared standard ones above since Express mounts on its own page/script and genuinely
+ * needs different values.
+ */
+export const buildExpressSdkOptions = (cartSummary?: {
+  currency?: string;
+}): ConfigResponse["expressSdkOptions"] => {
+  const configured = getConfig().expressSdkOptions;
+  return cartSummary?.currency
+    ? { ...configured, currency: cartSummary.currency }
+    : configured;
 };

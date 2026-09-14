@@ -95,8 +95,12 @@ const PayPalIntentSchema = Type.Optional(
   Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
 );
 
+// paymentMethodType is optional: PayPalPaymentEnabler._Setup() now calls createPayment once per
+// checkout page load, before any component/builder is chosen, so it can't supply a real one —
+// see createPayment()'s own comment for how it handles that case. Self-hosted/legacy mode still
+// supplies a real value per-component call.
 export const InitPaymentRequestSchema = Type.Object({
-  paymentMethodType: Type.Enum(PaymentMethodType),
+  paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
   builderType: Type.Optional(Type.String()),
 });
 
