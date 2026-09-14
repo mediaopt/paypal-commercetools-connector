@@ -63,15 +63,6 @@ deployAs:
       preUndeploy: npm install && npm run build && npm run connector:pre-undeploy
     configuration:
       standardConfiguration:
-        - key: PAYMENT_TYPE_KEY
-          description: key for commercetools custom type for payment
-          default: paypal-payment-type
-        - key: CUSTOMER_TYPE_KEY
-          description: key for commercetools custom type for customer
-          default: paypal-customer-type
-        - key: PAYMENT_INTERACTION_TYPE_KEY
-          description: key for commercetools custom type for payment interaction
-          default: paypal-payment-interaction-type
         - key: SMTP_HOST
           description: SMTP Host for sending pay upon invoice mail
         - key: SMTP_PORT
@@ -113,6 +104,15 @@ inheritAs:
         required: true
       - key: PAYPAL_ENVIRONMENT
         description: PayPal environment (Sandbox or Production)
+      - key: PAYMENT_TYPE_KEY
+        description: key for commercetools custom type for payment
+        default: paypal-payment-type
+      - key: CUSTOMER_TYPE_KEY
+        description: key for commercetools custom type for customer
+        default: paypal-customer-type
+      - key: PAYMENT_INTERACTION_TYPE_KEY
+        description: key for commercetools custom type for payment interaction
+        default: paypal-payment-interaction-type
     securedConfiguration:
       - key: CTP_PROJECT_KEY
         description: commercetools Composable Commerce project key

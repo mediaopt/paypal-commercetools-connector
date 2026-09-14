@@ -1,8 +1,10 @@
 import {
   PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_CUSTOMER_TYPE_KEY,
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   CUSTOM_OBJECT_DEFAULT_VALUES,
   PayPalSettings,
+  resolveTypeKey,
 } from "common-connect";
 
 // PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding,
@@ -89,13 +91,9 @@ export const config = {
   // General feature flags
   enableVaulting: process.env.STORED_PAYMENT_METHODS_ENABLED === "true",
 
-  // Custom type keys for processor-owned audit logging (see utils/processorInteraction.utils.ts
-  // and connectors/post-deploy.ts) — same env-override/fallback resolution as
-  // paypal-commercetools-extension's own PAYMENT_TYPE_KEY/PAYMENT_INTERACTION_TYPE_KEY, so both
-  // modules resolve to the same custom types when both are installed on the same project.
-  paymentTypeKey: process.env.PAYMENT_TYPE_KEY || PAYPAL_PAYMENT_TYPE_KEY,
-  interactionTypeKey:
-    process.env.PAYMENT_INTERACTION_TYPE_KEY || PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
+  paymentTypeKey: resolveTypeKey(PAYPAL_PAYMENT_TYPE_KEY),
+  customerTypeKey: resolveTypeKey(PAYPAL_CUSTOMER_TYPE_KEY),
+  interactionTypeKey: resolveTypeKey(PAYPAL_PAYMENT_INTERACTION_TYPE_KEY),
 
   // Per-component overrides, keyed by componentType (plus the dedicated PayPalExpress slot) — see
   // PAYPAL_BUTTON_CONFIG in processor/.env.template

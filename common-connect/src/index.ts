@@ -4,6 +4,7 @@ export { readConfiguration } from "./utils/config.utils";
 
 export * from "./types/index.types";
 export * from "./constants";
+export * from "./paypalCustomTypes";
 export { createApiRoot, getProject } from "./client/create.client";
 
 export { getCachedAccessToken, getSettings } from "./service/config.service";
