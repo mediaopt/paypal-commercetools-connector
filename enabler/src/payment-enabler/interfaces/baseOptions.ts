@@ -1,18 +1,8 @@
+import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import { PaymentResult } from "./enabler";
 import { CreatePaymentResponse, GetSettingsResponse } from "../../types";
 
 type ComponentSdkOptions = Record<string, unknown>;
-
-/**
- * PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding, etc.),
- * keyed by paymentMethodType — sourced from the processor's `/operations/config` response, see
- * PAYPAL_SDK_OPTIONS in processor/.env.template. PayPalExpress is the one dedicated exception,
- * since only PayPal's own component with builderType: "express" needs its own slot — see
- * RenderTemplate/resolveOptions.ts.
- */
-export type PayPalSdkOptions = Partial<Record<string, ComponentSdkOptions>> & {
-  PayPalExpress?: ComponentSdkOptions;
-};
 
 export type BaseOptions = {
   processorUrl: string;
@@ -20,7 +10,11 @@ export type BaseOptions = {
   storedPaymentMethodsEnabled?: boolean;
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;
-  sdkOptions?: PayPalSdkOptions;
+  /** PayPal Express's own PayPal JS SDK script options, from the processor's
+   * PAYPAL_EXPRESS_SDK_OPTIONS — see resolveOptions.ts's express branch. Flat, not keyed by
+   * paymentMethodType: Express is the only paymentMethodType that ever reads this field, since
+   * every other (standard) method instead shares paypalScriptOptions below. */
+  expressSdkOptions?: ComponentSdkOptions;
   /** PayPal client id from `/operations/config`, used to load the PayPal JS SDK script. */
   clientId?: string;
   /**
@@ -31,13 +25,22 @@ export type BaseOptions = {
   /** PayPal SDK identity token from `/operations/config`, when a vaulted PayPal customer exists. */
   userIdToken?: string;
   /** Shared PayPal JS SDK script options for every *standard* component (PayPal, Sepa, PayLater,
-   * PayPalCreditCard, AllButtons, Venmo, CardFields, ApplePay) — computed server-side, in
-   * PayPalPaymentService.config(), from PAYPAL_STANDARD_SCRIPT_OPTIONS narrowed by
-   * settings.acceptCredit. Used by every non-express resolver's buildScriptOptions()  and stored payment methods call so every
-   * concurrently-mounted standard component's PayPalScriptProvider requests the identical SDK
-   * script, avoiding a window.paypal race across separately-mounted components. PayPal Express
-   * (a different page) don't use this. */
-  standardScriptOptions: { components?: string[]; disableFunding?: string[] };
+   * PayPalCreditCard, AllButtons, Venmo, CardFields, ApplePay, CardFieldsStored) — computed
+   * server-side, in PayPalPaymentService.config()*/
+  standardScriptOptions: ComponentSdkOptions & {
+    components?: string[];
+    disableFunding?: string[];
+    enableFunding?: string[];
+  };
+  /**
+   * The ONE PayPal JS SDK script config every standard (non-express, non-stored) component uses —
+   * resolved once in PayPalPaymentEnabler._Setup. Deliberately includes
+   * intent/dataPartnerAttributionId/merchantId already baked in, computed identically to what
+   * useSettings.tsx's <PayPalScriptProvider>.
+   *
+   * PayPal Express is excluded — it always must mount alone (no concurrent-mount risk) and needs
+   * genuinely different options*/
+  paypalScriptOptions: ReactPayPalScriptOptions;
   /** When true express PayPal payment is redirected to merchant side for approval */
   redirectOnApprove?: boolean;
   /** The commercetools Payment for this checkout page load — created once in PayPalPaymentEnabler._Setup(),

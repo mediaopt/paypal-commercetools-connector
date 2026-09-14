@@ -123,31 +123,33 @@ driving the component through the `PaymentComponent` contract
 
 ### PayPal JS SDK script options (currency, funding sources, etc.)
 
-`<PayPal/>`/`<CreditCard/>` (`CardFields`) both load against the PayPal JS SDK, whose script options
+In checkout mode every standard component (`<PayPal/>`, `<CreditCard/>` i.e. `CardFields`, and every other
+individual-funding-source/AllButtons/ApplePay/CardFieldsStored variant) shares one PayPal JS SDK
+script load, resolved once per page in `PayPalPaymentEnabler._Setup()` and loaded before any
+component ever mounts — see `enabler/src/app/preloadPayPalScript.ts` for the mechanics. Its options
 (`currency`, `components`, `enableFunding`/`disableFunding`, `buyerCountry`, `locale`, `vault`, and
 so on) used to be supplied directly as component props by the merchant's own frontend code in the
-standalone client. In Checkout mode there's no merchant frontend code path left to supply them — the
-enabler is mounted by Checkout itself — so **for now these are configured separately, from
-`processor`'s environment**: see `PAYPAL_SDK_OPTIONS` in `processor/.env.template`.
+standalone client; in Checkout mode there's no such path left, so these are configured from
+`processor`'s environment instead: see `PAYPAL_STANDARD_SCRIPT_OPTIONS` in `processor/.env.template`.
 
-They're configurable per payment method (`PayPal`, `CardFields`) and, for `PayPal` specifically,
-separately for `builderType: undefined` (standard) and `builderType: "express"`
-(`PayPalComponentBuilder` vs. `createExpressBuilder` — see `enabler/src/components/PayPalBuilder.ts`),
-since a merchant may want different funding sources/currency for a regular PayPal button versus an
-express-checkout one. `CardFields` has no standard/express split since it has no `builderType: "express"`
-mount. `enableFunding` defaults to `"paylater"` for both `PayPal` and `PayPalExpress` if left
-unset, so the PayPal Pay Later button stays enabled out of the box even with no configuration at all.
+Deliberately **not** configurable per payment method — every standard component must request the
+identical script (that's what lets them share one PayPal JS SDK load instead of racing each other),
+so this is one flat object, not keyed by `paymentMethodType`. If you need genuinely different
+values for one specific method, please open an issue.
 
-`currency` and `buyerCountry` specifically are the exception to "configured from `processor`'s
-environment": `processor` derives them from the current cart on every `/operations/config` request
-(the cart's total price currency, and its `country` field — not billing/shipping address) and
-overrides whatever `PAYPAL_SDK_OPTIONS` configured for them, since the actual cart in progress is a
-better source of truth than a static deploy-time value. `PAYPAL_SDK_OPTIONS`'s `currency`/
-`buyerCountry` only take effect as a fallback when the cart can't supply them (e.g. no `country` set
-on the cart).
+PayPal Express (`builderType: "express"`) is the one exception: it always mounts alone (its own page,
+no concurrent-mount risk to begin with) and is configured completely independently, via
+`PAYPAL_EXPRESS_SDK_OPTIONS` — see that var's own comment in `processor/.env.template`.
 
-This is a stopgap, not the final shape — richer configuration is expected in future versions. **If
-you need something this doesn't yet cover, please open an issue.**
+`currency` and `buyerCountry` are additionally overlaid per request from the current cart (the
+cart's total price currency, and its `country` field — not billing/shipping address; `buyerCountry`
+only in sandbox) — thou only Express is supposed to be able to create new cart. `PAYPAL_STANDARD_SCRIPT_OPTIONS`'s own `currency`/`buyerCountry`
+only take effect as a fallback when the cart can't supply them (e.g. no `country` set on the cart); same for
+`PAYPAL_EXPRESS_SDK_OPTIONS`'s `currency` on the Express side (buyerCountry is never overlaid there).
+
+In legacy mode when each component is loaded independently separate script options still can be provided per component.
+Thou this is a merchant responsibility than to prevent concurrency. I.e. by first select payment render, than render - opposite to ct checkout.
+**If you need something this doesn't yet cover, please open an issue.**
 
 ### Venmo eligibility is not enforced by the payment-method list
 

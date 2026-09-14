@@ -34,11 +34,13 @@ export function resolvePayPalBrandOptions(
   // per-payment-method) since no other paymentMethodType can ever produce it.
   const isExpress = builderType === "express";
 
-  // Resolves to the processor-configured slice for this specific payment method — see
-  // BaseOptions.sdkOptions and PAYPAL_SDK_OPTIONS in processor/.env.template.
-  const componentSdkOptions = isExpress
-    ? baseOptions.sdkOptions?.PayPalExpress
-    : baseOptions.sdkOptions?.[paymentMethodType];
+  // Standard (non-express) components all share the ONE script config resolved once in
+  // PayPalPaymentEnabler._Setup() (see BaseOptions.paypalScriptOptions) — avoids each mounted
+  // component's own PayPalScriptProvider racing on the PayPal JS SDK.
+  // Express is supposed to be loaded on a different page so it keeps resolving own config.
+  const options = isExpress
+    ? buildScriptOptions(baseOptions, baseOptions.expressSdkOptions, true)
+    : baseOptions.paypalScriptOptions;
 
   const resolvedDefaults = isExpress
     ? ENABLER_DEFAULT_EXPRESS_CONFIG
@@ -70,11 +72,6 @@ export function resolvePayPalBrandOptions(
     resolvedFixedConfig?.fundingSource ??
     resolvedOverride?.fundingSource ??
     resolvedDefaults?.fundingSource;
-  const options = buildScriptOptions(
-    baseOptions,
-    componentSdkOptions,
-    isExpress
-  );
 
   const initialSettings = {
     ...baseOptions.settings,
@@ -114,18 +111,11 @@ export function resolveCardFieldsOptions(
 ): CardFieldsResolvedOptions {
   // CardFields has no button style/fundingSource of its own (nothing in CardFields.tsx's render
   // tree ever reads initialSettings.paypalButtonConfig/buttonShape or a fundingSource prop).
-  // `components` comes from baseOptions.standardScriptOptions (see constants.ts's
-  // buildScriptOptions()) same as every other standard component.
   const fixedOverrides =
     FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
 
-  const options = buildScriptOptions(
-    baseOptions,
-    baseOptions.sdkOptions?.CardFields
-  );
-
   return {
-    options,
+    options: baseOptions.paypalScriptOptions,
     initialSettings: { ...baseOptions.settings, ...fixedOverrides },
     enableVaulting: baseOptions.enableVaulting ?? false,
   };
@@ -149,13 +139,8 @@ export function resolveCardFieldsStoredOptions(
 export function resolveApplePayOptions(
   baseOptions: BaseOptions
 ): ApplePayResolvedOptions {
-  // ApplePay has no button style/fundingSource concept. `components` comes from
-  // baseOptions.standardScriptOptions (see constants.ts's buildScriptOptions()) same as every
-  // other standard component; only applePayDisplayName goes through its own settings chain.
-  const options = buildScriptOptions(
-    baseOptions,
-    baseOptions.sdkOptions?.ApplePay
-  );
+  // ApplePay has no button style/fundingSource concept.
+  // Only applePayDisplayName goes through its own settings chain.
 
   // Missing-config warning for this lives in the processor's config()
   const applePayDisplayName =
@@ -167,7 +152,7 @@ export function resolveApplePayOptions(
   // here. The legacy self-hosted vaulted-card UI in ApplePayMask.tsx is naturally never reached
   // under Checkout regardless (see its own comment), so no gate is needed on this side either.
   return {
-    options,
+    options: baseOptions.paypalScriptOptions,
     initialSettings: baseOptions.settings,
     enableVaulting: false,
     applePayDisplayName,

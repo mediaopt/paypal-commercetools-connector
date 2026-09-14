@@ -103,7 +103,8 @@ import {
 } from "../utils/storedPaymentMethod.utils";
 import {
   isStoredPaymentMethodsEnabled,
-  buildSdkOptions,
+  buildStandardScriptCartOverlay,
+  buildExpressSdkOptions,
 } from "../utils/config.utils";
 import {
   buildProcessorLogging,
@@ -162,7 +163,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         }))
         .catch((e) => {
           log.warn(
-            `config: failed to fetch cart for sdkOptions/stored-payment-methods derivation — ${errorMessage(
+            `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
               e
             )}`
           );
@@ -194,6 +195,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // this env var alone.
     const standardScriptOptions = {
       ...getConfig().standardScriptOptions,
+      ...buildStandardScriptCartOverlay(cartSummary),
       components: getConfig().standardScriptOptions.components.filter(
         (component) =>
           component !== "card-fields" || settings.acceptCredit !== false
@@ -249,7 +251,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       redirectOnApprove: this.hasExpressReviewStep(),
       settings: mergedSettings,
       userIdToken,
-      sdkOptions: buildSdkOptions(cartSummary),
+      expressSdkOptions: buildExpressSdkOptions(cartSummary),
       standardScriptOptions,
     };
   }

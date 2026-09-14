@@ -7,33 +7,28 @@ import {
   resolveTypeKey,
 } from "common-connect";
 
-// PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding,
-// buyerCountry, locale, vault, etc.) — previously supplied directly by the merchant's own frontend
-// code when mounting <PayPal/>/<CreditCard/> outside commercetools Checkout, not something the
-// paypal-commercetools-connector/settings custom object manages. Configurable per componentType
-// (PayPal, CardFields), plus a dedicated PayPalExpress slot for PayPal's own express builder
-// variant — the one componentType with more than one builder variant (see
-// PayPalComponentBuilder/createExpressBuilder in the enabler). Format: JSON object matching (a
-// subset of) @paypal/paypal-js's PayPalScriptOptions shape (excluding clientId, which the config()
-// response supplies separately from paypalClientId below) keyed by componentType, e.g.
-// {"PayPal":{"currency":"USD"},"PayPalExpress":{"currency":"USD","enableFunding":"venmo"},"CardFields":{"currency":"USD"}}
-// Passed through to the enabler as-is (see sdkOptions below) — the enabler applies its own
-// enableFunding: "paylater" default (PayPalBuilder.ts) so Pay Later stays enabled if nothing is
-// configured; that default lives enabler-side only, not duplicated here.
-const configuredSdkOptions = process.env.PAYPAL_SDK_OPTIONS
-  ? JSON.parse(process.env.PAYPAL_SDK_OPTIONS)
+// PayPal Express's own PayPal JS SDK script options — kept separate from
+// PAYPAL_STANDARD_SCRIPT_OPTIONS because Express mounts on its own page.
+// Flat JSON object matching (a subset of) @paypal/paypal-js's PayPalScriptOptions shape
+// (excluding clientId, which the config() response supplies separately from paypalClientId below),
+// Passed through to the enabler as-is — no processor-side defaulting. `currency` is overridden per request from the
+// cart (its total price's currencyCode) whenever available — this only takes effect as a fallback.
+const configuredExpressSdkOptions: Record<string, unknown> = process.env
+  .PAYPAL_EXPRESS_SDK_OPTIONS
+  ? JSON.parse(process.env.PAYPAL_EXPRESS_SDK_OPTIONS)
   : {};
 
-// Shared script options for every *standard* component (see PAYPAL_STANDARD_SCRIPT_OPTIONS
-// comment in .env.template) — layered over this connector's own built-in default the same way
-// PAYPAL_SETTINGS layers over CUSTOM_OBJECT_DEFAULT_VALUES below, so an unset/{} env value keeps
-// the default rather than wiping it out. `components` is narrowed further per request in
-// PayPalPaymentService.config() by settings.acceptCredit.
+// Shared script options for every *standard* component (PayPal, Sepa, PayLater, PayPalCreditCard,
+// AllButtons, Venmo, Credit, the active local-payment-method subset, CardFields, ApplePay,
+// CardFieldsStored). An unset/{} env value keeps the default. `components` is narrowed further per request in
+// PayPalPaymentService.config() by settings.acceptCredit;
+// `currency`/`buyerCountry` are overlaid per request from the cart — this env value only takes effect as a
+// fallback. Every standard component shares this one config.
 const configuredStandardScriptOptions: {
   components: string[];
   disableFunding?: string[];
   enableFunding?: string[];
-} = {
+} & Record<string, unknown> = {
   components: ["buttons", "card-fields", "applepay"],
   ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
     ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
@@ -127,8 +122,7 @@ export const config = {
       : {}),
   } as Partial<PayPalSettings>,
 
-  // See the configuredSdkOptions comment above — passed through as-is, no processor-side defaulting.
-  sdkOptions: configuredSdkOptions,
+  expressSdkOptions: configuredExpressSdkOptions,
 
   // See the configuredStandardScriptOptions comment above.
   standardScriptOptions: configuredStandardScriptOptions,
