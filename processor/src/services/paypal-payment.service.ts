@@ -606,7 +606,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
       builderType === CustomBuilderType.EXPRESS,
       showContinueReview,
       returnUrl,
-      cancelUrl
+      cancelUrl,
+      getConfig().orderExperienceContext
     );
 
     let response: Order;

@@ -12,6 +12,7 @@ import {
   CheckoutPaymentIntent,
   OrderRequest,
   PurchaseUnitRequest,
+  PaypalWallet,
   Authorization2StatusEnum,
   Capture2StatusEnum,
 } from "common-connect";
@@ -56,7 +57,11 @@ export const buildOrderRequest = (
   // session return url is configured, in which case the corresponding experience_context field is
   // simply omitted below.
   returnUrl?: string,
-  cancelUrl?: string
+  cancelUrl?: string,
+  // getConfig().orderExperienceContext (PAYPAL_ORDER_EXPERIENCE_CONTEXT) — merchant JSON overrides
+  // spread over this function's own computed experience_context defaults below, so an explicit key
+  // here (e.g. user_action, payment_method_preference) always wins, including over showContinueReview.
+  experienceContextOverrides: Record<string, unknown> = {}
 ): OrderRequest => {
   const { address: resolvedShippingAddress } =
     resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
@@ -97,11 +102,13 @@ export const buildOrderRequest = (
   const experienceContext = {
     ...(returnUrl ? { return_url: returnUrl } : {}),
     ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
-    ...(showContinueReview ? { user_action: "CONTINUE" as const } : {}),
+    user_action: showContinueReview ? ("CONTINUE" as const) : ("PAY_NOW" as const),
+    payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED" as const,
     ...(shipping && !isExpress
       ? { shipping_preference: "SET_PROVIDED_ADDRESS" as const }
       : {}),
-  };
+    ...experienceContextOverrides,
+  } as PaypalWallet["experience_context"];
 
   return {
     intent:
@@ -113,9 +120,7 @@ export const buildOrderRequest = (
       ? {
           payment_source: {
             paypal: {
-              ...(Object.keys(experienceContext).length
-                ? { experience_context: experienceContext }
-                : {}),
+              experience_context: experienceContext,
               ...(orderData?.storeInVault
                 ? {
                     attributes: {

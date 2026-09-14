@@ -43,6 +43,16 @@ const configuredButtonConfig = process.env.PAYPAL_BUTTON_CONFIG
   ? JSON.parse(process.env.PAYPAL_BUTTON_CONFIG)
   : {};
 
+// Merchant overrides for PayPal wallet experience_context (payment_source.paypal.experience_context
+// on the Orders v2 createOrder request — e.g. user_action, payment_method_preference), as a single
+// flat JSON object. Spread over buildOrderRequest's own computed defaults (order.utils.ts) so any
+// key set here always wins — add new experience_context fields here as needed rather than growing
+// config.ts one flag at a time (see PAYPAL_ORDER_EXPERIENCE_CONTEXT in processor/.env.template).
+const configuredOrderExperienceContext: Record<string, unknown> = process.env
+  .PAYPAL_ORDER_EXPERIENCE_CONTEXT
+  ? JSON.parse(process.env.PAYPAL_ORDER_EXPERIENCE_CONTEXT)
+  : {};
+
 const PAYMENT_INTERFACE_NAME = "PayPal";
 
 export const config = {
@@ -89,6 +99,9 @@ export const config = {
   // (see enabler/README.md's "PayPal-Express/ legal-review requirement" section).
   redirectOnApprove: process.env.PAYPAL_REDIRECT_ON_APPROVE === "true",
   paymentInterface: PAYMENT_INTERFACE_NAME,
+
+  // See configuredOrderExperienceContext comment above.
+  orderExperienceContext: configuredOrderExperienceContext,
 
   // env variables related to stored payment methods feature
   storedPaymentMethodsEnabled:

@@ -46,6 +46,9 @@ deployAs:
           description: For PayPal Express (Authorize or Capture intent), redirect to PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL on approval instead of finalizing the payment immediately (true OR false). REQUIRED to be true, with that review page actually built, for PayPal Express in Germany.
           required: false
           default: "false"
+        - key: PAYPAL_ORDER_EXPERIENCE_CONTEXT
+          description: Merchant overrides for PayPal wallet experience_context on the Orders v2 createOrder request (e.g. user_action, payment_method_preference), as a JSON object. Defaults, unless overridden here, are user_action PAY_NOW (CONTINUE for Express with a review-step redirect configured) and payment_method_preference IMMEDIATE_PAYMENT_REQUIRED
+          required: false
         - key: PAYPAL_BUTTON_CONFIG
           description: Per-component/variant style and funding-source overrides (keyed by payment method type, plus a dedicated PayPalExpress slot), as a JSON object
           required: false
