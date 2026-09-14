@@ -85,6 +85,12 @@ builder instead, not through `CardFields`.*/
 // How long after the SDK script resolves the card fields form may still legitimately be absent.
 const CARD_FIELDS_READY_TIMEOUT_MS = 3_000;
 
+// PayPal's Card Fields SDK invokes onApprove/onError as independent, fire-and-forget callbacks —
+// it gives no guarantee either one ever fires (e.g. its internal 3DS contingency handling can
+// stall or abort silently). Generous on purpose: a real interactive 3DS challenge can legitimately
+// take a while to complete.
+const CARD_FIELDS_SUBMIT_TIMEOUT_MS = 90_000;
+
 type CardFieldsState = {
   form: PayPalCardFieldsComponent | null;
   fields: RegisteredFields;
@@ -230,6 +236,23 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     return () => window.clearTimeout(timer);
   }, [cardFieldsForm, isCardFieldsScriptResolved]);
 
+  // Safety net for submit(): every other code path that ends the "paying" state (the 3DS
+  // switch below, handleError, errorFunc, handleOnApprove's finally) clears the loader — this is
+  // the one guard against the SDK never calling onApprove/onError at all.
+  useEffect(() => {
+    if (!paying) return;
+    const timer = window.setTimeout(() => {
+      console.error(
+        "[paypal-enabler][CardFields] submit() never completed (no onApprove/onError within timeout) — resetting"
+      );
+      setPaying(false);
+      isLoading(false);
+      notify("Error", t("cardFields.tryAgain"));
+    }, CARD_FIELDS_SUBMIT_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paying]);
+
   const handleApprove = (data: CardFieldsOnApproveData) => {
     if (vaultOnly) {
       approveTransaction({ vaultSetupToken: data.orderID });
@@ -242,24 +265,29 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     };
 
     if (threeDSAuth) {
-      handleAuthenticateThreeDSOrder(data.orderID).then((result) => {
-        switch (result.toString(10)) {
-          case "2":
-            approveTransaction(approveData);
-            break;
-          case "1":
-            notify("Warning", t("cardFields.tryAgain"));
-            isLoading(false);
-            setPaying(false);
-            break;
-          case "0":
-          default:
-            notify("Error", t("cardFields.selectDifferentMethod"));
-            isLoading(false);
-            setPaying(false);
-            break;
-        }
-      });
+      handleAuthenticateThreeDSOrder(data.orderID)
+        .then((result) => {
+          switch (result.toString(10)) {
+            case "2":
+              approveTransaction(approveData);
+              break;
+            case "1":
+              notify("Warning", t("cardFields.tryAgain"));
+              isLoading(false);
+              setPaying(false);
+              break;
+            case "0":
+            default:
+              notify("Error", t("cardFields.selectDifferentMethod"));
+              isLoading(false);
+              setPaying(false);
+              break;
+          }
+        })
+        .catch((err) => {
+          setPaying(false);
+          errorFunc(err as Record<string, unknown>, isLoading, notify, t);
+        });
     } else {
       approveTransaction(approveData);
     }

@@ -864,8 +864,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // risk, not just a data-integrity nicety). Checked before ever calling PayPal.
     this.assertNotLinkedToDifferentOrder(payment, orderID);
 
-    await this.ensureOrderApproved(orderID);
-
     let response: Order;
     try {
       response = await config.callPayPal(orderID);
@@ -875,6 +873,22 @@ export class PayPalPaymentService extends AbstractPaymentService {
           payment.id
         } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
+
+      // In most of cases paypal webhook submits approved PayPal order state before frontend
+      // could trigger capture attempt and even if not it is not blocking. This is precaution
+      // needed for some slow 3ds verifications.
+      const order = await getPayPalOrder(orderID).catch(() => undefined);
+      if (
+        order &&
+        order.status !== "APPROVED" &&
+        order.status !== "COMPLETED"
+      ) {
+        throw new ErrorInvalidOperation(
+          `PayPal order ${orderID} is not yet approved (status: ${order.status}) — buyer approval may not have finished processing on PayPal's side yet`,
+          { fields: { orderID, orderStatus: order.status } }
+        );
+      }
+
       throw new ErrorInvalidOperation(
         `Failed to ${
           config.operation === "authorizeOrder" ? "authorize" : "capture"
@@ -944,29 +958,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * PayPal's own backend can lag slightly behind the buyer's client-side approval — this bridges
-   * that brief gap with a short bounded retry before authorizeOrder()/captureOrder()/settlement()
-   * actually calls PayPal's authorize/capture API, instead of racing it. Not gated to Express —
-   * the same gap can happen for the standard flow too.
-   */
-  private async ensureOrderApproved(orderID: string): Promise<void> {
-    const maxAttempts = 3;
-    const baseDelayMs = 500;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const order = await getPayPalOrder(orderID);
-      if (order.status === "APPROVED" || order.status === "COMPLETED") return;
-      if (attempt === maxAttempts) {
-        throw new ErrorInvalidOperation(
-          `PayPal order ${orderID} is not yet approved (status: ${order.status}) — buyer approval may not have finished processing on PayPal's side yet`
-        );
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, baseDelayMs * attempt)
-      );
-    }
-  }
-
-  /**
    * Fetches the payment, checks the caller-supplied orderID actually belongs to it, then
    * delegates to applyPayPalOrderTransaction() and shapes the result for authorizeOrder()/
    * captureOrder() — including the optional merchantReturnUrl convenience. Always uses the plain
@@ -996,11 +987,37 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // inside applyPayPalOrderTransaction.
     this.assertIsCurrentPayPalOrder(payment, orderID);
 
-    const response = await this.applyPayPalOrderTransaction(
-      payment,
-      orderID,
-      config
-    );
+    let response: Order;
+    try {
+      response = await this.applyPayPalOrderTransaction(
+        payment,
+        orderID,
+        config
+      );
+    } catch (error) {
+      const notYetApprovedStatus =
+        error instanceof ErrorInvalidOperation &&
+        (error.fields as { orderID?: string; orderStatus?: string })
+          ?.orderStatus;
+      if (notYetApprovedStatus) {
+        // Confirmed via getPayPalOrder (in applyPayPalOrderTransaction's catch) that PayPal's own
+        // backend hadn't caught up with the buyer's approval yet — respond with the normal
+        // success-shaped response instead of an HTTP error, so the enabler's
+        // existing orderData.status !== "COMPLETED" handling shows a proper failure result instead
+        // of losing this message to processorRequest's swallow-on-non-2xx behavior (see
+        // enabler/src/api/request.ts). No merchantReturnUrl: handleOnApprove in usePayment.tsx
+        // redirects on merchantReturnUrl before ever checking orderData.status, which would abandon
+        // the order before any capture/authorize was attempted.
+        return {
+          orderData: {
+            id: orderID,
+            status: notYetApprovedStatus,
+            message: error.message,
+          },
+        };
+      }
+      throw error;
+    }
 
     return {
       orderData: { id: response.id ?? "", status: response.status ?? "" },
