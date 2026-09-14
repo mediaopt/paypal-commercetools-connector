@@ -82,6 +82,9 @@ pay flow below). So in Checkout mode `vaultOnly` is forced off (see `vaultOnly` 
 save-only flow there would have to go through a separate stored-payment-methods component/
 builder instead, not through `CardFields`.*/
 
+// How long after the SDK script resolves the card fields form may still legitimately be absent.
+const CARD_FIELDS_READY_TIMEOUT_MS = 3_000;
+
 type CardFieldsState = {
   form: PayPalCardFieldsComponent | null;
   fields: RegisteredFields;
@@ -207,17 +210,24 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardFieldsForm]);
 
-  // Traceable script-resolution visibility, mirroring PayPalMask.tsx's equivalent addition —
-  // logs when the CardFields SDK component becomes ready, and flags the case it's resolved but
-  // never becomes ready at all (today produces no output of any kind).
+  // TODO - remove after server tests success
   useEffect(() => {
     if (cardFieldsForm) {
       console.log("[paypal-enabler][CardFields] cardFieldsForm ready");
-    } else if (isCardFieldsScriptResolved) {
+      return;
+    }
+    if (!isCardFieldsScriptResolved) {
+      return;
+    }
+    // "Resolved but no form yet" is the normal intermediate state, not a failure: the form is only
+    // populated an effect-cycle later
+    const timer = window.setTimeout(() => {
       console.error(
         "[paypal-enabler][CardFields] script resolved but cardFieldsForm never became ready"
       );
-    }
+    }, CARD_FIELDS_READY_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timer);
   }, [cardFieldsForm, isCardFieldsScriptResolved]);
 
   const handleApprove = (data: CardFieldsOnApproveData) => {
