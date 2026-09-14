@@ -645,6 +645,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
           payment_source: response.payment_source,
           links: response.links,
         },
+        // Same convention as finalizeOrder: this order already settled synchronously (e.g. a
+        // vaulted card), so the buyer needs the same redirect a post-approval finalize gets —
+        // handleCreateOrder has no other way to reach the result page for this case.
+        merchantReturnUrl: this.buildRedirectMerchantUrl(
+          payment.id,
+          response.status
+        ),
       };
     }
 

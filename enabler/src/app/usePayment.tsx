@@ -354,7 +354,11 @@ export const PaymentProvider: FC<
 
         const oldOrderData = orderData;
 
-        const { orderData: newOrderData, paymentVersion } = createOrderResult;
+        const {
+          orderData: newOrderData,
+          paymentVersion,
+          merchantReturnUrl,
+        } = createOrderResult;
         const { id, status, payment_source, details, links, message } =
           newOrderData;
         latestPaymentVersion = paymentVersion;
@@ -430,6 +434,10 @@ export const PaymentProvider: FC<
             onSuccess(newOrderData);
           } else {
             if (status === "COMPLETED" && payment_source) {
+              if (merchantReturnUrl) {
+                redirectTo(merchantReturnUrl);
+                return "";
+              }
               onSuccess(newOrderData);
             } else if (
               status === "PAYER_ACTION_REQUIRED" &&

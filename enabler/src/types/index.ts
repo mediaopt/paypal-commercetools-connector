@@ -160,6 +160,9 @@ export type OrderData = {
 export type CreateOrderResponse = {
   orderData: OrderData;
   paymentVersion?: PaymentVersion;
+  // Buyer redirect target for orders that settle synchronously inside createOrder itself (e.g. a
+  // vaulted card) — same convention as OnApproveResponse.merchantReturnUrl below.
+  merchantReturnUrl?: string;
   ok?: boolean;
 };
 

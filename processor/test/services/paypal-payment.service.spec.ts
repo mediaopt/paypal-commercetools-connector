@@ -647,20 +647,34 @@ describe("paypal-payment.service", () => {
       expect(loggingCall).not.toHaveProperty("transaction");
     });
 
-    test("throws without ever calling PayPal when the order has not finished being marked APPROVED yet", async () => {
+    test("returns a graceful not-yet-approved result instead of throwing, after confirming via getPayPalOrder, when PayPal rejects the authorize call because the order isn't approved yet", async () => {
+      (CommonConnect.authorizePayPalOrder as jest.Mock).mockRejectedValueOnce(
+        new Error("UNPROCESSABLE_ENTITY") as never
+      );
       (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
         ...mockPayPalOrder,
         status: "CREATED",
       } as never);
 
-      await expect(
-        paypalPaymentService.authorizeOrder({
-          paymentId: mockPayment.id,
-          orderID: mockAuthorizedOrder.id,
-        })
-      ).rejects.toThrow();
+      const result = await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
 
-      expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        orderData: {
+          id: mockAuthorizedOrder.id,
+          status: "CREATED",
+          message: expect.stringContaining("is not yet approved"),
+        },
+      });
+      expect(CommonConnect.authorizePayPalOrder).toHaveBeenCalledWith(
+        mockAuthorizedOrder.id,
+        {}
+      );
+      expect(CommonConnect.getPayPalOrder).toHaveBeenCalledWith(
+        mockAuthorizedOrder.id
+      );
     }, 10000);
 
     test("links interfaceId to the authorized order when it was previously unset", async () => {
