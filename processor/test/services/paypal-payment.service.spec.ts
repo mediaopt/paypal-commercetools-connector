@@ -262,11 +262,10 @@ describe("paypal-payment.service", () => {
         purchase_units: [{ shipping?: unknown }];
       }
     ];
-    // No return url configured and no review step configured in this test, so
-    // experience_context ends up empty and is omitted entirely (see order.utils.ts) —
-    // shipping_preference itself stays Express-excluded either way.
+    // experience_context still carries this connector's own user_action/payment_method_preference
+    // defaults regardless (see order.utils.ts) — shipping_preference itself stays Express-excluded.
     expect(
-      orderRequest.payment_source?.paypal?.experience_context
+      orderRequest.payment_source?.paypal?.experience_context?.shipping_preference
     ).toBeUndefined();
     // shipping.type is always set by mapCommercetoolsAddressToPayPalAddress, and PayPal
     // rejects a later shipping.options PATCH (SHIPPING_OPTIONS_NOT_SUPPORTED) whenever
@@ -324,7 +323,7 @@ describe("paypal-payment.service", () => {
     );
   });
 
-  test("does not set experience_context.user_action for Express without a review step configured, even with a return url", async () => {
+  test("sets experience_context.user_action to PAY_NOW for Express without a review step configured, even with a return url", async () => {
     jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
       ...ConfigModule.getConfig(),
       returnUrl: "https://merchant.example.com/return",
@@ -342,10 +341,10 @@ describe("paypal-payment.service", () => {
     ];
     expect(
       orderRequest.payment_source?.paypal?.experience_context?.user_action
-    ).toBeUndefined();
+    ).toBe("PAY_NOW");
   });
 
-  test("does not set experience_context.user_action for a standard (non-express) order, even with a review step configured", async () => {
+  test("sets experience_context.user_action to PAY_NOW for a standard (non-express) order, even with a review step configured", async () => {
     jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
       ...ConfigModule.getConfig(),
       redirectOnApprove: true,
@@ -362,7 +361,7 @@ describe("paypal-payment.service", () => {
     ];
     expect(
       orderRequest.payment_source?.paypal?.experience_context?.user_action
-    ).toBeUndefined();
+    ).toBe("PAY_NOW");
   });
 
   test("still sets shipping (with shipping.type) for a non-express order with a shipping address on the cart", async () => {
