@@ -1472,7 +1472,7 @@ describe("paypal-payment.service", () => {
       });
     });
 
-    test("falls back to configured sdkOptions when the cart has no currency or country", async () => {
+    test("falls back to configured expressSdkOptions/standardScriptOptions when the cart has no currency or country", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         totalPrice: undefined,
@@ -1480,13 +1480,17 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      // No processor-side enableFunding defaulting anymore — that default now lives enabler-only
-      // (PayPalBuilder.ts) — and PAYPAL_SDK_OPTIONS is unset in this test env, so sdkOptions passes
-      // through empty.
-      expect(result.sdkOptions).toEqual({});
+      // PAYPAL_EXPRESS_SDK_OPTIONS is unset in this test env, so expressSdkOptions passes through
+      // empty; standardScriptOptions still carries its own built-in default (components), just no
+      // cart-derived currency/buyerCountry overlay.
+      expect(result.expressSdkOptions).toEqual({});
+      // components itself is separately narrowed by settings.acceptCredit (tested elsewhere) —
+      // this test only cares that no cart-derived currency/buyerCountry overlay leaked in.
+      expect(result.standardScriptOptions).not.toHaveProperty("currency");
+      expect(result.standardScriptOptions).not.toHaveProperty("buyerCountry");
     });
 
-    test("overlays the cart's currency and country onto every sdkOptions component slice", async () => {
+    test("overlays the cart's currency and country onto the one shared standardScriptOptions", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         country: "US",
@@ -1494,80 +1498,47 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      // Flat per-componentType overlay (StandardPaymentMethodType's members) plus the dedicated
-      // PayPalExpress slot — see config.utils.ts's buildSdkOptions(). Includes the active
-      // local-payment-method (APM) subset (Credit, Ideal, Bancontact, Eps, MyBank, P24, Blik)
-      expect(result.sdkOptions).toEqual({
-        CardFields: { currency: "USD", buyerCountry: "US" },
-        PayPal: { currency: "USD", buyerCountry: "US" },
-        Sepa: { currency: "USD", buyerCountry: "US" },
-        PayLater: { currency: "USD", buyerCountry: "US" },
-        PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
-        AllButtons: { currency: "USD", buyerCountry: "US" },
-        Venmo: { currency: "USD", buyerCountry: "US" },
-        Credit: { currency: "USD", buyerCountry: "US" },
-        Ideal: { currency: "USD", buyerCountry: "US" },
-        Bancontact: { currency: "USD", buyerCountry: "US" },
-        Eps: { currency: "USD", buyerCountry: "US" },
-        MyBank: { currency: "USD", buyerCountry: "US" },
-        P24: { currency: "USD", buyerCountry: "US" },
-        Blik: { currency: "USD", buyerCountry: "US" },
-        ApplePay: { currency: "USD", buyerCountry: "US" },
-        // PayPalExpress is a different page/script than the standard components — it gets the
-        // cart's currency but never buyerCountry (sandbox-only, standard-only — see
-        // config.utils.ts's buildSdkOptions()).
-        PayPalExpress: { currency: "USD" },
+      // One flat overlay for every standard component (PayPal, CardFields, Sepa, Venmo, the
+      // active APM subset, etc. all share this same standardScriptOptions object) — see
+      // config.utils.ts's buildStandardScriptCartOverlay().
+      expect(result.standardScriptOptions).toMatchObject({
+        currency: "USD",
+        buyerCountry: "US",
       });
+      // PayPal Express is a different page/script than the standard components — it gets the
+      // cart's currency but never buyerCountry (sandbox-only, standard-only — see
+      // config.utils.ts's buildExpressSdkOptions()).
+      expect(result.expressSdkOptions).toEqual({ currency: "USD" });
     });
 
-    test("cart-derived currency/country override processor-configured sdkOptions per component", async () => {
+    test("cart-derived currency/country override processor-configured standardScriptOptions/expressSdkOptions", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         country: "US",
       } as unknown as Cart);
       jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
         ...ConfigModule.getConfig(),
-        sdkOptions: {
-          PayPal: {
-            enableFunding: "paylater",
-            currency: "EUR",
-            buyerCountry: "DE",
-          },
-          PayPalExpress: { enableFunding: "venmo", currency: "EUR" },
-          CardFields: { currency: "EUR" },
+        standardScriptOptions: {
+          ...ConfigModule.getConfig().standardScriptOptions,
+          currency: "EUR",
+          buyerCountry: "DE",
         },
+        expressSdkOptions: { enableFunding: "venmo", currency: "EUR" },
       });
 
       const result = await paypalPaymentService.config();
 
-      expect(result.sdkOptions).toEqual({
-        PayPal: {
-          enableFunding: "paylater",
-          currency: "USD",
-          buyerCountry: "US",
-        },
-        CardFields: { currency: "USD", buyerCountry: "US" },
-        Sepa: { currency: "USD", buyerCountry: "US" },
-        PayLater: { currency: "USD", buyerCountry: "US" },
-        PayPalCreditCard: { currency: "USD", buyerCountry: "US" },
-        AllButtons: { currency: "USD", buyerCountry: "US" },
-        Venmo: { currency: "USD", buyerCountry: "US" },
-        Credit: { currency: "USD", buyerCountry: "US" },
-        Ideal: { currency: "USD", buyerCountry: "US" },
-        Bancontact: { currency: "USD", buyerCountry: "US" },
-        Eps: { currency: "USD", buyerCountry: "US" },
-        MyBank: { currency: "USD", buyerCountry: "US" },
-        P24: { currency: "USD", buyerCountry: "US" },
-        Blik: { currency: "USD", buyerCountry: "US" },
-        ApplePay: { currency: "USD", buyerCountry: "US" },
-        PayPalExpress: {
-          enableFunding: "venmo",
-          currency: "USD",
-        },
+      expect(result.standardScriptOptions).toMatchObject({
+        currency: "USD",
+        buyerCountry: "US",
+      });
+      expect(result.expressSdkOptions).toEqual({
+        enableFunding: "venmo",
+        currency: "USD",
       });
     });
 
-    test("resolves with stored payment methods disabled and unmodified sdkOptions when the cart fetch fails", async () => {
+    test("resolves with stored payment methods disabled and unmodified expressSdkOptions when the cart fetch fails", async () => {
       jest
         .spyOn(paymentSDK.ctCartService, "getCart")
         .mockRejectedValue(new Error("cart is gone") as never);
@@ -1575,7 +1546,7 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       expect(result.storedPaymentMethodsConfig).toEqual({ isEnabled: false });
-      expect(result.sdkOptions).toEqual({});
+      expect(result.expressSdkOptions).toEqual({});
     });
 
     test("throws ErrorInvalidOperation when standardScriptOptions.enableFunding and disableFunding both list the same funding source", async () => {
