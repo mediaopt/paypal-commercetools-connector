@@ -430,7 +430,11 @@ export const PaymentProvider: FC<
           }
         } else {
           if (setRatepayMessage) {
-            setRatepayMessage && setRatepayMessage(undefined);
+            setRatepayMessage(undefined);
+            if (merchantReturnUrl) {
+              redirectTo(merchantReturnUrl);
+              return "";
+            }
             onSuccess(newOrderData);
           } else {
             if (status === "COMPLETED" && payment_source) {

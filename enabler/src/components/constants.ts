@@ -1,10 +1,19 @@
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import {
+  FraudnetPage,
   GetSettingsResponse,
   PayPalMethodConfig,
   PayPalPaymentMethodType,
 } from "../types";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
+
+// PayUponInvoice — category 1, hardcoded/non-overridable (see FIXED_SETTINGS_OVERRIDES_BY_
+// PAYMENT_METHOD_TYPE's own comment). PayPal's FraudNet page id for our one PUI mount point
+// (Checkout's own payment step), and RatePay's EUR-denominated payable-amount range — never
+// merchant-configurable. Amounts are in cents (centAmount) to match paymentInfo.amountPlanned.
+export const PAY_UPON_INVOICE_FRAUDNET_PAGE_ID: FraudnetPage = "checkout-page";
+export const PAY_UPON_INVOICE_MIN_PAYABLE_AMOUNT = 500; // 5 EUR
+export const PAY_UPON_INVOICE_MAX_PAYABLE_AMOUNT = 250000; // 2500 EUR
 
 /*
 IMPORTANT — if you deploy these payment components yourself, outside commercetools Checkout
@@ -48,7 +57,7 @@ export const storedPaymentMethodUrl = (processorUrl: string, id: string) =>
 export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
   Record<PayPalPaymentMethodType, Partial<GetSettingsResponse>>
 > = {
-  // PayUponInvoice: { payPalIntent: "Capture" },
+  PayUponInvoice: { payPalIntent: "Capture" },
   // Every individual funding-source button (including PayPal itself, repurposed from the old
   // unscoped default) is built on the standard PayPal smart button — their funding source is a
   // method identity, not a merchant preference, so it's fixed here rather than left to
@@ -144,7 +153,13 @@ export const ENABLER_DEFAULT_CONFIG: Record<
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
   },
   GooglePay: {},
-  PayUponInvoice: {},
+  // No style/fundingSource. invoiceBenefitsMessage overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.PayUponInvoice.invoiceBenefitsMessage — pageId/min/maxPayableAmount are
+  // NOT merchant-configurable, see PAY_UPON_INVOICE_FRAUDNET_PAGE_ID/_MIN/_MAX_PAYABLE_AMOUNT above.
+  PayUponInvoice: {
+    invoiceBenefitsMessage:
+      "Once you place an order, pay within 30 days. Our partner Ratepay will send you the instructions.",
+  },
 };
 
 // RenderTemplate/resolveOptions.ts's scriptOptions — plain defaults applied to every payment method.

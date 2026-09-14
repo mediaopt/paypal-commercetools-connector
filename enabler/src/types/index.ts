@@ -357,6 +357,10 @@ export type PayUponInvoiceProps = ratepayPaymentRestrictions & {
 
 export type PayUponInvoiceMaskProps = {
   fraudNetSessionId: string;
+  onRegisterSubmit?: (
+    handler: (storePaymentDetails?: boolean) => Promise<void>
+  ) => void;
+  onRegisterValidation?: (handlers: ValidationHandlers) => void;
 } & Pick<PayUponInvoiceProps, "invoiceBenefitsMessage">;
 
 export type PayUponInvoiceButtonProps = ratepayPaymentRestrictions &
@@ -622,6 +626,12 @@ export type PayPalMethodConfig = {
   components?: string;
   // ApplePay only — the merchant-facing store name shown in Apple's native payment sheet.
   applePayDisplayName?: string;
+  // PayUponInvoice only block
+  merchantId?: string; //FraudNet merchant configuration.
+  pageId?: string;
+  invoiceBenefitsMessage?: string; // merchant-facing invoice benefits message.
+  minPayableAmount?: number; //payment amount constraints.
+  maxPayableAmount?: number;
 };
 
 /** Method-independent props every mounted component receives — assembled once by
@@ -676,6 +686,15 @@ export type CardFieldsStoredResolvedOptions = Pick<
  * unique to it: the merchant store name shown in the native Apple Pay sheet. */
 export type ApplePayResolvedOptions = BaseResolvedMethodOptions & {
   applePayDisplayName: string;
+};
+
+/** Resolved options for <PayUponInvoice/> — no style/fundingSource concept, plus PUI-specific fields. */
+export type PayUponInvoiceResolvedOptions = BaseResolvedMethodOptions & {
+  merchantId: string;
+  pageId?: string;
+  invoiceBenefitsMessage?: string;
+  minPayableAmount: number;
+  maxPayableAmount: number;
 };
 
 /** The 6 paymentMethodType values that render through the shared <PayPal/> component. */

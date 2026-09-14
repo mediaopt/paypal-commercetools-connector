@@ -3,24 +3,39 @@ import { useTranslation } from "react-i18next";
 
 import { useNotifications } from "../../app/useNotifications";
 
-import { PayUponInvoiceProps, SmartComponentsProps } from "../../types";
+import { PayUponInvoiceProps, SmartComponentsProps, FormComponentProps } from "../../types";
 
-import { RenderTemplate } from "../RenderTemplate";
+import { PayPalContextProvider } from "../PayPalContextProvider";
 import { embeddFraudNet } from "./fraudNetIntegration";
 import { PayUponInvoiceButton } from "./PayUponInvoiceButton";
 import i18n from "../../messages/i18n";
 
-export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps> = ({
+export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps & FormComponentProps> = ({
   options,
   createPaymentUrl,
   getSettingsUrl,
   getClientTokenUrl,
   createOrderUrl,
+  authorizeOrderUrl,
+  authenticateThreeDSOrderUrl,
+  getUserInfoUrl,
   onApproveUrl,
+  onApproveRedirectionUrl,
+  createVaultSetupTokenUrl,
+  approveVaultSetupTokenUrl,
   requestHeader,
   shippingMethodId,
   cartInformation,
   purchaseCallback,
+  enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
+  initialSettings,
+  initialUserIdToken,
+  initialPayment,
+  onRegisterSubmit,
+  onRegisterValidation,
   merchantId,
   pageId,
   invoiceBenefitsMessage,
@@ -51,17 +66,29 @@ export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps> = ({
   }, [fraudNetSessionId, notify, t]);
 
   return (
-    <RenderTemplate
+    <PayPalContextProvider
       options={options}
-      createPaymentUrl={createPaymentUrl}
-      getSettingsUrl={getSettingsUrl}
-      createOrderUrl={createOrderUrl}
-      getClientTokenUrl={getClientTokenUrl}
-      onApproveUrl={onApproveUrl}
       requestHeader={requestHeader}
       shippingMethodId={shippingMethodId}
       cartInformation={cartInformation}
+      createPaymentUrl={createPaymentUrl}
+      createOrderUrl={createOrderUrl}
+      onApproveUrl={onApproveUrl}
+      getSettingsUrl={getSettingsUrl}
       purchaseCallback={purchaseCallback}
+      authorizeOrderUrl={authorizeOrderUrl}
+      authenticateThreeDSOrderUrl={authenticateThreeDSOrderUrl}
+      getUserInfoUrl={getUserInfoUrl}
+      enableVaulting={enableVaulting}
+      createVaultSetupTokenUrl={createVaultSetupTokenUrl}
+      approveVaultSetupTokenUrl={approveVaultSetupTokenUrl}
+      onApproveRedirectionUrl={onApproveRedirectionUrl}
+      paymentMethodType={paymentMethodType}
+      builderType={builderType}
+      processorUrl={processorUrl}
+      initialSettings={initialSettings}
+      initialUserIdToken={initialUserIdToken}
+      initialPayment={initialPayment}
     >
       {fraudNetSessionId ? (
         <PayUponInvoiceButton
@@ -69,10 +96,12 @@ export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps> = ({
           invoiceBenefitsMessage={invoiceBenefitsMessage}
           maxPayableAmount={maxPayableAmount}
           minPayableAmount={minPayableAmount}
+          onRegisterSubmit={onRegisterSubmit}
+          onRegisterValidation={onRegisterValidation}
         />
       ) : (
         <></>
       )}
-    </RenderTemplate>
+    </PayPalContextProvider>
   );
 };

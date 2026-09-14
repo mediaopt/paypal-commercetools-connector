@@ -6,12 +6,16 @@ import {
   CardFieldsStoredResolvedOptions,
   PayPalBrandButtonType,
   PayPalBrandResolvedOptions,
+  PayUponInvoiceResolvedOptions,
 } from "../../types";
 import {
   buildScriptOptions,
   ENABLER_DEFAULT_CONFIG,
   ENABLER_DEFAULT_EXPRESS_CONFIG,
   FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE,
+  PAY_UPON_INVOICE_FRAUDNET_PAGE_ID,
+  PAY_UPON_INVOICE_MAX_PAYABLE_AMOUNT,
+  PAY_UPON_INVOICE_MIN_PAYABLE_AMOUNT,
 } from "../constants";
 
 // 4-layer resolution (category 2, lowest → highest priority), per mounted payment method:
@@ -156,5 +160,28 @@ export function resolveApplePayOptions(
     initialSettings: baseOptions.settings,
     enableVaulting: false,
     applePayDisplayName,
+  };
+}
+
+export function resolvePayUponInvoiceOptions(
+  baseOptions: BaseOptions
+): PayUponInvoiceResolvedOptions {
+  const fixedOverrides =
+    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.PayUponInvoice;
+  const settings = baseOptions.settings.PayUponInvoice;
+
+  return {
+    options: baseOptions.paypalScriptOptions,
+    initialSettings: { ...baseOptions.settings, ...fixedOverrides },
+    enableVaulting: false,
+    merchantId: settings?.merchantId ?? "",
+    // Category 1 — hardcoded, non-overridable: see PAY_UPON_INVOICE_FRAUDNET_PAGE_ID/_MIN/
+    // _MAX_PAYABLE_AMOUNT's own comment in constants.ts.
+    pageId: PAY_UPON_INVOICE_FRAUDNET_PAGE_ID,
+    minPayableAmount: PAY_UPON_INVOICE_MIN_PAYABLE_AMOUNT,
+    maxPayableAmount: PAY_UPON_INVOICE_MAX_PAYABLE_AMOUNT,
+    invoiceBenefitsMessage:
+      settings?.invoiceBenefitsMessage ??
+      ENABLER_DEFAULT_CONFIG.PayUponInvoice.invoiceBenefitsMessage,
   };
 }

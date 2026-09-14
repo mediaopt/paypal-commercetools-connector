@@ -24,6 +24,7 @@ const PAYMENT_METHOD_ICON_KEY_MAP: Record<PaymentMethodType, string> = {
   [StandardPaymentMethodType.MYBANK]: StandardPaymentMethodType.MYBANK,
   [StandardPaymentMethodType.P24]: StandardPaymentMethodType.P24,
   [StandardPaymentMethodType.BLIK]: StandardPaymentMethodType.BLIK,
+  [StandardPaymentMethodType.PAY_UPON_INVOICE]: StandardPaymentMethodType.PAY_UPON_INVOICE,
 
   // GOOGLE_PAY: [StandardPaymentMethodType.GOOGLE_PAY]: "googlepay",
   // Maps the same as CreditCard/CardFields since the stored variant is distinguished by using a

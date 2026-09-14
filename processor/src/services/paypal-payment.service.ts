@@ -507,7 +507,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       true, // matchingAmounts: true because amountPlanned was just computed from this cart
       isShipped,
       ctCart.taxCalculationMode,
-      false, // isPayUponInvoice: false, only PayPal and CardFields are supported in this enabler phase
+      false, // isPayUponInvoice: false — this response is payment-method-agnostic, actual PUI order items are built in buildOrderRequest
       ctCart.lineItems,
       ctCart.locale
     );
@@ -567,6 +567,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
       id: getCartIdFromContext(),
     });
 
+    if (paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE) {
+      this.validatePayUponInvoiceOrderParams(payment, ctCart);
+    }
+
     // Informational only — customerEmail is never actually sent to PayPal (createOrder/
     // buildOrderRequest never reference it), so a missing one here isn't fatal. A real standard
     // checkout flow already forces the buyer to fill this in before the enabler even loads;
@@ -607,17 +611,27 @@ export class PayPalPaymentService extends AbstractPaymentService {
       showContinueReview,
       returnUrl,
       cancelUrl,
-      getConfig().orderExperienceContext
+      getConfig().orderExperienceContext,
+      paymentMethodType
     );
 
     let response: Order;
     try {
-      response = await createPayPalOrder(orderRequest);
+      // orderData?.fraudNetSessionId, when present, must reach PayPal as the
+      // PayPal-Client-Metadata-Id header (not a body field) — PayPal validates FraudNet's device
+      // data against that header specifically for payment_source.pay_upon_invoice orders and
+      // 400s with a dedicated error otherwise.
+      response = await createPayPalOrder(
+        orderRequest,
+        orderData?.fraudNetSessionId
+      );
     } catch (e) {
       log.error(
         `createOrder: PayPal order creation failed for payment ${
           payment.id
-        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)} — request: ${JSON.stringify(
+          orderRequest
+        )} — response: ${JSON.stringify(errorResponseBody(e))}`
       );
       throw new ErrorInvalidOperation(
         `Failed to create PayPal order for payment ${payment.id}`
@@ -649,6 +663,32 @@ export class PayPalPaymentService extends AbstractPaymentService {
         // Same convention as finalizeOrder: this order already settled synchronously (e.g. a
         // vaulted card), so the buyer needs the same redirect a post-approval finalize gets —
         // handleCreateOrder has no other way to reach the result page for this case.
+        merchantReturnUrl: this.buildRedirectMerchantUrl(
+          payment.id,
+          response.status
+        ),
+      };
+    } else if (paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE) {
+      const { transactionType } = resolvePayPalIntentTransactionConfig(payPalIntent);
+      await Promise.all([
+        this.addApprovalPlaceholderTransaction(payment, response.id ?? "", transactionType),
+        this.logProcessorInteraction(
+          payment.id,
+          "createPayPalOrder",
+          orderRequest,
+          response
+        ),
+      ]);
+
+      return {
+        orderData: {
+          id: response.id ?? "",
+          status: response.status ?? "",
+          payment_source: response.payment_source,
+          links: response.links,
+        },
+        // Standard redirect chain — deliberately NOT getConfig().onApprovePrefix, which is
+        // PayPal Express's own legal-review-page override and doesn't apply to PUI.
         merchantReturnUrl: this.buildRedirectMerchantUrl(
           payment.id,
           response.status
@@ -691,6 +731,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
     if (payment.amountPlanned.currencyCode !== "USD") {
       throw new ErrorInvalidOperation(
         `Venmo requires a USD-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
+      );
+    }
+  }
+
+  // PayUponInvoice requires the order amount to exactly match the cart's taxed gross total.
+  private validatePayUponInvoiceOrderParams(payment: Payment, ctCart: Cart): void {
+    const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)?.centAmount;
+    if (payment.amountPlanned.centAmount !== cartTotal) {
+      throw new ErrorInvalidOperation(
+        `PayUponInvoice requires order amount to match cart total; payment amount ${payment.amountPlanned.centAmount} does not match cart total ${cartTotal}`
       );
     }
   }
@@ -1106,45 +1156,21 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE (default off).
-   * Called from handleOnApprove at approval time, *instead of*
-   * authorizeOrder()/captureOrder() — the real authorize/capture can happen later, triggered by the
-   * merchant's own backend via the Payment Intents API → settlement() or extension app,
-   * once the buyer has reviewed on that page.
-   *
-   * The buyer has already approved the order on PayPal's side at this point — this triggers an
-   * optimistic CT Order creation ahead of the real authorize/capture, using PayPalOrderId (the
-   * only PayPal-side identifier available yet) as the payment's interfaceId.
-   * The placeholder is added via a **raw CT API call**, not ctPaymentService.updatePayment() —
-   * that wrapped helper silently discards a bare Initial-state transaction with no interactionId
-   *
-   * TODO: verify on server that the order is created. Otherwice backward compatibility with extension
-   * should be dropped down and interactionId set as the only available - PayPalOrderId.
+   * Adds a placeholder Authorization/Charge transaction with no interactionId to a payment,
+   * triggering commercetools Checkout's optimistic Order creation. Used by expressApprove()
+   * for PayPal Express and by createOrder()'s PUI flow (where the real authorization/capture
+   * happens asynchronously after the buyer is redirected).
    */
-  public async expressApprove({
-    paymentId,
-    orderID,
-    payPalIntent,
-  }: ExpressApproveRequestSchemaDTO): Promise<ExpressApproveResponseSchemaDTO> {
-    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
-
-    // Ownership check (see assertIsCurrentPayPalOrder's own comment) — PayPalOrderId, not interfaceId.
-    this.assertIsCurrentPayPalOrder(payment, orderID);
-    // This *is* the approval moment for the Express+redirect flow — refuse to link a second order
-    // to a payment that already completed a real authorize/capture via a different one (see
-    // assertNotLinkedToDifferentOrder's own comment).
-    this.assertNotLinkedToDifferentOrder(payment, orderID);
-
-    const { transactionType } =
-      resolvePayPalIntentTransactionConfig(payPalIntent);
+  private async addApprovalPlaceholderTransaction(
+    payment: Payment,
+    orderID: string,
+    transactionType: "Authorization" | "Charge"
+  ): Promise<void> {
     const hasPlaceholder = payment.transactions.some(
       (transaction) =>
         transaction.type === transactionType && !transaction.interactionId
     );
 
-    // interfaceId is only ever set once, at a genuine approval moment — createOrder() only
-    // touches it if the payment was approved (see syncPayPalOrderStatus), so this is the one place in the Express flow that
-    // links it, merged into the same atomic update as the placeholder transaction.
     const actions: PaymentUpdateAction[] = [
       ...(hasPlaceholder
         ? []
@@ -1177,6 +1203,41 @@ export class PayPalPaymentService extends AbstractPaymentService {
         })
         .execute();
     }
+  }
+
+  /**
+   * PayPal Express only, gated by PAYPAL_REDIRECT_ON_APPROVE (default off).
+   * Called from handleOnApprove at approval time, *instead of*
+   * authorizeOrder()/captureOrder() — the real authorize/capture can happen later, triggered by the
+   * merchant's own backend via the Payment Intents API → settlement() or extension app,
+   * once the buyer has reviewed on that page.
+   *
+   * The buyer has already approved the order on PayPal's side at this point — this triggers an
+   * optimistic CT Order creation ahead of the real authorize/capture, using PayPalOrderId (the
+   * only PayPal-side identifier available yet) as the payment's interfaceId.
+   * The placeholder is added via a **raw CT API call**, not ctPaymentService.updatePayment() —
+   * that wrapped helper silently discards a bare Initial-state transaction with no interactionId
+   *
+   * TODO: verify on server that the order is created. Otherwice backward compatibility with extension
+   * should be dropped down and interactionId set as the only available - PayPalOrderId.
+   */
+  public async expressApprove({
+    paymentId,
+    orderID,
+    payPalIntent,
+  }: ExpressApproveRequestSchemaDTO): Promise<ExpressApproveResponseSchemaDTO> {
+    const payment = await this.ctPaymentService.getPayment({ id: paymentId });
+
+    // Ownership check (see assertIsCurrentPayPalOrder's own comment) — PayPalOrderId, not interfaceId.
+    this.assertIsCurrentPayPalOrder(payment, orderID);
+    // This *is* the approval moment for the Express+redirect flow — refuse to link a second order
+    // to a payment that already completed a real authorize/capture via a different one (see
+    // assertNotLinkedToDifferentOrder's own comment).
+    this.assertNotLinkedToDifferentOrder(payment, orderID);
+
+    const { transactionType } =
+      resolvePayPalIntentTransactionConfig(payPalIntent);
+    await this.addApprovalPlaceholderTransaction(payment, orderID, transactionType);
 
     return {
       onApproveRedirectionUrl: this.buildRedirectMerchantUrl(

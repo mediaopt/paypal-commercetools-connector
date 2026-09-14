@@ -29,8 +29,7 @@ export const StandardPaymentMethodType = {
   APPLE_PAY: "ApplePay",
   // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
   // GOOGLE_PAY: "GooglePay",
-  // PayUponInvoice has no commercetools Checkout equivalent — not available in commercetools itself.
-  // PAY_UPON_INVOICE: "PayUponInvoice",
+  PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
 export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType

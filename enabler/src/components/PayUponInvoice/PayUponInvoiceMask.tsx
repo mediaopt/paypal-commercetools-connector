@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useState, useEffect } from "react";
 import parsePhoneNumber from "libphonenumber-js";
 import { usePayment } from "../../app/usePayment";
 import { useNotifications } from "../../app/useNotifications";
@@ -12,7 +12,13 @@ import { RatepayErrorNote } from "./RatepayErrorNote";
 import { errorFunc } from "../errorNotification";
 
 const parsePhone = (phone: string) => {
-  const formattedPhone = `+${phone.replace(/\D/g, "")}`;
+  const digits = phone.replace(/\D/g, "");
+  // "00" is the common alternative to "+" for the international dialing prefix (e.g. "0049 30
+  // 901820" instead of "+49 30 901820") — normalize it away first, otherwise it survives digit
+  // stripping and produces a bogus "+00..." number once "+" is prepended below (no country
+  // calling code starts with 0).
+  const normalizedDigits = digits.startsWith("00") ? digits.slice(2) : digits;
+  const formattedPhone = `+${normalizedDigits}`;
   const parsedPhone = parsePhoneNumber(formattedPhone);
   return parsedPhone
     ? `+${parsedPhone?.countryCallingCode ?? ""} ${
@@ -24,6 +30,8 @@ const parsePhone = (phone: string) => {
 export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
   fraudNetSessionId,
   invoiceBenefitsMessage,
+  onRegisterSubmit,
+  onRegisterValidation,
 }) => {
   const { handleCreateOrder } = usePayment();
   const { notify } = useNotifications();
@@ -33,32 +41,78 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
   const [phone, setPhone] = useState("+49 ");
   const [birthDate, setBirthDate] = useState<string>();
   const notifyWrongPhone = () => notify("Warning", t("invoice.wrongPhone"));
+  const notifyMissingBirthDate = () =>
+    notify("Warning", t("invoice.missingBirthDate"));
   let date = new Date();
   date.setFullYear(date.getFullYear() - 18);
   const maxDate = date.toJSON().slice(0, 10);
   const [ratepayMessage, setRatepayMessage] = useState<string>();
 
-  const submitForm = async () => {
-    isLoading(true);
-    setRatepayMessage("");
+  // Single source of truth for form validity — submitForm must gate on this itself, not just
+  // trust Checkout to have called isValid()/showValidation() first (it's the last line of
+  // defense against sending PayPal a request with birthDate/phone missing).
+  const getFormValidity = () => {
     const { countryCallingCode, nationalNumber } = {
       ...parsePhoneNumber(phone),
     };
-    if (countryCallingCode && nationalNumber) {
-      try {
-        await handleCreateOrder({
-          fraudNetSessionId,
-          nationalNumber,
-          countryCode: countryCallingCode,
-          birthDate,
-          setRatepayMessage,
-        });
-      } catch (err: any) {
-        errorFunc(err, isLoading, notify, t);
-      }
-    } else notifyWrongPhone();
+    return {
+      hasBirthDate: !!birthDate,
+      hasValidPhone: !!(countryCallingCode && nationalNumber),
+      countryCallingCode,
+      nationalNumber,
+    };
+  };
+
+  const submitForm = async () => {
+    const { hasBirthDate, hasValidPhone, countryCallingCode, nationalNumber } =
+      getFormValidity();
+    if (!hasBirthDate) {
+      notifyMissingBirthDate();
+      return;
+    }
+    if (!hasValidPhone) {
+      notifyWrongPhone();
+      return;
+    }
+    isLoading(true);
+    setRatepayMessage("");
+    try {
+      await handleCreateOrder({
+        fraudNetSessionId,
+        nationalNumber,
+        countryCode: countryCallingCode,
+        birthDate,
+        setRatepayMessage,
+      });
+    } catch (err: any) {
+      errorFunc(err, isLoading, notify, t);
+    }
     isLoading(false);
   };
+
+  useEffect(() => {
+    if (!onRegisterSubmit) return;
+
+    onRegisterSubmit(() => submitForm());
+    onRegisterValidation?.({
+      isValid: async () => {
+        const { hasBirthDate, hasValidPhone } = getFormValidity();
+        return hasBirthDate && hasValidPhone;
+      },
+      showValidation: async () => {
+        const { hasBirthDate, hasValidPhone } = getFormValidity();
+        if (!hasBirthDate) {
+          notifyMissingBirthDate();
+        } else if (!hasValidPhone) {
+          notifyWrongPhone();
+        }
+      },
+    });
+    // Must re-register on every phone/birthDate change, not just once on mount — onRegisterSubmit/
+    // onRegisterValidation just overwrite Checkout's stored handler each call (last call wins, see
+    // PayPalBuilder.ts), so this keeps it pointing at a closure with the current field values
+    // instead of freezing on whatever they were when this effect first ran.
+  }, [onRegisterSubmit, onRegisterValidation, phone, birthDate]);
 
   return (
     <form
@@ -66,7 +120,13 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
       className="my-4"
       onSubmit={async (event) => {
         event.preventDefault();
-        await submitForm();
+        // In Checkout mode, submission is owned entirely by Checkout's own Pay button via
+        // onRegisterSubmit (which runs isValid()/showValidation() first) — the native form must
+        // never self-submit, since e.g. pressing Enter in the phone field would otherwise bypass
+        // that gating and submit with birthDate still unset.
+        if (!onRegisterSubmit) {
+          await submitForm();
+        }
       }}
     >
       <div className="my-2">
@@ -94,15 +154,19 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
         placeholder="+49 1231231234"
         maxLength={18}
         value={phone}
-        onChange={({ target }) => setPhone(parsePhone(target.value))}
+        // Reformatting on every keystroke fights the controlled input's own cursor position
+        onChange={({ target }) => setPhone(target.value)}
+        onBlur={({ target }) => setPhone(parsePhone(target.value))}
         className={STYLED_PAYMENT_FIELDS}
         autoComplete="tel"
         required
       />
       {InvoiceLegalNote}
-      <button className={STYLED_PAYMENT_BUTTON} type="submit">
-        Pay
-      </button>
+      {!onRegisterSubmit && (
+        <button className={STYLED_PAYMENT_BUTTON} type="submit">
+          Pay
+        </button>
+      )}
       {ratepayMessage && RatepayErrorNote(ratepayMessage)}
     </form>
   );

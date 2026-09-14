@@ -44,6 +44,7 @@ export {
   OrderAuthorizeRequest,
   Patch,
   Order,
+  ProcessingInstruction,
 } from "./paypal/checkout_api";
 export {
   Authorization2StatusEnum,

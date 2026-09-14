@@ -16,7 +16,10 @@ import {
   Authorization2StatusEnum,
   Capture2StatusEnum,
 } from "common-connect";
-import { CreateOrderRequestSchemaDTO } from "../dtos/paypal-payment.dto";
+import {
+  CreateOrderRequestSchemaDTO,
+  StandardPaymentMethodType,
+} from "../dtos/paypal-payment.dto";
 import { ErrorInvalidOperation } from "@commercetools/connect-payments-sdk";
 
 /**
@@ -38,6 +41,22 @@ const buildVaultCustomerAttributes = (existingPayPalCustomerId?: string) =>
   existingPayPalCustomerId
     ? { customer: { id: existingPayPalCustomerId } }
     : {};
+
+// PayPal requires payment_source.pay_upon_invoice.experience_context.locale — omitting it doesn't
+// 400 at the schema level, it instead fails RatePay's own business validation with a generic
+// PAYMENT_SOURCE_CANNOT_BE_USED (422) pointing at this field. ctCart.locale is frequently unset
+// (it's optional on a commercetools Cart), so this is the fallback then — RatePay/PUI is a
+// DACH-region product only (matches the enabler's own default +49 phone prefix), so "de-DE" is a
+// reasonable default rather than guessing from country_code.
+const PAY_UPON_INVOICE_DEFAULT_LOCALE = "de-DE";
+
+// PayPal requires payment_source.pay_upon_invoice.experience_context.customer_service_instructions
+// (400s with MISSING_REQUIRED_PARAMETER otherwise) — merchant-facing text shown to the buyer for
+// how to reach support about their RatePay invoice. Placeholder default; override via
+// PAYPAL_ORDER_EXPERIENCE_CONTEXT (see .env.template) — the merchant must set a real one.
+const PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS = [
+  "It is merchant responsibility to set this message.",
+];
 
 export const buildOrderRequest = (
   payment: Payment,
@@ -61,7 +80,8 @@ export const buildOrderRequest = (
   // getConfig().orderExperienceContext (PAYPAL_ORDER_EXPERIENCE_CONTEXT) — merchant JSON overrides
   // spread over this function's own computed experience_context defaults below, so an explicit key
   // here (e.g. user_action, payment_method_preference) always wins, including over showContinueReview.
-  experienceContextOverrides: Record<string, unknown> = {}
+  experienceContextOverrides: Record<string, unknown> = {},
+  paymentMethodType?: CreateOrderRequestSchemaDTO["paymentMethodType"]
 ): OrderRequest => {
   const { address: resolvedShippingAddress } =
     resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
@@ -93,7 +113,7 @@ export const buildOrderRequest = (
         matchingAmounts,
         isShipped,
         ctCart.taxCalculationMode,
-        false, // TODO: make configurable when working on PUI
+        paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE,
         ctCart.lineItems,
         ctCart.locale
       ) ?? undefined,
@@ -102,7 +122,9 @@ export const buildOrderRequest = (
   const experienceContext = {
     ...(returnUrl ? { return_url: returnUrl } : {}),
     ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
-    user_action: showContinueReview ? ("CONTINUE" as const) : ("PAY_NOW" as const),
+    user_action: showContinueReview
+      ? ("CONTINUE" as const)
+      : ("PAY_NOW" as const),
     payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED" as const,
     ...(shipping && !isExpress
       ? { shipping_preference: "SET_PROVIDED_ADDRESS" as const }
@@ -110,11 +132,18 @@ export const buildOrderRequest = (
     ...experienceContextOverrides,
   } as PaypalWallet["experience_context"];
 
-  return {
+  const result = {
     intent:
-      payPalIntent === "Authorize"
+      paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE
+        ? CheckoutPaymentIntent.Capture
+        : payPalIntent === "Authorize"
         ? CheckoutPaymentIntent.Authorize
         : CheckoutPaymentIntent.Capture,
+    ...(paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE
+      ? {
+          processing_instruction: "ORDER_COMPLETE_ON_PAYMENT_APPROVAL" as const,
+        }
+      : {}),
     purchase_units: [purchaseUnit],
     ...(orderData?.paymentSource === "paypal"
       ? {
@@ -159,7 +188,51 @@ export const buildOrderRequest = (
           },
         }
       : {}),
-  };
+    ...(paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE
+      ? {
+          payment_source: {
+            pay_upon_invoice: {
+              email: ctCart.customerEmail,
+              name: {
+                given_name: ctCart.billingAddress?.firstName,
+                surname: ctCart.billingAddress?.lastName,
+              },
+              ...(ctCart.billingAddress
+                ? {
+                    // PayPal's pay_upon_invoice.billing_address is a flat Address — unlike
+                    // `shipping` above, it does NOT take the {type, name, address} ShippingDetail
+                    // wrapper mapCommercetoolsAddressToPayPalAddress returns, so only its nested
+                    // `address` is used here (PayPal 400s with "billing_address/country_code must
+                    // not be null" otherwise, since it never sees country_code at the level it
+                    // expects).
+                    billing_address: mapCommercetoolsAddressToPayPalAddress(
+                      ctCart.billingAddress
+                    )?.address,
+                  }
+                : {}),
+              phone: {
+                country_code: orderData?.countryCode,
+                national_number: orderData?.nationalNumber,
+              },
+              birth_date: orderData?.birthDate,
+              // customer_service_instructions/locale are placeholder defaults — merchant-
+              // configurable via the same PAYPAL_ORDER_EXPERIENCE_CONTEXT env var used for the
+              // generic wallet experience_context above (e.g.
+              // {"customer_service_instructions":["Contact us at support@mystore.example"]});
+              // an explicit key there always wins, same convention as experienceContext.
+              experience_context: {
+                customer_service_instructions:
+                  PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS,
+                locale: ctCart.locale ?? PAY_UPON_INVOICE_DEFAULT_LOCALE,
+                ...experienceContextOverrides,
+              },
+            },
+          } as any,
+        }
+      : {}),
+  } as any;
+
+  return result as OrderRequest;
 };
 
 export const buildPayPalAmount = (
