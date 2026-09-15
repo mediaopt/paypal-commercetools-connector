@@ -1,5 +1,4 @@
 import { CustomerReference } from '@commercetools/platform-sdk';
-import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
 import {
   handleCreatePaymentTokenRequest,
@@ -8,8 +7,7 @@ import {
   handleGetPaymentTokensRequest,
   handleGetUserIDTokenRequest,
 } from '../service/customers.service';
-import { UpdateActions } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
+import { UpdateActions, logger, CustomError } from 'common-connect/dist';
 
 /**
  * Handle the update action

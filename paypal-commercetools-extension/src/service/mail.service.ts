@@ -1,6 +1,6 @@
 import * as nodemailer from 'nodemailer';
-import { SmtpSettings } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
+import { SmtpSettings } from 'common-connect/dist/types/index.types';
+import { logger } from 'common-connect/dist/utils/logger.utils';
 
 export const sendEmail = async (
   customerEmail: string,

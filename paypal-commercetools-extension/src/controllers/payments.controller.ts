@@ -1,6 +1,6 @@
 import { PaymentReference } from '@commercetools/platform-sdk';
-import CustomError from '../errors/custom.error';
 import { Resource } from '../interfaces/resource.interface';
+import { UpdateActions, logger, CustomError } from 'common-connect/dist';
 import {
   handleAuthorizeOrderRequest,
   handleCaptureAuthorizationRequest,
@@ -15,8 +15,6 @@ import {
   handleUpdateTrackingInformation,
   handleVoidAuthorizationRequest,
 } from '../service/payments.service';
-import { UpdateActions } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
 
 /**
  * Handle the update action

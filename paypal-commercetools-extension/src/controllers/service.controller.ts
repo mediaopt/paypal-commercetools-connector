@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { apiSuccess } from '../api/success.api';
-import CustomError from '../errors/custom.error';
+import { CustomError } from 'common-connect/dist';
 import { customerController } from './customers.controller';
 import { paymentController } from './payments.controller';
 

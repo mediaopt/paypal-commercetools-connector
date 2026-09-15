@@ -10,26 +10,26 @@ import {
   TransactionDraft,
 } from '@commercetools/platform-sdk';
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
-import { createApiRoot } from '../client/create.client';
 
-import CustomError from '../errors/custom.error';
-import { Authorization2, Capture2 } from '../paypal/payments_api';
-import { Order, PayPalVaultPaymentTokenResource } from '../types/index.types';
-import { logger } from '../utils/logger.utils';
 import {
-  isPaymentUpToDate,
+  CustomError,
+  Order,
+  PayPalVaultPaymentTokenResource,
+  PAYPAL_CUSTOMER_TYPE_KEY,
+  createApiRoot,
+  getPayPalOrder,
   mapPayPalAuthorizationStatusToCommercetoolsTransactionState,
   mapPayPalCaptureStatusToCommercetoolsTransactionState,
   mapPayPalMoneyToCommercetoolsMoney,
-} from '../utils/map.utils';
+  logger,
+  Capture2,
+  Authorization2,
+  isPaymentUpToDate,
+} from 'common-connect/dist';
+
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
 import { updatePaymentFields } from './payments.service';
-import { getPayPalOrder } from './paypal.service';
-import {
-  PAYPAL_CUSTOMER_TYPE_KEY,
-  PAYPAL_PAYMENT_EXTENSION_KEY,
-} from '../constants';
 import { sleep } from '../utils/response.utils';
 
 const TIMEOUT_PAYMENT = 9500;
@@ -411,29 +411,3 @@ export async function findMatchingExtension(
     .execute();
   return extensions.length > 0 ? extensions[0] : undefined;
 }
-
-export const getPayPalExtensionUrl = async () => {
-  const apiRoot = createApiRoot();
-  const extensions = await apiRoot
-    .extensions()
-    .get({
-      queryArgs: {
-        where: `key = "${PAYPAL_PAYMENT_EXTENSION_KEY}"`,
-      },
-    })
-    .execute();
-  if (extensions.body.total !== 1)
-    throw new CustomError(
-      500,
-      `Matching PayPal extension for the key ${PAYPAL_PAYMENT_EXTENSION_KEY} not found.`
-    );
-  else {
-    const destination = extensions.body.results[0].destination;
-    if ('url' in destination) return destination.url;
-    else
-      throw new CustomError(
-        500,
-        `Extension ${PAYPAL_PAYMENT_EXTENSION_KEY} is of ${destination.type} instead of expected HTTP type`
-      );
-  }
-};

@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { Response } from 'express';
-import { CheckoutPaymentIntent } from '../src/paypal/checkout_api';
+import { CheckoutPaymentIntent } from 'common-connect/dist/paypal/checkout_api';
 
 let apiRequest: any = undefined;
 let apiRoot: any = undefined;
@@ -18,12 +18,12 @@ const mockConfigModule = () => {
     get: jest.fn(() => apiRequest),
     post: jest.fn(() => apiRequest),
   };
-  jest.mock('../src/client/create.client', () => {
+  jest.mock('common-connect/dist/client/create.client', () => {
     return {
       createApiRoot: () => apiRoot,
     };
   });
-  jest.mock('../src/service/paypal.service', () => ({
+  jest.mock('common-connect/dist/service/paypal.service', () => ({
     validateSignature: () => ({ verification_status: 'SUCCESS' }),
     getWebhookId: () => 1,
     getPayPalOrder: () => ({
@@ -38,8 +38,7 @@ mockConfigModule();
 const responseUtilsActual = jest.requireActual('../src/utils/response.utils');
 const spyOnSleep = jest.spyOn(responseUtilsActual, 'sleep');
 
-import { logger } from '../src/utils/logger.utils';
-jest.mock('../src/utils/logger.utils', () => ({
+jest.mock('common-connect/dist/utils/logger.utils', () => ({
   logger: { info: jest.fn(), error: jest.fn() },
 }));
 
@@ -47,8 +46,9 @@ jest.mock('../src/service/mail.service', () => ({ sendEmail: jest.fn() }));
 
 import { post } from '../src/controllers/webhook.controller';
 import { longTestTimeoutMs } from './constants';
-import { Capture2StatusEnum } from '../src/paypal/payments_api';
+import { Capture2StatusEnum } from 'common-connect/dist/paypal/payments_api';
 import { sendEmail } from '../src/service/mail.service';
+import { logger } from 'common-connect/dist';
 
 const mockAutrhorizedPayment = {
   id: 1,

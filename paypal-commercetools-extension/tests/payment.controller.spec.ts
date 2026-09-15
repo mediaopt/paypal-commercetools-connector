@@ -2,9 +2,12 @@ import { PaymentReference } from '@commercetools/platform-sdk';
 import { describe, expect, test } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import validator from 'validator';
-import { Capture, Order, Refund } from '../src/paypal/checkout_api';
-import { PayPalSettings, UpdateActions } from '../src/types/index.types';
-import { logger } from '../src/utils/logger.utils';
+import {
+  Capture,
+  Order,
+  Refund,
+} from 'common-connect/dist/paypal/checkout_api';
+import type { PayPalSettings, UpdateActions } from 'common-connect/dist';
 import {
   cartFromCartData,
   complexCartsData,
@@ -40,16 +43,19 @@ const mockConfigModule = () => {
           payPalIntent: 'Authorize',
         } as PayPalSettings)
     ),
-    getCachedAccessToken: jest.fn(),
-    cacheAccessToken: jest.fn(),
   };
   jest.mock('../src/service/config.service', () => configMock);
+  jest.mock('common-connect/dist/service/config.service', () => ({
+    getCachedAccessToken: jest.fn(),
+    cacheAccessToken: jest.fn(),
+  }));
 };
 mockConfigModule();
 
 import { paymentController } from '../src/controllers/payments.controller';
+import * as paypalService from 'common-connect/dist/service/paypal.service';
+import { logger } from 'common-connect/dist';
 import { getCart } from '../src/service/commercetools.service';
-import * as paypalService from '../src/service/paypal.service';
 
 const amountPlanned = {
   centAmount: 8200,
