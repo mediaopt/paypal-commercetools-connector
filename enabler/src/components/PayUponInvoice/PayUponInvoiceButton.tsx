@@ -1,7 +1,8 @@
-import { FC } from "react";
+import { FC, useEffect } from "react";
 
 import { usePayment } from "../../app/usePayment";
 import { useSettings } from "../../app/useSettings";
+import { useNotifications } from "../../app/useNotifications";
 
 import { PayUponInvoiceButtonProps } from "../../types";
 
@@ -19,6 +20,7 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   const { paymentInfo, clientToken } = usePayment();
   const { t } = useTranslation();
   const { settings } = useSettings();
+  const { notify } = useNotifications();
 
   // minPayableAmount/maxPayableAmount are in cents (to compare directly against
   // paymentInfo.amountPlanned.centAmount).
@@ -37,6 +39,36 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     : paymentInfo.id && !onRegisterSubmit && !clientToken
     ? ["invoice.thirdPartyIssue"]
     : null;
+
+  useEffect(() => {
+    if (!onRegisterSubmit || !invoiceError) return;
+    // Checkout mode, but this cart/settings state is ineligible — PayUponInvoiceMask never mounts
+    // below, so nothing would otherwise call onRegisterSubmit/onRegisterValidation. Registering
+    // both here overwrites any stale handler PayUponInvoiceMask left behind if the cart became
+    // ineligible after it had already mounted.
+    const message = t(
+      ...(invoiceError as [string, Record<string, number>] | [string])
+    );
+    const notifyInvoiceError = () => notify("Warning", message);
+
+    // isValid()/showValidation() are the primary path — Checkout is expected to check isValid()
+    // before ever calling submit(), and showValidation() is what actually surfaces this message
+    // when it does. But a buyer who missed that (e.g. never revisited this step after the cart
+    // total dropped below the minimum) can still reach a "Pay" click that goes straight to
+    // submit() — PayPalComponent.submit() already throws for a form-like type with nothing
+    // registered (see its own comment), but with a generic message; registering a submit handler
+    // here instead surfaces the same real reason before rejecting, so the buyer isn't just left
+    // with a dead button.
+    onRegisterSubmit(async () => {
+      notifyInvoiceError();
+      throw new Error(message);
+    });
+    onRegisterValidation?.({
+      isValid: async () => false,
+      showValidation: async () => notifyInvoiceError(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoiceError, onRegisterSubmit, onRegisterValidation]);
 
   return invoiceError ? (
     <div>

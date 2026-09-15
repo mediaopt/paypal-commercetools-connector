@@ -114,7 +114,20 @@ class PayPalComponent implements PaymentComponent {
   }): Promise<void> {
     // The component handles submission internally through purchaseCallback by default;
     // if it registers a submit handler via onRegisterSubmit, delegate to that instead.
-    await this.submitHandler?.(storePaymentDetails);
+    if (!this.submitHandler) {
+      if (this.isFormLike()) {
+        // A form-like component (CardFields/PayUponInvoice) with nothing registered means its
+        // Mask either never mounted (e.g. PayUponInvoice showing an ineligible-cart message
+        // instead of its form) or unmounted after a state change — either way there is nothing to
+        // submit. Silently resolving here used to leave Checkout waiting forever for a completion
+        // signal that would never come (an infinite loader) instead of surfacing an error.
+        throw new Error(
+          `${this.paymentMethodType} is not ready to submit — no handler registered`
+        );
+      }
+      return;
+    }
+    await this.submitHandler(storePaymentDetails);
   }
 
   async showValidation(): Promise<void> {
@@ -122,7 +135,17 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isValid(): Promise<boolean> {
-    return (await this.validationHandlers?.isValid()) ?? true;
+    if (this.validationHandlers) {
+      return await this.validationHandlers.isValid();
+    }
+    // Self-driving buttons (PayPal, ApplePay, etc.) never register validation handlers at all, so
+    // "nothing registered" correctly means "always valid" for them. A form-like component with
+    // nothing registered means it isn't actually ready/eligible — see submit()'s own comment.
+    return !this.isFormLike();
+  }
+
+  private isFormLike(): boolean {
+    return FORM_LIKE_PAYMENT_METHOD_TYPES.includes(this.paymentMethodType);
   }
 
   async getState() {
