@@ -17,14 +17,15 @@ const PAYMENT_METHOD_ICON_KEY_MAP: Record<PaymentMethodType, string> = {
   [StandardPaymentMethodType.VENMO]: StandardPaymentMethodType.VENMO,
   [StandardPaymentMethodType.CREDIT]: StandardPaymentMethodType.CREDIT,
   [StandardPaymentMethodType.APPLE_PAY]: "applepay",
+  [StandardPaymentMethodType.PAY_UPON_INVOICE]:
+    StandardPaymentMethodType.PAY_UPON_INVOICE,
   // Local payment methods (APMs)
-  [StandardPaymentMethodType.IDEAL]: StandardPaymentMethodType.IDEAL,
-  [StandardPaymentMethodType.BANCONTACT]: StandardPaymentMethodType.BANCONTACT,
-  [StandardPaymentMethodType.EPS]: StandardPaymentMethodType.EPS,
-  [StandardPaymentMethodType.MYBANK]: StandardPaymentMethodType.MYBANK,
-  [StandardPaymentMethodType.P24]: StandardPaymentMethodType.P24,
-  [StandardPaymentMethodType.BLIK]: StandardPaymentMethodType.BLIK,
-  [StandardPaymentMethodType.PAY_UPON_INVOICE]: StandardPaymentMethodType.PAY_UPON_INVOICE,
+  [StandardPaymentMethodType.IDEAL]: "ideal",
+  [StandardPaymentMethodType.BANCONTACT]: "bancontact",
+  [StandardPaymentMethodType.EPS]: "eps",
+  [StandardPaymentMethodType.MYBANK]: "mybank",
+  [StandardPaymentMethodType.P24]: "p24",
+  [StandardPaymentMethodType.BLIK]: "blik",
 
   // GOOGLE_PAY: [StandardPaymentMethodType.GOOGLE_PAY]: "googlepay",
   // Maps the same as CreditCard/CardFields since the stored variant is distinguished by using a

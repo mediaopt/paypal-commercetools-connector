@@ -4,6 +4,12 @@ const CT_ICON_KEY_TO_PAYMENT_METHOD_TYPE: Record<string, PayPalPaymentMethodType
   card: "CardFields",
   paypal: "PayPal",
   applepay: "ApplePay",
+  ideal: "Ideal",
+  bancontact: "Bancontact",
+  eps: "Eps",
+  mybank: "MyBank",
+  p24: "P24",
+  blik: "Blik",
 };
 
 export const toPayPalPaymentMethodType = (type: string): PayPalPaymentMethodType =>
