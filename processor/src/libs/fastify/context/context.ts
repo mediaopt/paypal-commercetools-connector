@@ -64,6 +64,11 @@ export const getFutureOrderNumberFromContext = (): string | undefined => {
   return paymentSdk.getFutureOrderNumberFromContext(contextData);
 };
 
+export const getCheckoutTransactionItemIdFromContext = (): string | undefined => {
+  const contextData = getRequestContext() as ContextData;
+  return paymentSdk.getCheckoutTransactionItemIdFromContext(contextData);
+};
+
 export const requestContextPlugin = fp(async (fastify: FastifyInstance) => {
   // Enhance the request object with a correlationId property
   fastify.decorateRequest('correlationId', '');

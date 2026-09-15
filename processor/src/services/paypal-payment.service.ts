@@ -47,6 +47,7 @@ import { toPaymentMethodIconKey } from "../utils/paymentMethodIcon.utils";
 import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
 import {
   getCartIdFromContext,
+  getCheckoutTransactionItemIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context";
 import { getStoredPaymentMethodsConfig } from "../config/stored-payment-methods.config";
@@ -103,7 +104,8 @@ import {
 } from "../utils/storedPaymentMethod.utils";
 import {
   isStoredPaymentMethodsEnabled,
-  buildSdkOptions,
+  buildStandardScriptCartOverlay,
+  buildExpressSdkOptions,
 } from "../utils/config.utils";
 import {
   buildProcessorLogging,
@@ -184,7 +186,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
         ...getConfig().buttonConfig,
       },
       userIdToken,
-      sdkOptions: buildSdkOptions(cartSummary),
+      standardScriptOptions: buildStandardScriptCartOverlay(cartSummary),
+      expressSdkOptions: buildExpressSdkOptions(cartSummary),
     };
   }
 
@@ -297,17 +300,25 @@ export class PayPalPaymentService extends AbstractPaymentService {
     builderType,
     paymentMethodType,
   }: PaymentRequestSchemaDTO): Promise<PaymentResponseSchemaDTO> {
+    // Expanded so a still-relevant last-linked payment (e.g. PayPalPaymentEnabler._Setup()
+    // re-running on a payment-method switch) can be reused instead of creating a duplicate.
     const ctCart = await this.ctCartService.getCart({
       id: getCartIdFromContext(),
+      expand: ["paymentInfo.payments[*]"],
     });
 
     // PayPal collects the buyer's email inside its own popup and only returns it on approval,
-    // so a fresh Express cart won't have one yet — skip the requirement in that case.
+    // so a fresh Express cart won't have one yet — skip the requirement in that case. Also
+    // skipped when paymentMethodType isn't supplied at all: _Setup() now calls createPayment once
+    // per checkout page load, before any component/builder is chosen, so it can never positively
+    // state a non-Express method — and a real Checkout flow already forces the buyer to fill in
+    // email before the enabler loads regardless. Self-hosted/legacy mode, which still calls this
+    // per-component with a real paymentMethodType, keeps the check.
     const isExpress =
       paymentMethodType === StandardPaymentMethodType.PAYPAL &&
       builderType === CustomBuilderType.EXPRESS;
 
-    if (!isExpress && !ctCart.customerEmail) {
+    if (paymentMethodType && !isExpress && !ctCart.customerEmail) {
       throw new ErrorInvalidOperation("Required data missing: customer email");
     }
 
@@ -315,10 +326,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
       cart: ctCart,
     });
 
+    // Try to reuse the cart's last linked payment if it's still relevant, instead of always
+    // creating a new one (createPayment can be called more than once per checkout page load).
+    const lastPayment = ctCart.paymentInfo?.payments?.at(-1)?.obj;
+    if (
+      lastPayment &&
+      this.isRelevantExistingPayment(lastPayment, ctCart, amountPlanned)
+    ) {
+      log.info(
+        `relevant existing payment found for cart ${ctCart.id}, reusing it instead of creating a new one`
+      );
+      return this.buildPaymentResponse(ctCart, lastPayment);
+    }
+
     // Create a new payment in commercetools
     const newPayment = await this.ctPaymentService.createPayment({
       amountPlanned,
       paymentMethodInfo: { paymentInterface: getConfig().paymentInterface },
+      checkoutTransactionItemId: getCheckoutTransactionItemIdFromContext(),
       ...(ctCart.customerId
         ? { customer: { typeId: "customer", id: ctCart.customerId } }
         : { anonymousId: ctCart.anonymousId }),
@@ -354,17 +379,65 @@ export class PayPalPaymentService extends AbstractPaymentService {
         );
       });
 
-    const addPaymentPromise =
-      ctCart.paymentInfo?.payments === undefined ||
-      ctCart.paymentInfo.payments.length === 0
-        ? this.ctCartService.addPayment({
-            resource: { id: ctCart.id, version: ctCart.version },
-            paymentId: newPayment.id,
-          })
-        : Promise.resolve();
+    // Link the newly-created payment to the cart. The reuse check above has already established
+    // no existing linked payment covers this call, so this must run regardless of how many
+    // payments the cart already has.
+    const addPaymentPromise = this.ctCartService.addPayment({
+      resource: { id: ctCart.id, version: ctCart.version },
+      paymentId: newPayment.id,
+    });
 
     await Promise.all([assignCustomTypePromise, addPaymentPromise]);
 
+    return this.buildPaymentResponse(ctCart, newPayment);
+  }
+
+  /**
+   * Whether `payment` — the cart's last linked payment — can be reused for this createPayment
+   * call instead of creating a new one.
+   */
+  private isRelevantExistingPayment(
+    payment: Payment,
+    ctCart: Cart,
+    amountPlanned: { centAmount: number; currencyCode: string }
+  ): boolean {
+    if (payment.paymentStatus?.interfaceCode !== "Initial") {
+      return false;
+    }
+
+    if (ctCart.customerId) {
+      if (payment.customer?.id !== ctCart.customerId) {
+        return false;
+      }
+    } else if (payment.anonymousId !== ctCart.anonymousId) {
+      return false;
+    }
+
+    if (
+      !payment.checkoutTransactionItemId ||
+      payment.checkoutTransactionItemId !==
+        getCheckoutTransactionItemIdFromContext()
+    ) {
+      return false;
+    }
+
+    if (
+      payment.amountPlanned.centAmount !== amountPlanned.centAmount ||
+      payment.amountPlanned.currencyCode !== amountPlanned.currencyCode
+    ) {
+      return false;
+    }
+
+    return (
+      payment.paymentMethodInfo?.paymentInterface ===
+      getConfig().paymentInterface
+    );
+  }
+
+  private buildPaymentResponse(
+    ctCart: Cart,
+    payment: Payment
+  ): PaymentResponseSchemaDTO {
     // Gather additional cart data for the response
     const isShipped =
       !!ctCart.shippingAddress ||
@@ -381,7 +454,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const priceBreakdown = mapCommercetoolsCartToPayPalPriceBreakdown(ctCart);
 
     const { address: resolvedShippingAddress } =
-      resolveCommercetoolsCartShippingAddress(ctCart, newPayment.id);
+      resolveCommercetoolsCartShippingAddress(ctCart, payment.id);
     const shippingAddress = resolvedShippingAddress
       ? mapCommercetoolsAddressToPayPalAddress(resolvedShippingAddress)
       : undefined;
@@ -390,10 +463,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return {
       paypalData: {
         clientId: getConfig().paypalClientId ?? "",
-        currency: newPayment.amountPlanned.currencyCode,
+        currency: payment.amountPlanned.currencyCode,
       },
-      id: newPayment.id,
-      amountPlanned: newPayment.amountPlanned,
+      id: payment.id,
+      amountPlanned: payment.amountPlanned,
       email: ctCart.customerEmail,
       ctCustomerId: ctCart.customerId,
       firstName: ctCart.billingAddress?.firstName,

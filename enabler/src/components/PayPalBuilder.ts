@@ -84,12 +84,6 @@ class PayPalComponent implements PaymentComponent {
     // componentType can ever produce it.
     const isExpress = this.builderType === "express";
 
-    // Resolves to the processor-configured slice for this specific component — see
-    // BaseOptions.sdkOptions and PAYPAL_SDK_OPTIONS in processor/.env.template.
-    const componentSdkOptions = isExpress
-      ? this.baseOptions.sdkOptions?.PayPalExpress
-      : this.baseOptions.sdkOptions?.[this.componentType];
-
     // 4-layer resolution (category 2, lowest → highest priority), per mounted component:
     // 1) ENABLER_DEFAULT_EXPRESS_CONFIG/ENABLER_DEFAULT_CONFIG (built-in safety net),
     // 2) "general settings" — the shared, non-variant-specific style the processor resolved from
@@ -107,8 +101,10 @@ class PayPalComponent implements PaymentComponent {
       this.baseOptions.settings?.paypalButtonConfig &&
       this.baseOptions.settings?.buttonShape
         ? {
-            buttonColor: this.baseOptions.settings.paypalButtonConfig.buttonColor,
-            buttonLabel: this.baseOptions.settings.paypalButtonConfig.buttonLabel,
+            buttonColor:
+              this.baseOptions.settings.paypalButtonConfig.buttonColor,
+            buttonLabel:
+              this.baseOptions.settings.paypalButtonConfig.buttonLabel,
             buttonShape: this.baseOptions.settings.buttonShape,
           }
         : undefined;
@@ -120,25 +116,22 @@ class PayPalComponent implements PaymentComponent {
       variantOverride?.style ?? generalStyle ?? variantDefaults?.style;
     const fundingSource =
       variantOverride?.fundingSource ?? variantDefaults?.fundingSource;
-    // Same concern as PAYPAL_SDK_OPTIONS.<componentType>.components (componentSdkOptions, spread
-    // into scriptOptions below) — PAYPAL_SDK_OPTIONS still wins if it also sets `components`,
-    // since it's spread after scriptOptions.components here.
+    // Only still relevant for express — every standard checkout component shares one script
+    // config (see PAYPAL_STANDARD_SCRIPT_OPTIONS in processor/.env.template).
     const resolvedComponents =
       variantOverride?.components ?? variantDefaults?.components;
 
-    const scriptOptions: ReactPayPalScriptOptions = {
-      clientId: this.baseOptions.clientId || "",
-      currency: "EUR",
-      components: resolvedComponents,
-      enableFunding: "paylater",
-      // TODO: placeholder default, not a final decision — see the "SEPA" entry in TODO.md. Without
-      // an explicit fundingSource, <PayPalButtons/> auto-renders every eligible funding source,
-      // which for some merchant accounts includes SEPA; excluded here so the default PayPal button
-      // doesn't unexpectedly grow a SEPA button until it's decided whether SEPA should be offered
-      // as its own separate named button instead. Override via PAYPAL_SDK_OPTIONS if needed sooner.
-      disableFunding: "sepa",
-      ...componentSdkOptions,
-    };
+    // Express must mount alone (its own page), so it keeps resolving its own script options
+    // per-mount from BaseOptions.expressSdkOptions/PAYPAL_EXPRESS_SDK_OPTIONS instead.
+    const scriptOptions: ReactPayPalScriptOptions = isExpress
+      ? {
+          clientId: this.baseOptions.clientId || "",
+          currency: "EUR",
+          components: resolvedComponents,
+          enableFunding: "paylater",
+          ...this.baseOptions.expressSdkOptions,
+        }
+      : this.baseOptions.paypalScriptOptions;
 
     const fixedOverrides =
       FIXED_SETTINGS_OVERRIDES_BY_COMPONENT[this.componentType] ?? {};
@@ -172,6 +165,7 @@ class PayPalComponent implements PaymentComponent {
       redirectOnApprove: this.baseOptions.redirectOnApprove,
       initialSettings,
       initialUserIdToken: this.baseOptions.userIdToken,
+      initialPayment: this.baseOptions.initialPayment,
       showPayButton: this.config.showPayButton ?? true,
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,

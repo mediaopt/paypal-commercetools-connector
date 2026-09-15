@@ -7,21 +7,29 @@ import {
   resolveTypeKey,
 } from "common-connect";
 
-// PayPal JS SDK script-level options (currency, components, enableFunding/disableFunding,
-// buyerCountry, locale, vault, etc.) — previously supplied directly by the merchant's own frontend
-// code when mounting <PayPal/>/<CreditCard/> outside commercetools Checkout, not something the
-// paypal-commercetools-connector/settings custom object manages. Configurable per componentType
-// (PayPal, CardFields), plus a dedicated PayPalExpress slot for PayPal's own express builder
-// variant — the one componentType with more than one builder variant (see
-// PayPalComponentBuilder/createExpressBuilder in the enabler). Format: JSON object matching (a
-// subset of) @paypal/paypal-js's PayPalScriptOptions shape (excluding clientId, which the config()
-// response supplies separately from paypalClientId below) keyed by componentType, e.g.
-// {"PayPal":{"currency":"USD"},"PayPalExpress":{"currency":"USD","enableFunding":"venmo"},"CardFields":{"currency":"USD"}}
-// Passed through to the enabler as-is (see sdkOptions below) — the enabler applies its own
-// enableFunding: "paylater" default (PayPalBuilder.ts) so Pay Later stays enabled if nothing is
+// PayPal JS SDK script-level options shared by every *standard* (non-express) component — every
+// standard component mounts its own <PayPalScriptProvider>, but window.paypal is one shared global
+// overwritten by whichever script tag finishes loading last, so every standard component must
+// request the *same* script (same currency/components/enableFunding/disableFunding/etc.) or risk
+// one intermittently clobbering another's required SDK piece — see preloadPayPalScript.ts in the
+// enabler. Flat (not keyed by componentType) for exactly that reason: a per-component slot here
+// would let a merchant reintroduce the divergence this exists to prevent. Format: JSON object
+// matching (a subset of) @paypal/paypal-js's PayPalScriptOptions shape (excluding clientId, which
+// the config() response supplies separately from paypalClientId below), e.g.
+// {"currency":"USD","enableFunding":"venmo"}
+// Passed through to the enabler as-is (see standardScriptOptions below) — the enabler applies its
+// own enableFunding: "paylater" default (PayPalBuilder.ts) so Pay Later stays enabled if nothing is
 // configured; that default lives enabler-side only, not duplicated here.
-const configuredSdkOptions = process.env.PAYPAL_SDK_OPTIONS
-  ? JSON.parse(process.env.PAYPAL_SDK_OPTIONS)
+const configuredStandardScriptOptions = process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
+  ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
+  : {};
+
+// PayPal Express's own PayPal JS SDK script options — kept separate from
+// configuredStandardScriptOptions above because Express always mounts alone, on its own page, so
+// the shared-script concern that forces every standard component onto one flat config doesn't
+// apply to it. Format: same PayPalScriptOptions subset, e.g. {"currency":"USD","enableFunding":"venmo"}
+const configuredExpressSdkOptions = process.env.PAYPAL_EXPRESS_SDK_OPTIONS
+  ? JSON.parse(process.env.PAYPAL_EXPRESS_SDK_OPTIONS)
   : {};
 
 // PayPal button config overrides (style/funding sources), keyed by componentType, plus a
@@ -109,8 +117,10 @@ export const config = {
     ...(process.env.PAYPAL_SETTINGS ? JSON.parse(process.env.PAYPAL_SETTINGS) : {}),
   } as Partial<PayPalSettings>,
 
-  // See the configuredSdkOptions comment above — passed through as-is, no processor-side defaulting.
-  sdkOptions: configuredSdkOptions,
+  // See the configuredStandardScriptOptions/configuredExpressSdkOptions comments above — passed
+  // through as-is, no processor-side defaulting.
+  standardScriptOptions: configuredStandardScriptOptions,
+  expressSdkOptions: configuredExpressSdkOptions,
 };
 
 export const getConfig = () => {
