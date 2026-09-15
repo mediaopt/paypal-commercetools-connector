@@ -329,7 +329,9 @@ export type HostedFieldsProps = Pick<
 >;
 
 export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting"> &
-  FormComponentProps;
+  FormComponentProps & {
+    onError?: (error: GenericError) => void;
+  };
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
   HostedFieldsThreeDSAuth;

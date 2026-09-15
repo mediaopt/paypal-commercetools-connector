@@ -8,6 +8,7 @@ export const CardFieldsButton: FC<CardFieldsProps> = ({
   enableVaulting,
   onRegisterSubmit,
   onRegisterValidation,
+  onError,
 }) => {
   const { paymentInfo, vaultOnly } = usePayment();
 
@@ -26,6 +27,7 @@ export const CardFieldsButton: FC<CardFieldsProps> = ({
       enableVaulting={resolvedEnableVaulting}
       onRegisterSubmit={onRegisterSubmit}
       onRegisterValidation={onRegisterValidation}
+      onError={onError}
     />
   ) : (
     <></>

@@ -115,6 +115,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
   enableVaulting,
   onRegisterSubmit,
   onRegisterValidation,
+  onError,
 }) => {
   const {
     handleCreateOrder,
@@ -307,12 +308,20 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
               notify("Warning", t("cardFields.tryAgain"));
               isLoading(false);
               setPaying(false);
+              onError?.({
+                code: "THREE_DS_DECLINED_RETRY",
+                message: t("cardFields.tryAgain"),
+              });
               break;
             case "0":
             default:
               notify("Error", t("cardFields.selectDifferentMethod"));
               isLoading(false);
               setPaying(false);
+              onError?.({
+                code: "THREE_DS_DECLINED",
+                message: t("cardFields.selectDifferentMethod"),
+              });
               break;
           }
         })
@@ -323,7 +332,13 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
             err
           );
           setPaying(false);
-          errorFunc(err as Record<string, unknown>, isLoading, notify, t);
+          const genericError = errorFunc(
+            err as Record<string, unknown>,
+            isLoading,
+            notify,
+            t
+          );
+          onError?.(genericError);
         });
     } else {
       approveTransaction(approveData);
@@ -332,7 +347,8 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
 
   const handleError = (error: Record<string, unknown>) => {
     setPaying(false);
-    errorFunc(error, isLoading, notify, t);
+    const genericError = errorFunc(error, isLoading, notify, t);
+    onError?.(genericError);
   };
 
   const submit = async (storePaymentDetails?: boolean): Promise<void> => {
