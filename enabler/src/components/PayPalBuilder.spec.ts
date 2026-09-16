@@ -108,8 +108,7 @@ describe("PayPalComponentBuilder", () => {
     expect(capturedElement.props.genericOptions.showPayButton).toBe(false);
   });
 
-  it("genericOptions.fullWidth/buttonText/onError/initialAmount pass through from config unchanged", async () => {
-    const onError = jest.fn();
+  it("genericOptions.fullWidth/buttonText/initialAmount pass through from config unchanged", async () => {
     const initialAmount = {
       centAmount: 1000,
       currencyCode: "EUR",
@@ -123,17 +122,49 @@ describe("PayPalComponentBuilder", () => {
     const component = builder.build({
       fullWidth: true,
       buttonText: "Pay now",
-      onError,
       initialAmount,
     });
     await component.mount("#paypal-container");
 
     expect(capturedElement.props.genericOptions.fullWidth).toBe(true);
     expect(capturedElement.props.genericOptions.buttonText).toBe("Pay now");
-    expect(capturedElement.props.genericOptions.onError).toBe(onError);
     expect(capturedElement.props.genericOptions.initialAmount).toBe(
       initialAmount
     );
+  });
+
+  it("genericOptions.onError is never config.onError — that channel is only ever supplied via baseOptions.onError", async () => {
+    const configOnError = jest.fn();
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions(),
+      undefined
+    );
+    const component = builder.build({ onError: configOnError });
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.genericOptions.onError).toBeUndefined();
+  });
+
+  it("genericOptions.onError adapts baseOptions.onError with the initial payment id as paymentReference", async () => {
+    const enablerOnError = jest.fn();
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions({
+        onError: enablerOnError,
+        initialPayment: { id: "payment-id" } as BaseOptions["initialPayment"],
+      }),
+      undefined
+    );
+    const component = builder.build({});
+    await component.mount("#paypal-container");
+
+    const error = { code: "SOME_ERROR", message: "Something went wrong" };
+    capturedElement.props.genericOptions.onError(error);
+
+    expect(enablerOnError).toHaveBeenCalledWith(error, {
+      paymentReference: "payment-id",
+    });
   });
 
   it("onRegisterSubmit wires component.submit() to the registered handler", async () => {

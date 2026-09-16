@@ -126,6 +126,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           clientId: configJson.clientId,
           settings: configJson.settings,
           userIdToken: configJson.userIdToken,
+          onError: options.onError,
           purchaseCallback:
             configJson.purchaseCallback ||
             options.onComplete ||

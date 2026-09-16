@@ -7,6 +7,7 @@ import {
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 import {
   BuilderType,
+  GenericError,
   GenericMountProps,
   PayPalPaymentMethodType,
   ValidationHandlers,
@@ -87,7 +88,13 @@ class PayPalComponent implements PaymentComponent {
       showPayButton: this.config.showPayButton ?? true,
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,
-      onError: this.config.onError,
+      // onError is a new, checkout-only prop — not supported for legacy enabler components
+      onError: this.baseOptions.onError
+        ? (error: GenericError) =>
+            this.baseOptions.onError?.(error, {
+              paymentReference: this.baseOptions.initialPayment?.id,
+            })
+        : undefined,
       initialAmount: this.config.initialAmount,
       onRegisterSubmit: (
         handler: (storePaymentDetails?: boolean) => Promise<void>

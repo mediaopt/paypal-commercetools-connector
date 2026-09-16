@@ -10,6 +10,8 @@ export type BaseOptions = {
   storedPaymentMethodsEnabled?: boolean;
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;
+  /** commercetools Checkout's own construction-time failure channel (EnablerOptions.onError)*/
+  onError?: (error: any, context?: { paymentReference?: string }) => void;
   /** PayPal Express's own PayPal JS SDK script options, from the processor's
    * PAYPAL_EXPRESS_SDK_OPTIONS — see resolveOptions.ts's express branch. Flat, not keyed by
    * paymentMethodType: Express is the only paymentMethodType that ever reads this field, since
