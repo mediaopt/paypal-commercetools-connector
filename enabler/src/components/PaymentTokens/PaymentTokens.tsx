@@ -1,3 +1,11 @@
+// LEGACY_STANDALONE_CLIENT_ONLY: unreachable from commercetools Checkout. This is the
+// list/select/delete UI from the discontinued standalone paypal-commercetools-client — Checkout's
+// stored-payment-method component is PayPalStoredBuilder/CardFieldsStored instead (Checkout owns
+// the saved-card display/selection UI itself, so that component renders nothing). This component
+// itself is untouched/working — kept for self-hosting merchants who mount these components
+// directly outside Checkout (see enabler/README.md). Please open an issue if you are interested
+// in wiring this into the Checkout SDK path.
+
 import { FC } from "react";
 
 import { PayPalContextProvider } from "../PayPalContextProvider";

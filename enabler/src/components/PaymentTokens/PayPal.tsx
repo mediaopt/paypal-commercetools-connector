@@ -1,3 +1,5 @@
+// LEGACY_STANDALONE_CLIENT_ONLY: unreachable from commercetools Checkout — see PaymentTokens.tsx.
+
 import { FC } from "react";
 
 import { PayPalPaymentSource } from "../../types";
