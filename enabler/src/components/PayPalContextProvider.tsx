@@ -40,6 +40,7 @@ export const PayPalContextProvider: FC<
   initialSettings,
   initialUserIdToken,
   redirectOnApprove,
+  initialPayment,
 
   children,
 }) => {
@@ -78,6 +79,7 @@ export const PayPalContextProvider: FC<
             builderType={builderType}
             processorUrl={processorUrl}
             redirectOnApprove={redirectOnApprove}
+            initialPayment={initialPayment}
           >
             <RenderPurchase>{children}</RenderPurchase>
           </PaymentProvider>

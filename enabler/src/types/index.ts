@@ -216,6 +216,10 @@ export type CheckoutOnlyProps = {
   /** PayPal Express only, from the processor's `/operations/config` `redirectOnApprove` (its
    * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
   redirectOnApprove?: boolean;
+  /** Seeds `PaymentProvider`'s `paymentInfo` state synchronously — the commercetools Payment for
+   * this checkout page load, created once in `PayPalPaymentEnabler._Setup()` and shared by every
+   * component, instead of each component creating its own on mount. */
+  initialPayment?: CreatePaymentResponse;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.

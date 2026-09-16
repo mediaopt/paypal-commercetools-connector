@@ -9,29 +9,35 @@ import {
 import { ByProjectKeyRequestBuilder } from '@commercetools/platform-sdk/dist/declarations/src/generated/client/by-project-key-request-builder';
 import {
   CUSTOM_OBJECT_DEFAULT_VALUES,
+  CUSTOM_TYPE_DESCRIPTORS,
+  FieldDefinitionData,
   GRAPHQL_CUSTOMOBJECT_CONTAINER_NAME,
   GRAPHQL_CUSTOMOBJECT_KEY_NAME,
   PAYPAL_CUSTOMER_EXTENSION_KEY,
   PAYPAL_CUSTOMER_TYPE_KEY,
+  PAYPAL_ORDER_ID_FIELD,
   PAYPAL_PAYMENT_EXTENSION_KEY,
+  PAYPAL_PAYMENT_INTERACTION_TYPE_FIELDS,
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
   PAYPAL_PAYMENT_TYPE_KEY,
+  PAYPAL_PROCESSOR_CUSTOMER_API_CALL_NAMES,
+  PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES,
+  PAYPAL_USER_ID_FIELD,
+  PayPalCustomTypeKeys,
+  apiCallNameToFieldData,
+  resolveTypeKey,
+  toFieldDefinition,
   logger,
   getCachedAccessToken,
 } from 'common-connect/dist';
-import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 import { deleteAccessToken } from '../service/config.service';
 import { findMatchingExtension } from '../service/commercetools.service';
 
+// The shared calls can be processed by extension after it was set on processor
 const PAYPAL_API_PAYMENT_ENDPOINTS = [
-  'createPayPalOrder',
+  ...PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES,
   'getClientToken',
-  'authorizePayPalOrder',
-  'capturePayPalOrder',
-  'capturePayPalAuthorization',
   'voidPayPalAuthorization',
-  'updatePayPalOrder',
-  'getPayPalOrder',
   'getPayPalCapture',
   'refundPayPalOrder',
   'createTrackingInformation',
@@ -39,11 +45,9 @@ const PAYPAL_API_PAYMENT_ENDPOINTS = [
 ];
 
 const PAYPAL_API_CUSTOMER_ENDPOINTS = [
+  ...PAYPAL_PROCESSOR_CUSTOMER_API_CALL_NAMES,
   'createVaultSetupToken',
-  'getUserIDToken',
   'createPaymentToken',
-  'getPaymentTokens',
-  'deletePaymentToken',
 ];
 
 type EndpointData = {
@@ -123,10 +127,7 @@ export async function deleteExtension(
   logger.info(`extension ${extensionKey} is deleted`);
 }
 
-export type PayPalCustomTypeKeys =
-  | typeof PAYPAL_PAYMENT_TYPE_KEY
-  | typeof PAYPAL_CUSTOMER_TYPE_KEY
-  | typeof PAYPAL_PAYMENT_INTERACTION_TYPE_KEY;
+export type { PayPalCustomTypeKeys };
 
 const payPalCustomTypeKeys: PayPalCustomTypeKeys[] = [
   PAYPAL_PAYMENT_TYPE_KEY,
@@ -134,113 +135,47 @@ const payPalCustomTypeKeys: PayPalCustomTypeKeys[] = [
   PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
 ];
 
-type FieldDefinitionData = {
-  name: string;
-  label?: LocalizedString;
-  typeName?: 'String' | 'DateTime';
-  inputHint?: 'SingleLine' | 'MultiLine';
+// PayPalCustomId is extension-only — processor never writes it, so it stays local rather than
+// living in common-connect.
+const PAYPAL_CUSTOM_ID_FIELD: FieldDefinitionData = {
+  name: 'PayPalCustomId',
+  label: { en: 'PayPal custom id' },
 };
 
-const apiCallNameToFieldData = (apiCallName: string): FieldDefinitionData[] => [
-  {
-    name: `${apiCallName}Request`,
-    inputHint: 'MultiLine',
-  },
-  {
-    name: `${apiCallName}Response`,
-    inputHint: 'MultiLine',
-  },
-];
-
+// The full field set per type — this extension's own schema (every field it provisions), using
+// the full endpoint lists above. If used processor builds its own narrower, ProcessorRequest-named list
+// separately (see its own connectors/post-deploy.ts), reusing common-connect
 const customFieldsDefinitionData: Record<
   PayPalCustomTypeKeys,
   FieldDefinitionData[]
 > = {
   [PAYPAL_PAYMENT_TYPE_KEY]: [
-    {
-      name: 'PayPalOrderId',
-      label: {
-        en: `PayPal Order Id`,
-        de: 'PayPal Bestellnummer',
-      },
-    },
-    {
-      name: 'PayPalCustomId',
-      label: {
-        en: 'PayPal custom id',
-      },
-    },
-    ...PAYPAL_API_PAYMENT_ENDPOINTS.map((endpoint) =>
-      apiCallNameToFieldData(endpoint)
-    ).flat(),
+    PAYPAL_ORDER_ID_FIELD,
+    PAYPAL_CUSTOM_ID_FIELD,
+    ...PAYPAL_API_PAYMENT_ENDPOINTS.flatMap((name) =>
+      apiCallNameToFieldData(name)
+    ),
   ],
   [PAYPAL_CUSTOMER_TYPE_KEY]: [
-    {
-      name: 'PayPalUserId',
-      label: {
-        en: `PayPal User Id`,
-        de: 'PayPal Kundernummer',
-      },
-    },
-    ...PAYPAL_API_CUSTOMER_ENDPOINTS.map((endpoint) =>
-      apiCallNameToFieldData(endpoint)
-    ).flat(),
+    PAYPAL_USER_ID_FIELD,
+    ...PAYPAL_API_CUSTOMER_ENDPOINTS.flatMap((name) =>
+      apiCallNameToFieldData(name)
+    ),
   ],
-  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: [
-    { name: 'type', inputHint: 'SingleLine' },
-    { name: 'data', inputHint: 'MultiLine' },
-    { name: 'timestamp', typeName: 'DateTime' },
-  ],
+  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: PAYPAL_PAYMENT_INTERACTION_TYPE_FIELDS,
 };
 
-const fieldCredentialsToDefinition = ({
-  name,
-  label,
-  typeName,
-  inputHint,
-}: FieldDefinitionData): FieldDefinition => ({
-  name,
-  label: label ?? { en: name },
-  type: { name: typeName ?? 'String' },
-  inputHint,
-  required: false,
-});
-
-const customTypesNames: Record<
-  PayPalCustomTypeKeys,
-  { name: LocalizedString; resourceTypeIds: string[]; key: string }
-> = {
-  [PAYPAL_PAYMENT_TYPE_KEY]: {
-    name: {
-      en: 'Custom payment type to PayPal fields',
-    },
-    resourceTypeIds: ['payment'],
-    key: process.env.PAYMENT_TYPE_KEY ?? PAYPAL_PAYMENT_TYPE_KEY,
-  },
-  [PAYPAL_CUSTOMER_TYPE_KEY]: {
-    name: {
-      en: 'Custom customer type for PayPal fields',
-    },
-    resourceTypeIds: ['customer'],
-    key: process.env.CUSTOMER_TYPE_KEY ?? PAYPAL_CUSTOMER_TYPE_KEY,
-  },
-  [PAYPAL_PAYMENT_INTERACTION_TYPE_KEY]: {
-    name: {
-      en: 'Custom payment interaction type to PayPal fields',
-    },
-    resourceTypeIds: ['payment-interface-interaction'],
-    key:
-      process.env.PAYMENT_INTERACTION_TYPE_KEY ??
-      PAYPAL_PAYMENT_INTERACTION_TYPE_KEY,
-  },
+// Looks up name/resourceTypeIds directly off CUSTOM_TYPE_DESCRIPTORS
+// and resolves the key through common-connect — to ensure processors compatibility.
+const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => {
+  const { name, resourceTypeIds } = CUSTOM_TYPE_DESCRIPTORS[key];
+  return {
+    key: resolveTypeKey(key),
+    name,
+    resourceTypeIds,
+    fieldDefinitions: customFieldsDefinitionData[key].map(toFieldDefinition),
+  };
 };
-
-const customTypeDataToCustomType = (key: PayPalCustomTypeKeys): TypeDraft => ({
-  ...customTypesNames[key],
-  fieldDefinitions: customFieldsDefinitionData[key].map(
-    fieldCredentialsToDefinition
-  ),
-});
 
 const customTypesDrafts = Object.fromEntries(
   payPalCustomTypeKeys.map((key) => [key, customTypeDataToCustomType(key)])
