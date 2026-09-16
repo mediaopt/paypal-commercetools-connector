@@ -30,10 +30,6 @@ getSettingsUrl, createVaultSetupTokenUrl, approveVaultSetupTokenUrl
 const stripTrailingSlash = (processorUrl: string) =>
   processorUrl.replace(/\/$/, "");
 
-/** Fallback currency for the shared PayPal JS SDK script options, when neither the processor's
- * PAYPAL_STANDARD_SCRIPT_OPTIONS nor a cart-derived overlay supplies one. */
-export const DEFAULT_SCRIPT_CURRENCY = "EUR";
-
 export const processorUrls = (processorUrl: string) => {
   const base = stripTrailingSlash(processorUrl);
   return {

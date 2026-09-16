@@ -62,16 +62,16 @@ export const getMerchantReturnUrlFromContext = (): string | undefined => {
   return paymentSdk.getMerchantReturnUrlFromContext(contextData);
 };
 
+export const getFutureOrderNumberFromContext = (): string | undefined => {
+  const contextData = getRequestContext() as ContextData;
+  return paymentSdk.getFutureOrderNumberFromContext(contextData);
+};
+
 export const getCheckoutTransactionItemIdFromContext = ():
   | string
   | undefined => {
   const contextData = getRequestContext() as ContextData;
   return paymentSdk.getCheckoutTransactionItemIdFromContext(contextData);
-};
-
-export const getFutureOrderNumberFromContext = (): string | undefined => {
-  const contextData = getRequestContext() as ContextData;
-  return paymentSdk.getFutureOrderNumberFromContext(contextData);
 };
 
 export const requestContextPlugin = fp(async (fastify: FastifyInstance) => {
