@@ -1,14 +1,17 @@
 import { Request, Response } from 'express';
-import CustomError from '../errors/custom.error';
-import { VerifyWebhookSignature } from '../paypal/webhooks_api';
+import {
+  CustomError,
+  getWebhookId,
+  validateSignature,
+  logger,
+  VerifyWebhookSignature,
+} from 'common-connect/dist';
 import {
   handleAuthorizeWebhook,
   handleCaptureWebhook,
   handleOrderWebhook,
   handlePaymentTokenWebhook,
 } from '../service/commercetools.service';
-import { getWebhookId, validateSignature } from '../service/paypal.service';
-import { logger } from '../utils/logger.utils';
 
 async function verifyWebhookSignature(request: Request) {
   const webhookId = await getWebhookId();

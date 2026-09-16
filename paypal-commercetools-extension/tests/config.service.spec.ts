@@ -12,7 +12,7 @@ const mockConfigModule = () => {
     get: jest.fn(() => apiRequest),
     post: jest.fn(() => apiRequest),
   };
-  jest.mock('../src/client/create.client', () => {
+  jest.mock('common-connect/dist/client/create.client', () => {
     return {
       createApiRoot: () => apiRoot,
     };
@@ -21,11 +21,7 @@ const mockConfigModule = () => {
 };
 mockConfigModule();
 
-import {
-  cacheAccessToken,
-  getCachedAccessToken,
-  getSettings,
-} from '../src/service/config.service';
+import { getSettings } from '../src/service/config.service';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -38,26 +34,5 @@ describe('Testing config service', () => {
     expect(settings).toBe('VALUE');
     expect(apiRequest.execute).toHaveBeenCalledTimes(1);
     expect(apiRoot.get).toHaveBeenCalledTimes(1);
-  });
-  test('test get cached access token', async () => {
-    apiRequest.execute = jest.fn(() => ({
-      body: {
-        value: {
-          accessToken:
-            'A21AAKRK-ACvRmtR9xofN-KiTpprBzvE4x8V0lcVAylYv1KKglxbWrg8jOVSkrwflEg_61ZgeoCU-AliYAfMlzcyB72h3vXDg',
-          validUntil: '2023-11-29T04:14:29.323Z',
-        },
-      },
-    }));
-    const cachedToken = await getCachedAccessToken();
-
-    expect(cachedToken?.value).toHaveProperty('accessToken');
-    expect(apiRoot.get).toHaveBeenCalledTimes(1);
-    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
-  });
-  test('test cacheAccessToken', async () => {
-    await cacheAccessToken({ accessToken: '123', validUntil: new Date() }, 1);
-    expect(apiRoot.post).toHaveBeenCalledTimes(1);
-    expect(apiRequest.execute).toHaveBeenCalledTimes(1);
   });
 });

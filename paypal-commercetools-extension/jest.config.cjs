@@ -5,6 +5,6 @@ module.exports = {
   testMatch: ['**/?(*.)+(spec|test).[tj]s?(x)'],
   preset: 'ts-jest',
   testEnvironment: 'node',
-  collectCoverageFrom: ['src/{!(paypal),}/*'],
-  coverageProvider: 'v8',
+  transformIgnorePatterns: ['node_modules/(?!(common-connect)/)'],
+  collectCoverageFrom: ['src/**/*.ts'],
 };
