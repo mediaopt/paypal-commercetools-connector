@@ -78,3 +78,9 @@ export const CUSTOM_OBJECT_DEFAULT_VALUES = {
 
 export const PAYPAL_EXTENSION_PATH = "/paypal-commercetools-extension";
 export const PAYPAL_WEBHOOKS_PATH = "/paypal-webhooks";
+
+// Buyer-approval polling budget for a PayPal order's status before authorize/capture.
+// Unrelated to paypal.service.ts's own module-private TIMEOUT_PAYMENT (an axios request timeout
+// that happens to share the same value) — do not conflate the two.
+export const TIMEOUT_PAYMENT = 9500;
+export const RETRY_DELAY = 2000;

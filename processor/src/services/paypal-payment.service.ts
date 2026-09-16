@@ -75,6 +75,8 @@ import {
   findMostRecentTransaction,
   Patch,
   PayPalSettings,
+  TIMEOUT_PAYMENT,
+  RETRY_DELAY,
 } from "common-connect";
 
 import { log } from "../libs/logger";
@@ -896,6 +898,72 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * Confirms a PayPal order has actually been approved before it's authorized/captured, instead
+   * of optimistically calling PayPal and only checking on failure. CREATED/PAYER_ACTION_REQUIRED
+   * are treated as "buyer may have approved but PayPal hasn't synced it back yet" and polled for
+   * up to TIMEOUT_PAYMENT; any other non-approved status is treated as unambiguously wrong and
+   * fails immediately.
+   */
+  private async ensureOrderApproved(
+    orderID: string,
+    paymentId: string,
+    operation: string
+  ): Promise<Order> {
+    const deadline = Date.now() + TIMEOUT_PAYMENT;
+
+    for (;;) {
+      let order: Order;
+      try {
+        order = await getPayPalOrder(orderID);
+      } catch (e) {
+        log.error(
+          `${operation}: PayPal order lookup failed for payment ${paymentId} — ${errorMessage(
+            e
+          )}${payPalDebugIdSuffix(e)}`
+        );
+        throw new ErrorInvalidOperation(
+          `Failed to look up PayPal order ${orderID}`
+        );
+      }
+      await this.logProcessorInteraction(
+        paymentId,
+        "getPayPalOrder",
+        { orderID },
+        order
+      );
+
+      if (order.status === "APPROVED" || order.status === "COMPLETED") {
+        return order;
+      }
+
+      if (order.status !== "CREATED" && order.status !== "PAYER_ACTION_REQUIRED") {
+        log.error(
+          `${operation}: PayPal order ${orderID} is in an unexpected state (status: ${order.status}) for payment ${paymentId}`
+        );
+        throw new ErrorInvalidOperation(
+          `PayPal order ${orderID} is in an unexpected state (status: ${order.status})`,
+          { fields: { orderID, orderStatus: order.status } }
+        );
+      }
+
+      if (Date.now() >= deadline) {
+        log.error(
+          `${operation}: PayPal order ${orderID} still not approved after ${TIMEOUT_PAYMENT}ms (status: ${order.status}) for payment ${paymentId}`
+        );
+        throw new ErrorInvalidOperation(
+          `PayPal order ${orderID} is not yet approved (status: ${order.status}) — buyer approval may not have finished processing on PayPal's side yet`,
+          { fields: { orderID, orderStatus: order.status } }
+        );
+      }
+
+      log.info(
+        `${operation}: PayPal order ${orderID} not yet approved (status: ${order.status}) for payment ${paymentId} — retrying in ${RETRY_DELAY}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+    }
+  }
+
+  /**
    * Shared by authorizeOrder()/captureOrder()/settlement() — calls a PayPal API, adds the
    * matching CT transaction, syncs order status, and links a vaulted card's customer id,
    * differing only in which PayPal call/purchase-unit key/transaction type/status mapper applies.
@@ -922,6 +990,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // risk, not just a data-integrity nicety). Checked before ever calling PayPal.
     this.assertNotLinkedToDifferentOrder(payment, orderID);
 
+    await this.ensureOrderApproved(orderID, payment.id, config.operation);
+
     let response: Order;
     try {
       response = await config.callPayPal(orderID);
@@ -931,22 +1001,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
           payment.id
         } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
-
-      // In most of cases paypal webhook submits approved PayPal order state before frontend
-      // could trigger capture attempt and even if not it is not blocking. This is precaution
-      // needed for some slow 3ds verifications.
-      const order = await getPayPalOrder(orderID).catch(() => undefined);
-      if (
-        order &&
-        order.status !== "APPROVED" &&
-        order.status !== "COMPLETED"
-      ) {
-        throw new ErrorInvalidOperation(
-          `PayPal order ${orderID} is not yet approved (status: ${order.status}) — buyer approval may not have finished processing on PayPal's side yet`,
-          { fields: { orderID, orderStatus: order.status } }
-        );
-      }
-
       throw new ErrorInvalidOperation(
         `Failed to ${
           config.operation === "authorizeOrder" ? "authorize" : "capture"
@@ -1667,6 +1721,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     if (authorizationTransaction) {
       const authorizationId = findAuthorizationTransactionId(ctPayment);
+      if (!ctPayment.interfaceId) {
+        throw new ErrorInvalidOperation(
+          `Payment ${ctPayment.id} has no associated PayPal order to settle`
+        );
+      }
+      await this.ensureOrderApproved(
+        ctPayment.interfaceId,
+        ctPayment.id,
+        "settlement"
+      );
+
       // `amount` (from the commercetools Payment Intents request) has no fractionDigits of its own —
       const paypalAmount = buildPayPalAmount(
         amount,
