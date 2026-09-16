@@ -40,7 +40,6 @@ import {
 } from "../types";
 import { processorRequest } from "../services/processorRequest";
 import { processorUrls } from "../components/constants";
-import { resolveEndpointUrl } from "../helpers/resolveEndpointUrl";
 
 import { useLoader } from "./useLoader";
 import { useNotifications } from "./useNotifications";
@@ -158,7 +157,7 @@ export const PaymentProvider: FC<
   // Seeded synchronously from initialPayment when present (Checkout mode — already resolved in
   // PayPalPaymentEnabler._Setup() before this component ever mounts, see BaseOptions's own
   // comment). Falls back to PaymentInfoInitialObject otherwise, populated by the mount effect
-  // below instead (self-hosted/legacy mode, no processorUrl).
+  // below instead (self-hosted/legacy mode).
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>(
     initialPayment
       ? {
@@ -218,17 +217,10 @@ export const PaymentProvider: FC<
     const initPayment = async () => {
       isLoading(true);
       try {
-        const createPaymentRequestUrl = resolveEndpointUrl(
-          derivedUrls.createPaymentUrl,
-          createPaymentUrl,
-          "createPaymentUrl",
-          t
-        );
-
         const createPaymentResult = await processorRequest<
           {},
           CreatePaymentResponse
-        >(requestHeader, createPaymentRequestUrl, {
+        >(requestHeader, createPaymentUrl, {
           ...cartInformation,
           shippingMethodId: shippingMethodId,
           paymentMethodType,
@@ -286,18 +278,12 @@ export const PaymentProvider: FC<
     const handleCreateVaultSetupToken = async (
       paymentSource: FUNDING_SOURCE
     ) => {
+      if (!createVaultSetupTokenUrl) return "";
       try {
-        const requestUrl = resolveEndpointUrl(
-          undefined,
-          createVaultSetupTokenUrl,
-          "createVaultSetupTokenUrl",
-          t
-        );
-
         const createVaultSetupTokenResult = await processorRequest<
           CreateVaultSetupTokenRequest,
           CreateVaultSetupTokenResponse
-        >(requestHeader, requestUrl, { paymentSource });
+        >(requestHeader, createVaultSetupTokenUrl, { paymentSource });
 
         return createVaultSetupTokenResult
           ? createVaultSetupTokenResult.createVaultSetupTokenResponse.id
@@ -313,18 +299,12 @@ export const PaymentProvider: FC<
     const handleApproveVaultSetupToken = async ({
       vaultSetupToken,
     }: ApproveVaultSetupTokenData) => {
+      if (!approveVaultSetupTokenUrl) return;
       try {
-        const requestUrl = resolveEndpointUrl(
-          undefined,
-          approveVaultSetupTokenUrl,
-          "approveVaultSetupTokenUrl",
-          t
-        );
-
         const result = await processorRequest<
           ApproveVaultSetupTokenRequest,
           ApproveVaultSetupTokenResponse
-        >(requestHeader, requestUrl, { vaultSetupToken });
+        >(requestHeader, approveVaultSetupTokenUrl, { vaultSetupToken });
         if (result) {
           setShowResult(true);
           setResultSuccess(true);
@@ -342,15 +322,9 @@ export const PaymentProvider: FC<
     };
 
     const handleCreateOrder = async (orderData?: CustomOrderData) => {
+      if (!createOrderUrl) return "";
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
       try {
-        const createOrderRequestUrl = resolveEndpointUrl(
-          derivedUrls.createOrderUrl,
-          createOrderUrl,
-          "createOrderUrl",
-          t
-        );
-
         const relevantOrderData = setRelevantData(
           orderData,
           !!setRatepayMessage,
@@ -360,11 +334,12 @@ export const PaymentProvider: FC<
         const createOrderResult = await processorRequest<
           CreateOrderRequest,
           CreateOrderResponse
-        >(requestHeader, createOrderRequestUrl, {
+        >(requestHeader, createOrderUrl, {
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
           payPalIntent: settings?.payPalIntent,
           builderType,
+          paymentMethodType,
           orderData: {
             ...relevantOrderData,
           },
@@ -379,7 +354,11 @@ export const PaymentProvider: FC<
 
         const oldOrderData = orderData;
 
-        const { orderData: newOrderData, paymentVersion } = createOrderResult;
+        const {
+          orderData: newOrderData,
+          paymentVersion,
+          merchantReturnUrl,
+        } = createOrderResult;
         const { id, status, payment_source, details, links, message } =
           newOrderData;
         latestPaymentVersion = paymentVersion;
@@ -451,10 +430,18 @@ export const PaymentProvider: FC<
           }
         } else {
           if (setRatepayMessage) {
-            setRatepayMessage && setRatepayMessage(undefined);
+            setRatepayMessage(undefined);
+            if (merchantReturnUrl) {
+              redirectTo(merchantReturnUrl);
+              return "";
+            }
             onSuccess(newOrderData);
           } else {
             if (status === "COMPLETED" && payment_source) {
+              if (merchantReturnUrl) {
+                redirectTo(merchantReturnUrl);
+                return "";
+              }
               onSuccess(newOrderData);
             } else if (
               status === "PAYER_ACTION_REQUIRED" &&
@@ -522,22 +509,16 @@ export const PaymentProvider: FC<
         return;
       }
 
-      try {
-        const requestUrl =
-          settings?.payPalIntent === "Authorize"
-            ? resolveEndpointUrl(
-                derivedUrls.authorizeOrderUrl,
-                authorizeOrderUrl,
-                "authorizeOrderUrl",
-                t
-              )
-            : resolveEndpointUrl(
-                derivedUrls.onApproveUrl,
-                onApproveUrl,
-                "onApproveUrl",
-                t
-              );
+      const requestUrl =
+        settings?.payPalIntent === "Authorize"
+          ? authorizeOrderUrl
+          : onApproveUrl;
+      if (!requestUrl) {
+        isLoading(false);
+        return;
+      }
 
+      try {
         const onApproveResult = await processorRequest<
           OnApproveRequest,
           OnApproveResponse
@@ -584,14 +565,10 @@ export const PaymentProvider: FC<
       orderID: string,
       isGPay?: boolean
     ): Promise<number> => {
+      if (!authenticateThreeDSOrderUrl) {
+        return 0;
+      }
       try {
-        const requestUrl = resolveEndpointUrl(
-          derivedUrls.authenticateThreeDSOrderUrl,
-          authenticateThreeDSOrderUrl,
-          "authenticateThreeDSOrderUrl",
-          t
-        );
-
         const result = await processorRequest<
           {
             orderID: string;
@@ -609,7 +586,7 @@ export const PaymentProvider: FC<
               };
             };
           }
-        >(requestHeader, requestUrl, {
+        >(requestHeader, authenticateThreeDSOrderUrl, {
           orderID,
           paymentVersion: latestPaymentVersion,
           paymentId: paymentInfo.id,
@@ -652,7 +629,8 @@ export const PaymentProvider: FC<
       request: UpdateShippingRequest
     ): Promise<UpdateShippingResponse> => {
       try {
-        // No resolveEndpointUrl here — legacy way is to register onShippingChange on the component.
+        // Checkout-exclusive, no legacy equivalent — legacy way is to register onShippingChange
+        // on the component instead.
         const requestUrl = derivedUrls.updateShippingUrl;
         if (!requestUrl) {
           console.error(

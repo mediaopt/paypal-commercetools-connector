@@ -9,6 +9,7 @@ import { CardFields } from "../CardFields";
 // } from "paypal-commercetools-client";
 
 import { RenderPurchase } from "../RenderPurchase/RenderPurchase";
+import { processorUrls } from "../constants";
 
 /**
  * Maps PayPal payment method types to their corresponding components —
@@ -54,6 +55,12 @@ export const RenderTemplate: FC<RenderTemplateProps> = ({
         paymentMethodType,
         builderType,
         processorUrl,
+        // Injects createPaymentUrl/createOrderUrl/authorizeOrderUrl/onApproveUrl/
+        // authenticateThreeDSOrderUrl (plus expressApproveUrl/updateShippingUrl/
+        // getStoredPaymentMethodsURL, unused as props but harmless) into the same named slots a
+        // self-hosted merchant would otherwise fill in directly — RenderTemplate only ever runs in
+        // Checkout mode, so this never runs for self-hosted deployments.
+        ...(processorUrl ? processorUrls(processorUrl) : {}),
       })}
     </RenderPurchase>
   );
