@@ -51,6 +51,8 @@ export {
   CaptureRequest,
   Capture2,
   Authorization2,
+  Refund,
+  RefundRequest,
 } from "./paypal/payments_api";
 export { VerifyWebhookSignature } from "./paypal/webhooks_api";
 export {
@@ -70,6 +72,7 @@ export {
   mapPayPalMoneyToCommercetoolsMoney,
   mapPayPalPaymentSourceToCommercetoolsMethodInfo,
   mapPayPalRefundStatusToCommercetoolsTransactionState,
+  mapPayPalVoidStatusToCommercetoolsTransactionState,
   mapValidCommercetoolsLineItemsToPayPalItems,
   resolveCommercetoolsCartShippingAddress,
   isPaymentUpToDate,

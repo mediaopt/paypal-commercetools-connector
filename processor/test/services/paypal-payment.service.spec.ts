@@ -23,6 +23,8 @@ jest.mock("common-connect", () => ({
   deletePaymentToken: jest.fn(),
   generateUserIdToken: jest.fn(),
   updatePayPalOrder: jest.fn(),
+  refundPayPalOrder: jest.fn(),
+  voidPayPalAuthorization: jest.fn(),
 }));
 import * as CommonConnect from "common-connect";
 
@@ -962,6 +964,458 @@ describe("paypal-payment.service", () => {
       ).rejects.toThrow(
         `Payment ${mockPayment.id} has no associated PayPal order to settle`
       );
+    });
+  });
+
+  describe("refundPayment", () => {
+    const mockAmount = {
+      type: "centPrecision",
+      currencyCode: "USD",
+      centAmount: 1000,
+      fractionDigits: 2,
+    } as never;
+
+    const chargeTransaction = {
+      id: "charge-transaction-id",
+      type: "Charge",
+      state: "Success",
+      interactionId: "capture-id",
+      amount: {
+        type: "centPrecision",
+        currencyCode: "USD",
+        centAmount: 1000,
+        fractionDigits: 2,
+      },
+    };
+
+    test("refunds the transaction matching the given transactionId", async () => {
+      (CommonConnect.refundPayPalOrder as jest.Mock).mockResolvedValue({
+        id: "refund-id",
+        status: "COMPLETED",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.refundPayment({
+        payment: {
+          ...mockPayment,
+          transactions: [chargeTransaction],
+        } as unknown as Payment,
+        amount: mockAmount,
+        transactionId: "charge-transaction-id",
+      });
+
+      expect(CommonConnect.refundPayPalOrder).toHaveBeenCalledWith(
+        "capture-id",
+        { amount: expect.anything() }
+      );
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Refund",
+            interactionId: "refund-id",
+          }),
+        })
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: `Payment ${mockPayment.id} refunded successfully`,
+        })
+      );
+    });
+
+    test("falls back to the most recent successful Charge when no transactionId is given", async () => {
+      (CommonConnect.refundPayPalOrder as jest.Mock).mockResolvedValue({
+        id: "refund-id",
+        status: "COMPLETED",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.refundPayment({
+        payment: {
+          ...mockPayment,
+          transactions: [chargeTransaction],
+        } as unknown as Payment,
+        amount: mockAmount,
+      });
+
+      expect(CommonConnect.refundPayPalOrder).toHaveBeenCalledWith(
+        "capture-id",
+        { amount: expect.anything() }
+      );
+      expect(result).toEqual(
+        expect.objectContaining({ success: true })
+      );
+    });
+
+    test("still auto-selects the Charge for a further partial refund even after a prior refund", async () => {
+      // Auto-select doesn't track remaining balance itself — a caller that omits transactionId is
+      // expected to pass whatever amount they intend to refund next, and PayPal validates it.
+      // reversePayment (abstract-payment.service.ts) is the one caller that needs to stop once
+      // nothing's left, and it uses findCapturedChargeBalance + an explicit transactionId instead.
+      (CommonConnect.refundPayPalOrder as jest.Mock).mockResolvedValue({
+        id: "refund-id-2",
+        status: "COMPLETED",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.refundPayment({
+        payment: {
+          ...mockPayment,
+          transactions: [
+            chargeTransaction,
+            {
+              id: "refund-transaction-id",
+              type: "Refund",
+              state: "Success",
+              interactionId: "refund-id",
+            },
+          ],
+        } as unknown as Payment,
+        amount: mockAmount,
+      });
+
+      expect(CommonConnect.refundPayPalOrder).toHaveBeenCalledWith(
+        "capture-id",
+        { amount: expect.anything() }
+      );
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+    });
+
+    test("throws when no matching transaction is found for the given transactionId", async () => {
+      await expect(
+        paypalPaymentService.refundPayment({
+          payment: { ...mockPayment, transactions: [] } as unknown as Payment,
+          amount: mockAmount,
+          transactionId: "does-not-exist",
+        })
+      ).rejects.toThrow(`TransactionId does-not-exist is not found.`);
+    });
+
+    test("throws when the matching transaction is not a successful Charge", async () => {
+      await expect(
+        paypalPaymentService.refundPayment({
+          payment: {
+            ...mockPayment,
+            transactions: [
+              {
+                id: "auth-transaction-id",
+                type: "Authorization",
+                state: "Success",
+                interactionId: "auth-id",
+              },
+            ],
+          } as unknown as Payment,
+          amount: mockAmount,
+          transactionId: "auth-transaction-id",
+        })
+      ).rejects.toThrow(`TransactionId auth-transaction-id is not refundable`);
+    });
+
+    test("throws when the PayPal refund call fails", async () => {
+      (CommonConnect.refundPayPalOrder as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await expect(
+        paypalPaymentService.refundPayment({
+          payment: {
+            ...mockPayment,
+            transactions: [chargeTransaction],
+          } as unknown as Payment,
+          amount: mockAmount,
+          transactionId: "charge-transaction-id",
+        })
+      ).rejects.toThrow(
+        `refundPayment failed for payment ${mockPayment.id} with error PayPal is down`
+      );
+    });
+  });
+
+  describe("void", () => {
+    const authorizationTransaction = {
+      id: "auth-transaction-id",
+      type: "Authorization",
+      state: "Success",
+      interactionId: "auth-id",
+      amount: {
+        type: "centPrecision",
+        currencyCode: "USD",
+        centAmount: 1000,
+        fractionDigits: 2,
+      },
+    };
+
+    test("voids the most recent successful authorization", async () => {
+      (CommonConnect.voidPayPalAuthorization as jest.Mock).mockResolvedValue({
+        id: "auth-id",
+        status: "VOIDED",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.void({
+        payment: {
+          ...mockPayment,
+          transactions: [authorizationTransaction],
+        } as unknown as Payment,
+      });
+
+      expect(CommonConnect.voidPayPalAuthorization).toHaveBeenCalledWith(
+        "auth-id"
+      );
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "CancelAuthorization",
+            interactionId: "auth-id",
+          }),
+        })
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: `Payment ${mockPayment.id} voided successfully`,
+        })
+      );
+    });
+
+    test("throws when no successful authorization transaction exists", async () => {
+      await expect(
+        paypalPaymentService.void({
+          payment: { ...mockPayment, transactions: [] } as unknown as Payment,
+        })
+      ).rejects.toThrow(
+        `No voidable transaction found for payment ${mockPayment.id}`
+      );
+    });
+
+    test("does not re-select an authorization that has already been voided", async () => {
+      await expect(
+        paypalPaymentService.void({
+          payment: {
+            ...mockPayment,
+            transactions: [
+              authorizationTransaction,
+              {
+                id: "cancel-transaction-id",
+                type: "CancelAuthorization",
+                state: "Success",
+                interactionId: "auth-id",
+              },
+            ],
+          } as unknown as Payment,
+        })
+      ).rejects.toThrow(
+        `No voidable transaction found for payment ${mockPayment.id}`
+      );
+      expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
+    });
+
+    test("does not void an authorization that has already been captured", async () => {
+      await expect(
+        paypalPaymentService.void({
+          payment: {
+            ...mockPayment,
+            transactions: [
+              authorizationTransaction,
+              {
+                id: "charge-transaction-id",
+                type: "Charge",
+                state: "Success",
+                interactionId: "capture-id",
+                amount: {
+                  type: "centPrecision",
+                  currencyCode: "USD",
+                  centAmount: 1000,
+                  fractionDigits: 2,
+                },
+              },
+            ],
+          } as unknown as Payment,
+        })
+      ).rejects.toThrow(
+        `No voidable transaction found for payment ${mockPayment.id}`
+      );
+      expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
+    });
+
+    test("throws when the PayPal void call fails", async () => {
+      (CommonConnect.voidPayPalAuthorization as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await expect(
+        paypalPaymentService.void({
+          payment: {
+            ...mockPayment,
+            transactions: [authorizationTransaction],
+          } as unknown as Payment,
+        })
+      ).rejects.toThrow(
+        `void failed for payment ${mockPayment.id} with error PayPal is down`
+      );
+    });
+  });
+
+  describe("modifyPayment: reversePayment routing", () => {
+    test("voids when the payment has not been captured yet", async () => {
+      (CommonConnect.voidPayPalAuthorization as jest.Mock).mockResolvedValue({
+        id: "auth-id",
+        status: "VOIDED",
+      } as never);
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        transactions: [
+          {
+            id: "auth-transaction-id",
+            type: "Authorization",
+            state: "Success",
+            interactionId: "auth-id",
+            amount: mockPayment.amountPlanned,
+          },
+        ],
+      } as unknown as Payment);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.modifyPayment({
+        paymentId: mockPayment.id,
+        data: { actions: [{ action: "reversePayment" }] } as never,
+      });
+
+      expect(CommonConnect.voidPayPalAuthorization).toHaveBeenCalledWith(
+        "auth-id"
+      );
+      expect(CommonConnect.refundPayPalOrder).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+    });
+
+    test("refunds the captured amount, not the payment's full amountPlanned", async () => {
+      // The Charge here (400 = $4.00) is a partial capture, deliberately less than
+      // mockPayment.amountPlanned (1000 = $10.00) — proves the refund targets what was actually
+      // captured rather than the payment's planned total.
+      (CommonConnect.refundPayPalOrder as jest.Mock).mockResolvedValue({
+        id: "refund-id",
+        status: "COMPLETED",
+      } as never);
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        transactions: [
+          {
+            id: "charge-transaction-id",
+            type: "Charge",
+            state: "Success",
+            interactionId: "capture-id",
+            amount: {
+              type: "centPrecision",
+              currencyCode: "USD",
+              centAmount: 400,
+              fractionDigits: 2,
+            },
+          },
+        ],
+      } as unknown as Payment);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.modifyPayment({
+        paymentId: mockPayment.id,
+        data: { actions: [{ action: "reversePayment" }] } as never,
+      });
+
+      expect(CommonConnect.refundPayPalOrder).toHaveBeenCalledWith(
+        "capture-id",
+        { amount: { currency_code: "USD", value: "4.00" } }
+      );
+      expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+    });
+
+    test("throws when the payment has already been fully refunded", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        transactions: [
+          {
+            id: "charge-transaction-id",
+            type: "Charge",
+            state: "Success",
+            interactionId: "capture-id",
+            amount: {
+              type: "centPrecision",
+              currencyCode: "USD",
+              centAmount: 1000,
+              fractionDigits: 2,
+            },
+          },
+          {
+            id: "refund-transaction-id",
+            type: "Refund",
+            state: "Success",
+            interactionId: "refund-id",
+            amount: {
+              type: "centPrecision",
+              currencyCode: "USD",
+              centAmount: 1000,
+              fractionDigits: 2,
+            },
+          },
+        ],
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.modifyPayment({
+          paymentId: mockPayment.id,
+          data: { actions: [{ action: "reversePayment" }] } as never,
+        })
+      ).rejects.toThrow(
+        `Payment ${mockPayment.id} has already been fully refunded`
+      );
+      expect(CommonConnect.refundPayPalOrder).not.toHaveBeenCalled();
+      expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
+    });
+
+    test("throws rather than silently under-refunding when the payment has multiple captures", async () => {
+      // settlement() allows capturing an authorization in installments (PayPal captures default
+      // to final_capture: false), so more than one successful Charge is possible — reversing that
+      // safely would mean refunding each capture individually, which this action doesn't attempt.
+      const partialCharge = {
+        type: "Charge",
+        state: "Success",
+        amount: {
+          type: "centPrecision",
+          currencyCode: "USD",
+          centAmount: 400,
+          fractionDigits: 2,
+        },
+      };
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        transactions: [
+          { ...partialCharge, id: "charge-1", interactionId: "capture-1" },
+          { ...partialCharge, id: "charge-2", interactionId: "capture-2" },
+        ],
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.modifyPayment({
+          paymentId: mockPayment.id,
+          data: { actions: [{ action: "reversePayment" }] } as never,
+        })
+      ).rejects.toThrow(
+        `Payment ${mockPayment.id} has more than one captured Charge`
+      );
+      expect(CommonConnect.refundPayPalOrder).not.toHaveBeenCalled();
+      expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
     });
   });
 

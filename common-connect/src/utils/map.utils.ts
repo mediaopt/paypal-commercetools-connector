@@ -154,6 +154,21 @@ export const mapPayPalAuthorizationStatusToCommercetoolsTransactionState = (
   }
 };
 
+export const mapPayPalVoidStatusToCommercetoolsTransactionState = (
+  status?: Authorization2StatusEnum
+): TransactionState => {
+  switch (status) {
+    case Authorization2StatusEnum.Voided:
+      return 'Success';
+    case Authorization2StatusEnum.Denied:
+    case undefined:
+      return 'Failure';
+    case Authorization2StatusEnum.Pending:
+    default:
+      return 'Pending';
+  }
+};
+
 export const mapPayPalPaymentSourceToCommercetoolsMethodInfo = (
   source: PaymentSourceResponse
 ): string => {
