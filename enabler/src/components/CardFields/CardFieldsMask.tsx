@@ -151,6 +151,27 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
   // Set by submit() when an external caller (e.g. commercetools Checkout) passes
   // storePaymentDetails=true — combined with the local "save this card" checkbox.
   const externalStoreInVaultRef = useRef(false);
+  // Covers the whole card-processing flow triggered by a submit() call — not just the initial
+  // cardFieldsForm.submit() kickoff, but the 3DS challenge and final approve/capture that follow
+  // it — so the promise Checkout mode's registered submit handler awaits (see onRegisterSubmit
+  // below) actually reflects the real outcome instead of resolving as soon as the SDK submission
+  // kicks off. See PayPalBuilder.ts:122's comment for why an unsettled submit() promise is what
+  // leaves Checkout's own processing state stuck with no exit on failure (unlike success, which
+  // exits via redirect instead).
+  const pendingCardProcessingRef = useRef<{
+    resolve: () => void;
+    reject: (err: unknown) => void;
+  } | null>(null);
+
+  const resolveCardProcessing = () => {
+    pendingCardProcessingRef.current?.resolve();
+    pendingCardProcessingRef.current = null;
+  };
+
+  const rejectCardProcessing = (err: unknown) => {
+    pendingCardProcessingRef.current?.reject(err);
+    pendingCardProcessingRef.current = null;
+  };
 
   const [cardFieldsState, setCardFieldsState] = useState<CardFieldsState>({
     form: null,
@@ -184,17 +205,21 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     approveData: CustomOnApproveData | ApproveVaultSetupTokenData
   ) => {
     if (vaultOnly) {
-      handleApproveVaultSetupToken(
-        approveData as ApproveVaultSetupTokenData
-      ).catch((err) => {
-        setPaying(false);
-        errorFunc(err, isLoading, notify, t);
-      });
+      handleApproveVaultSetupToken(approveData as ApproveVaultSetupTokenData)
+        .then(() => resolveCardProcessing()) //vault only is not included in checkout mode, only checkout relevant promises are only added for consistency
+        .catch((err) => {
+          setPaying(false);
+          errorFunc(err, isLoading, notify, t);
+          rejectCardProcessing(err);
+        });
     } else {
-      handleOnApprove(approveData as CustomOnApproveData).catch((err) => {
-        setPaying(false);
-        errorFunc(err, isLoading, notify, t);
-      });
+      handleOnApprove(approveData as CustomOnApproveData)
+        .then(() => resolveCardProcessing())
+        .catch((err) => {
+          setPaying(false);
+          errorFunc(err, isLoading, notify, t);
+          rejectCardProcessing(err);
+        });
     }
   };
 
@@ -255,6 +280,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
       setPaying(false);
       isLoading(false);
       notify("Error", t("cardFields.tryAgain"));
+      rejectCardProcessing(new Error("CARD_FIELDS_SUBMIT_TIMEOUT"));
     }, CARD_FIELDS_SUBMIT_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -312,6 +338,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
                 code: "THREE_DS_DECLINED_RETRY",
                 message: t("cardFields.tryAgain"),
               });
+              rejectCardProcessing(new Error("THREE_DS_DECLINED_RETRY"));
               break;
             case "0":
             default:
@@ -322,6 +349,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
                 code: "THREE_DS_DECLINED",
                 message: t("cardFields.selectDifferentMethod"),
               });
+              rejectCardProcessing(new Error("THREE_DS_DECLINED"));
               break;
           }
         })
@@ -339,6 +367,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
             t
           );
           onError?.(genericError);
+          rejectCardProcessing(err);
         });
     } else {
       approveTransaction(approveData);
@@ -349,6 +378,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     setPaying(false);
     const genericError = errorFunc(error, isLoading, notify, t);
     onError?.(genericError);
+    rejectCardProcessing(error);
   };
 
   const submit = async (storePaymentDetails?: boolean): Promise<void> => {
@@ -369,7 +399,17 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
   useEffect(() => {
     if (!cardFieldsForm) return;
 
-    onRegisterSubmit?.((storePaymentDetails) => submit(storePaymentDetails));
+    onRegisterSubmit?.((storePaymentDetails) => {
+      // Unlike submit() above (used as-is by the legacy self-hosted Pay button, untouched), the
+      // handler Checkout actually awaits (PayPalComponent.submit() in PayPalBuilder.ts) needs to
+      // stay pending until the real 3DS/approve outcome is known — see pendingCardProcessingRef's
+      // comment. Created synchronously before submit() runs so a synchronous handleError (thrown
+      // by cardFieldsForm.submit() itself) already has somewhere to reject into.
+      const pendingCardProcessing = new Promise<void>((resolve, reject) => {
+        pendingCardProcessingRef.current = { resolve, reject };
+      });
+      return submit(storePaymentDetails).then(() => pendingCardProcessing);
+    });
     onRegisterValidation?.({
       isValid: async () => (await cardFieldsForm.getState()).isFormValid,
       showValidation: async () => {
