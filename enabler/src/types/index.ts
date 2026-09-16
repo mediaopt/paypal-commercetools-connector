@@ -71,6 +71,10 @@ export type CreateOrderRequest = {
    * PayPal the shipping address is fixed and disables the buyer's ability to change it in the
    * popup, which would make onShippingAddressChange/onShippingOptionsChange unreachable. */
   builderType?: BuilderType;
+  /** The same paymentMethodType already sent on the initial /payments request (see
+   * PaymentRequestSchemaDTO's paymentMethodType) — lets the processor apply payment-method-specific
+   * order constraints. */
+  paymentMethodType?: string;
 };
 
 export type CreateOrderData = {
@@ -111,6 +115,9 @@ export type OrderData = {
 export type CreateOrderResponse = {
   orderData: OrderData;
   paymentVersion?: PaymentVersion;
+  // Buyer redirect target for orders that settle synchronously inside createOrder itself (e.g. a
+  // vaulted card) — same convention as OnApproveResponse.merchantReturnUrl below.
+  merchantReturnUrl?: string;
   ok?: boolean;
 };
 
@@ -187,20 +194,18 @@ export type BasicComponentProps = {
   enableVaulting?: boolean;
 };
 
-/** Category 2 — legacy per-endpoint URLs, superseded by `processorUrl`.
- * will be removed, must be replaced with processorURL */
+/** Category 2 — per-endpoint URLs. In Checkout mode, `processorUrl` + `processorUrls()` derive
+ * these same named props instead of a self-hosted merchant filling them in directly — the two
+ * deployment modes converge on identical prop names, just from different sources (no
+ * `@deprecated` marking needed — nothing here is being phased out, it's just populated one way or
+ * the other). */
 export type LegacyEndpointUrlProps = {
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createPaymentUrl: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   onApproveUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   authorizeOrderUrl?: string;
   /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   removePaymentTokenUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   createOrderUrl?: string;
-  /** @deprecated superseded by `processorUrl` + `processorUrls()`. */
   authenticateThreeDSOrderUrl?: string;
 };
 

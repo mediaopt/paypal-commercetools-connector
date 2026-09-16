@@ -151,6 +151,9 @@ export const CreateOrderResponseSchema = Type.Object({
     links: Type.Optional(Type.Array(Type.Any())),
     message: Type.Optional(Type.String()),
   }),
+  // Buyer redirect target for orders that settle synchronously inside createOrder itself (e.g. a
+  // vaulted card) — same convention as OnApproveResponseSchema.merchantReturnUrl.
+  merchantReturnUrl: Type.Optional(Type.String()),
   ok: Type.Optional(Type.Boolean()),
 });
 export type CreateOrderResponseSchemaDTO = Static<

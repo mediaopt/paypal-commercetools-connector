@@ -51,6 +51,37 @@ describe("RenderTemplate", () => {
     });
   });
 
+  it("injects processorUrls()-derived URLs (createPaymentUrl, createOrderUrl, etc.) when processorUrl is passed", () => {
+    render(
+      <RenderTemplate
+        paymentMethodType="PayPal"
+        customOptions={{}}
+        processorUrl="https://processor.test"
+      />
+    );
+
+    const probe = screen.getByTestId("probe");
+    const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
+
+    expect(props).toMatchObject({
+      createPaymentUrl: "https://processor.test/payments",
+      createOrderUrl: "https://processor.test/payments/createOrder",
+      authorizeOrderUrl: "https://processor.test/payments/authorize",
+      onApproveUrl: "https://processor.test/payments/approve",
+      authenticateThreeDSOrderUrl: "https://processor.test/payments/3ds",
+    });
+  });
+
+  it("injects nothing beyond customOptions when processorUrl is absent (self-hosted mode)", () => {
+    render(<RenderTemplate paymentMethodType="PayPal" customOptions={{}} />);
+
+    const probe = screen.getByTestId("probe");
+    const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
+
+    expect(props.createPaymentUrl).toBeUndefined();
+    expect(props.createOrderUrl).toBeUndefined();
+  });
+
   it("throws for an unsupported payment method type", () => {
     expect(() =>
       render(
