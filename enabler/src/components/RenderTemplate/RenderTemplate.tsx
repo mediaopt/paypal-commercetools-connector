@@ -5,8 +5,8 @@ import { CardFields } from "../CardFields";
 import { CardFieldsStored } from "../CardFields/CardFieldsStored";
 import { ApplePay } from "../ApplePay";
 import { PayUponInvoice } from "../PayUponInvoice";
+import { GooglePay } from "../GooglePay";
 // import {
-//   GooglePay,
 //   PaymentTokens,
 // } from "paypal-commercetools-client";
 
@@ -17,6 +17,7 @@ import {
   CardFieldsResolvedOptions,
   CardFieldsStoredResolvedOptions,
   GenericMountProps,
+  GooglePayResolvedOptions,
   PayPalBrandResolvedOptions,
   PayPalPaymentMethodType,
   PayUponInvoiceResolvedOptions,
@@ -26,6 +27,7 @@ import {
   resolveApplePayOptions,
   resolveCardFieldsOptions,
   resolveCardFieldsStoredOptions,
+  resolveGooglePayOptions,
   resolvePayPalBrandOptions,
   resolvePayUponInvoiceOptions,
 } from "./resolveOptions";
@@ -46,6 +48,7 @@ export function resolvePayPalComponent(
     | CardFieldsResolvedOptions
     | CardFieldsStoredResolvedOptions
     | ApplePayResolvedOptions
+    | GooglePayResolvedOptions
     | PayUponInvoiceResolvedOptions;
 } {
   switch (paymentMethodType) {
@@ -93,8 +96,11 @@ export function resolvePayPalComponent(
         Component: PayUponInvoice,
         options: resolvePayUponInvoiceOptions(baseOptions),
       };
-    // case "GooglePay":
-    //   return { Component: GooglePay, options: ... };
+    case "GooglePay":
+      return {
+        Component: GooglePay,
+        options: resolveGooglePayOptions(baseOptions),
+      };
     // case "PaymentTokens":
     //   return { Component: PaymentTokens, options: ... };
     default:

@@ -34,6 +34,7 @@ const REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE: Partial<
 > = {
   CardFields: "card-fields",
   ApplePay: "applepay",
+  GooglePay: "googlepay",
 };
 
 // Form-like components that use onRegisterSubmit instead of an internal pay button — Checkout

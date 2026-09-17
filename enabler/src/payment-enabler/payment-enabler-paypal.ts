@@ -124,6 +124,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           standardScriptOptions: configJson.standardScriptOptions,
           paypalScriptOptions,
           clientId: configJson.clientId,
+          environment: configJson.environment,
           settings: configJson.settings,
           userIdToken: configJson.userIdToken,
           onError: options.onError,

@@ -29,7 +29,7 @@ const configuredStandardScriptOptions: {
   disableFunding?: string[];
   enableFunding?: string[];
 } & Record<string, unknown> = {
-  components: ["buttons", "card-fields", "applepay"],
+  components: ["buttons", "card-fields", "applepay", "googlepay"],
   ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
     ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
     : {}),

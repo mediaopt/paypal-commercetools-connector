@@ -19,6 +19,10 @@ export type BaseOptions = {
   expressSdkOptions?: ComponentSdkOptions;
   /** PayPal client id from `/operations/config`, used to load the PayPal JS SDK script. */
   clientId?: string;
+  /** The processor's own PAYPAL_ENVIRONMENT ("Sandbox"/"Live") from `/operations/config` — used by
+   * GooglePay to pick "TEST" vs "PRODUCTION" for google.payments.api.PaymentsClient; not
+   * merchant-configurable per component. */
+  environment?: string;
   /**
    * Merchant settings from the processor's `/operations/config` response — seeds
    * SettingsProvider's `settings` state.

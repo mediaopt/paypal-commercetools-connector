@@ -389,42 +389,35 @@ export const PaymentProvider: FC<
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
           ) {
-            return "";
-            /*
             //@ts-ignore
             paypal
               .Googlepay()
-              .initiatePayerAction({ orderId: orderData.id })
-              .then(async () => {
-                handleAuthenticateThreeDSOrder(orderData.id, true).then(
+              .initiatePayerAction({ orderId: newOrderData.id })
+              .then(() => {
+                handleAuthenticateThreeDSOrder(newOrderData.id, true).then(
                   (result) => {
-                    if (!result) {
-                      notify("Error", "Please select different payment method");
-                      isLoading(false);
-                      return "";
-                    }
                     switch (result.toString(10)) {
                       case "2":
-                        handleOnApprove({ orderID: orderData.id }).then(() =>
-                          onSuccess(orderData)
+                        handleOnApprove({ orderID: newOrderData.id }).then(
+                          () => onSuccess(newOrderData)
                         );
                         break;
                       case "1":
-                        notify("Warning", "Try again");
+                        notify("Warning", t("cardFields.tryAgain"));
                         isLoading(false);
                         break;
                       case "0":
                       default:
                         notify(
                           "Error",
-                          "Please select different payment method"
+                          t("cardFields.selectDifferentMethod")
                         );
                         isLoading(false);
                         break;
                     }
                   }
                 );
-              });*/
+              });
           } else {
             return "";
           }

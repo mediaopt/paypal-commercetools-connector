@@ -395,6 +395,9 @@ export type ApplePayProps = {
 
 export type ApplePayComponentsProps = ApplePayProps & SmartComponentsProps;
 
+export type GooglePayComponentsProps = GooglePayOptionsType &
+  SmartComponentsProps;
+
 export type CartInformation = {
   account: {
     email: string;
@@ -634,6 +637,29 @@ export type PayPalMethodConfig = {
   invoiceBenefitsMessage?: string; // merchant-facing invoice benefits message.
   minPayableAmount?: number; //payment amount constraints.
   maxPayableAmount?: number;
+  // GooglePay only — Google Pay API's own required/appearance fields, merchant-overridable the
+  // same way applePayDisplayName is (see resolveGooglePayOptions). Not merchant-configurable:
+  // verificationMethod (sourced from the shared threeDSOption setting) and environment (sourced
+  // from the processor's sandbox/live config).
+  allowedCardNetworks?: string[];
+  allowedCardAuthMethods?: string[];
+  callbackIntents?: string[];
+  buttonColor?: "default" | "white" | "black";
+  buttonType?:
+    | "book"
+    | "buy"
+    | "checkout"
+    | "donate"
+    | "order"
+    | "pay"
+    | "plain"
+    | "subscribe";
+  buttonRadius?: number;
+  buttonSizeMode?: "static" | "fill";
+  apiVersion?: number;
+  apiVersionMinor?: number;
+  totalPriceStatus?: "FINAL" | "ESTIMATED";
+  verificationMethod?: ThreeDSVerification;
 };
 
 /** Method-independent props every mounted component receives — assembled once by
@@ -698,6 +724,14 @@ export type PayUponInvoiceResolvedOptions = BaseResolvedMethodOptions & {
   minPayableAmount: number;
   maxPayableAmount: number;
 };
+
+/** Resolved options for <GooglePay/> — no style/fundingSource concept either; every field is
+ * Google Pay's own API config (allowedCardNetworks/allowedCardAuthMethods/callbackIntents/button
+ * appearance), plus verificationMethod (sourced from the shared threeDSOption setting, same as
+ * CardFields) and environment (sourced from the processor's sandbox/live config, not merchant
+ * overridable). */
+export type GooglePayResolvedOptions = BaseResolvedMethodOptions &
+  GooglePayOptionsType;
 
 /** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
 export type PayPalBrandButtonType = Extract<
@@ -859,7 +893,10 @@ export type GooglePayOptionsType = {
     | "subscribe";
   buttonRadius?: number;
   buttonSizeMode?: "static" | "fill";
-  verificationMethod: ThreeDSVerification;
+  // Sourced from the shared threeDSOption merchant setting (see resolveGooglePayOptions), the same
+  // as CardFieldsMask.tsx's own threeDSAuth — not every merchant configures 3DS, so this is
+  // optional here unlike the reference project's own fixed-test-value usage.
+  verificationMethod?: ThreeDSVerification;
 };
 
 export type ApplePaySession = any;

@@ -27,8 +27,7 @@ export const StandardPaymentMethodType = {
   BLIK: "Blik",
 
   APPLE_PAY: "ApplePay",
-  // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
-  // GOOGLE_PAY: "GooglePay",
+  GOOGLE_PAY: "GooglePay",
   PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
 export type StandardPaymentMethodType = ValuesOf<

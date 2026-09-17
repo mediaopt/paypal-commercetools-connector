@@ -4,6 +4,7 @@ import {
   GetSettingsResponse,
   PayPalMethodConfig,
   PayPalPaymentMethodType,
+  ThreeDSVerification,
 } from "../types";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 
@@ -152,7 +153,15 @@ export const ENABLER_DEFAULT_CONFIG: Record<
   Blik: {
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
   },
-  GooglePay: {},
+  // No style/fundingSource. allowedCardNetworks/allowedCardAuthMethods/callbackIntents are Google
+  // Pay API constraints (not arbitrary merchant preferences), but stay overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.GooglePay the same way applePayDisplayName is.
+  GooglePay: {
+    allowedCardNetworks: ["VISA", "MASTERCARD"],
+    allowedCardAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+    callbackIntents: ["PAYMENT_AUTHORIZATION"],
+    verificationMethod: "SCA_ALWAYS" as ThreeDSVerification,
+  },
   // No style/fundingSource. invoiceBenefitsMessage overridable per merchant via
   // PAYPAL_BUTTON_CONFIG.PayUponInvoice.invoiceBenefitsMessage — pageId/min/maxPayableAmount are
   // NOT merchant-configurable, see PAY_UPON_INVOICE_FRAUDNET_PAGE_ID/_MIN/_MAX_PAYABLE_AMOUNT above.

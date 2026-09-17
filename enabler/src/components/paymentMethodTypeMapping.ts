@@ -4,6 +4,7 @@ const CT_ICON_KEY_TO_PAYMENT_METHOD_TYPE: Record<string, PayPalPaymentMethodType
   card: "CardFields",
   paypal: "PayPal",
   applepay: "ApplePay",
+  googlepay: "GooglePay",
   ideal: "Ideal",
   bancontact: "Bancontact",
   eps: "Eps",

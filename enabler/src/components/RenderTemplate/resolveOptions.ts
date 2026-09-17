@@ -4,6 +4,7 @@ import {
   BuilderType,
   CardFieldsResolvedOptions,
   CardFieldsStoredResolvedOptions,
+  GooglePayResolvedOptions,
   PayPalBrandButtonType,
   PayPalBrandResolvedOptions,
   PayUponInvoiceResolvedOptions,
@@ -160,6 +161,48 @@ export function resolveApplePayOptions(
     initialSettings: baseOptions.settings,
     enableVaulting: false,
     applePayDisplayName,
+  };
+}
+
+export function resolveGooglePayOptions(
+  baseOptions: BaseOptions
+): GooglePayResolvedOptions {
+  // GooglePay has no button style/fundingSource concept either. Its own API config
+  // (allowedCardNetworks/allowedCardAuthMethods/callbackIntents/button appearance) follows the
+  // same merchant-override chain as applePayDisplayName above.
+  const override = baseOptions.settings.GooglePay;
+  const defaults = ENABLER_DEFAULT_CONFIG.GooglePay;
+
+  // verificationMethod is the shared threeDSOption merchant setting — same source
+  // CardFieldsMask.tsx already reads directly, not a GooglePay-only override.
+  const verificationMethod = baseOptions.settings.threeDSOption || undefined;
+
+  // environment is derived from the processor's own sandbox/live config — not merchant
+  // configurable per component, unlike everything else resolved here.
+  const environment: "TEST" | "PRODUCTION" =
+    baseOptions.environment?.toLowerCase() === "sandbox" ? "TEST" : "PRODUCTION";
+
+  return {
+    options: baseOptions.paypalScriptOptions,
+    initialSettings: baseOptions.settings,
+    enableVaulting: false,
+    environment,
+    verificationMethod,
+    allowedCardNetworks:
+      override?.allowedCardNetworks ?? defaults?.allowedCardNetworks ?? [],
+    allowedCardAuthMethods:
+      override?.allowedCardAuthMethods ??
+      defaults?.allowedCardAuthMethods ??
+      [],
+    callbackIntents:
+      override?.callbackIntents ?? defaults?.callbackIntents ?? [],
+    buttonColor: override?.buttonColor ?? defaults?.buttonColor,
+    buttonType: override?.buttonType ?? defaults?.buttonType,
+    buttonRadius: override?.buttonRadius ?? defaults?.buttonRadius,
+    buttonSizeMode: override?.buttonSizeMode ?? defaults?.buttonSizeMode,
+    apiVersion: override?.apiVersion ?? defaults?.apiVersion,
+    apiVersionMinor: override?.apiVersionMinor ?? defaults?.apiVersionMinor,
+    totalPriceStatus: override?.totalPriceStatus ?? defaults?.totalPriceStatus,
   };
 }
 
