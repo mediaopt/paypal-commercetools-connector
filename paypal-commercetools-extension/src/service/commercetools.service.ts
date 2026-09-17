@@ -25,15 +25,14 @@ import {
   Capture2,
   Authorization2,
   isPaymentUpToDate,
+  TIMEOUT_PAYMENT,
+  RETRY_DELAY,
 } from 'common-connect/dist';
 
 import { getSettings } from './config.service';
 import { sendEmail } from './mail.service';
 import { updatePaymentFields } from './payments.service';
 import { sleep } from '../utils/response.utils';
-
-const TIMEOUT_PAYMENT = 9500;
-const RETRY_DELAY = 2000;
 
 const getPaymentByPayPalOrderId = async (
   orderId: string,

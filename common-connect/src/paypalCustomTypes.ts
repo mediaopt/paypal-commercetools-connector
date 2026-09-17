@@ -32,6 +32,8 @@ export const PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES = [
   "capturePayPalAuthorization",
   "getPayPalOrder",
   "updatePayPalOrder",
+  "refundPayPalOrder",
+  "voidPayPalAuthorization",
 ] as const;
 
 export const PAYPAL_PROCESSOR_CUSTOMER_API_CALL_NAMES = [
