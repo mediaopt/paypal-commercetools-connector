@@ -1368,9 +1368,7 @@ describe("paypal-payment.service", () => {
           amount: mockAmount,
           transactionId: "charge-transaction-id",
         })
-      ).rejects.toThrow(
-        `refundPayment failed for payment ${mockPayment.id} with error PayPal is down`
-      );
+      ).rejects.toThrow(`Failed to refund PayPal transaction capture-id`);
     });
   });
 
@@ -1495,9 +1493,7 @@ describe("paypal-payment.service", () => {
             transactions: [authorizationTransaction],
           } as unknown as Payment,
         })
-      ).rejects.toThrow(
-        `void failed for payment ${mockPayment.id} with error PayPal is down`
-      );
+      ).rejects.toThrow(`Failed to void PayPal authorization auth-id`);
     });
   });
 

@@ -81,6 +81,8 @@ import {
   voidPayPalAuthorization,
   mapPayPalVoidStatusToCommercetoolsTransactionState,
   RefundRequest,
+  Refund,
+  Authorization2,
 } from "common-connect";
 
 import { log } from "../libs/logger";
@@ -1872,25 +1874,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  // Shared by refundPayment()/void(): PayPal call failures are always reported the same way —
-  // logged, then surfaced to the caller as ErrorInvalidOperation.
-  private async callPayPalOrThrow<T>(
-    operation: string,
-    paymentId: string,
-    callPayPal: () => Promise<T>,
-  ): Promise<T> {
-    try {
-      return await callPayPal();
-    } catch (err) {
-      log.error(
-        `${operation}: PayPal call failed, paymentId: ${paymentId} — ${errorMessage(err)}`,
-      );
-      throw new ErrorInvalidOperation(
-        `${operation} failed for payment ${paymentId} with error ${errorMessage(err)}`,
-      );
-    }
-  }
-
   async refundPayment(
     request: ModifyPaymentWithTransactionRequest,
   ): Promise<PaymentUpdateResponseSchemaDTO> {
@@ -1902,11 +1885,23 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctPayment.amountPlanned.fractionDigits,
     );
     const refundRequest: RefundRequest = { amount: paypalAmount };
-    const response = await this.callPayPalOrThrow(
-      "refundPayment",
-      ctPayment.id,
-      () => refundPayPalOrder(paypalTransactionId, refundRequest),
-    );
+
+    let response: Refund;
+    try {
+      response = await refundPayPalOrder(paypalTransactionId, refundRequest);
+    } catch (e) {
+      void this.logProcessorInteraction(
+        ctPayment.id,
+        "refundPayPalOrder",
+        refundRequest,
+        undefined,
+        e,
+        ctPayment.interfaceId
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to refund PayPal transaction ${paypalTransactionId}`
+      );
+    }
 
     await this.ctPaymentService.updatePayment({
       id: ctPayment.id,
@@ -1919,6 +1914,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
         ),
       },
     });
+    void this.logProcessorInteraction(
+      ctPayment.id,
+      "refundPayPalOrder",
+      refundRequest,
+      response,
+      undefined,
+      ctPayment.interfaceId
+    );
 
     return {
       success: true,
@@ -1933,12 +1936,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const { payment: ctPayment } = request;
 
     const transaction = findVoidableTransaction(ctPayment);
+    const voidRequest = { authorizationId: transaction.interactionId };
 
-    const response = await this.callPayPalOrThrow(
-      "void",
-      ctPayment.id,
-      () => voidPayPalAuthorization(transaction.interactionId),
-    );
+    let response: Authorization2;
+    try {
+      response = await voidPayPalAuthorization(transaction.interactionId);
+    } catch (e) {
+      void this.logProcessorInteraction(
+        ctPayment.id,
+        "voidPayPalAuthorization",
+        voidRequest,
+        undefined,
+        e,
+        ctPayment.interfaceId
+      );
+      throw new ErrorInvalidOperation(
+        `Failed to void PayPal authorization ${transaction.interactionId}`
+      );
+    }
 
     await this.ctPaymentService.updatePayment({
       id: ctPayment.id,
@@ -1951,6 +1966,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
         ),
       },
     });
+    void this.logProcessorInteraction(
+      ctPayment.id,
+      "voidPayPalAuthorization",
+      voidRequest,
+      response,
+      undefined,
+      ctPayment.interfaceId
+    );
 
     return {
       success: true,
