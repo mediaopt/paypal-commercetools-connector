@@ -57,6 +57,8 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
           return;
         }
         try {
+          //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+          console.log("[paypal-enabler][ApplePay] calling Applepay().config()");
           const applepay: Applepay = await paypal.Applepay();
           const applepayConfig: ApplepayConfig = await applepay.config();
           if (applepayConfig.isEligible) {
@@ -68,6 +70,12 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
           }
         } catch (error) {
           console.warn("ApplePay: failed to fetch configuration", error);
+          //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+          console.warn("[paypal-enabler][ApplePay] structured error:", {
+            name: error instanceof Error ? error.name : undefined,
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
           setError("Error while fetching Apple Pay configuration.");
           return;
         }

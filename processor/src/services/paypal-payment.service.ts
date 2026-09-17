@@ -160,6 +160,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const rawSettings = await getSettings();
     if (!rawSettings)
       log.warn(`No settings configured in merchant center application.`);
+    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+    log.info(
+      `resolveSettings: hasRawSettings=${!!rawSettings} rawMerchantId=${JSON.stringify(
+        rawSettings?.merchantId
+      )} fallbackMerchantId=${JSON.stringify(
+        getConfig().settingsFallback.merchantId
+      )}`
+    );
     return rawSettings
       ? { ...getConfig().settingsFallback, ...rawSettings }
       : getConfig().settingsFallback;
@@ -202,8 +210,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     // Shared script options for every *standard* and stored component (PayPal Express is configured independently).
     // `components` is narrowed here by settings.acceptCredit — the only accept* flag with a real
-    // components-level effect (card-fields); acceptPayPal/acceptPayLater/acceptVenmo/acceptLocal
-    // are funding-source/method-availability concerns handled elsewhere (Checkout's own predicate,
+    // components-level effect (card-fields); acceptPayPal/acceptPayLater/acceptLocal are
+    // funding-source/method-availability concerns handled elsewhere (Checkout's own predicate,
     // getSupportedPaymentComponents()), not reasons to drop a script component every button-based
     // method still needs. No settings flag exists for "applepay", so its inclusion is controlled by
     // this env var alone.
@@ -258,6 +266,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
         'ApplePay is using the default applePayDisplayName ("My Store") — set PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName to your store\'s real name.'
       );
     }
+
+    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+    log.info(
+      `config: merchantId=${JSON.stringify(
+        mergedSettings.merchantId
+      )} components=${JSON.stringify(
+        standardScriptOptions.components
+      )} disableFunding=${JSON.stringify(
+        standardScriptOptions.disableFunding
+      )} currency=${cartSummary?.currency}`
+    );
 
     return {
       clientId: getConfig().paypalClientId ?? "",
@@ -1884,14 +1903,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   async refundPayment(
-    request: ModifyPaymentWithTransactionRequest,
+    request: ModifyPaymentWithTransactionRequest
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment, amount, transactionId } = request;
-    const paypalTransactionId = findRefundableTransactionId(ctPayment, transactionId);
+    const paypalTransactionId = findRefundableTransactionId(
+      ctPayment,
+      transactionId
+    );
 
     const paypalAmount = buildPayPalAmount(
       amount,
-      ctPayment.amountPlanned.fractionDigits,
+      ctPayment.amountPlanned.fractionDigits
     );
     const refundRequest: RefundRequest = { amount: paypalAmount };
 
@@ -1919,7 +1941,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         amount,
         interactionId: response.id,
         state: mapPayPalRefundStatusToCommercetoolsTransactionState(
-          response.status,
+          response.status
         ),
       },
     });
@@ -1940,7 +1962,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   async void(
-    request: CancelPaymentRequest,
+    request: CancelPaymentRequest
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment } = request;
 

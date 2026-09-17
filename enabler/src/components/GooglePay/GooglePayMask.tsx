@@ -3,7 +3,10 @@ import { useEffect, useRef, useState, FC } from "react";
 import { usePayment } from "../../app/usePayment";
 import loadScript from "../../app/loadScript";
 import { ERROR_TEXT_STYLE } from "../../styles";
-import { CustomPayPalButtonsComponentProps, GooglePayOptionsType } from "../../types";
+import {
+  CustomPayPalButtonsComponentProps,
+  GooglePayOptionsType,
+} from "../../types";
 
 declare const google: any;
 declare const paypal: any;
@@ -57,6 +60,7 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
   };
 
   const processPayment = async (paymentData: any) => {
+    console.log("processPayment");
     try {
       const { currencyCode, totalPrice } = getGoogleTransactionInfo();
       await handleCreateOrder({
@@ -92,10 +96,20 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
   const getGooglePaymentDataRequest = async () => {
     // Server-driven Google Pay config from PayPal — allowedPaymentMethods/merchantInfo, same bridge
     // usePayment.tsx's handleCreateOrder already calls Googlepay() on for confirmOrder.
+    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+    console.log("[paypal-enabler][GooglePay] calling Googlepay().config()");
     // @ts-ignore
     const { allowedPaymentMethods, merchantInfo } = await paypal
       .Googlepay()
       .config();
+
+    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+    console.log(
+      "[paypal-enabler][GooglePay] Googlepay().config() resolved — merchantInfo:",
+      merchantInfo,
+      "| allowedPaymentMethods:",
+      allowedPaymentMethods
+    );
 
     return {
       ...baseRequest,
@@ -107,8 +121,10 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
   };
 
   const onGooglePayButtonClicked = async () => {
+    console.log("onButtonClick");
     try {
       const paymentDataRequest = await getGooglePaymentDataRequest();
+      console.log("paymentDataRequest", paymentDataRequest);
       if (isProduction) {
         // Production requires the paymentDataCallbacks.onPaymentAuthorized callback registered on
         // the client at construction time — Google resolves the payment sheet through that
@@ -122,6 +138,11 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
       }
     } catch (err) {
       console.error("GooglePay: button click failed", err);
+      //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+      console.error("[paypal-enabler][GooglePay] structured error:", {
+        name: err instanceof Error ? err.name : undefined,
+        message: err instanceof Error ? err.message : String(err),
+      });
       setError("Error in payment authorization");
     }
   };

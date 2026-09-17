@@ -92,6 +92,14 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           : undefined,
       };
 
+      //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+      console.log(
+        `[paypal-enabler][setup:${setupCallId}] paypalScriptOptions:`,
+        paypalScriptOptions,
+        "| merchantId:",
+        paypalScriptOptions.merchantId || "(empty)"
+      );
+
       // One shared commercetools Payment per checkout page load, shared by every standard/stored/
       // express builder resolving this same setupData; and the one PayPal JS SDK script load
       // above — independent of each other, so run together instead of sequentially. Both fatal on failure.
