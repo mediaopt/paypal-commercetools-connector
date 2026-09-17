@@ -34,6 +34,7 @@ import { PayPalCustomerService } from "../../src/services/paypal-customer.servic
 import { PayPalPaymentServiceOptions } from "../../src/services/types/paypal-payment.type";
 import * as FastifyContext from "../../src/libs/fastify/context/context";
 import * as ConfigModule from "../../src/config/config";
+import { log } from "../../src/libs/logger";
 
 describe("paypal-payment.service", () => {
   const opts: PayPalPaymentServiceOptions = {
@@ -102,6 +103,8 @@ describe("paypal-payment.service", () => {
   const mockClientPost = jest.fn();
   const mockClientExecute = jest.fn();
   const mockCustomerGetExecute = jest.fn();
+  const mockCustomerPost = jest.fn();
+  const mockCustomerPostExecute = jest.fn();
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -118,21 +121,25 @@ describe("paypal-payment.service", () => {
     (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue(
       mockPayPalOrder as never
     );
+    (CommonConnect.getSettings as jest.Mock).mockResolvedValue(
+      undefined as never
+    );
 
     savedClient = paymentSDK.ctAPI.client;
     mockClientExecute.mockResolvedValue({ body: mockPayment } as never);
     mockClientPost.mockReturnValue({ execute: mockClientExecute });
     mockCustomerGetExecute.mockResolvedValue({ body: mockCtCustomer } as never);
+    mockCustomerPostExecute.mockResolvedValue({ body: mockCtCustomer } as never);
+    mockCustomerPost.mockReturnValue({ execute: mockCustomerPostExecute });
     (paymentSDK.ctAPI as any).client = {
       payments: jest.fn().mockReturnValue({
         withId: jest.fn().mockReturnValue({ post: mockClientPost }),
       }),
       customers: jest.fn().mockReturnValue({
-        withId: jest
-          .fn()
-          .mockReturnValue({
-            get: jest.fn().mockReturnValue({ execute: mockCustomerGetExecute }),
-          }),
+        withId: jest.fn().mockReturnValue({
+          get: jest.fn().mockReturnValue({ execute: mockCustomerGetExecute }),
+          post: mockCustomerPost,
+        }),
       }),
     };
   });
@@ -142,7 +149,7 @@ describe("paypal-payment.service", () => {
     jest.restoreAllMocks();
   });
 
-  test("creates a PayPal order and syncs interfaceId/status onto the CT payment", async () => {
+  test("creates a PayPal order and syncs PayPalOrderId/status onto the CT payment, without touching interfaceId", async () => {
     const result = await paypalPaymentService.createOrder({
       paymentId: mockPayment.id,
       orderData: { paymentSource: "paypal" },
@@ -162,7 +169,11 @@ describe("paypal-payment.service", () => {
       body: {
         version: mockPayment.version,
         actions: expect.arrayContaining([
-          { action: "setInterfaceId", interfaceId: mockPayPalOrder.id },
+          {
+            action: "setCustomField",
+            name: "PayPalOrderId",
+            value: mockPayPalOrder.id,
+          },
           {
             action: "setStatusInterfaceCode",
             interfaceCode: mockPayPalOrder.status,
@@ -174,6 +185,12 @@ describe("paypal-payment.service", () => {
         ]),
       },
     });
+    const [{ body }] = mockClientPost.mock.calls[0] as [
+      { body: { actions: { action: string }[] } }
+    ];
+    expect(
+      body.actions.some((action) => action.action === "setInterfaceId")
+    ).toBe(false);
 
     expect(result).toEqual({
       orderData: {
@@ -381,43 +398,23 @@ describe("paypal-payment.service", () => {
     expect(mockClientPost).not.toHaveBeenCalled();
   });
 
-  test("updates interfaceId to a newly created order that differs from what was already set — e.g. the buyer reopened the popup and a fresh PayPal order was created for the same payment", async () => {
+  test("throws immediately, before ever calling PayPal, when the payment already has an interfaceId — an earlier order already completed a real authorize/capture, so a new one could never be finalized against this payment either", async () => {
     jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
       ...mockPayment,
       interfaceId: "stale-earlier-order-id",
     } as Payment);
 
-    await paypalPaymentService.createOrder({
-      paymentId: mockPayment.id,
-      orderData: { paymentSource: "paypal" },
-    });
+    await expect(
+      paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "paypal" },
+      })
+    ).rejects.toThrow(
+      `Payment ${mockPayment.id} is already linked to PayPal order stale-earlier-order-id — refusing to create a new order for it`
+    );
 
-    const [{ body }] = mockClientPost.mock.calls[0] as [
-      { body: { actions: { action: string; interfaceId?: string }[] } }
-    ];
-    expect(body.actions).toContainEqual({
-      action: "setInterfaceId",
-      interfaceId: mockPayPalOrder.id,
-    });
-  });
-
-  test("does not re-set interfaceId when it already matches the created order", async () => {
-    jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
-      ...mockPayment,
-      interfaceId: mockPayPalOrder.id,
-    } as Payment);
-
-    await paypalPaymentService.createOrder({
-      paymentId: mockPayment.id,
-      orderData: { paymentSource: "paypal" },
-    });
-
-    const [{ body }] = mockClientPost.mock.calls[0] as [
-      { body: { actions: { action: string }[] } }
-    ];
-    expect(
-      body.actions.some((action) => action.action === "setInterfaceId")
-    ).toBe(false);
+    expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    expect(mockClientPost).not.toHaveBeenCalled();
   });
 
   describe("authorizeOrder", () => {
@@ -554,20 +551,84 @@ describe("paypal-payment.service", () => {
     });
 
     test("throws without ever calling PayPal when the order has not finished being marked APPROVED yet", async () => {
+      jest.useFakeTimers();
       (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
         ...mockPayPalOrder,
         status: "CREATED",
       } as never);
+
+      const resultPromise = paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+      const assertion = expect(resultPromise).rejects.toThrow();
+      // ensureOrderApproved polls getPayPalOrder every RETRY_DELAY until TIMEOUT_PAYMENT is
+      // exhausted, since the mock above never reports an approved status — fast-forward past
+      // that whole budget instead of actually waiting on it.
+      await jest.advanceTimersByTimeAsync(
+        CommonConnect.TIMEOUT_PAYMENT + CommonConnect.RETRY_DELAY * 2
+      );
+      await assertion;
+
+      expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    test("links interfaceId to the authorized order when it was previously unset", async () => {
+      await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+
+      expect(mockClientPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            actions: expect.arrayContaining([
+              { action: "setInterfaceId", interfaceId: mockAuthorizedOrder.id },
+            ]),
+          }),
+        })
+      );
+    });
+
+    test("regression: authorizes successfully against the second, actually-approved order after an earlier popup was closed without approving — no interfaceId was ever set for the first (abandoned) order, so there's nothing stale to reject", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        // interfaceId stays unset — the first, closed-without-approving order never reached
+        // authorize/capture, so (per this fix) it never got linked at all.
+        custom: { fields: { PayPalOrderId: mockAuthorizedOrder.id } },
+      } as unknown as Payment);
 
       await expect(
         paypalPaymentService.authorizeOrder({
           paymentId: mockPayment.id,
           orderID: mockAuthorizedOrder.id,
         })
-      ).rejects.toThrow();
+      ).resolves.toBeDefined();
 
+      expect(CommonConnect.authorizePayPalOrder).toHaveBeenCalledWith(
+        mockAuthorizedOrder.id,
+        {}
+      );
+    });
+
+    test("throws (double-link guard) when interfaceId is already set to a different order than the one being authorized — a prior order already completed a real authorize/capture for this payment, even when PayPalOrderId matches the new one", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        interfaceId: "already-linked-order-id",
+        custom: { fields: { PayPalOrderId: mockAuthorizedOrder.id } },
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.authorizeOrder({
+          paymentId: mockPayment.id,
+          orderID: mockAuthorizedOrder.id,
+        })
+      ).rejects.toThrow(
+        `Payment ${mockPayment.id} is already linked to a different PayPal order (already-linked-order-id)`
+      );
       expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
-    }, 10000);
+    });
   });
 
   describe("captureOrder", () => {
@@ -687,7 +748,7 @@ describe("paypal-payment.service", () => {
   });
 
   describe("expressApprove", () => {
-    test("adds an Initial Authorization placeholder transaction (no interactionId) via a raw CT call, for Authorize intent", async () => {
+    test("adds an Initial Authorization placeholder transaction (no interactionId) and links interfaceId (unset), via one raw CT call, for Authorize intent", async () => {
       await paypalPaymentService.expressApprove({
         paymentId: mockPayment.id,
         orderID: mockPayPalOrder.id,
@@ -709,6 +770,10 @@ describe("paypal-payment.service", () => {
                 },
               },
             },
+            {
+              action: "setInterfaceId",
+              interfaceId: mockPayPalOrder.id,
+            },
           ],
         },
       });
@@ -724,17 +789,17 @@ describe("paypal-payment.service", () => {
       expect(mockClientPost).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.objectContaining({
-            actions: [
+            actions: expect.arrayContaining([
               expect.objectContaining({
                 transaction: expect.objectContaining({ type: "Charge" }),
               }),
-            ],
+            ]),
           }),
         })
       );
     });
 
-    test("does not add a second placeholder when a matching Initial/no-interactionId transaction already exists", async () => {
+    test("does not add a second placeholder when a matching Initial/no-interactionId transaction already exists, but still links interfaceId if unset", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
         transactions: [
@@ -748,13 +813,57 @@ describe("paypal-payment.service", () => {
         payPalIntent: "Capture",
       });
 
+      expect(mockClientPost).toHaveBeenCalledWith({
+        body: {
+          version: mockPayment.version,
+          actions: [{ action: "setInterfaceId", interfaceId: mockPayPalOrder.id }],
+        },
+      });
+    });
+
+    test("does not attempt to set interfaceId when it's already set", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        interfaceId: mockPayPalOrder.id,
+        transactions: [
+          {
+            type: "Charge",
+            state: "Initial",
+            amount: mockPayment.amountPlanned,
+          },
+        ],
+      } as unknown as Payment);
+
+      await paypalPaymentService.expressApprove({
+        paymentId: mockPayment.id,
+        orderID: mockPayPalOrder.id,
+        payPalIntent: "Capture",
+      });
+
       expect(mockClientPost).not.toHaveBeenCalled();
     });
 
-    test("throws when the caller-supplied orderID does not belong to the payment", async () => {
+    test("throws when the caller-supplied orderID does not match the payment's PayPalOrderId", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        custom: { fields: { PayPalOrderId: "some-other-order-id" } },
+      } as unknown as Payment);
+
+      await expect(
+        paypalPaymentService.expressApprove({
+          paymentId: mockPayment.id,
+          orderID: mockPayPalOrder.id,
+          payPalIntent: "Capture",
+        })
+      ).rejects.toThrow();
+      expect(mockClientPost).not.toHaveBeenCalled();
+    });
+
+    test("throws when interfaceId is already set to a different order, even though PayPalOrderId matches (double-link guard)", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
         interfaceId: "some-other-order-id",
+        custom: { fields: { PayPalOrderId: mockPayPalOrder.id } },
       } as unknown as Payment);
 
       await expect(
@@ -850,6 +959,10 @@ describe("paypal-payment.service", () => {
       (CommonConnect.getSettings as jest.Mock).mockResolvedValue({
         payPalIntent: "Authorize",
       } as never);
+      (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockPayPalOrder,
+        status: "APPROVED",
+      } as never);
       (CommonConnect.capturePayPalAuthorization as jest.Mock).mockResolvedValue(
         {
           id: "capture-id",
@@ -863,6 +976,7 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.settlement({
         payment: {
           ...mockPayment,
+          interfaceId: "paypal-order-id",
           transactions: [
             {
               type: "Authorization",
@@ -1132,9 +1246,7 @@ describe("paypal-payment.service", () => {
           amount: mockAmount,
           transactionId: "charge-transaction-id",
         })
-      ).rejects.toThrow(
-        `refundPayment failed for payment ${mockPayment.id} with error PayPal is down`
-      );
+      ).rejects.toThrow(`Failed to refund PayPal transaction capture-id`);
     });
   });
 
@@ -1259,9 +1371,7 @@ describe("paypal-payment.service", () => {
             transactions: [authorizationTransaction],
           } as unknown as Payment,
         })
-      ).rejects.toThrow(
-        `void failed for payment ${mockPayment.id} with error PayPal is down`
-      );
+      ).rejects.toThrow(`Failed to void PayPal authorization auth-id`);
     });
   });
 
@@ -1478,11 +1588,11 @@ describe("paypal-payment.service", () => {
       expect(mockClientPost).not.toHaveBeenCalled();
     });
 
-    test("throws when orderID does not match the payment's interfaceId", async () => {
+    test("throws when orderID does not match the payment's PayPalOrderId", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
-        interfaceId: "some-other-order-id",
-      } as Payment);
+        custom: { fields: { PayPalOrderId: "some-other-order-id" } },
+      } as unknown as Payment);
 
       await expect(
         paypalPaymentService.authenticateThreeDSOrder({
@@ -1490,13 +1600,13 @@ describe("paypal-payment.service", () => {
           orderID: mockPayPalOrder.id,
         })
       ).rejects.toThrow(
-        `Order ${mockPayPalOrder.id} does not belong to payment ${mockPayment.id}`
+        `Order ${mockPayPalOrder.id} is stale for payment ${mockPayment.id} — a newer PayPal order (some-other-order-id) has since been created for it`
       );
 
       expect(CommonConnect.getPayPalOrder).not.toHaveBeenCalled();
     });
 
-    test("does not throw when interfaceId is not set yet", async () => {
+    test("does not throw when PayPalOrderId is not set yet", async () => {
       await expect(
         paypalPaymentService.authenticateThreeDSOrder({
           paymentId: mockPayment.id,
@@ -1650,7 +1760,77 @@ describe("paypal-payment.service", () => {
       expect(result.userIdToken).toBeUndefined();
     });
 
-    test("falls back to configured sdkOptions when the cart has no currency or country", async () => {
+    test("logs the getUserIDToken request/response onto the CT customer on success", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        enableVaulting: true,
+      });
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      mockCustomerGetExecute.mockResolvedValue({
+        body: mockCtCustomer,
+      } as never);
+      (CommonConnect.generateUserIdToken as jest.Mock).mockResolvedValue(
+        "id-token" as never
+      );
+
+      await paypalPaymentService.config();
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "getUserIDTokenProcessorRequest",
+              value: JSON.stringify({ customerId: "paypal-customer-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "getUserIDTokenResponse",
+              value: JSON.stringify("id-token"),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the getUserIDToken failure onto the CT customer", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        enableVaulting: true,
+      });
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      mockCustomerGetExecute.mockResolvedValue({
+        body: mockCtCustomer,
+      } as never);
+      (CommonConnect.generateUserIdToken as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await paypalPaymentService.config();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getUserIDTokenResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
+    });
+
+    test("falls back to configured standardScriptOptions/expressSdkOptions when the cart has no currency or country", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         totalPrice: undefined,
@@ -1658,13 +1838,13 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      // No processor-side enableFunding defaulting anymore — that default now lives enabler-only
-      // (PayPalBuilder.ts) — and PAYPAL_SDK_OPTIONS is unset in this test env, so sdkOptions passes
-      // through empty.
-      expect(result.sdkOptions).toEqual({});
+      // PAYPAL_STANDARD_SCRIPT_OPTIONS/PAYPAL_EXPRESS_SDK_OPTIONS are unset in this test env, so
+      // both pass through empty.
+      expect(result.standardScriptOptions).toEqual({});
+      expect(result.expressSdkOptions).toEqual({});
     });
 
-    test("overlays the cart's currency and country onto every sdkOptions component slice", async () => {
+    test("overlays the cart's currency and country onto standardScriptOptions (sandbox), and currency onto expressSdkOptions", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         country: "US",
@@ -1672,51 +1852,44 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      // Flat per-componentType overlay (StandardPaymentMethodType's members) plus the dedicated
-      // PayPalExpress slot — see config.utils.ts's buildSdkOptions().
-      expect(result.sdkOptions).toEqual({
-        PayPal: { currency: "USD", buyerCountry: "US" },
-        CardFields: { currency: "USD", buyerCountry: "US" },
-        PayPalExpress: { currency: "USD", buyerCountry: "US" },
+      // buyerCountry is sandbox-only (see buildStandardScriptCartOverlay) and expressSdkOptions
+      // never takes a buyerCountry at all (see buildExpressSdkOptions) — config.utils.ts.
+      expect(result.standardScriptOptions).toEqual({
+        currency: "USD",
+        buyerCountry: "US",
       });
+      expect(result.expressSdkOptions).toEqual({ currency: "USD" });
     });
 
-    test("cart-derived currency/country override processor-configured sdkOptions per component", async () => {
+    test("cart-derived currency/country override processor-configured standardScriptOptions/expressSdkOptions", async () => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
         ...mockCart,
         country: "US",
       } as unknown as Cart);
       jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
         ...ConfigModule.getConfig(),
-        sdkOptions: {
-          PayPal: {
-            enableFunding: "paylater",
-            currency: "EUR",
-            buyerCountry: "DE",
-          },
-          PayPalExpress: { enableFunding: "venmo", currency: "EUR" },
-          CardFields: { currency: "EUR" },
+        standardScriptOptions: {
+          enableFunding: "paylater",
+          currency: "EUR",
+          buyerCountry: "DE",
         },
+        expressSdkOptions: { enableFunding: "venmo", currency: "EUR" },
       });
 
       const result = await paypalPaymentService.config();
 
-      expect(result.sdkOptions).toEqual({
-        PayPal: {
-          enableFunding: "paylater",
-          currency: "USD",
-          buyerCountry: "US",
-        },
-        CardFields: { currency: "USD", buyerCountry: "US" },
-        PayPalExpress: {
-          enableFunding: "venmo",
-          currency: "USD",
-          buyerCountry: "US",
-        },
+      expect(result.standardScriptOptions).toEqual({
+        enableFunding: "paylater",
+        currency: "USD",
+        buyerCountry: "US",
+      });
+      expect(result.expressSdkOptions).toEqual({
+        enableFunding: "venmo",
+        currency: "USD",
       });
     });
 
-    test("resolves with stored payment methods disabled and unmodified sdkOptions when the cart fetch fails", async () => {
+    test("resolves with stored payment methods disabled and unmodified standardScriptOptions/expressSdkOptions when the cart fetch fails", async () => {
       jest
         .spyOn(paymentSDK.ctCartService, "getCart")
         .mockRejectedValue(new Error("cart is gone") as never);
@@ -1724,7 +1897,8 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       expect(result.storedPaymentMethodsConfig).toEqual({ isEnabled: false });
-      expect(result.sdkOptions).toEqual({});
+      expect(result.standardScriptOptions).toEqual({});
+      expect(result.expressSdkOptions).toEqual({});
     });
   });
 
@@ -1859,6 +2033,90 @@ describe("paypal-payment.service", () => {
 
       expect(result).toEqual({ storedPaymentMethods: [] });
     });
+
+    test("logs the getPaymentTokens request/response onto the CT customer on success", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      const response = { payment_tokens: [mockPaymentToken] };
+      (CommonConnect.getPaymentTokens as jest.Mock).mockResolvedValue(
+        response as never
+      );
+      jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "find")
+        .mockResolvedValue({ results: [] } as never);
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "getPaymentTokensProcessorRequest",
+              value: JSON.stringify({ customerId: "paypal-customer-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "getPaymentTokensResponse",
+              value: JSON.stringify(response),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the getPaymentTokens failure onto the CT customer", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getPaymentTokensResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
+    });
+
+    test("includes PayPal's debug id in the logged failure message when present, for asking PayPal to look up their own logs", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      const paypalError = Object.assign(
+        new Error("Request failed with status code 403"),
+        { response: { headers: { "paypal-debug-id": "abc123" } } }
+      );
+      (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+        paypalError as never
+      );
+
+      await paypalPaymentService.getStoredPaymentMethods();
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "getPaymentTokensResponse"
+      );
+      expect(JSON.parse(responseAction!.value).message).toBe(
+        "Request failed with status code 403 (paypalDebugId: abc123)"
+      );
+    });
   });
 
   describe("deleteStoredPaymentMethod", () => {
@@ -1930,6 +2188,67 @@ describe("paypal-payment.service", () => {
       ).rejects.toThrow("PayPal is down");
 
       expect(getByTokenValueSpy).not.toHaveBeenCalled();
+    });
+
+    test("logs the deletePaymentToken request/response onto the CT customer on success", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
+        status: "success",
+      } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
+        .mockRejectedValue(new Error("not found") as never);
+
+      await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
+      await new Promise(process.nextTick);
+
+      expect(mockCustomerPost).toHaveBeenCalledWith({
+        body: {
+          version: mockCtCustomer.version,
+          actions: [
+            {
+              action: "setCustomField",
+              name: "deletePaymentTokenProcessorRequest",
+              value: JSON.stringify({ paymentToken: "paypal-token-id" }),
+            },
+            {
+              action: "setCustomField",
+              name: "deletePaymentTokenResponse",
+              value: JSON.stringify({ status: "success" }),
+            },
+          ],
+        },
+      });
+    });
+
+    test("logs the deletePaymentToken failure onto the CT customer, using the cart still fetched in parallel", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      (CommonConnect.deletePaymentToken as jest.Mock).mockRejectedValue(
+        new Error("PayPal is down") as never
+      );
+
+      await expect(
+        paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+      ).rejects.toThrow("PayPal is down");
+      await new Promise(process.nextTick);
+
+      const [{ body }] = mockCustomerPost.mock.calls[0] as [
+        { body: { actions: { name: string; value: string }[] } }
+      ];
+      const responseAction = body.actions.find(
+        (action) => action.name === "deletePaymentTokenResponse"
+      );
+      expect(JSON.parse(responseAction!.value)).toEqual({
+        success: false,
+        message: "PayPal is down",
+        details: undefined,
+      });
     });
   });
 
