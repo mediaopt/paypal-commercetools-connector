@@ -174,13 +174,19 @@ export function resolveGooglePayOptions(
   const defaults = ENABLER_DEFAULT_CONFIG.GooglePay;
 
   // verificationMethod is the shared threeDSOption merchant setting — same source
-  // CardFieldsMask.tsx already reads directly, not a GooglePay-only override.
-  const verificationMethod = baseOptions.settings.threeDSOption || undefined;
+  // CardFieldsMask.tsx already reads directly, not a GooglePay-only override. Falls back to
+  // defaults.verificationMethod when unset, matching every other field resolved below — previously
+  // this skipped the fallback entirely and silently sent GooglePay `verificationMethod: undefined`
+  // whenever threeDSOption wasn't configured.
+  const verificationMethod =
+    baseOptions.settings.threeDSOption || defaults?.verificationMethod;
 
   // environment is derived from the processor's own sandbox/live config — not merchant
   // configurable per component, unlike everything else resolved here.
   const environment: "TEST" | "PRODUCTION" =
-    baseOptions.environment?.toLowerCase() === "sandbox" ? "TEST" : "PRODUCTION";
+    baseOptions.environment?.toLowerCase() === "sandbox"
+      ? "TEST"
+      : "PRODUCTION";
 
   return {
     options: baseOptions.paypalScriptOptions,
