@@ -123,8 +123,8 @@ const buildSetShippingMethodAction = (
   shippingMethod: { typeId: "shipping-method" as const, id: shippingMethodId },
 });
 
-// Failure-path response payload for logProcessorCustomerInteraction() — matches the shape
-// paypal-commercetools-extension's handleError() (response.utils.ts)
+// Failure-path response payload for logProcessorInteraction()/logProcessorCustomerInteraction()
+// — matches the shape paypal-commercetools-extension's handleError() (response.utils.ts)
 const buildErrorResponsePayload = (e: unknown) => ({
   success: false,
   message: `${errorMessage(e)}${payPalDebugIdSuffix(e)}`,
@@ -150,7 +150,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
   // field was added) still falls back to processor's base instead of leaving it undefined.
   private async resolveSettings(): Promise<Partial<PayPalSettings>> {
     const rawSettings = await getSettings();
-    return { ...getConfig().settingsFallback, ...rawSettings };
+    if (!rawSettings)
+      log.warn(`No settings configured in merchant center application.`);
+    return rawSettings
+      ? { ...getConfig().settingsFallback, ...rawSettings }
+      : getConfig().settingsFallback;
   }
 
   public async config(): Promise<ConfigResponse> {
@@ -628,12 +632,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
         orderData?.fraudNetSessionId
       );
     } catch (e) {
-      log.error(
-        `createOrder: PayPal order creation failed for payment ${
-          payment.id
-        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)} — request: ${JSON.stringify(
-          orderRequest
-        )} — response: ${JSON.stringify(errorResponseBody(e))}`
+      void this.logProcessorInteraction(
+        payment.id,
+        "createPayPalOrder",
+        orderRequest,
+        undefined,
+        e
       );
       throw new ErrorInvalidOperation(
         `Failed to create PayPal order for payment ${payment.id}`
@@ -642,18 +646,18 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     // vaulted payment methods are captured/authorized immediately on create order
     if (response.status === "COMPLETED") {
-      await Promise.all([
-        this.writeSettledOrderTransaction(payment, response, {
-          operation: "createOrder",
-          ...resolvePayPalIntentTransactionConfig(payPalIntent),
-        }),
-        this.logProcessorInteraction(
-          payment.id,
-          "createPayPalOrder",
-          orderRequest,
-          response
-        ),
-      ]);
+      await this.writeSettledOrderTransaction(payment, response, {
+        operation: "createOrder",
+        ...resolvePayPalIntentTransactionConfig(payPalIntent),
+      });
+      void this.logProcessorInteraction(
+        payment.id,
+        "createPayPalOrder",
+        orderRequest,
+        response,
+        undefined,
+        response.id
+      );
 
       return {
         orderData: {
@@ -670,17 +674,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
           response.status
         ),
       };
-    } else if (paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE) {
-      const { transactionType } = resolvePayPalIntentTransactionConfig(payPalIntent);
-      await Promise.all([
-        this.addApprovalPlaceholderTransaction(payment, response.id ?? "", transactionType),
-        this.logProcessorInteraction(
-          payment.id,
-          "createPayPalOrder",
-          orderRequest,
-          response
-        ),
-      ]);
+    } else if (
+      paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE
+    ) {
+      const { transactionType } =
+        resolvePayPalIntentTransactionConfig(payPalIntent);
+      await this.addApprovalPlaceholderTransaction(
+        payment,
+        response.id ?? "",
+        transactionType
+      );
+      void this.logProcessorInteraction(
+        payment.id,
+        "createPayPalOrder",
+        orderRequest,
+        response,
+        undefined,
+        response.id
+      );
 
       return {
         orderData: {
@@ -703,20 +714,20 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // in-progress transaction, so adding one now would create it before the buyer has
     // actually approved on PayPal. That happens later, in authorizeOrder()/captureOrder() — or,
     // when PayPal settles synchronously with no buyer-approval step, in the COMPLETED branch above.
-    await Promise.all([
-      retryCTSync(
-        () => this.syncPayPalOrderStatus(payment.id, response, false),
-        "createOrder",
-        payment.id,
-        response.status ?? ""
-      ),
-      this.logProcessorInteraction(
-        payment.id,
-        "createPayPalOrder",
-        orderRequest,
-        response
-      ),
-    ]);
+    await retryCTSync(
+      () => this.syncPayPalOrderStatus(payment.id, response, false),
+      "createOrder",
+      payment.id,
+      response.status ?? ""
+    );
+    void this.logProcessorInteraction(
+      payment.id,
+      "createPayPalOrder",
+      orderRequest,
+      response,
+      undefined,
+      response.id
+    );
 
     return {
       orderData: {
@@ -738,8 +749,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   // PayUponInvoice requires the order amount to exactly match the cart's taxed gross total.
-  private validatePayUponInvoiceOrderParams(payment: Payment, ctCart: Cart): void {
-    const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)?.centAmount;
+  private validatePayUponInvoiceOrderParams(
+    payment: Payment,
+    ctCart: Cart
+  ): void {
+    const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)
+      ?.centAmount;
     if (payment.amountPlanned.centAmount !== cartTotal) {
       throw new ErrorInvalidOperation(
         `PayUponInvoice requires order amount to match cart total; payment amount ${payment.amountPlanned.centAmount} does not match cart total ${cartTotal}`
@@ -749,18 +764,44 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
   /**
    * Logs a processor-owned PayPal request/response pair (see utils/processorInteraction.utils.ts)
-   * as both an interface interaction and a payment custom field — success only; a PSP-call failure there is
-   * logged by logger.error — only its extension has an error-specific fallback).
-   * Best-effort even on the success path: a logging failure is warned, never thrown, so it can't
-   * mask or block the actual authorize/capture/create-order outcome. Assumes the payment already
-   * carries the paymentTypeKey custom type (see createPayment()).
+   * as both an interface interaction and a payment custom field — on success AND on failure
+   * (pass the raw `error` to log a failure; its presence, not `response`, decides which), same as
+   * its customer counterpart below, so every PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES call leaves a
+   * commercetools-visible trace regardless of outcome. Also owns the app-level log line itself —
+   * one unified log.error/log.info call, instead of each caller writing its own — and builds the
+   * `orderId`/`operation` context fragment itself so every call site's message stays consistently
+   * shaped.
+   * Best-effort: a logging failure is warned, never thrown, so it can't mask or block the actual
+   * authorize/capture/create-order outcome. Assumes the payment already carries the
+   * paymentTypeKey custom type (see createPayment()).
+   * Since this write can block on the same Payment resource the caller just wrote to, call it
+   * after (never alongside, e.g. in a Promise.all with) the real write, and never await it.
    */
   private async logProcessorInteraction(
     paymentId: string,
     apiCallName: ProcessorApiCallName,
     request: unknown,
-    response: unknown
+    response: unknown,
+    error?: unknown,
+    orderId?: string,
+    operation?: string
   ): Promise<void> {
+    const orderContext = orderId
+      ? `, orderId: ${orderId}${operation ? `, triggered by ${operation}` : ""}`
+      : "";
+    if (error !== undefined) {
+      log.error(
+        `${apiCallName} failed for payment ${paymentId}${orderContext} PayPal debug id${payPalDebugIdSuffix(
+          error
+        )}`
+      );
+      response = buildErrorResponsePayload(error);
+    } else {
+      log.info(
+        `${apiCallName} succeeded for payment ${paymentId}${orderContext}`
+      );
+    }
+
     try {
       const { pspInteractions, customFieldValues } = buildProcessorLogging(
         apiCallName,
@@ -784,16 +825,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
   /**
    * Customer-level sibling of logProcessorInteraction() — logs a processor-owned PayPal
    * request/response pair (see utils/processorInteraction.utils.ts) onto the CT customer, both
-   * on success and on failure (unlike the payment-side version, which is success-only), since a
-   * failed customer-level call — e.g. getStoredPaymentMethods's getPaymentTokens — otherwise
-   * leaves no commercetools-visible trace at all. Reuses PayPalCustomerService's
-   * getCtCustomer/updateCtCustomer, which already catch and log their own failures — no extra
-   * try/catch needed here.
+   * on success and on failure.
+   * Reuses PayPalCustomerService's getCtCustomer/updateCtCustomer, which already catch and
+   * log their own failures — no extra try/catch needed here.
    *
-   * Always called fire-and-forget (`void ...`), never awaited — unlike logProcessorInteraction.
-   * These 3 calls sit on hot, customer-facing paths (getStoredPaymentMethods, and
-   * resolveUserIdToken via config(), run on essentially every signed-in checkout page load), so
-   * this audit write must never add latency to the response the shopper is waiting on.
+   * Always called fire-and-forget (`void ...`), never awaited - this is log purpose only, not required for actual payment
    */
   private async logProcessorCustomerInteraction(
     ctCustomerId: string,
@@ -916,10 +952,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
       try {
         order = await getPayPalOrder(orderID);
       } catch (e) {
-        log.error(
-          `${operation}: PayPal order lookup failed for payment ${paymentId} — ${errorMessage(
-            e
-          )}${payPalDebugIdSuffix(e)}`
+        void this.logProcessorInteraction(
+          paymentId,
+          "getPayPalOrder",
+          { orderID },
+          undefined,
+          e,
+          orderID,
+          operation
         );
         throw new ErrorInvalidOperation(
           `Failed to look up PayPal order ${orderID}`
@@ -929,14 +969,20 @@ export class PayPalPaymentService extends AbstractPaymentService {
         paymentId,
         "getPayPalOrder",
         { orderID },
-        order
+        order,
+        undefined,
+        orderID,
+        operation
       );
 
       if (order.status === "APPROVED" || order.status === "COMPLETED") {
         return order;
       }
 
-      if (order.status !== "CREATED" && order.status !== "PAYER_ACTION_REQUIRED") {
+      if (
+        order.status !== "CREATED" &&
+        order.status !== "PAYER_ACTION_REQUIRED"
+      ) {
         log.error(
           `${operation}: PayPal order ${orderID} is in an unexpected state (status: ${order.status}) for payment ${paymentId}`
         );
@@ -996,10 +1042,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
     try {
       response = await config.callPayPal(orderID);
     } catch (e) {
-      log.error(
-        `${config.operation}: PayPal call failed for payment ${
-          payment.id
-        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
+      void this.logProcessorInteraction(
+        payment.id,
+        apiCallName,
+        { orderID },
+        undefined,
+        e,
+        orderID,
+        config.operation
       );
       throw new ErrorInvalidOperation(
         `Failed to ${
@@ -1008,22 +1058,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    // updatePayment (Payment resource) and syncPayPalOrderStatus (same Payment resource, via a
-    // raw CT call) both retry on a version conflict with a fresh refetch, so running them
-    // alongside linkVaultedCardCustomer (Customer resource) here is safe, not just faster.
-    // logProcessorInteraction is deliberately its own call, not merged into this transaction
-    // update — a single commercetools updatePayment() either applies its whole actions array or
-    // none of it, so bundling the audit-log fields in here would let a logging-only problem (e.g.
-    // a not-yet-provisioned field definition) block the real authorize/capture transaction too.
-    await Promise.all([
-      this.writeSettledOrderTransaction(payment, response, config),
-      this.logProcessorInteraction(
-        payment.id,
-        apiCallName,
-        { orderID },
-        response
-      ),
-    ]);
+    await this.writeSettledOrderTransaction(payment, response, config);
+    void this.logProcessorInteraction(
+      payment.id,
+      apiCallName,
+      { orderID },
+      response,
+      undefined,
+      orderID,
+      config.operation
+    );
 
     return response;
   }
@@ -1049,6 +1093,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
       config.purchaseUnitKey
     );
 
+    // updatePayment and syncPayPalOrderStatus both write the same Payment resource — sequenced,
+    // linkVaultedCardCustomer writes a different entity (Customer/PaymentMethod), so it stays parallel.
     await Promise.all([
       this.ctPaymentService.updatePayment({
         id: payment.id,
@@ -1059,14 +1105,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
           state: config.mapStatus(transaction?.status),
         },
       }),
-      retryCTSync(
-        () => this.syncPayPalOrderStatus(payment.id, response, true),
-        config.operation,
-        payment.id,
-        response.status ?? ""
-      ),
       this.linkVaultedCardCustomer(payment, response),
     ]);
+    await retryCTSync(
+      () => this.syncPayPalOrderStatus(payment.id, response, true),
+      config.operation,
+      payment.id,
+      response.status ?? ""
+    );
   }
 
   /**
@@ -1291,7 +1337,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     const { transactionType } =
       resolvePayPalIntentTransactionConfig(payPalIntent);
-    await this.addApprovalPlaceholderTransaction(payment, orderID, transactionType);
+    await this.addApprovalPlaceholderTransaction(
+      payment,
+      orderID,
+      transactionType
+    );
 
     return {
       onApproveRedirectionUrl: this.buildRedirectMerchantUrl(
@@ -1322,10 +1372,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
     try {
       order = await getPayPalOrder(orderID);
     } catch (e) {
-      log.error(
-        `authenticateThreeDSOrder: PayPal order lookup failed for payment ${
-          payment.id
-        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
+      void this.logProcessorInteraction(
+        payment.id,
+        "getPayPalOrder",
+        { orderID },
+        undefined,
+        e,
+        orderID
       );
       throw new ErrorInvalidOperation(
         `Failed to look up PayPal order ${orderID}`
@@ -1336,7 +1389,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       payment.id,
       "getPayPalOrder",
       { orderID },
-      order
+      order,
+      undefined,
+      orderID
     );
 
     const authenticationResult =
@@ -1471,14 +1526,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
     e: unknown,
     orderID: string,
     paymentId: string,
-    context: string
+    patches: Patch[]
   ): never {
-    log.error(
-      `updateShipping: PayPal order update failed${context} for payment ${paymentId} — ${errorMessage(
-        e
-      )}${payPalDebugIdSuffix(e)} — response body: ${JSON.stringify(
-        errorResponseBody(e)
-      )}`
+    void this.logProcessorInteraction(
+      paymentId,
+      "updatePayPalOrder",
+      patches,
+      undefined,
+      e,
+      orderID
     );
     throw new ErrorInvalidOperation(`Failed to update PayPal order ${orderID}`);
   }
@@ -1496,11 +1552,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
         paymentId,
         "updatePayPalOrder",
         patches,
-        response
+        response,
+        undefined,
+        orderID
       );
     } catch (e) {
       if (!isPayPalInvalidPatchOperationError(e)) {
-        this.failPatchPayPalOrderShipping(e, orderID, paymentId, "");
+        this.failPatchPayPalOrderShipping(e, orderID, paymentId, patches);
       }
 
       const correctedOp = assumedOp === "add" ? "replace" : "add";
@@ -1514,14 +1572,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
           paymentId,
           "updatePayPalOrder",
           correctedPatches,
-          response
+          response,
+          undefined,
+          orderID
         );
       } catch (retryError) {
         this.failPatchPayPalOrderShipping(
           retryError,
           orderID,
           paymentId,
-          " after op correction"
+          correctedPatches
         );
       }
     }
@@ -1744,35 +1804,41 @@ export class PayPalPaymentService extends AbstractPaymentService {
           amount: paypalAmount,
         });
       } catch (e) {
-        log.error(
-          `settlement: PayPal capture failed for payment ${
-            ctPayment.id
-          } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
+        void this.logProcessorInteraction(
+          ctPayment.id,
+          "capturePayPalAuthorization",
+          { authorizationId, amount: paypalAmount },
+          undefined,
+          e,
+          ctPayment.interfaceId,
+          "settlement"
         );
         throw new ErrorInvalidOperation(
           `Failed to capture PayPal authorization ${authorizationId}`
         );
       }
 
-      await Promise.all([
-        this.ctPaymentService.updatePayment({
-          id: ctPayment.id,
-          transaction: {
-            type: "Charge",
-            amount,
-            interactionId: response.id,
-            state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
-              response.status
-            ),
-          },
-        }),
-        this.logProcessorInteraction(
-          ctPayment.id,
-          "capturePayPalAuthorization",
-          { authorizationId, amount: paypalAmount },
-          response
-        ),
-      ]);
+      await this.ctPaymentService.updatePayment({
+        id: ctPayment.id,
+        transaction: {
+          type: "Charge",
+          amount,
+          interactionId: response.id,
+          state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
+            response.status
+          ),
+        },
+      });
+      // Logged after, unawaited — same reasoning as applyPayPalOrderTransaction/createOrder.
+      void this.logProcessorInteraction(
+        ctPayment.id,
+        "capturePayPalAuthorization",
+        { authorizationId, amount: paypalAmount },
+        response,
+        undefined,
+        ctPayment.interfaceId,
+        "settlement"
+      );
 
       return {
         success: true,

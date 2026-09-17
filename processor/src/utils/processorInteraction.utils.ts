@@ -41,7 +41,8 @@ const buildInteractionDraft = (
 
 /**
  * Builds the pspInteractions/customFieldValues to pass into ctPaymentService.updatePayment(),
- * logging a processor-owned customer-level PayPal request/response pair — success only.
+ * logging a processor-owned payment-level PayPal request/response pair — on success and on
+ * failure (callers pass an error-shaped response on failure).
  * Uses "${apiCallName}ProcessorRequest" "${apiCallName}Response" naming convention to
  * prevent triggering extension while keeping compatibility
  * Requires the payment to have paymentTypeKey custom type

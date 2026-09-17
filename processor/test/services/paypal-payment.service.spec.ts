@@ -123,6 +123,9 @@ describe("paypal-payment.service", () => {
     (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue(
       mockPayPalOrder as never
     );
+    (CommonConnect.getSettings as jest.Mock).mockResolvedValue(
+      undefined as never
+    );
 
     savedClient = paymentSDK.ctAPI.client;
     mockClientExecute.mockResolvedValue({ body: mockPayment } as never);
@@ -161,7 +164,8 @@ describe("paypal-payment.service", () => {
           expect.objectContaining({ invoice_id: mockPayment.id }),
         ],
         payment_source: expect.objectContaining({ paypal: expect.any(Object) }),
-      })
+      }),
+      undefined
     );
 
     expect(mockClientPost).toHaveBeenCalledWith({
@@ -237,7 +241,8 @@ describe("paypal-payment.service", () => {
             }),
           }),
         }),
-      })
+      }),
+      undefined
     );
   });
 
@@ -294,7 +299,8 @@ describe("paypal-payment.service", () => {
             }),
           }),
         }),
-      })
+      }),
+      undefined
     );
   });
 
@@ -319,7 +325,8 @@ describe("paypal-payment.service", () => {
             }),
           }),
         }),
-      })
+      }),
+      undefined
     );
   });
 
@@ -400,7 +407,8 @@ describe("paypal-payment.service", () => {
             vault_id: "vault-123",
           }),
         },
-      })
+      }),
+      undefined
     );
   });
 
@@ -422,7 +430,8 @@ describe("paypal-payment.service", () => {
             vault_id: "vault-123",
           }),
         },
-      })
+      }),
+      undefined
     );
   });
 
@@ -445,7 +454,8 @@ describe("paypal-payment.service", () => {
             }),
           }),
         },
-      })
+      }),
+      undefined
     );
   });
 
@@ -646,19 +656,24 @@ describe("paypal-payment.service", () => {
       expect(loggingCall).not.toHaveProperty("transaction");
     });
 
-    test("returns a graceful not-yet-approved result instead of throwing, after confirming via getPayPalOrder, when PayPal rejects the authorize call because the order isn't approved yet", async () => {
-      (CommonConnect.authorizePayPalOrder as jest.Mock).mockRejectedValueOnce(
-        new Error("UNPROCESSABLE_ENTITY") as never
-      );
+    test("returns a graceful not-yet-approved result, without ever attempting to authorize, when the order is still not approved after the retry budget is exhausted", async () => {
+      jest.useFakeTimers();
       (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
         ...mockPayPalOrder,
         status: "CREATED",
       } as never);
 
-      const result = await paypalPaymentService.authorizeOrder({
+      const resultPromise = paypalPaymentService.authorizeOrder({
         paymentId: mockPayment.id,
         orderID: mockAuthorizedOrder.id,
       });
+      // ensureOrderApproved polls getPayPalOrder every RETRY_DELAY until TIMEOUT_PAYMENT is
+      // exhausted, since the mock above never reports an approved status — fast-forward past
+      // that whole budget instead of actually waiting on it.
+      await jest.advanceTimersByTimeAsync(
+        CommonConnect.TIMEOUT_PAYMENT + CommonConnect.RETRY_DELAY * 2
+      );
+      const result = await resultPromise;
 
       expect(result).toEqual({
         orderData: {
@@ -667,14 +682,13 @@ describe("paypal-payment.service", () => {
           message: expect.stringContaining("is not yet approved"),
         },
       });
-      expect(CommonConnect.authorizePayPalOrder).toHaveBeenCalledWith(
-        mockAuthorizedOrder.id,
-        {}
-      );
+      expect(CommonConnect.authorizePayPalOrder).not.toHaveBeenCalled();
       expect(CommonConnect.getPayPalOrder).toHaveBeenCalledWith(
         mockAuthorizedOrder.id
       );
-    }, 10000);
+
+      jest.useRealTimers();
+    });
 
     test("links interfaceId to the authorized order when it was previously unset", async () => {
       await paypalPaymentService.authorizeOrder({
@@ -1065,6 +1079,10 @@ describe("paypal-payment.service", () => {
       (CommonConnect.getSettings as jest.Mock).mockResolvedValue({
         payPalIntent: "Authorize",
       } as never);
+      (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockPayPalOrder,
+        status: "APPROVED",
+      } as never);
       (CommonConnect.capturePayPalAuthorization as jest.Mock).mockResolvedValue(
         {
           id: "capture-id",
@@ -1078,6 +1096,7 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.settlement({
         payment: {
           ...mockPayment,
+          interfaceId: "paypal-order-id",
           transactions: [
             {
               type: "Authorization",
