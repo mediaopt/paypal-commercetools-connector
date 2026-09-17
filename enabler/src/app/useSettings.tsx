@@ -209,6 +209,12 @@ export const SettingsProvider: FC<
     }
   }, [settings]);
 
+  //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
+  console.log(
+    `[paypal-enabler][${scriptLogTag}] PayPalScriptProvider merchantId:`,
+    settings?.merchantId || "(empty)"
+  );
+
   // isStoredCheckoutComponent is set once, at the source, by PayPalStoredBuilder (see its own
   // comment) for every component it builds — none of them need the PayPal JS SDK to render —
   // rather than inferred here from paymentMethodType/builderType.
@@ -227,7 +233,11 @@ export const SettingsProvider: FC<
               intent: settings?.payPalIntent?.toString().toLowerCase(),
               dataUserIdToken: initialSettings ? undefined : userIdToken, //only stored cards by own ct interface are permitted in checkout mode
               dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-              merchantId: settings?.merchantId,
+              // See payment-enabler-paypal.ts's matching comment — an unconfigured merchantId is
+              // "" from the processor, not undefined, and must be normalized here too.
+              merchantId: settings?.merchantId?.length
+                ? settings?.merchantId
+                : undefined,
             }}
           >
             <ScriptLoadLogger tag={scriptLogTag} />

@@ -86,7 +86,10 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
         ...configJson.standardScriptOptions,
         intent: configJson.settings?.payPalIntent?.toString().toLowerCase(),
         dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-        merchantId: configJson.settings?.merchantId,
+        // An unconfigured merchantId resolves to "" from the processor
+        merchantId: configJson.settings?.merchantId?.length
+          ? configJson.settings?.merchantId
+          : undefined,
       };
 
       // One shared commercetools Payment per checkout page load, shared by every standard/stored/

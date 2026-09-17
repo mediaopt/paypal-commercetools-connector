@@ -165,7 +165,9 @@ class PayPalComponent implements PaymentComponent {
     // merchant's shared script config.
     const browserCheck = AVAILABILITY_CHECKS[this.paymentMethodType];
     if (browserCheck && !browserCheck()) {
-      console.warn(`${this.paymentMethodType} not available`);
+      console.warn(
+        `${this.paymentMethodType} not available — browser/device check failed`
+      );
       return false;
     }
 
