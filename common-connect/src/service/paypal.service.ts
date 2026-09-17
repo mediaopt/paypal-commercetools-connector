@@ -13,6 +13,7 @@ import {
 } from "../paypal/checkout_api";
 import { Configuration } from "../paypal/configuration";
 import {
+  Authorization2StatusEnum,
   AuthorizationsApi,
   CaptureRequest,
   CapturesApi,
@@ -178,6 +179,12 @@ export const voidPayPalAuthorization = async (authorizationId: string) => {
     undefined,
     "return=representation"
   );
+  // Despite requesting return=representation, PayPal may still respond 204 No Content for this
+  // endpoint (same as updatePayPalOrder/deletePaymentToken/updateDeliveryData above) — a 204 here
+  // only ever means the void succeeded, so synthesize the one status a caller could observe.
+  if (response.status === 204) {
+    return { status: Authorization2StatusEnum.Voided };
+  }
   return response.data;
 };
 

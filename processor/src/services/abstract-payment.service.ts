@@ -26,7 +26,8 @@ import {
   UpdateShippingResponseSchemaDTO,
 } from "../dtos/paypal-payment.dto";
 import { StoredPaymentMethodsResponse } from "../dtos/stored-payment-methods.dto";
-import { logger } from "common-connect/dist";
+import { logger } from "common-connect";
+import { findCapturedChargeBalance } from "../utils/order.utils";
 
 /**
  * Abstract base class for payment service implementations.
@@ -274,6 +275,24 @@ export abstract class AbstractPaymentService {
         });
       }
       case "reversePayment": {
+        // Reverse means void what hasn't been captured yet, or refund what has — mirrors
+        // commercetools' reversePayment semantics (docs.commercetools.com/checkout/payment-intents-api).
+        const capturedBalance = findCapturedChargeBalance(ctPayment);
+        if (capturedBalance) {
+          if (capturedBalance.remainingAmount <= 0) {
+            throw new ErrorInvalidOperation(
+              `Payment ${ctPayment.id} has already been fully refunded`
+            );
+          }
+          return await this.refundPayment({
+            payment: ctPayment,
+            transactionId: capturedBalance.transaction.id,
+            amount: {
+              ...capturedBalance.transaction.amount,
+              centAmount: capturedBalance.remainingAmount,
+            },
+          });
+        }
         return await this.void({ payment: ctPayment });
       }
       default: {

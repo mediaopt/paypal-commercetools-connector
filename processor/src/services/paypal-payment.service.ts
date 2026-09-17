@@ -70,13 +70,17 @@ import {
   updatePayPalOrder,
   Order,
   Capture2,
-  logger,
   CheckoutPaymentIntent,
   findMostRecentTransaction,
   Patch,
   PayPalSettings,
   TIMEOUT_PAYMENT,
   RETRY_DELAY,
+  refundPayPalOrder,
+  mapPayPalRefundStatusToCommercetoolsTransactionState,
+  voidPayPalAuthorization,
+  mapPayPalVoidStatusToCommercetoolsTransactionState,
+  RefundRequest,
 } from "common-connect";
 
 import { log } from "../libs/logger";
@@ -93,6 +97,8 @@ import {
   extractPayPalPurchaseUnitTransaction,
   findAuthorizationTransactionId,
   resolvePayPalIntentTransactionConfig,
+  findRefundableTransactionId,
+  findVoidableTransaction,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -1866,14 +1872,53 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  async refundPayment(
-    request: ModifyPaymentWithTransactionRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO> {
-    const { payment: ctPayment, amount } = request;
+  // Shared by refundPayment()/void(): PayPal call failures are always reported the same way —
+  // logged, then surfaced to the caller as ErrorInvalidOperation.
+  private async callPayPalOrThrow<T>(
+    operation: string,
+    paymentId: string,
+    callPayPal: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await callPayPal();
+    } catch (err) {
+      log.error(
+        `${operation}: PayPal call failed, paymentId: ${paymentId} — ${errorMessage(err)}`,
+      );
+      throw new ErrorInvalidOperation(
+        `${operation} failed for payment ${paymentId} with error ${errorMessage(err)}`,
+      );
+    }
+  }
 
-    // TODO: Implement PayPal refund logic using common-connect functions
-    // This would involve calling refundPayPalOrder from common-connect
-    // For now, return a stub response
+  async refundPayment(
+    request: ModifyPaymentWithTransactionRequest,
+  ): Promise<PaymentUpdateResponseSchemaDTO> {
+    const { payment: ctPayment, amount, transactionId } = request;
+    const paypalTransactionId = findRefundableTransactionId(ctPayment, transactionId);
+
+    const paypalAmount = buildPayPalAmount(
+      amount,
+      ctPayment.amountPlanned.fractionDigits,
+    );
+    const refundRequest: RefundRequest = { amount: paypalAmount };
+    const response = await this.callPayPalOrThrow(
+      "refundPayment",
+      ctPayment.id,
+      () => refundPayPalOrder(paypalTransactionId, refundRequest),
+    );
+
+    await this.ctPaymentService.updatePayment({
+      id: ctPayment.id,
+      transaction: {
+        type: "Refund",
+        amount,
+        interactionId: response.id,
+        state: mapPayPalRefundStatusToCommercetoolsTransactionState(
+          response.status,
+        ),
+      },
+    });
 
     return {
       success: true,
@@ -1883,13 +1928,29 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   async void(
-    request: CancelPaymentRequest
+    request: CancelPaymentRequest,
   ): Promise<PaymentUpdateResponseSchemaDTO> {
     const { payment: ctPayment } = request;
 
-    // TODO: Implement PayPal void logic using common-connect functions
-    // This would involve calling voidPayPalOrder from common-connect
-    // For now, return a stub response
+    const transaction = findVoidableTransaction(ctPayment);
+
+    const response = await this.callPayPalOrThrow(
+      "void",
+      ctPayment.id,
+      () => voidPayPalAuthorization(transaction.interactionId),
+    );
+
+    await this.ctPaymentService.updatePayment({
+      id: ctPayment.id,
+      transaction: {
+        amount: transaction.amount,
+        type: "CancelAuthorization",
+        interactionId: transaction.interactionId,
+        state: mapPayPalVoidStatusToCommercetoolsTransactionState(
+          response.status
+        ),
+      },
+    });
 
     return {
       success: true,
