@@ -22,10 +22,10 @@ const PAYMENT_METHOD_ICON_KEY_MAP: Record<PaymentMethodType, string> = {
     StandardPaymentMethodType.PAY_UPON_INVOICE,
   // Local payment methods (APMs)
   [StandardPaymentMethodType.IDEAL]: "ideal",
-  [StandardPaymentMethodType.BANCONTACT]: "bancontact",
+  [StandardPaymentMethodType.BANCONTACT]: "bancontactcard",
   [StandardPaymentMethodType.EPS]: "eps",
   [StandardPaymentMethodType.MYBANK]: "mybank",
-  [StandardPaymentMethodType.P24]: "p24",
+  [StandardPaymentMethodType.P24]: "przelewy24",
   [StandardPaymentMethodType.BLIK]: "blik",
 
   // Maps the same as CreditCard/CardFields since the stored variant is distinguished by using a
