@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   PayPalButtons,
   PayPalMessages,
+  PayPalMessagesComponentProps,
   usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
@@ -39,13 +40,14 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     builderType,
     handleUpdateShipping,
     resolveShippingOptionId,
+    paymentInfo,
   } = usePayment();
   const { settings, paymentTokens } = useSettings();
   const isExpress = builderType === "express";
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
   const { t } = useTranslation();
-  const { enableVaulting, paypalMessages, ...restprops } = props;
+  const { enableVaulting, paypalMessages, messagesStyle, ...restprops } = props;
   const save = useRef<HTMLInputElement>(null);
   const [{ isResolved }] = usePayPalScriptReducer();
 
@@ -123,6 +125,28 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     return styles;
   }, [settings, restprops]);
 
+  // Real (merchant-agnostic) config for the standard PayPal button's <PayPalMessages/> — amount
+  // and currency come from the actual cart total, placement reflects where the button is mounted
+  // (Express is a product/cart-page Buy Now button; everything else is the checkout/payment page),
+  // style comes from settings (see resolveOptions.ts's generalMessagesStyle, sourced from the CT
+  // custom object's payLater* fields, overridable via PAYPAL_BUTTON_CONFIG). Undefined for
+  // vaultOnly — a vault-setup-token flow has no purchase amount to message against.
+  const resolvedPaypalMessages = useMemo<
+    PayPalMessagesComponentProps | undefined
+  >(() => {
+    if (vaultOnly) {
+      return undefined;
+    }
+    const { centAmount, currencyCode, fractionDigits } =
+      paymentInfo.amountPlanned;
+    return {
+      ...(messagesStyle && { style: messagesStyle }),
+      amount: (centAmount / 10 ** fractionDigits).toFixed(fractionDigits),
+      currency: currencyCode as PayPalMessagesComponentProps["currency"],
+      placement: isExpress ? "product" : "payment",
+    };
+  }, [vaultOnly, paymentInfo, isExpress, messagesStyle]);
+
   let actions: any;
 
   if (vaultOnly) {
@@ -190,6 +214,14 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
         )}
 
       {paypalMessages && <PayPalMessages {...paypalMessages} />}
+      {/* Gated to a single funding source — Checkout mounts every configured payment method's
+          PayPalMask concurrently, and mounting more than one <PayPalMessages> at once against the
+          same PayPal JS SDK instance throws inside the SDK itself (can't access "PAGE_TYPE"). */}
+      {!paypalMessages &&
+        restprops.fundingSource === "paypal" &&
+        resolvedPaypalMessages && (
+          <PayPalMessages {...resolvedPaypalMessages} />
+        )}
 
       {restprops.fundingSource && !isFundingSourceEligible && (
         <div>{t("payPal.notEligible")}</div>

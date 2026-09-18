@@ -384,6 +384,10 @@ export type CustomPayPalButtonsComponentProps = Omit<
   // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
   // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
   fundingSource?: FUNDING_SOURCE;
+  // Merchant-configurable style for the real (non-hardcoded) <PayPalMessages/> PayPalMask
+  // renders for the standard PayPal button — resolved the same way as PayPalMethodConfig.style,
+  // just a different shape (layout/logo/text/ratio vs. button color/label/shape).
+  messagesStyle?: PayPalMessagesComponentProps["style"];
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -624,6 +628,10 @@ type PayPalMethodStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
 export type PayPalMethodConfig = {
   style?: PayPalMethodStyle;
   fundingSource?: FUNDING_SOURCE;
+  // PayPal-brand only — style for the <PayPalMessages/> Pay-Later-style widget PayPalMask renders
+  // alongside the standard PayPal button. A different shape entirely from `style` above
+  // (layout/logo/text/ratio, not button color/label/shape).
+  messagesStyle?: PayPalMessagesComponentProps["style"];
   // PayPal JS SDK script `components` list for this payment method (e.g. "buttons,card-fields") —
   // same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components, but resolved through this
   // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
@@ -695,6 +703,7 @@ export type BaseResolvedMethodOptions = {
  * PayPalCreditCard, AllButtons, Venmo). */
 export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
   fundingSource?: FUNDING_SOURCE;
+  messagesStyle?: PayPalMessagesComponentProps["style"];
 };
 
 /** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike

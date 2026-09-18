@@ -28,6 +28,9 @@ const basePaymentMock = {
   handleApproveVaultSetupToken: jest.fn(),
   handleUpdateShipping: mockHandleUpdateShipping,
   resolveShippingOptionId: mockResolveShippingOptionId,
+  paymentInfo: {
+    amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+  },
 };
 
 const mockUseSettings = jest.fn();

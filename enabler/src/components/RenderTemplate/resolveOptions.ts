@@ -64,6 +64,24 @@ export function resolvePayPalBrandOptions(
           buttonShape: baseOptions.settings.buttonShape,
         }
       : undefined;
+  // Same "general settings" tier as generalStyle above, but for the <PayPalMessages/> widget —
+  // sourced from the CT custom object's legacy payLater* fields. Layout is fixed to "text" here;
+  // payLaterMessagingType (per-page "flex" vs "text" selection) isn't wired yet — please open an
+  // issue if you need "flex" layout support.
+  const generalMessagesStyle = {
+    layout: "text",
+    logo: {
+      type: baseOptions.settings.payLaterMessageTextLogoType,
+      position: baseOptions.settings.payLaterMessageTextLogoPosition,
+    },
+    text: {
+      color: baseOptions.settings.payLaterMessageTextColor,
+      size: Number(baseOptions.settings.payLaterMessageTextSize),
+      align: baseOptions.settings.payLaterMessageTextAlign,
+    },
+    color: baseOptions.settings.payLaterMessageFlexColor,
+    ratio: baseOptions.settings.payLaterMessageFlexRatio,
+  } as PayPalBrandResolvedOptions["messagesStyle"];
   const resolvedOverride = isExpress
     ? baseOptions.settings.PayPalExpress
     : baseOptions.settings[paymentMethodType];
@@ -77,6 +95,10 @@ export function resolvePayPalBrandOptions(
     resolvedFixedConfig?.fundingSource ??
     resolvedOverride?.fundingSource ??
     resolvedDefaults?.fundingSource;
+  const messagesStyle =
+    resolvedFixedConfig?.messagesStyle ??
+    resolvedOverride?.messagesStyle ??
+    generalMessagesStyle;
 
   const initialSettings = {
     ...baseOptions.settings,
@@ -108,6 +130,7 @@ export function resolvePayPalBrandOptions(
     initialSettings,
     enableVaulting: false,
     ...(fundingSource && { fundingSource }),
+    ...(messagesStyle && { messagesStyle }),
   };
 }
 
