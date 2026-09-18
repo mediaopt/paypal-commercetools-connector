@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   PayPalButtons,
   PayPalMessages,
@@ -64,9 +64,11 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
   }, [isResolved]);
 
+  const [isFundingSourceEligible, setIsFundingSourceEligible] = useState(true);
+
   // Silent-render safety net: a funding-source-restricted button (Sepa/PayLater/PayPalCreditCard/
   // Venmo) renders nothing at all when PayPal's own SDK decides the buyer/cart isn't eligible for
-  // it (e.g. Venmo for a EUR cart) — this notifies the buyer instead of leaving an unexplained gap.
+  // it (e.g. Venmo for a EUR cart) — notification is not an option for checkout - as it loads all methods and show error regardless if venmo is selected.
   useEffect(() => {
     if (!isResolved || !restprops.fundingSource || !window.paypal?.Buttons) {
       return;
@@ -80,8 +82,11 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     const isEligible =
       paypalEligible &&
       (restprops.fundingSource !== "venmo" || isVenmoSupported());
+    setIsFundingSourceEligible(isEligible);
     if (!isEligible) {
-      notify("Error", t("interface.generalError"));
+      console.log(
+        `[paypal-enabler][${logTag}] funding source not eligible, rendering not-eligible notice instead of an error`
+      );
     }
   }, [isResolved, restprops.fundingSource]);
 
@@ -185,6 +190,10 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
         )}
 
       {paypalMessages && <PayPalMessages {...paypalMessages} />}
+
+      {restprops.fundingSource && !isFundingSourceEligible && (
+        <div>{t("payPal.notEligible")}</div>
+      )}
     </>
   );
 };

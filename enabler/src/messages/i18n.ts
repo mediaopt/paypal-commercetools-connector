@@ -39,6 +39,7 @@ i18n.use(initReactI18next).init({
             "Your address could not be validated. Please correct your data and try again.",
           generalError:
             "Something went wrong. Please check your data and try again.",
+          notEligible: "This payment method is not available for your cart.",
         },
         cardFields: {
           pay: "Pay",
@@ -85,6 +86,8 @@ i18n.use(initReactI18next).init({
             "Ihre Adresse konnte nicht validiert werden. Bitte korrigieren Sie Ihre Daten und versuchen Sie es erneut.",
           generalError:
             "Etwas ist schief gelaufen. Bitte überprüfen Sie Ihre Daten und versuchen Sie es erneut.",
+          notEligible:
+            "Diese Zahlungsart ist für Ihren Warenkorb nicht verfügbar.",
         },
         cardFields: {
           pay: "Zahlen",
