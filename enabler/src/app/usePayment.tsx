@@ -337,7 +337,12 @@ export const PaymentProvider: FC<
         >(requestHeader, createOrderUrl, {
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
-          payPalIntent: settings?.payPalIntent,
+          // PayUponInvoice must always submit Capture intent, regardless of the merchant's
+          // global setting — fraudNetSessionId is the only PUI-exclusive field on orderData, so
+          // its presence is a reliable signal this call originated from PUI.
+          payPalIntent: orderData?.fraudNetSessionId
+            ? "Capture"
+            : settings?.payPalIntent,
           builderType,
           paymentMethodType,
           orderData: {

@@ -30,7 +30,11 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   // initialPayment is already seeded, which it always is there (see usePayment.tsx's own
   // comment), so clientToken never populates and must not gate rendering. In legacy/self-hosted
   // mode (no onRegisterSubmit) that fetch does run, so it's still a real, required check there.
-  const invoiceError = !(settings?.payPalIntent === "Capture")
+  // In Checkout mode (onRegisterSubmit set) intent is forced to Capture at submission time
+  // (usePayment.tsx's handleCreateOrder), regardless of the merchant's global setting, so this
+  // check must not fire there. In legacy/self-hosted mode, settings are fetched raw from the
+  // processor with no such forcing, so the merchant genuinely must configure Capture intent.
+  const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
     : paymentInfo.id && paymentInfo.amountPlanned.centAmount < minPayableAmount
     ? ["invoice.tooSmall", { min: minPayableAmount / 100 }]

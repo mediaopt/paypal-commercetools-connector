@@ -52,13 +52,14 @@ export const storedPaymentMethodUrl = (processorUrl: string, id: string) =>
 // RenderTemplate/resolveOptions.ts's resolution config — see that file's 4-layer resolution
 // comment for how these fit together.
 
-// Category 1 — hardcoded, non-overridable: something the merchant/processor should not be able to configure —
-// e.g. Pay Upon Invoice must always use Capture intent. Applied last, unconditionally, per mounted component
-// — whatever the  processor sends can never change these.
+// Category 1 — hardcoded, non-overridable: something the merchant/processor should not be able to configure.
+// Applied last, unconditionally, per mounted component — whatever the processor sends can never change these.
+// (PayUponInvoice's own must-always-be-Capture requirement is forced at the point intent is actually
+// submitted — usePayment.tsx's handleCreateOrder — rather than here, since forcing it into this shared
+// settings object leaks into every mounted component's PayPal JS SDK script options.)
 export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
   Record<PayPalPaymentMethodType, Partial<GetSettingsResponse>>
 > = {
-  PayUponInvoice: { payPalIntent: "Capture" },
   // Every individual funding-source button (including PayPal itself, repurposed from the old
   // unscoped default) is built on the standard PayPal smart button — their funding source is a
   // method identity, not a merchant preference, so it's fixed here rather than left to
