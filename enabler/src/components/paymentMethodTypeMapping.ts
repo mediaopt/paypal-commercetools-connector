@@ -14,6 +14,7 @@ const CT_ICON_KEY_TO_PAYMENT_METHOD_TYPE: Record<
   mybank: "MyBank",
   przelewy24: "P24",
   blik: "Blik",
+  sepa: "Sepa",
 };
 
 export const toPayPalPaymentMethodType = (

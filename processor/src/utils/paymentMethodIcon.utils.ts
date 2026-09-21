@@ -8,7 +8,7 @@ const PAYMENT_METHOD_ICON_KEY_MAP: Record<PaymentMethodType, string> = {
   [StandardPaymentMethodType.CREDIT_CARD]: "card",
   [StandardPaymentMethodType.PAYPAL]: "paypal",
   // No commercetools icon-key equivalent for these — see paypal-payment.dto.ts.
-  [StandardPaymentMethodType.SEPA]: StandardPaymentMethodType.SEPA,
+  [StandardPaymentMethodType.SEPA]: "sepa",
   [StandardPaymentMethodType.PAY_LATER]: StandardPaymentMethodType.PAY_LATER,
   [StandardPaymentMethodType.PAYPAL_CREDIT_CARD]:
     StandardPaymentMethodType.PAYPAL_CREDIT_CARD,
