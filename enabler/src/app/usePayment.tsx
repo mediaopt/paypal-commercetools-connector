@@ -58,8 +58,14 @@ type PaymentContextT = {
   paymentInfo: PaymentInfo;
   requestHeader: RequestHeader;
   clientToken: string;
-  handleCreateOrder: (orderData?: CustomOrderData) => Promise<string>;
-  handleOnApprove: (data: CustomOnApproveData) => Promise<void>;
+  handleCreateOrder: (
+    orderData?: CustomOrderData,
+    isCheckoutCard?: boolean
+  ) => Promise<string>;
+  handleOnApprove: (
+    data: CustomOnApproveData,
+    isCheckoutCard?: boolean
+  ) => Promise<void>;
   vaultOnly: boolean;
   orderDataLinks?: OrderDataLinks;
   handleCreateVaultSetupToken: (
@@ -321,8 +327,16 @@ export const PaymentProvider: FC<
       }
     };
 
-    const handleCreateOrder = async (orderData?: CustomOrderData) => {
-      if (!createOrderUrl) return "";
+    const handleCreateOrder = async (
+      orderData?: CustomOrderData,
+      isCheckoutCard?: boolean
+    ) => {
+      if (!createOrderUrl) {
+        if (isCheckoutCard) {
+          throw new Error(t("payPal.generalError"));
+        }
+        return "";
+      }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
       try {
         const relevantOrderData = setRelevantData(
@@ -369,6 +383,9 @@ export const PaymentProvider: FC<
         latestPaymentVersion = paymentVersion;
 
         if (!id) {
+          // For the card-fields checkout path, setRatepayMessage is always undefined, so
+          // handleResponseError (Ratepay/PUI-specific) always takes its `!showError` branch and
+          // throws directly — the catch below's isCheckoutCard rethrow already covers that case.
           handleResponseError(
             t,
             notify,
@@ -476,11 +493,17 @@ export const PaymentProvider: FC<
           error instanceof Error ? error.message : t("interface.generalError")
         );
         isLoading(false);
+        if (isCheckoutCard) {
+          throw error;
+        }
         return "";
       }
     };
 
-    const handleOnApprove = async (data: CustomOnApproveData) => {
+    const handleOnApprove = async (
+      data: CustomOnApproveData,
+      isCheckoutCard?: boolean
+    ) => {
       const { orderID, saveCard } = data;
       isLoading(true);
 
@@ -566,12 +589,21 @@ export const PaymentProvider: FC<
           if (orderData) {
             setResultMessage(orderData.message);
           }
+          if (isCheckoutCard) {
+            console.error(
+              `[paypal-enabler] Card Fields checkout order not completed, status: ${orderData.status}`
+            );
+            throw new Error(t("payPal.generalError"));
+          }
         }
       } catch (error) {
         notify(
           "Error",
           error instanceof Error ? error.message : t("interface.generalError")
         );
+        if (isCheckoutCard) {
+          throw error;
+        }
       } finally {
         isLoading(false);
       }
