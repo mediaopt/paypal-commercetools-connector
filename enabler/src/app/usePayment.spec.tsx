@@ -37,21 +37,31 @@ const CreateOrderConsumer: FC = () => {
   return null;
 };
 
-const CreateOrderWithDataConsumer: FC<{ orderData?: Record<string, unknown> }> = ({
-  orderData,
-}) => {
+const CreateOrderWithDataConsumer: FC<{
+  orderData?: Record<string, unknown>;
+  isCheckoutCard?: boolean;
+  onResult?: (result: string) => void;
+  onError?: (error: unknown) => void;
+}> = ({ orderData, isCheckoutCard, onResult, onError }) => {
   const { handleCreateOrder } = usePayment();
   useEffect(() => {
-    handleCreateOrder(orderData as never);
+    handleCreateOrder(orderData as never, isCheckoutCard)
+      .then((result) => onResult?.(result))
+      .catch((error) => onError?.(error));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
 };
 
-const OnApproveConsumer: FC = () => {
+const OnApproveConsumer: FC<{
+  isCheckoutCard?: boolean;
+  onError?: (error: unknown) => void;
+}> = ({ isCheckoutCard, onError }) => {
   const { handleOnApprove } = usePayment();
   useEffect(() => {
-    handleOnApprove({ orderID: "order-1" });
+    handleOnApprove({ orderID: "order-1" }, isCheckoutCard).catch((error) =>
+      onError?.(error)
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
@@ -917,5 +927,277 @@ describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInv
 
     const [, , body] = mockedProcessorRequest.mock.calls[0];
     expect(body).toMatchObject({ payPalIntent: "Authorize" });
+  });
+});
+
+// Regression coverage for: Card Fields checkout never completing when the PayPal order isn't
+// approved yet — handleOnApprove used to resolve normally (only flipping local result-display
+// state) for a non-COMPLETED status, and its catch block always swallowed errors after notifying.
+// Both silently told CardFieldsMask's approveTransaction the payment succeeded. isCheckoutCard
+// (passed only by CardFieldsMask, based on onRegisterSubmit) makes both paths reject instead.
+describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("rejects and logs the order status when isCheckoutCard is true and the order isn't COMPLETED", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    // Keyed by URL rather than call order — OnApproveConsumer's effect (a child of
+    // PaymentProvider) fires before PaymentProvider's own initial createPayment effect, so
+    // queued mockResolvedValueOnce values would be consumed out of the order they're declared in.
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED", message: "pending" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer isCheckoutCard onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("CREATED")
+    );
+    // The existing notify(...) still fires before the new rethrow — checkout callers keep the
+    // same user-facing message, they just also now reject the promise.
+    expect(mockNotify).toHaveBeenCalledWith("Error", expect.any(String));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("resolves normally (no throw, no notify) for the same non-COMPLETED order when isCheckoutCard is not set — legacy/other callers unaffected", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED", message: "pending" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledTimes(2)
+    );
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("rethrows a failed processor call for isCheckoutCard callers instead of only notifying — any error, not just the non-COMPLETED case, must now fail the payment step", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.reject(new Error("network down"))
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer isCheckoutCard onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Error", "network down");
+  });
+
+  it("does not rethrow a failed processor call when isCheckoutCard is not set — matches today's behavior for other builders", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.reject(new Error("network down"))
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith("Error", "network down")
+    );
+    expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+// Regression coverage for the same swallow-and-continue pattern in handleCreateOrder, the other
+// checkout-relevant call CardFieldsMask makes (via its shared createOrder prop).
+describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("rejects when createOrderUrl is not configured and isCheckoutCard is true, instead of silently resolving to an empty string", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    const onResult = jest.fn();
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          isCheckoutCard
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(onResult).not.toHaveBeenCalled();
+    // No processor call other than the initial createPayment — misconfiguration is detected
+    // before ever reaching the try/catch, so there's nothing for notify to report either.
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("still silently resolves to an empty string when createOrderUrl is not configured and isCheckoutCard is not set — legacy/other callers unaffected", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    const onResult = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer onResult={onResult} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(""));
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the processor response is missing an order id and isCheckoutCard is true (handleResponseError's own throw now propagates instead of being swallowed)", async () => {
+    // Keyed by URL rather than call order — see the equivalent handleOnApprove tests above for why.
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { message: "missing-id" },
+            paymentVersion: 2,
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer isCheckoutCard onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Error", "missing-id");
   });
 });

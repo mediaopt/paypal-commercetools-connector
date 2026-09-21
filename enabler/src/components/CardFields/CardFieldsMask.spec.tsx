@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 let capturedProviderProps: any;
 
@@ -164,5 +164,85 @@ describe("CardFieldsMask — Checkout-facing onError signal on payment failure",
       code: "MOCK_SDK_ERROR",
       message: "resolved sdk error message",
     });
+  });
+});
+
+// Regression coverage for: Card Fields checkout never completing when the PayPal order isn't
+// approved yet. isCheckoutCard (usePayment's new flag for handleCreateOrder/handleOnApprove) must
+// be derived from onRegisterSubmit — the same signal this file already uses everywhere else to
+// tell Checkout mode from legacy/self-hosted mode (see the header comment above).
+describe("CardFieldsMask — passes isCheckoutCard (derived from onRegisterSubmit) through to handleCreateOrder/handleOnApprove", () => {
+  const mockHandleCreateOrder = jest.fn();
+  const mockHandleOnApprove = jest.fn();
+
+  beforeEach(() => {
+    capturedProviderProps = undefined;
+    mockHandleCreateOrder.mockReset().mockResolvedValue("order-1");
+    mockHandleOnApprove.mockReset().mockResolvedValue(undefined);
+    mockNotify.mockReset();
+    mockIsLoading.mockReset();
+    mockUsePayment.mockReset().mockReturnValue({
+      handleCreateOrder: mockHandleCreateOrder,
+      handleOnApprove: mockHandleOnApprove,
+      handleAuthenticateThreeDSOrder: jest.fn(),
+      vaultOnly: false,
+      handleApproveVaultSetupToken: jest.fn(),
+      handleCreateVaultSetupToken: jest.fn(),
+      orderDataLinks: undefined,
+      orderId: undefined,
+    });
+    mockUseSettings.mockReset().mockReturnValue({
+      settings: undefined,
+      paymentTokens: undefined,
+    });
+  });
+
+  it("passes isCheckoutCard=true in Checkout mode (onRegisterSubmit supplied)", async () => {
+    render(<CardFieldsMask onRegisterSubmit={jest.fn()} />);
+
+    capturedProviderProps.createOrder();
+    expect(mockHandleCreateOrder).toHaveBeenCalledWith(
+      {
+        paymentSource: "card",
+        storeInVault: false,
+        verificationMethod: undefined,
+      },
+      true
+    );
+
+    await act(async () => {
+      capturedProviderProps.onApprove({ orderID: "order-1" });
+      await flushMicrotasks();
+    });
+    expect(mockHandleOnApprove).toHaveBeenCalledWith(
+      { orderID: "order-1", saveCard: false },
+      true
+    );
+  });
+
+  it("passes isCheckoutCard=false in legacy/self-hosted mode (no onRegisterSubmit)", async () => {
+    render(<CardFieldsMask />);
+    // The checkout-relevant createOrder/onApprove block only renders once a card is being
+    // added — in legacy mode that's driven by picking "Add a new card" from the saved-card table.
+    fireEvent.click(screen.getByLabelText("cardFields.addNewCard"));
+
+    capturedProviderProps.createOrder();
+    expect(mockHandleCreateOrder).toHaveBeenCalledWith(
+      {
+        paymentSource: "card",
+        storeInVault: false,
+        verificationMethod: undefined,
+      },
+      false
+    );
+
+    await act(async () => {
+      capturedProviderProps.onApprove({ orderID: "order-1" });
+      await flushMicrotasks();
+    });
+    expect(mockHandleOnApprove).toHaveBeenCalledWith(
+      { orderID: "order-1", saveCard: false },
+      false
+    );
   });
 });
