@@ -99,6 +99,9 @@ export function resolvePayPalBrandOptions(
     resolvedFixedConfig?.messagesStyle ??
     resolvedOverride?.messagesStyle ??
     generalMessagesStyle;
+  const disablePayLaterButton =
+    resolvedFixedConfig?.disablePayLaterButton ??
+    resolvedOverride?.disablePayLaterButton;
 
   const initialSettings = {
     ...baseOptions.settings,
@@ -131,6 +134,7 @@ export function resolvePayPalBrandOptions(
     enableVaulting: false,
     ...(fundingSource && { fundingSource }),
     ...(messagesStyle && { messagesStyle }),
+    disablePayLaterButton,
   };
 }
 

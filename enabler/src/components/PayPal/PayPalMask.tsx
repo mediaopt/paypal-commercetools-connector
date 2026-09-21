@@ -48,12 +48,26 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
   const { t } = useTranslation();
-  const { enableVaulting, paypalMessages, messagesStyle, ...restprops } = props;
+  const {
+    enableVaulting,
+    paypalMessages,
+    messagesStyle,
+    disablePayLaterButton,
+    ...restprops
+  } = props;
   const save = useRef<HTMLInputElement>(null);
   const [{ isResolved }] = usePayPalScriptReducer();
 
   const storeInVaultOnSuccess = settings?.storeInVaultOnSuccess;
   const logTag = restprops.fundingSource ?? "PayPal";
+
+  // by PayPal requirement unless requested by merchant PayLater should be placed together with PayPal pay button
+  const payLaterButtonAllowed =
+    restprops.fundingSource === "paypal" &&
+    !vaultOnly &&
+    !isExpress &&
+    settings?.acceptPayLater !== false &&
+    disablePayLaterButton !== true;
 
   // Traceable script-resolution visibility for this specific button
   useEffect(() => {
@@ -92,6 +106,26 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
       );
     }
   }, [isResolved, restprops.fundingSource]);
+
+  const [isPayLaterEligible, setIsPayLaterEligible] = useState(true);
+
+  // isFundingSourceEligible above, but for the extra "paylater" button specifically
+  useEffect(() => {
+    if (!isResolved || !payLaterButtonAllowed || !window.paypal?.Buttons) {
+      return;
+    }
+    const eligible = window.paypal
+      .Buttons({ fundingSource: "paylater" })
+      .isEligible();
+    setIsPayLaterEligible(eligible);
+    if (!eligible) {
+      console.log(
+        `[paypal-enabler][${logTag}] "paylater" not eligible, skipping the extra PayLater button`
+      );
+    }
+  }, [isResolved, payLaterButtonAllowed]);
+
+  const showPayLaterButton = payLaterButtonAllowed && isPayLaterEligible;
 
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {
@@ -213,6 +247,15 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
         {...actions}
         onError={(err) => errorFunc(err, isLoading, notify, t)}
       />
+      {showPayLaterButton && (
+        <PayPalButtons
+          {...restprops}
+          fundingSource="paylater"
+          style={style}
+          {...actions}
+          onError={(err) => errorFunc(err, isLoading, notify, t)}
+        />
+      )}
       {!vaultOnly &&
         builderType !== "express" &&
         !hasPaypalToken &&

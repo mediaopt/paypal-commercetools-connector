@@ -388,6 +388,10 @@ export type CustomPayPalButtonsComponentProps = Omit<
   // renders for the standard PayPal button — resolved the same way as PayPalMethodConfig.style,
   // just a different shape (layout/logo/text/ratio vs. button color/label/shape).
   messagesStyle?: PayPalMessagesComponentProps["style"];
+  // Mirrors PayPalMethodConfig.disablePayLaterButton — resolved once per mount in
+  // resolveOptions.ts and arrives here as a real prop (like messagesStyle above), not read via
+  // useSettings().
+  disablePayLaterButton?: boolean;
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -632,6 +636,11 @@ export type PayPalMethodConfig = {
   // alongside the standard PayPal button. A different shape entirely from `style` above
   // (layout/logo/text/ratio, not button color/label/shape).
   messagesStyle?: PayPalMessagesComponentProps["style"];
+  // PayPal-brand only, "PayPal" paymentMethodType — when true, suppresses the extra
+  // <PayPalButtons fundingSource="paylater"/> PayPalMask otherwise renders directly below the
+  // standard PayPal button (gated together with settings.acceptPayLater — both must allow it).
+  // Ops-only, set via PAYPAL_BUTTON_CONFIG; no merchant-center/custom-application equivalent.
+  disablePayLaterButton?: boolean;
   // PayPal JS SDK script `components` list for this payment method (e.g. "buttons,card-fields") —
   // same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components, but resolved through this
   // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
@@ -704,6 +713,7 @@ export type BaseResolvedMethodOptions = {
 export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
   fundingSource?: FUNDING_SOURCE;
   messagesStyle?: PayPalMessagesComponentProps["style"];
+  disablePayLaterButton?: boolean;
 };
 
 /** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
