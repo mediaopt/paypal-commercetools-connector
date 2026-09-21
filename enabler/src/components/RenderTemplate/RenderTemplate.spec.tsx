@@ -12,51 +12,98 @@ jest.mock("../CardFields", () => ({
   ),
 }));
 
+// Decouples dispatch-correctness (this file) from resolution-correctness (resolveOptions.spec.ts).
+jest.mock("./resolveOptions", () => ({
+  resolvePayPalBrandOptions: jest.fn(() => ({
+    options: { clientId: "resolved" },
+    initialSettings: {},
+    enableVaulting: false,
+  })),
+  resolveCardFieldsOptions: jest.fn(() => ({
+    options: { clientId: "resolved-cardfields" },
+    initialSettings: {},
+    enableVaulting: true,
+  })),
+}));
+
 import { RenderTemplate } from "./RenderTemplate";
+import {
+  resolveCardFieldsOptions,
+  resolvePayPalBrandOptions,
+} from "./resolveOptions";
+
+const baseOptions = {
+  processorUrl: "https://processor.example",
+  sdkOptions: {},
+  settings: {},
+} as any;
+const genericOptions = { requestHeader: { "X-Session-Id": "session-id" } } as any;
 
 describe("RenderTemplate", () => {
-  it("forwards paymentMethodType and builderType to the rendered component, alongside customOptions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("dispatches PayPal-brand types to resolvePayPalBrandOptions and merges genericOptions + resolved options onto <PayPal/>", () => {
     render(
       <RenderTemplate
-        paymentMethodType="PayPal"
+        paymentMethodType="Sepa"
         builderType="express"
-        customOptions={{ foo: "bar" }}
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
       />
     );
+
+    expect(resolvePayPalBrandOptions).toHaveBeenCalledWith(
+      "Sepa",
+      baseOptions,
+      "express"
+    );
+    expect(resolveCardFieldsOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("probe");
     const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
 
     expect(props).toMatchObject({
-      foo: "bar",
-      paymentMethodType: "PayPal",
+      requestHeader: { "X-Session-Id": "session-id" },
+      options: { clientId: "resolved" },
+      enableVaulting: false,
+      paymentMethodType: "Sepa",
       builderType: "express",
+      processorUrl: "https://processor.example",
     });
   });
 
-  it("dispatches to CardFields for paymentMethodType=CardFields", () => {
+  it("dispatches CardFields to resolveCardFieldsOptions and renders <CardFields/>", () => {
     render(
       <RenderTemplate
         paymentMethodType="CardFields"
-        customOptions={{ foo: "bar" }}
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
       />
     );
+
+    expect(resolveCardFieldsOptions).toHaveBeenCalledWith(baseOptions);
+    expect(resolvePayPalBrandOptions).not.toHaveBeenCalled();
 
     const probe = screen.getByTestId("cardfields-probe");
     const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
 
     expect(props).toMatchObject({
-      foo: "bar",
+      requestHeader: { "X-Session-Id": "session-id" },
+      options: { clientId: "resolved-cardfields" },
+      enableVaulting: true,
       paymentMethodType: "CardFields",
+      processorUrl: "https://processor.example",
     });
   });
 
-  it("injects processorUrls()-derived URLs (createPaymentUrl, createOrderUrl, etc.) when processorUrl is passed", () => {
+  it("injects processorUrls()-derived URLs (createPaymentUrl, createOrderUrl, etc.) from baseOptions.processorUrl", () => {
     render(
       <RenderTemplate
         paymentMethodType="PayPal"
-        customOptions={{}}
-        processorUrl="https://processor.test"
+        baseOptions={baseOptions}
+        genericOptions={genericOptions}
       />
     );
 
@@ -64,28 +111,22 @@ describe("RenderTemplate", () => {
     const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
 
     expect(props).toMatchObject({
-      createPaymentUrl: "https://processor.test/payments",
-      createOrderUrl: "https://processor.test/payments/createOrder",
-      authorizeOrderUrl: "https://processor.test/payments/authorize",
-      onApproveUrl: "https://processor.test/payments/approve",
-      authenticateThreeDSOrderUrl: "https://processor.test/payments/3ds",
+      createPaymentUrl: "https://processor.example/payments",
+      createOrderUrl: "https://processor.example/payments/createOrder",
+      authorizeOrderUrl: "https://processor.example/payments/authorize",
+      onApproveUrl: "https://processor.example/payments/approve",
+      authenticateThreeDSOrderUrl: "https://processor.example/payments/3ds",
     });
-  });
-
-  it("injects nothing beyond customOptions when processorUrl is absent (self-hosted mode)", () => {
-    render(<RenderTemplate paymentMethodType="PayPal" customOptions={{}} />);
-
-    const probe = screen.getByTestId("probe");
-    const props = JSON.parse(probe.getAttribute("data-props") ?? "{}");
-
-    expect(props.createPaymentUrl).toBeUndefined();
-    expect(props.createOrderUrl).toBeUndefined();
   });
 
   it("throws for an unsupported payment method type", () => {
     expect(() =>
       render(
-        <RenderTemplate paymentMethodType="Invalid Method" customOptions={{}} />
+        <RenderTemplate
+          paymentMethodType="Invalid Method" as any
+          baseOptions={baseOptions}
+          genericOptions={genericOptions}
+        />
       )
     ).toThrow("Unsupported payment method type: Invalid Method");
   });
