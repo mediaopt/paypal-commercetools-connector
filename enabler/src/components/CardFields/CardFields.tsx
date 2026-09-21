@@ -3,9 +3,16 @@ import { FC } from "react";
 import { PayPalContextProvider } from "../PayPalContextProvider";
 import { CardFieldsButton } from "./CardFieldsButton";
 
-import { FormComponentProps, SmartComponentsProps } from "../../types";
+import {
+  FormComponentProps,
+  GenericError,
+  SmartComponentsProps,
+} from "../../types";
 
-export const CardFields: FC<SmartComponentsProps & FormComponentProps> = ({
+export const CardFields: FC<
+  SmartComponentsProps &
+    FormComponentProps & { onError?: (error: GenericError) => void }
+> = ({
   options,
 
   createPaymentUrl,
@@ -35,6 +42,7 @@ export const CardFields: FC<SmartComponentsProps & FormComponentProps> = ({
 
   onRegisterSubmit,
   onRegisterValidation,
+  onError,
 }) => {
   return (
     <PayPalContextProvider
@@ -65,6 +73,7 @@ export const CardFields: FC<SmartComponentsProps & FormComponentProps> = ({
         enableVaulting={enableVaulting}
         onRegisterSubmit={onRegisterSubmit}
         onRegisterValidation={onRegisterValidation}
+        onError={onError}
       />
     </PayPalContextProvider>
   );

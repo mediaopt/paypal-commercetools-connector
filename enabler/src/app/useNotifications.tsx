@@ -10,6 +10,7 @@ import {
 } from "react";
 import { NotificationType } from "../components/Notifications";
 import { NotificationTypeBanner } from "../components/Notifications/NotificationTypeBanner";
+import { createPortal } from "react-dom";
 
 type NotificationWithId = { id: string; text: string; type: NotificationType };
 
@@ -68,16 +69,20 @@ export const NotificationsProvider: FC<React.PropsWithChildren> = ({
 
   return (
     <NotificationContext.Provider value={value}>
-      <div className="fixed bottom-0 left-0 right-0 z-50 w-full">
-        {notifications.map((n) => (
-          <NotificationTypeBanner
-            key={n.id}
-            type={n.type}
-            text={n.text}
-            onClose={() => removeNotification(n.id)}
-          />
-        ))}
-      </div>
+      {/* z-1000000001 is for render exactly above checkout */}
+      {createPortal(
+        <div className="fixed bottom-0 left-0 right-0 z-1000000001 w-full">
+          {notifications.map((n) => (
+            <NotificationTypeBanner
+              key={n.id}
+              type={n.type}
+              text={n.text}
+              onClose={() => removeNotification(n.id)}
+            />
+          ))}
+        </div>,
+        document.body
+      )}
       {children}
     </NotificationContext.Provider>
   );
