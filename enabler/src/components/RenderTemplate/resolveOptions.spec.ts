@@ -106,6 +106,43 @@ describe("resolvePayPalBrandOptions", () => {
     expect(result.initialSettings.paypalButtonConfig?.buttonColor).toBe("gold");
   });
 
+  it("express builder: script components default to 'buttons,messages' (ENABLER_DEFAULT_EXPRESS_CONFIG.components) when the processor sends none — PayPalMessagesWidget needs 'messages' to render at all", () => {
+    const result = resolvePayPalBrandOptions(
+      "PayPal",
+      baseOptions({ expressSdkOptions: { currency: "USD" } as any }),
+      "express"
+    );
+
+    expect(result.options).toMatchObject({ components: "buttons,messages" });
+  });
+
+  it("express builder: the processor's expressSdkOptions.components wins outright over the default, even when the merchant strips 'messages' back out", () => {
+    const result = resolvePayPalBrandOptions(
+      "PayPal",
+      baseOptions({
+        expressSdkOptions: { components: "buttons" } as any,
+      }),
+      "express"
+    );
+
+    expect(result.options).toMatchObject({ components: "buttons" });
+  });
+
+  it("standard builder: 'messages' is never forced into options.components — same shared paypalScriptOptions object as-is", () => {
+    const paypalScriptOptions = {
+      clientId: "x",
+      currency: "EUR",
+      components: ["buttons"],
+    } as any;
+    const result = resolvePayPalBrandOptions(
+      "PayPal",
+      baseOptions({ paypalScriptOptions }),
+      undefined
+    );
+
+    expect(result.options).toBe(paypalScriptOptions);
+  });
+
   it("standard builder: buttonLabel is not forced — settings.PayPal.style.buttonLabel is honored as-is", () => {
     const result = resolvePayPalBrandOptions(
       "PayPal",

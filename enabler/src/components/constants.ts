@@ -78,7 +78,7 @@ export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<
 > = {
   style: { buttonColor: "blue", buttonLabel: "buynow", buttonShape: "rect" },
   fundingSource: "paypal",
-  components: "buttons,card-fields",
+  components: "buttons,messages",
 };
 
 // Enabler's own built-in default, lowest-priority tier: what renders when the processor sends

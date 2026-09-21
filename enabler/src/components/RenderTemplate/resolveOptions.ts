@@ -32,17 +32,25 @@ export function resolvePayPalBrandOptions(
   // per-payment-method) since no other paymentMethodType can ever produce it.
   const isExpress = builderType === "express";
 
+  const resolvedDefaults = isExpress
+    ? ENABLER_DEFAULT_EXPRESS_CONFIG
+    : ENABLER_DEFAULT_CONFIG[paymentMethodType];
+
   // Standard (non-express) components all share the ONE script config resolved once in
   // PayPalPaymentEnabler._Setup() (see BaseOptions.paypalScriptOptions) — avoids each mounted
   // component's own PayPalScriptProvider racing on the PayPal JS SDK.
   // Express is supposed to be loaded on a different page so it keeps resolving own config.
   const options = isExpress
-    ? buildScriptOptions(baseOptions, baseOptions.expressSdkOptions, true)
+    ? buildScriptOptions(
+        baseOptions,
+        {
+          // ENABLER_DEFAULT_EXPRESS_CONFIG.components's own fallback, lowest priority
+          components: resolvedDefaults.components,
+          ...baseOptions.expressSdkOptions,
+        },
+        true
+      )
     : baseOptions.paypalScriptOptions;
-
-  const resolvedDefaults = isExpress
-    ? ENABLER_DEFAULT_EXPRESS_CONFIG
-    : ENABLER_DEFAULT_CONFIG[paymentMethodType];
   const fixedOverrides =
     FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
   // PayPal Express keeps its existing overridable fundingSource (settings.PayPalExpress.fundingSource)
