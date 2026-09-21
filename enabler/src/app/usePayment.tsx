@@ -382,9 +382,14 @@ export const PaymentProvider: FC<
           });
           const { status } = confirmOrderResult;
           if (status === "APPROVED") {
-            handleOnApprove({ orderID: newOrderData.id }).then(() =>
-              onSuccess(newOrderData)
-            );
+            handleOnApprove({ orderID: newOrderData.id })
+              .then(() => onSuccess(newOrderData))
+              .catch((err) =>
+                console.error(
+                  "GooglePay: handleOnApprove (APPROVED) failed",
+                  err
+                )
+              );
           } else if (
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
@@ -394,13 +399,18 @@ export const PaymentProvider: FC<
               .Googlepay()
               .initiatePayerAction({ orderId: newOrderData.id })
               .then(() => {
-                handleAuthenticateThreeDSOrder(newOrderData.id, true).then(
-                  (result) => {
+                handleAuthenticateThreeDSOrder(newOrderData.id, true)
+                  .then((result) => {
                     switch (result.toString(10)) {
                       case "2":
-                        handleOnApprove({ orderID: newOrderData.id }).then(
-                          () => onSuccess(newOrderData)
-                        );
+                        handleOnApprove({ orderID: newOrderData.id })
+                          .then(() => onSuccess(newOrderData))
+                          .catch((err) =>
+                            console.error(
+                              "GooglePay: handleOnApprove (3DS approved) failed",
+                              err
+                            )
+                          );
                         break;
                       case "1":
                         notify("Warning", t("cardFields.tryAgain"));
@@ -415,9 +425,17 @@ export const PaymentProvider: FC<
                         isLoading(false);
                         break;
                     }
-                  }
-                );
-              });
+                  })
+                  .catch((err) =>
+                    console.error(
+                      "GooglePay: handleAuthenticateThreeDSOrder failed",
+                      err
+                    )
+                  );
+              })
+              .catch((err: any) =>
+                console.error("GooglePay: initiatePayerAction failed", err)
+              );
           } else {
             return "";
           }
