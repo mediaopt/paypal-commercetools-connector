@@ -63,13 +63,6 @@ class PayPalComponent implements PaymentComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
-    //todo - remove console log after live tests success
-    console.log(
-      `[paypal-enabler] mount ${this.paymentMethodType}${
-        this.builderType ? ` (${this.builderType})` : ""
-      } -> ${selector}`
-    );
-
     if (this.root) {
       console.warn(
         `[paypal-enabler] ${this.paymentMethodType} mount() called again while a previous root was still active — unmounting it before remounting`
@@ -207,7 +200,6 @@ class PayPalComponent implements PaymentComponent {
   }
 
   unmount(): void {
-    console.log(`[paypal-enabler] unmount ${this.paymentMethodType}`);
     if (this.root) {
       this.root.unmount();
       this.root = null;

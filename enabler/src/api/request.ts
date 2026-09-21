@@ -41,7 +41,7 @@ export const makeRequest = <ResponseType, T>(
         // `error instanceof Error ? error.message : t(...)` catch throughout the enabler falls
         // through to its own already-defined, translated fallback instead of surfacing this to
         // the shopper via notify().
-        console.log(
+        console.warn(
           `Request to ${url} failed with status ${response.status}`,
           body
         );

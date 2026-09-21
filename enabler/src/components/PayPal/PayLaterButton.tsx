@@ -39,7 +39,7 @@ export const PayLaterButton: React.FC<PayLaterButtonProps> = ({
       .isEligible();
     setIsPayLaterEligible(eligible);
     if (!eligible) {
-      console.log(
+      console.warn(
         `[paypal-enabler][paylater] not eligible, skipping the extra PayLater button`
       );
     }

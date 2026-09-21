@@ -23,9 +23,6 @@ class PayPalStoredComponent implements StoredComponent {
   ) {}
 
   async mount(selector: string): Promise<void> {
-    //todo - remove after success server tests
-    console.log(`[paypal-enabler] mount CardFieldsStored -> ${selector}`);
-
     if (this.root) {
       console.warn(
         "[paypal-enabler] CardFieldsStored mount() called again while a previous root was still active — unmounting it before remounting"
@@ -89,7 +86,6 @@ class PayPalStoredComponent implements StoredComponent {
   }
 
   unmount(): void {
-    console.log("[paypal-enabler] unmount CardFieldsStored");
     if (this.root) {
       this.root.unmount();
       this.root = null;

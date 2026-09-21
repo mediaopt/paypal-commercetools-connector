@@ -242,37 +242,11 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardFieldsForm]);
 
-  // TODO - remove after server tests success
-  useEffect(() => {
-    if (cardFieldsForm) {
-      console.log("[paypal-enabler][CardFields] cardFieldsForm ready");
-      return;
-    }
-    if (!isCardFieldsScriptResolved) {
-      return;
-    }
-    // "Resolved but no form yet" is the normal intermediate state, not a failure: the form is only
-    // populated an effect-cycle later
-    const timer = window.setTimeout(() => {
-      console.error(
-        "[paypal-enabler][CardFields] script resolved but cardFieldsForm never became ready"
-      );
-    }, CARD_FIELDS_READY_TIMEOUT_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [cardFieldsForm, isCardFieldsScriptResolved]);
-
   // Safety net for submit(): every other code path that ends the "paying" state (the 3DS
   // switch below, handleError, errorFunc, handleOnApprove's finally) clears the loader — this is
   // the one guard against the SDK never calling onApprove/onError at all.
   useEffect(() => {
     if (!paying) return;
-    // TODO - remove after server tests success
-    console.log(
-      "[paypal-enabler][CardFields] submit() watchdog armed for",
-      CARD_FIELDS_SUBMIT_TIMEOUT_MS,
-      "ms"
-    );
     const timer = window.setTimeout(() => {
       console.error(
         "[paypal-enabler][CardFields] submit() never completed (no onApprove/onError within timeout) — resetting"
@@ -286,22 +260,6 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paying]);
 
-  // TODO - remove after server tests success
-  // Detects a remount/unmount mid-flow, which would silently cancel the watchdog above (its
-  // cleanup runs on unmount too) while the *global* loader (useLoader()'s context, which lives
-  // above this component) stays stuck visible since nothing left alive ever clears it again.
-  const payingRef = useRef(paying);
-  payingRef.current = paying;
-  useEffect(() => {
-    return () => {
-      if (payingRef.current) {
-        console.error(
-          "[paypal-enabler][CardFields] component unmounted while still paying — watchdog cancelled"
-        );
-      }
-    };
-  }, []);
-
   const handleApprove = (data: CardFieldsOnApproveData) => {
     if (vaultOnly) {
       approveTransaction({ vaultSetupToken: data.orderID });
@@ -314,18 +272,8 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     };
 
     if (threeDSAuth) {
-      // TODO - remove after server tests success
-      console.log(
-        "[paypal-enabler][CardFields] 3DS authenticate: requesting",
-        data.orderID
-      );
       handleAuthenticateThreeDSOrder(data.orderID)
         .then((result) => {
-          // TODO - remove after server tests success
-          console.log(
-            "[paypal-enabler][CardFields] 3DS authenticate: resolved",
-            result
-          );
           switch (result.toString(10)) {
             case "2":
               approveTransaction(approveData);
@@ -354,8 +302,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
           }
         })
         .catch((err) => {
-          // TODO - remove after server tests success
-          console.log(
+          console.warn(
             "[paypal-enabler][CardFields] 3DS authenticate: rejected",
             err
           );

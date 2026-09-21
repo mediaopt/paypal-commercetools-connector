@@ -41,9 +41,7 @@ const SettingsContext = createContext<SettingsContextT>({
 // Diagnostic only — logs PayPal JS SDK script-loading state transitions, tagged with the
 // component that mounted it. Must live inside <PayPalScriptProvider> to call
 // usePayPalScriptReducer(). react-paypal-js's own PayPalScriptProvider already console.errors a
-// genuine load rejection, but that log carries no indication of which mounted component it
-// belongs to, and nothing today logs the "never resolves" case at all.
-//todo - remove excessive logs after success server tests
+// genuine load rejection, but that log carries no indication of which mounted component it belongs to
 const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
   const [scriptState] = usePayPalScriptReducer();
   const { isInitial, isPending, isResolved, isRejected, options } = scriptState;
@@ -58,9 +56,6 @@ const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
       : isInitial
       ? "INITIAL"
       : "UNKNOWN";
-    console.log(
-      `[paypal-enabler][script:${tag ?? "unknown"}] loadingStatus=${status}`
-    );
     if (isRejected) {
       // loadingStatusErrorMessage exists on the underlying reducer state at runtime (it's on
       // ScriptContextState) but isn't part of ScriptContextDerivedState's declared type.
@@ -80,14 +75,6 @@ const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
       );
     }
   }, [isInitial, isPending, isResolved, isRejected]);
-
-  useEffect(() => {
-    // Only meaningful to log once, when this provider instance is first created.
-    console.log(
-      `[paypal-enabler][script:${tag ?? "unknown"}] options:`,
-      options
-    );
-  }, []);
 
   return null;
 };
@@ -208,12 +195,6 @@ export const SettingsProvider: FC<
       value.handleGetSettings();
     }
   }, [settings]);
-
-  //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
-  console.log(
-    `[paypal-enabler][${scriptLogTag}] PayPalScriptProvider merchantId:`,
-    settings?.merchantId || "(empty)"
-  );
 
   // isStoredCheckoutComponent is set once, at the source, by PayPalStoredBuilder (see its own
   // comment) for every component it builds — none of them need the PayPal JS SDK to render —

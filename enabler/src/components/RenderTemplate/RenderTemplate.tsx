@@ -164,13 +164,6 @@ export const mountRenderTemplate = (
   selector: string,
   props: RenderTemplateProps
 ): Root => {
-  //todo - remove after server tests success
-  console.log(
-    `[paypal-enabler] mountRenderTemplate ${props.paymentMethodType}${
-      props.builderType ? ` (${props.builderType})` : ""
-    } selector="${selector}"`
-  );
-
   const element = document.querySelector(selector);
   if (!element) {
     throw new Error(`Element not found for selector: ${selector}`);

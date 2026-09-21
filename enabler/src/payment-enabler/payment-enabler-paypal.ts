@@ -40,19 +40,6 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   private static _Setup = async (
     options: EnablerOptions
   ): Promise<{ baseOptions: BaseOptions }> => {
-    // Traceable per-call id: lets multiple overlapping/repeated _Setup() runs (e.g. Checkout
-    // re-triggering setup on a payment-method switch) be told apart in the console instead of
-    // their logs interleaving indistinguishably.
-    //todo - remove setup call id after live tests
-    const setupCallId = Math.random().toString(36).slice(2, 7);
-
-    console.log(
-      `[paypal-enabler][setup:${setupCallId}] starting — processorUrl:`,
-      options.processorUrl,
-      "| sessionId:",
-      options.sessionId
-    );
-
     try {
       // Fetch SDK config from processor
       const configResponse = await fetch(
@@ -66,11 +53,6 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       if (!configResponse.ok) {
         throw new Error("Could not fetch config");
       }
-
-      console.log(
-        `[paypal-enabler][setup:${setupCallId}] config fetched — status:`,
-        configResponse.status
-      );
 
       const configJson = await configResponse.json();
 
@@ -92,14 +74,6 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           : undefined,
       };
 
-      //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
-      console.log(
-        `[paypal-enabler][setup:${setupCallId}] paypalScriptOptions:`,
-        paypalScriptOptions,
-        "| merchantId:",
-        paypalScriptOptions.merchantId || "(empty)"
-      );
-
       // One shared commercetools Payment per checkout page load, shared by every standard/stored/
       // express builder resolving this same setupData; and the one PayPal JS SDK script load
       // above — independent of each other, so run together instead of sequentially. Both fatal on failure.
@@ -116,11 +90,6 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       if (!paymentResult) {
         throw new Error("Could not create payment");
       }
-
-      console.log(
-        `[paypal-enabler][setup:${setupCallId}] payment created/reused and PayPal script preloaded — payment id:`,
-        paymentResult.id
-      );
 
       return {
         baseOptions: {
@@ -143,16 +112,17 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
             configJson.purchaseCallback ||
             options.onComplete ||
             ((result: any, options: any) => {
-              console.log("Payment completed", result, options);
+              console.warn(
+                "Please configure merchant return url for checkout mode or purchaceCallback for legacy mode",
+                result,
+                options
+              );
             }),
         },
       };
     } catch (err) {
       // Rethrown unchanged; this only adds visibility.
-      console.error(
-        `[paypal-enabler][setup:${setupCallId}] _Setup failed:`,
-        err
-      );
+      console.error(`[paypal-enabler][setup] _Setup failed:`, err);
       throw err;
     }
   };

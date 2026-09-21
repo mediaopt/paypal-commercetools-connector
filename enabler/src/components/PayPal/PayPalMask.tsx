@@ -96,11 +96,6 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
       paypalEligible &&
       (restprops.fundingSource !== "venmo" || isVenmoSupported());
     setIsFundingSourceEligible(isEligible);
-    if (!isEligible) {
-      console.log(
-        `[paypal-enabler][${logTag}] funding source not eligible, rendering not-eligible notice instead of an error`
-      );
-    }
   }, [isResolved, restprops.fundingSource]);
 
   const hasPaypalToken = useMemo(() => {
