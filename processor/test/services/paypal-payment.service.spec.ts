@@ -1069,12 +1069,7 @@ describe("paypal-payment.service", () => {
           transaction: expect.objectContaining({ type: "Charge" }),
         })
       );
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: `Payment ${mockPayment.id} captured successfully`,
-        })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("captures the existing authorization when intent is Authorize and one already exists", async () => {
@@ -1119,12 +1114,7 @@ describe("paypal-payment.service", () => {
           transaction: expect.objectContaining({ type: "Charge" }),
         })
       );
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: `Payment ${mockPayment.id} captured successfully`,
-        })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("authorizes when intent is Authorize and nothing has been authorized yet", async () => {
@@ -1164,12 +1154,7 @@ describe("paypal-payment.service", () => {
           transaction: expect.objectContaining({ type: "Authorization" }),
         })
       );
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: `Payment ${mockPayment.id} authorized — call capturePayment again to capture funds`,
-        })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("throws when intent is Capture, nothing has been authorized, and the payment has no interfaceId", async () => {
@@ -1254,12 +1239,7 @@ describe("paypal-payment.service", () => {
           }),
         })
       );
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: `Payment ${mockPayment.id} refunded successfully`,
-        })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("falls back to the most recent successful Charge when no transactionId is given", async () => {
@@ -1283,9 +1263,7 @@ describe("paypal-payment.service", () => {
         "capture-id",
         { amount: expect.anything() }
       );
-      expect(result).toEqual(
-        expect.objectContaining({ success: true })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("still auto-selects the Charge for a further partial refund even after a prior refund", async () => {
@@ -1321,7 +1299,7 @@ describe("paypal-payment.service", () => {
         "capture-id",
         { amount: expect.anything() }
       );
-      expect(result).toEqual(expect.objectContaining({ success: true }));
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("throws when no matching transaction is found for the given transactionId", async () => {
@@ -1413,12 +1391,7 @@ describe("paypal-payment.service", () => {
           }),
         })
       );
-      expect(result).toEqual(
-        expect.objectContaining({
-          success: true,
-          message: `Payment ${mockPayment.id} voided successfully`,
-        })
-      );
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("throws when no successful authorization transaction exists", async () => {
@@ -1528,7 +1501,7 @@ describe("paypal-payment.service", () => {
         "auth-id"
       );
       expect(CommonConnect.refundPayPalOrder).not.toHaveBeenCalled();
-      expect(result).toEqual(expect.objectContaining({ success: true }));
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("refunds the captured amount, not the payment's full amountPlanned", async () => {
@@ -1570,7 +1543,7 @@ describe("paypal-payment.service", () => {
         { amount: { currency_code: "USD", value: "4.00" } }
       );
       expect(CommonConnect.voidPayPalAuthorization).not.toHaveBeenCalled();
-      expect(result).toEqual(expect.objectContaining({ success: true }));
+      expect(result).toEqual({ outcome: "approved" });
     });
 
     test("throws when the payment has already been fully refunded", async () => {
