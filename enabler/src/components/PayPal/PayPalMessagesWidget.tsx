@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   PayPalMessages,
   PayPalMessagesComponentProps,
@@ -27,21 +27,16 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
   messagesStyle,
 }) => {
   const [{ isResolved }] = usePayPalScriptReducer();
-  const [isMessagesEligible, setIsMessagesEligible] = useState(false);
-
   // Messages is not part of the default script components list, so window.paypal.Messages
   // may be missing even after the script resolves - guard rather than crash on render.
+  const isMessagesEligible = isResolved && !!window.paypal?.Messages;
+
   useEffect(() => {
-    if (!isResolved) {
-      return;
-    }
-    if (!window.paypal?.Messages) {
+    if (isResolved && !window.paypal?.Messages) {
       console.warn(
         `[paypal-enabler][messages] script resolved but window.paypal.Messages is missing — the message will not render`
       );
-      return;
     }
-    setIsMessagesEligible(true);
   }, [isResolved]);
 
   const resolved = useMemo<PayPalMessagesComponentProps | undefined>(() => {

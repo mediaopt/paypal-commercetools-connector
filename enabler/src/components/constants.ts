@@ -94,7 +94,7 @@ export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<
   // this value never actually changes in practice; kept for a type-required field's sake.
   style: { buttonColor: "blue", buttonLabel: "buynow", buttonShape: "rect" },
   fundingSource: "paypal",
-  components: "buttons,card-fields",
+  components: "buttons,messages",
 };
 // Enabler's own built-in default, lowest-priority tier: what renders when the processor sends
 // nothing at all for this payment method. Flat, keyed by paymentMethodType — add a row here for a
