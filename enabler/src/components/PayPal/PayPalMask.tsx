@@ -14,6 +14,7 @@ import { useNotifications } from "../../app/useNotifications";
 import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
 import { isVenmoSupported } from "../venmoAvailability";
+import { PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES } from "./messagesConstants";
 
 // Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
 // SDK's own actions.reject()
@@ -125,18 +126,26 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     return styles;
   }, [settings, restprops]);
 
-  // Real (merchant-agnostic) config for the standard PayPal button's <PayPalMessages/> — amount
-  // and currency come from the actual cart total, placement reflects where the button is mounted
-  // (Express is a product/cart-page Buy Now button; everything else is the checkout/payment page),
-  // style comes from settings (see resolveOptions.ts's generalMessagesStyle, sourced from the CT
-  // custom object's payLater* fields, overridable via PAYPAL_BUTTON_CONFIG). Undefined for
-  // vaultOnly — a vault-setup-token flow has no purchase amount to message against.
+  // In legacy mode it is merchant responsibility to provide messages content,
+  // in checkout they are calculated based on cart
+  // if cart currency and PayPal merchant account currency don't match -
+  // messages will not be shown by PayPal automatically
   const resolvedPaypalMessages = useMemo<
     PayPalMessagesComponentProps | undefined
   >(() => {
-    if (vaultOnly) {
+    if (paypalMessages) {
+      return paypalMessages;
+    }
+    if (
+      restprops.fundingSource !== "paypal" ||
+      !paymentInfo.countryCode ||
+      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(paymentInfo.countryCode)
+    ) {
       return undefined;
     }
+    if (vaultOnly) {
+      return undefined;
+    } //kept for consistency if vaultOnly will ever be allowed in checkout
     const { centAmount, currencyCode, fractionDigits } =
       paymentInfo.amountPlanned;
     return {
@@ -145,7 +154,14 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
       currency: currencyCode as PayPalMessagesComponentProps["currency"],
       placement: isExpress ? "product" : "payment",
     };
-  }, [vaultOnly, paymentInfo, isExpress, messagesStyle]);
+  }, [
+    paypalMessages,
+    restprops.fundingSource,
+    paymentInfo,
+    vaultOnly,
+    isExpress,
+    messagesStyle,
+  ]);
 
   let actions: any;
 
@@ -213,15 +229,7 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
           </label>
         )}
 
-      {paypalMessages && <PayPalMessages {...paypalMessages} />}
-      {/* Gated to a single funding source — Checkout mounts every configured payment method's
-          PayPalMask concurrently, and mounting more than one <PayPalMessages> at once against the
-          same PayPal JS SDK instance throws inside the SDK itself (can't access "PAGE_TYPE"). */}
-      {!paypalMessages &&
-        restprops.fundingSource === "paypal" &&
-        resolvedPaypalMessages && (
-          <PayPalMessages {...resolvedPaypalMessages} />
-        )}
+      {resolvedPaypalMessages && <PayPalMessages {...resolvedPaypalMessages} />}
 
       {restprops.fundingSource && !isFundingSourceEligible && (
         <div>{t("payPal.notEligible")}</div>
