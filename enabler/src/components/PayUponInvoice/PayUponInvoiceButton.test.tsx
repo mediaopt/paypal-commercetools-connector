@@ -68,6 +68,23 @@ test("If intent is wrong corresponding error is shown", () => {
   expect(screen.getAllByText("invoice.merchantIssue").length).toEqual(1);
 });
 
+test("In Checkout mode (onRegisterSubmit provided), a non-Capture settings.payPalIntent does not block the mask — regression test for the two-script-tag crash", () => {
+  // Intent is forced to Capture at createOrder submission time in Checkout mode (see
+  // usePayment.tsx's handleCreateOrder), not via settings, so this check must not fire there.
+  (usePayment as jest.Mock).mockReturnValue({
+    paymentInfo: paymentInfoWithAmount(2000),
+    clientToken: "123",
+  });
+  (useSettings as jest.Mock).mockReturnValue({
+    settings: { payPalIntent: "Authorize" },
+  });
+  render(
+    <PayUponInvoiceButton {...testButtonProps} onRegisterSubmit={() => {}} />,
+  );
+  expect(screen.getAllByText("Mocked mask").length).toEqual(1);
+  expect(screen.queryByText("invoice.merchantIssue")).toEqual(null);
+});
+
 test("If amount is smaller than min corresponding error is shown", () => {
   (usePayment as jest.Mock).mockReturnValue({
     paymentInfo: paymentInfoWithAmount(100),

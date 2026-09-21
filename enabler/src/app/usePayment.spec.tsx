@@ -7,7 +7,7 @@ jest.mock("../services/processorRequest", () => ({
   processorRequest: jest.fn(),
 }));
 jest.mock("./useSettings", () => ({
-  useSettings: () => ({ settings: undefined }),
+  useSettings: jest.fn(() => ({ settings: undefined })),
 }));
 const mockNotify = jest.fn();
 jest.mock("./useNotifications", () => ({
@@ -19,17 +19,30 @@ jest.mock("../helpers/redirectTo", () => ({
 
 import { processorRequest } from "../services/processorRequest";
 import { redirectTo } from "../helpers/redirectTo";
+import { useSettings } from "./useSettings";
 import { PaymentProvider, usePayment } from "./usePayment";
 
 const mockedProcessorRequest = processorRequest as jest.MockedFunction<
   typeof processorRequest
 >;
 const mockedRedirectTo = redirectTo as jest.MockedFunction<typeof redirectTo>;
+const mockedUseSettings = useSettings as jest.Mock;
 
 const CreateOrderConsumer: FC = () => {
   const { handleCreateOrder } = usePayment();
   useEffect(() => {
     handleCreateOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+};
+
+const CreateOrderWithDataConsumer: FC<{ orderData?: Record<string, unknown> }> = ({
+  orderData,
+}) => {
+  const { handleCreateOrder } = usePayment();
+  useEffect(() => {
+    handleCreateOrder(orderData as never);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
@@ -848,5 +861,61 @@ describe("PaymentProvider resolveShippingOptionId", () => {
     );
 
     await waitFor(() => expect(onError).toHaveBeenCalled());
+  });
+});
+
+describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInvoice orders", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockedProcessorRequest.mockResolvedValue(false);
+    mockNotify.mockReset();
+    // Real merchant-configured intent — must not reach the processor unchanged for a PUI order.
+    mockedUseSettings.mockReturnValue({ settings: { payPalIntent: "Authorize" } });
+  });
+
+  afterEach(() => {
+    mockedUseSettings.mockReturnValue({ settings: undefined });
+  });
+
+  it("submits payPalIntent: 'Capture' when orderData.fraudNetSessionId is present (PUI signal), overriding the real settings.payPalIntent — regression test for the two-script-tag crash", async () => {
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{ fraudNetSessionId: "session-1" }}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+
+    const [, , body] = mockedProcessorRequest.mock.calls[0];
+    expect(body).toMatchObject({ payPalIntent: "Capture" });
+  });
+
+  it("leaves payPalIntent as the real settings.payPalIntent when orderData has no fraudNetSessionId (non-PUI orders)", async () => {
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+
+    const [, , body] = mockedProcessorRequest.mock.calls[0];
+    expect(body).toMatchObject({ payPalIntent: "Authorize" });
   });
 });
