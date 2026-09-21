@@ -160,14 +160,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const rawSettings = await getSettings();
     if (!rawSettings)
       log.warn(`No settings configured in merchant center application.`);
-    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
-    log.info(
-      `resolveSettings: hasRawSettings=${!!rawSettings} rawMerchantId=${JSON.stringify(
-        rawSettings?.merchantId
-      )} fallbackMerchantId=${JSON.stringify(
-        getConfig().settingsFallback.merchantId
-      )}`
-    );
     return rawSettings
       ? { ...getConfig().settingsFallback, ...rawSettings }
       : getConfig().settingsFallback;
@@ -266,17 +258,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
         'ApplePay is using the default applePayDisplayName ("My Store") — set PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName to your store\'s real name.'
       );
     }
-
-    //todo - remove after ApplePay/GooglePay/Venmo merchantId investigation
-    log.info(
-      `config: merchantId=${JSON.stringify(
-        mergedSettings.merchantId
-      )} components=${JSON.stringify(
-        standardScriptOptions.components
-      )} disableFunding=${JSON.stringify(
-        standardScriptOptions.disableFunding
-      )} currency=${cartSummary?.currency}`
-    );
 
     return {
       clientId: getConfig().paypalClientId ?? "",
