@@ -37,9 +37,7 @@ import { findMatchingExtension } from '../service/commercetools.service';
 const PAYPAL_API_PAYMENT_ENDPOINTS = [
   ...PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES,
   'getClientToken',
-  'voidPayPalAuthorization',
   'getPayPalCapture',
-  'refundPayPalOrder',
   'createTrackingInformation',
   'updateTrackingInformation',
 ];

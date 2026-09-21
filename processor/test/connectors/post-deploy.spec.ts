@@ -20,6 +20,10 @@ const PAYMENT_TYPE_FULL_FIELD_NAMES = [
   "getPayPalOrderResponse",
   "updatePayPalOrderProcessorRequest",
   "updatePayPalOrderResponse",
+  "refundPayPalOrderProcessorRequest",
+  "refundPayPalOrderResponse",
+  "voidPayPalAuthorizationProcessorRequest",
+  "voidPayPalAuthorizationResponse",
 ];
 
 const CUSTOMER_TYPE_FULL_FIELD_NAMES = [
@@ -57,7 +61,7 @@ describe("connectors/post-deploy", () => {
     jest.clearAllMocks();
   });
 
-  test("provisions paypal-payment-type with processor's own 6 endpoints plus PayPalOrderId", async () => {
+  test("provisions paypal-payment-type with processor's own 8 endpoints plus PayPalOrderId", async () => {
     const createOrUpdate = await runPostDeploy();
 
     expect(createOrUpdate).toHaveBeenCalledWith({

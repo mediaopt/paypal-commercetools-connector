@@ -60,7 +60,7 @@ describe("toFieldDefinition", () => {
 });
 
 describe("processor's narrow endpoint-name lists", () => {
-  test("payment call names has no duplicates and matches the 6 endpoints processor actually calls", () => {
+  test("payment call names has no duplicates and matches the 8 endpoints processor actually calls", () => {
     expect(new Set(PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES).size).toBe(
       PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES.length
     );
@@ -72,9 +72,11 @@ describe("processor's narrow endpoint-name lists", () => {
         "capturePayPalAuthorization",
         "getPayPalOrder",
         "updatePayPalOrder",
+        "refundPayPalOrder",
+        "voidPayPalAuthorization",
       ])
     );
-    expect(PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES).toHaveLength(6);
+    expect(PAYPAL_PROCESSOR_PAYMENT_API_CALL_NAMES).toHaveLength(8);
   });
 
   test("customer call names has no duplicates and matches the 3 endpoints processor actually calls", () => {
