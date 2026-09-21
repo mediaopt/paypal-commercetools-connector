@@ -20,6 +20,7 @@ import {
 } from "./types/operation.type";
 
 import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-componets.dto";
+import { PaymentIntentResponseSchemaDTO, PaymentModificationStatus } from "../dtos/operations/payment-intents.dto";
 import packageJSON from "../../package.json";
 
 import { AbstractPaymentService } from "./abstract-payment.service";
@@ -27,7 +28,6 @@ import { getConfig } from "../config/config";
 import { appLogger, paymentSDK } from "../payment-sdk";
 import { PayPalPaymentServiceOptions } from "./types/paypal-payment.type";
 import {
-  PaymentUpdateResponseSchemaDTO,
   PaymentRequestSchemaDTO,
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
@@ -1756,7 +1756,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
   public async settlement(
     request: ModifyPaymentWithTransactionRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO> {
+  ): Promise<PaymentIntentResponseSchemaDTO> {
     const { payment: ctPayment, amount } = request;
 
     const settings = await this.resolveSettings();
@@ -1789,11 +1789,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         callPayPal: (id) => authorizePayPalOrder(id, {}),
         ...resolvePayPalIntentTransactionConfig("Authorize"),
       });
-      return {
-        success: true,
-        message: `Payment ${ctPayment.id} authorized — call capturePayment again to capture funds`,
-        paymentReference: ctPayment.id,
-      };
+      return { outcome: PaymentModificationStatus.APPROVED };
     }
 
     if (authorizationTransaction) {
@@ -1857,11 +1853,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         "settlement"
       );
 
-      return {
-        success: true,
-        message: `Payment ${ctPayment.id} captured successfully`,
-        paymentReference: ctPayment.id,
-      };
+      return { outcome: PaymentModificationStatus.APPROVED };
     }
 
     // intent === Capture, nothing authorized (e.g. first call under Capture intent via the
@@ -1876,16 +1868,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       callPayPal: (id) => capturePayPalOrder(id, {}),
       ...resolvePayPalIntentTransactionConfig("Capture"),
     });
-    return {
-      success: true,
-      message: `Payment ${ctPayment.id} captured successfully`,
-      paymentReference: ctPayment.id,
-    };
+    return { outcome: PaymentModificationStatus.APPROVED };
   }
 
   async refundPayment(
     request: ModifyPaymentWithTransactionRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO> {
+  ): Promise<PaymentIntentResponseSchemaDTO> {
     const { payment: ctPayment, amount, transactionId } = request;
     const paypalTransactionId = findRefundableTransactionId(
       ctPayment,
@@ -1935,16 +1923,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctPayment.interfaceId
     );
 
-    return {
-      success: true,
-      message: `Payment ${ctPayment.id} refunded successfully`,
-      paymentReference: ctPayment.id,
-    };
+    return { outcome: PaymentModificationStatus.APPROVED };
   }
 
   async void(
     request: CancelPaymentRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO> {
+  ): Promise<PaymentIntentResponseSchemaDTO> {
     const { payment: ctPayment } = request;
 
     const transaction = findVoidableTransaction(ctPayment);
@@ -1987,11 +1971,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctPayment.interfaceId
     );
 
-    return {
-      success: true,
-      message: `Payment ${ctPayment.id} voided successfully`,
-      paymentReference: ctPayment.id,
-    };
+    return { outcome: PaymentModificationStatus.APPROVED };
   }
 
   public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {

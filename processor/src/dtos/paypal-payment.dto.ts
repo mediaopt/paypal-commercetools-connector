@@ -130,16 +130,6 @@ export const InitPaymentRequestSchema = Type.Object({});
 export type PaymentRequestSchemaDTO = Static<typeof InitPaymentRequestSchema>;
 export type PaymentResponseSchemaDTO = Static<typeof InitPaymentResponseSchema>;
 
-export const PaymentUpdateResponseSchema = Type.Object({
-  message: Type.Optional(Type.String()),
-  success: Type.Boolean(),
-  paymentReference: Type.Optional(Type.String()),
-  merchantReturnUrl: Type.Optional(Type.String()),
-});
-export type PaymentUpdateResponseSchemaDTO = Static<
-  typeof PaymentUpdateResponseSchema
->;
-
 // Mirrors enabler's CreatePayPalOrderData — the full field set is kept for future payment
 // methods (see enabler/src/types/index.ts's FUNDING_SOURCE), even though only
 // paymentSource === "paypal" is functionally wired up today.
