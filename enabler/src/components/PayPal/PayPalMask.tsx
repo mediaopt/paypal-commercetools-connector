@@ -1,10 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  PayPalButtons,
-  PayPalMessages,
-  PayPalMessagesComponentProps,
-  usePayPalScriptReducer,
-} from "@paypal/react-paypal-js";
+import { PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
 
 import { usePayment } from "../../app/usePayment";
@@ -14,7 +9,8 @@ import { useNotifications } from "../../app/useNotifications";
 import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
 import { isVenmoSupported } from "../venmoAvailability";
-import { PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES } from "./messagesConstants";
+import { PayLaterButton } from "./PayLaterButton";
+import { PayPalMessagesWidget } from "./PayPalMessagesWidget";
 
 // Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
 // SDK's own actions.reject()
@@ -107,26 +103,6 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
   }, [isResolved, restprops.fundingSource]);
 
-  const [isPayLaterEligible, setIsPayLaterEligible] = useState(true);
-
-  // isFundingSourceEligible above, but for the extra "paylater" button specifically
-  useEffect(() => {
-    if (!isResolved || !payLaterButtonAllowed || !window.paypal?.Buttons) {
-      return;
-    }
-    const eligible = window.paypal
-      .Buttons({ fundingSource: "paylater" })
-      .isEligible();
-    setIsPayLaterEligible(eligible);
-    if (!eligible) {
-      console.log(
-        `[paypal-enabler][${logTag}] "paylater" not eligible, skipping the extra PayLater button`
-      );
-    }
-  }, [isResolved, payLaterButtonAllowed]);
-
-  const showPayLaterButton = payLaterButtonAllowed && isPayLaterEligible;
-
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {
       return paymentTokens.payment_tokens.some(
@@ -159,43 +135,6 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
 
     return styles;
   }, [settings, restprops]);
-
-  // In legacy mode it is merchant responsibility to provide messages content,
-  // in checkout they are calculated based on cart
-  // if cart currency and PayPal merchant account currency don't match -
-  // messages will not be shown by PayPal automatically
-  const resolvedPaypalMessages = useMemo<
-    PayPalMessagesComponentProps | undefined
-  >(() => {
-    if (paypalMessages) {
-      return paypalMessages;
-    }
-    if (
-      restprops.fundingSource !== "paypal" ||
-      !paymentInfo.countryCode ||
-      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(paymentInfo.countryCode)
-    ) {
-      return undefined;
-    }
-    if (vaultOnly) {
-      return undefined;
-    } //kept for consistency if vaultOnly will ever be allowed in checkout
-    const { centAmount, currencyCode, fractionDigits } =
-      paymentInfo.amountPlanned;
-    return {
-      ...(messagesStyle && { style: messagesStyle }),
-      amount: (centAmount / 10 ** fractionDigits).toFixed(fractionDigits),
-      currency: currencyCode as PayPalMessagesComponentProps["currency"],
-      placement: isExpress ? "product" : "payment",
-    };
-  }, [
-    paypalMessages,
-    restprops.fundingSource,
-    paymentInfo,
-    vaultOnly,
-    isExpress,
-    messagesStyle,
-  ]);
 
   let actions: any;
 
@@ -239,21 +178,23 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
   }
 
+  const onError = (err: Record<string, unknown>) =>
+    errorFunc(err, isLoading, notify, t);
+
   return (
     <>
       <PayPalButtons
         {...restprops}
         style={style}
         {...actions}
-        onError={(err) => errorFunc(err, isLoading, notify, t)}
+        onError={onError}
       />
-      {showPayLaterButton && (
-        <PayPalButtons
-          {...restprops}
-          fundingSource="paylater"
+      {payLaterButtonAllowed && (
+        <PayLaterButton
+          restprops={restprops}
           style={style}
-          {...actions}
-          onError={(err) => errorFunc(err, isLoading, notify, t)}
+          actions={actions}
+          onError={onError}
         />
       )}
       {!vaultOnly &&
@@ -272,7 +213,15 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
           </label>
         )}
 
-      {resolvedPaypalMessages && <PayPalMessages {...resolvedPaypalMessages} />}
+      {!vaultOnly && (
+        <PayPalMessagesWidget
+          paypalMessages={paypalMessages}
+          fundingSource={restprops.fundingSource}
+          paymentInfo={paymentInfo}
+          isExpress={isExpress}
+          messagesStyle={messagesStyle}
+        />
+      )}
 
       {restprops.fundingSource && !isFundingSourceEligible && (
         <div>{t("payPal.notEligible")}</div>
