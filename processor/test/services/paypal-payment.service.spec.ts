@@ -1839,8 +1839,10 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       // PAYPAL_STANDARD_SCRIPT_OPTIONS/PAYPAL_EXPRESS_SDK_OPTIONS are unset in this test env, so
-      // both pass through empty.
-      expect(result.standardScriptOptions).toEqual({});
+      // standard keeps only its built-in components default and express passes through empty.
+      expect(result.standardScriptOptions).toEqual({
+        components: ["buttons", "card-fields", "messages"],
+      });
       expect(result.expressSdkOptions).toEqual({});
     });
 
@@ -1855,6 +1857,7 @@ describe("paypal-payment.service", () => {
       // buyerCountry is sandbox-only (see buildStandardScriptCartOverlay) and expressSdkOptions
       // never takes a buyerCountry at all (see buildExpressSdkOptions) — config.utils.ts.
       expect(result.standardScriptOptions).toEqual({
+        components: ["buttons", "card-fields", "messages"],
         currency: "USD",
         buyerCountry: "US",
       });
@@ -1869,7 +1872,8 @@ describe("paypal-payment.service", () => {
       jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
         ...ConfigModule.getConfig(),
         standardScriptOptions: {
-          enableFunding: "paylater",
+          components: ["buttons"],
+          enableFunding: ["paylater"],
           currency: "EUR",
           buyerCountry: "DE",
         },
@@ -1879,7 +1883,8 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       expect(result.standardScriptOptions).toEqual({
-        enableFunding: "paylater",
+        components: ["buttons"],
+        enableFunding: ["paylater"],
         currency: "USD",
         buyerCountry: "US",
       });
@@ -1897,7 +1902,9 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       expect(result.storedPaymentMethodsConfig).toEqual({ isEnabled: false });
-      expect(result.standardScriptOptions).toEqual({});
+      expect(result.standardScriptOptions).toEqual({
+        components: ["buttons", "card-fields", "messages"],
+      });
       expect(result.expressSdkOptions).toEqual({});
     });
   });

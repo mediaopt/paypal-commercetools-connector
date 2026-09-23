@@ -16,13 +16,20 @@ import {
 // would let a merchant reintroduce the divergence this exists to prevent. Format: JSON object
 // matching (a subset of) @paypal/paypal-js's PayPalScriptOptions shape (excluding clientId, which
 // the config() response supplies separately from paypalClientId below), e.g.
-// {"currency":"USD","enableFunding":"venmo"}
-// Passed through to the enabler as-is (see standardScriptOptions below) — the enabler applies its
-// own enableFunding: "paylater" default (PayPalBuilder.ts) so Pay Later stays enabled if nothing is
-// configured; that default lives enabler-side only, not duplicated here.
-const configuredStandardScriptOptions = process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
-  ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
-  : {};
+// {"currency":"USD","enableFunding":["venmo"]}
+// Layered over this connector's own built-in default — an unset/{} env value keeps it, only the keys
+// set here override it. No enableFunding/disableFunding by default: an unset value means the buyer
+// sees whatever PayPal's own SDK considers eligible.
+const configuredStandardScriptOptions: {
+  components: string[];
+  disableFunding?: string[];
+  enableFunding?: string[];
+} & Record<string, unknown> = {
+  components: ["buttons", "card-fields", "messages"], //google pay, paylater and so on will be enabled in separate branches
+  ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
+    ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
+    : {}),
+};
 
 // PayPal Express's own PayPal JS SDK script options — kept separate from
 // configuredStandardScriptOptions above because Express always mounts alone, on its own page, so
@@ -114,11 +121,12 @@ export const config = {
   // fallback — format: JSON object matching (a subset of) common-connect's PayPalSettings shape.
   settingsFallback: {
     ...CUSTOM_OBJECT_DEFAULT_VALUES,
-    ...(process.env.PAYPAL_SETTINGS ? JSON.parse(process.env.PAYPAL_SETTINGS) : {}),
+    ...(process.env.PAYPAL_SETTINGS
+      ? JSON.parse(process.env.PAYPAL_SETTINGS)
+      : {}),
   } as Partial<PayPalSettings>,
 
-  // See the configuredStandardScriptOptions/configuredExpressSdkOptions comments above — passed
-  // through as-is, no processor-side defaulting.
+  // See the configuredStandardScriptOptions/configuredExpressSdkOptions comments above.
   standardScriptOptions: configuredStandardScriptOptions,
   expressSdkOptions: configuredExpressSdkOptions,
 };

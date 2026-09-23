@@ -27,7 +27,7 @@ import { CreatePaymentResponse } from "../types";
 export type {
   PayPalPaymentMethodType,
   PayPalPaymentMethodExpressType,
-} from "../components/types";
+} from "../types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
   setupData: Promise<{ baseOptions: BaseOptions }>;
