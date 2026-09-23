@@ -39,6 +39,7 @@ import { PayPalPaymentServiceOptions } from "../../src/services/types/paypal-pay
 import * as FastifyContext from "../../src/libs/fastify/context/context";
 import * as ConfigModule from "../../src/config/config";
 import { log } from "../../src/libs/logger";
+import { buildPlaceholderInteractionId } from "../../src/utils/order.utils";
 
 describe("paypal-payment.service", () => {
   const opts: PayPalPaymentServiceOptions = {
@@ -866,7 +867,7 @@ describe("paypal-payment.service", () => {
   });
 
   describe("expressApprove", () => {
-    test("adds an Initial Authorization placeholder transaction (no interactionId) and links interfaceId (unset), via one raw CT call, for Authorize intent", async () => {
+    test("adds a Pending Authorization placeholder transaction (interactionId marked with the PayPal order id, never a real PSP id) and links interfaceId (unset), via one raw CT call, for Authorize intent", async () => {
       await paypalPaymentService.expressApprove({
         paymentId: mockPayment.id,
         orderID: mockPayPalOrder.id,
@@ -881,7 +882,8 @@ describe("paypal-payment.service", () => {
               action: "addTransaction",
               transaction: {
                 type: "Authorization",
-                state: "Initial",
+                state: "Pending",
+                interactionId: buildPlaceholderInteractionId(mockPayPalOrder.id),
                 amount: {
                   centAmount: mockPayment.amountPlanned.centAmount,
                   currencyCode: mockPayment.amountPlanned.currencyCode,
@@ -917,13 +919,14 @@ describe("paypal-payment.service", () => {
       );
     });
 
-    test("does not add a second placeholder when a matching Initial/no-interactionId transaction already exists, but still links interfaceId if unset", async () => {
+    test("does not add a second placeholder when a matching placeholder transaction already exists, but still links interfaceId if unset", async () => {
       jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
         ...mockPayment,
         transactions: [
           {
             type: "Charge",
-            state: "Initial",
+            state: "Pending",
+            interactionId: buildPlaceholderInteractionId(mockPayPalOrder.id),
             amount: mockPayment.amountPlanned,
           },
         ],
@@ -950,7 +953,8 @@ describe("paypal-payment.service", () => {
         transactions: [
           {
             type: "Charge",
-            state: "Initial",
+            state: "Pending",
+            interactionId: buildPlaceholderInteractionId(mockPayPalOrder.id),
             amount: mockPayment.amountPlanned,
           },
         ],
@@ -1150,6 +1154,76 @@ describe("paypal-payment.service", () => {
         {}
       );
       expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({ type: "Authorization" }),
+        })
+      );
+      expect(result).toEqual({ outcome: "approved" });
+    });
+
+    test("reconciles an existing Express/PUI placeholder transaction in place (raw changeTransactionState/changeTransactionInteractionId) instead of adding a duplicate, when one already exists", async () => {
+      (CommonConnect.getSettings as jest.Mock).mockResolvedValue({
+        payPalIntent: "Authorize",
+      } as never);
+      (CommonConnect.getPayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockPayPalOrder,
+        status: "APPROVED",
+      } as never);
+      (CommonConnect.authorizePayPalOrder as jest.Mock).mockResolvedValue({
+        id: "paypal-order-id",
+        status: "CREATED",
+        purchase_units: [
+          {
+            payments: {
+              authorizations: [{ id: "auth-id", status: "CREATED" }],
+            },
+          },
+        ],
+      } as never);
+      const updatePaymentSpy = jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+
+      const result = await paypalPaymentService.settlement({
+        payment: {
+          ...mockPayment,
+          interfaceId: "paypal-order-id",
+          transactions: [
+            {
+              id: "placeholder-tx-id",
+              type: "Authorization",
+              state: "Pending",
+              interactionId: buildPlaceholderInteractionId("paypal-order-id"),
+              amount: mockPayment.amountPlanned,
+            },
+          ],
+        } as unknown as Payment,
+        amount: mockAmount,
+      });
+
+      expect(CommonConnect.authorizePayPalOrder).toHaveBeenCalledWith(
+        "paypal-order-id",
+        {}
+      );
+      expect(mockClientPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            actions: [
+              {
+                action: "changeTransactionState",
+                transactionId: "placeholder-tx-id",
+                state: "Success",
+              },
+              {
+                action: "changeTransactionInteractionId",
+                transactionId: "placeholder-tx-id",
+                interactionId: "auth-id",
+              },
+            ],
+          }),
+        })
+      );
+      expect(updatePaymentSpy).not.toHaveBeenCalledWith(
         expect.objectContaining({
           transaction: expect.objectContaining({ type: "Authorization" }),
         })
