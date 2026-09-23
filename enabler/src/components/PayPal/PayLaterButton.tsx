@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import {
   PayPalButtons,
   PayPalButtonsComponentProps,
-  usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
+import { useFundingSourceEligible } from "./useFundingSourceEligible";
 
 export type PayLaterButtonProps = {
   restprops: Omit<
@@ -27,23 +26,7 @@ export const PayLaterButton: React.FC<PayLaterButtonProps> = ({
   actions,
   onError,
 }) => {
-  const [{ isResolved }] = usePayPalScriptReducer();
-  const [isPayLaterEligible, setIsPayLaterEligible] = useState(true);
-
-  useEffect(() => {
-    if (!isResolved || !window.paypal?.Buttons) {
-      return;
-    }
-    const eligible = window.paypal
-      .Buttons({ fundingSource: "paylater" })
-      .isEligible();
-    setIsPayLaterEligible(eligible);
-    if (!eligible) {
-      console.warn(
-        `[paypal-enabler][paylater] not eligible, skipping the extra PayLater button`
-      );
-    }
-  }, [isResolved]);
+  const isPayLaterEligible = useFundingSourceEligible("paylater");
 
   if (!isPayLaterEligible) {
     return null;

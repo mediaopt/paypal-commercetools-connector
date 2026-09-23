@@ -165,12 +165,11 @@ class PayPalComponent implements PaymentComponent {
 
     // Every individual funding-source button must reflect the merchant's one shared
     // standardScriptOptions.disableFunding — reuses FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE
-    // directly (same nested lookup resolveOptions.ts already uses) rather than a second map, so
+    // directly (same lookup resolveOptions.ts already uses) rather than a second map, so
     // there's one source of truth for "this type's fixed funding source."
     const fixedFundingSource =
-      FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType]?.[
-        this.paymentMethodType
-      ]?.fundingSource;
+      FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType]
+        ?.fundingSource;
     if (
       fixedFundingSource &&
       this.baseOptions.standardScriptOptions?.disableFunding?.includes(

@@ -51,12 +51,10 @@ export function resolvePayPalBrandOptions(
         true
       )
     : baseOptions.paypalScriptOptions;
-  const fixedOverrides =
-    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
   // PayPal Express keeps its existing overridable fundingSource (settings.PayPalExpress.fundingSource)
   const resolvedFixedConfig = isExpress
     ? undefined
-    : fixedOverrides?.[paymentMethodType];
+    : FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE[paymentMethodType];
   const generalStyle =
     baseOptions.settings.paypalButtonConfig && baseOptions.settings.buttonShape
       ? {
@@ -120,7 +118,6 @@ export function resolvePayPalBrandOptions(
       },
       buttonShape: resolvedStyle.buttonShape,
     }),
-    ...fixedOverrides,
     // Vaulting is only genuinely supported end-to-end for CardFields today — commercetools
     // Checkout's own stored-payment-methods feature only ever surfaces card tokens back (see
     // storedPaymentMethod.utils.ts), so vaulting via any PayPal-brand button is a dead end right
@@ -144,12 +141,9 @@ export function resolveCardFieldsOptions(
 ): CardFieldsResolvedOptions {
   // CardFields has no button style/fundingSource of its own (nothing in CardFields.tsx's render
   // tree ever reads initialSettings.paypalButtonConfig/buttonShape or a fundingSource prop).
-  const fixedOverrides =
-    FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE.CardFields;
-
   return {
     options: baseOptions.paypalScriptOptions,
-    initialSettings: { ...baseOptions.settings, ...fixedOverrides },
+    initialSettings: baseOptions.settings,
     enableVaulting: baseOptions.enableVaulting ?? false,
   };
 }

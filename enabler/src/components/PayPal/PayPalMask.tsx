@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
 
@@ -10,6 +10,7 @@ import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
 import { isVenmoSupported } from "../venmoAvailability";
 import { PayLaterButton } from "./PayLaterButton";
+import { useFundingSourceEligible } from "./useFundingSourceEligible";
 import { PayPalMessagesWidget } from "./PayPalMessagesWidget";
 
 // Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
@@ -77,26 +78,13 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
   }, [isResolved]);
 
-  const [isFundingSourceEligible, setIsFundingSourceEligible] = useState(true);
-
   // Silent-render safety net: a funding-source-restricted button (Sepa/PayLater/PayPalCreditCard/
   // Venmo) renders nothing at all when PayPal's own SDK decides the buyer/cart isn't eligible for
   // it (e.g. Venmo for a EUR cart) — notification is not an option for checkout - as it loads all methods and show error regardless if venmo is selected.
-  useEffect(() => {
-    if (!isResolved || !restprops.fundingSource || !window.paypal?.Buttons) {
-      return;
-    }
-    const paypalEligible = window.paypal
-      .Buttons({ fundingSource: restprops.fundingSource })
-      .isEligible();
-    if (!paypalEligible) {
-      console.warn(`"${restprops.fundingSource}" not eligible`);
-    }
-    const isEligible =
-      paypalEligible &&
-      (restprops.fundingSource !== "venmo" || isVenmoSupported());
-    setIsFundingSourceEligible(isEligible);
-  }, [isResolved, restprops.fundingSource]);
+  const isPayPalEligible = useFundingSourceEligible(restprops.fundingSource);
+  const isFundingSourceEligible =
+    isPayPalEligible &&
+    (restprops.fundingSource !== "venmo" || isVenmoSupported());
 
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {
