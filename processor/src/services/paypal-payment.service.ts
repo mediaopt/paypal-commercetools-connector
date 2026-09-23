@@ -101,6 +101,8 @@ import {
   resolvePayPalIntentTransactionConfig,
   findRefundableTransactionId,
   findVoidableTransaction,
+  buildPlaceholderInteractionId,
+  isPlaceholderInteractionId,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -1094,6 +1096,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * and best-effort links a vaulted card's customer id — from an Order response.
    * Deliberately excludes logProcessorInteraction: callers log their own
    * request/response pair, since "the request" differs per caller.
+   *
+   * When a placeholder transaction already exists (added by addApprovalPlaceholderTransaction()
+   * for the Express-redirect/PUI flows — Pending state, a PayPalOrderId-prefixed marker
+   * interactionId, see isPlaceholderInteractionId in order.utils.ts), it's overwritten in place via
+   * a raw CT call instead of going through ctPaymentService.updatePayment(): that wrapped helper's
+   * own transaction-matching only ever reuses an existing *Initial*-state transaction, so it would
+   * add a second, duplicate transaction here rather than recognizing this one. A raw call also has
+   * no "won't overwrite an existing interactionId" restriction, so it can freely replace the
+   * placeholder marker with the real PayPal id — the wrapped call would refuse that even if the
+   * placeholder's state did match.
    */
   private async writeSettledOrderTransaction(
     payment: Payment,
@@ -1109,19 +1121,55 @@ export class PayPalPaymentService extends AbstractPaymentService {
       response.purchase_units,
       config.purchaseUnitKey
     );
+    const newState = config.mapStatus(transaction?.status);
 
-    // updatePayment and syncPayPalOrderStatus both write the same Payment resource — sequenced,
-    // linkVaultedCardCustomer writes a different entity (Customer/PaymentMethod), so it stays parallel.
+    const placeholder = payment.transactions.find(
+      (t) =>
+        t.type === config.transactionType &&
+        isPlaceholderInteractionId(t.interactionId)
+    );
+
+    const writeTransactionPromise = placeholder
+      ? paymentSDK.ctAPI.client
+          .payments()
+          .withId({ ID: payment.id })
+          .post({
+            body: {
+              version: payment.version,
+              actions: [
+                {
+                  action: "changeTransactionState" as const,
+                  transactionId: placeholder.id,
+                  state: newState,
+                },
+                ...(transaction?.id
+                  ? [
+                      {
+                        action: "changeTransactionInteractionId" as const,
+                        transactionId: placeholder.id,
+                        interactionId: transaction.id,
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          })
+          .execute()
+      : this.ctPaymentService.updatePayment({
+          id: payment.id,
+          transaction: {
+            type: config.transactionType,
+            amount: payment.amountPlanned,
+            interactionId: transaction?.id,
+            state: newState,
+          },
+        });
+
+    // updatePayment/the raw call above and syncPayPalOrderStatus both write the same Payment
+    // resource — sequenced; linkVaultedCardCustomer writes a different entity (Customer/
+    // PaymentMethod), so it stays parallel.
     await Promise.all([
-      this.ctPaymentService.updatePayment({
-        id: payment.id,
-        transaction: {
-          type: config.transactionType,
-          amount: payment.amountPlanned,
-          interactionId: transaction?.id,
-          state: config.mapStatus(transaction?.status),
-        },
-      }),
+      writeTransactionPromise,
       this.linkVaultedCardCustomer(payment, response),
     ]);
     await retryCTSync(
@@ -1273,10 +1321,18 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * Adds a placeholder Authorization/Charge transaction with no interactionId to a payment,
-   * triggering commercetools Checkout's optimistic Order creation. Used by expressApprove()
-   * for PayPal Express and by createOrder()'s PUI flow (where the real authorization/capture
-   * happens asynchronously after the buyer is redirected).
+   * Adds a placeholder Authorization/Charge transaction to a payment, meant to trigger
+   * commercetools Checkout's optimistic Order creation ahead of the real, indefinitely-delayed
+   * authorize/capture. Used by expressApprove() for PayPal Express and by createOrder()'s PUI flow.
+   *
+   * State is "Pending", never "Initial" — cross-checked against commercetools' own official
+   * reference connectors (Adyen, the generic template), every one of which only ever triggers Order
+   * creation with a non-Initial state. interactionId is a PayPalOrderId-prefixed marker (see
+   * buildPlaceholderInteractionId/isPlaceholderInteractionId in order.utils.ts) rather than left
+   * empty, matching those same reference connectors always setting a real identifier on this first
+   * transaction — PayPal just doesn't hand out the real authorization/capture id yet, so the order
+   * id stands in until writeSettledOrderTransaction() finds and overwrites this placeholder in
+   * place once the real authorize/capture completes.
    */
   private async addApprovalPlaceholderTransaction(
     payment: Payment,
@@ -1285,7 +1341,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<void> {
     const hasPlaceholder = payment.transactions.some(
       (transaction) =>
-        transaction.type === transactionType && !transaction.interactionId
+        transaction.type === transactionType &&
+        isPlaceholderInteractionId(transaction.interactionId)
     );
 
     const actions: PaymentUpdateAction[] = [
@@ -1296,7 +1353,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
               action: "addTransaction" as const,
               transaction: {
                 type: transactionType,
-                state: "Initial" as const,
+                state: "Pending" as const,
+                interactionId: buildPlaceholderInteractionId(orderID),
                 amount: {
                   centAmount: payment.amountPlanned.centAmount,
                   currencyCode: payment.amountPlanned.currencyCode,
@@ -1333,10 +1391,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * optimistic CT Order creation ahead of the real authorize/capture, using PayPalOrderId (the
    * only PayPal-side identifier available yet) as the payment's interfaceId.
    * The placeholder is added via a **raw CT API call**, not ctPaymentService.updatePayment() —
-   * that wrapped helper silently discards a bare Initial-state transaction with no interactionId
-   *
-   * TODO: verify on server that the order is created. Otherwice backward compatibility with extension
-   * should be dropped down and interactionId set as the only available - PayPalOrderId.
+   * that wrapped helper silently discards a bare Initial-state transaction with no interactionId.
+   * See addApprovalPlaceholderTransaction()'s own doc comment for the transaction shape (Pending
+   * state, PayPalOrderId-marker interactionId) actually required to trigger Order creation.
    */
   public async expressApprove({
     paymentId,

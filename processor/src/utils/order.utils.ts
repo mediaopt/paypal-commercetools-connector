@@ -289,12 +289,28 @@ export const resolvePayPalIntentTransactionConfig = (
     payPalIntent === "Authorize" ? "Authorize" : "Capture"
   ];
 
+const PAYPAL_ORDER_PLACEHOLDER_PREFIX = "PayPalOrderId: ";
+
+// The only case in this codebase where a transaction's interactionId is not a real PSP transaction
+// id — addApprovalPlaceholderTransaction() (paypal-payment.service.ts) marks its placeholder this
+// way, using the PayPal order id (the only identifier available before a real authorize/capture
+// happens), so it can never be mistaken for — or accidentally reused as — a genuine PayPal
+// authorization/capture id. Always find/exclude the placeholder via isPlaceholderInteractionId()
+// below, never by comparing interactionId against a specific order id.
+export const buildPlaceholderInteractionId = (orderID: string): string =>
+  `${PAYPAL_ORDER_PLACEHOLDER_PREFIX}${orderID}`;
+
+export const isPlaceholderInteractionId = (interactionId?: string): boolean =>
+  !!interactionId?.startsWith(PAYPAL_ORDER_PLACEHOLDER_PREFIX);
+
 /**
  * Finds the interactionId (PayPal authorization id) of the payment's most recent Authorization/
  * Success transaction — the transaction lookup itself is shared with paypal-commercetools-
  * extension's findSuitableTransactionId (see common-connect's findMostRecentTransaction); the
  * error type/messages here are processor-specific.
- * Used by settlement() to capture an authorization added earlier by authorizeOrder().
+ * Used by settlement() to capture an authorization added earlier by authorizeOrder(). The
+ * Success-state filter already excludes addApprovalPlaceholderTransaction()'s Pending placeholder
+ * (see isPlaceholderInteractionId above), so no extra guard is needed here.
  */
 export const findAuthorizationTransactionId = (payment: Payment): string => {
   const transaction = findMostRecentTransaction(
