@@ -2,7 +2,8 @@ let capturedElement: any;
 const mockRender = jest.fn((element: any) => {
   capturedElement = element;
 });
-const mockRoot = { render: mockRender };
+const mockUnmount = jest.fn();
+const mockRoot = { render: mockRender, unmount: mockUnmount };
 const mockCreateRoot = jest.fn((container?: Element) => mockRoot);
 
 jest.mock("react-dom/client", () => ({
@@ -30,6 +31,7 @@ describe("preloadPayPalScript", () => {
     capturedElement = undefined;
     mockRender.mockClear();
     mockCreateRoot.mockClear();
+    mockUnmount.mockClear();
     document.body.innerHTML = "";
   });
 
@@ -83,6 +85,38 @@ describe("preloadPayPalScript", () => {
     preloadPayPalScript({ clientId: "xyz" } as any);
 
     expect(mockCreateRoot).toHaveBeenCalledTimes(2);
+  });
+
+  it("disposes a superseded, already-settled preload's root and host element", async () => {
+    preloadPayPalScript({ clientId: "abc" } as any);
+    const firstHost = mockCreateRoot.mock.calls[0][0] as HTMLElement;
+    getOnSettled()();
+
+    preloadPayPalScript({ clientId: "xyz" } as any);
+    await new Promise(process.nextTick);
+
+    expect(mockUnmount).toHaveBeenCalledTimes(1);
+    expect(document.body.contains(firstHost)).toBe(false);
+    const secondHost = mockCreateRoot.mock.calls[1][0] as HTMLElement;
+    expect(document.body.contains(secondHost)).toBe(true);
+  });
+
+  it("keeps a superseded, still-pending preload mounted until it settles", async () => {
+    const first = preloadPayPalScript({ clientId: "abc" } as any);
+    const firstOnSettled = getOnSettled();
+    const firstHost = mockCreateRoot.mock.calls[0][0] as HTMLElement;
+
+    preloadPayPalScript({ clientId: "xyz" } as any);
+    await new Promise(process.nextTick);
+    expect(mockUnmount).not.toHaveBeenCalled();
+    expect(document.body.contains(firstHost)).toBe(true);
+
+    firstOnSettled(new Error("PayPal JS SDK script failed to load"));
+    await expect(first).rejects.toThrow();
+    await new Promise(process.nextTick);
+
+    expect(mockUnmount).toHaveBeenCalledTimes(1);
+    expect(document.body.contains(firstHost)).toBe(false);
   });
 
   it("resetPayPalScriptPreloadCache clears the cache so identical options preload again", () => {
