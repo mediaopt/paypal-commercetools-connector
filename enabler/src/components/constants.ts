@@ -1,7 +1,6 @@
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import {
   FraudnetPage,
-  GetSettingsResponse,
   PayPalMethodConfig,
   PayPalPaymentMethodType,
   ThreeDSVerification,
@@ -53,12 +52,14 @@ export const storedPaymentMethodUrl = (processorUrl: string, id: string) =>
 // comment for how these fit together.
 
 // Category 1 — hardcoded, non-overridable: something the merchant/processor should not be able to configure.
-// Applied last, unconditionally, per mounted component — whatever the processor sends can never change these.
+// Applied last, unconditionally, per mounted component, over the resolved PayPalMethodConfig — whatever the
+// processor sends can never change these.
 // (PayUponInvoice's own must-always-be-Capture requirement is forced at the point intent is actually
-// submitted — usePayment.tsx's handleCreateOrder — rather than here, since forcing it into this shared
-// settings object leaks into every mounted component's PayPal JS SDK script options.)
+// submitted — usePayment.tsx's handleCreateOrder — rather than here, since it's a settings field, not a
+// PayPalMethodConfig one, and forcing it into the shared settings leaks into every mounted component's
+// PayPal JS SDK script options.)
 export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
-  Record<PayPalPaymentMethodType, Partial<GetSettingsResponse>>
+  Record<PayPalPaymentMethodType, Partial<PayPalMethodConfig>>
 > = {
   // Every individual funding-source button (including PayPal itself, repurposed from the old
   // unscoped default) is built on the standard PayPal smart button — their funding source is a
@@ -66,19 +67,19 @@ export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
   // PAYPAL_BUTTON_CONFIG. AllButtons deliberately has no entry: it stays undefined by default
   // (renders every eligible funding source) and remains overridable via the normal
   // ENABLER_DEFAULT_CONFIG/settings chain below.
-  PayPal: { PayPal: { fundingSource: "paypal" } },
-  Sepa: { Sepa: { fundingSource: "sepa" } },
-  PayLater: { PayLater: { fundingSource: "paylater" } },
-  PayPalCreditCard: { PayPalCreditCard: { fundingSource: "card" } },
-  Venmo: { Venmo: { fundingSource: "venmo" } },
-  Credit: { Credit: { fundingSource: "credit" } },
+  PayPal: { fundingSource: "paypal" },
+  Sepa: { fundingSource: "sepa" },
+  PayLater: { fundingSource: "paylater" },
+  PayPalCreditCard: { fundingSource: "card" },
+  Venmo: { fundingSource: "venmo" },
+  Credit: { fundingSource: "credit" },
   // Local payment methods (APMs) — active only; see (enabler/src/types/index.ts) for the not-supported-yet/obsolete groups
-  Ideal: { Ideal: { fundingSource: "ideal" } },
-  Bancontact: { Bancontact: { fundingSource: "bancontact" } },
-  Eps: { Eps: { fundingSource: "eps" } },
-  MyBank: { MyBank: { fundingSource: "mybank" } },
-  P24: { P24: { fundingSource: "p24" } },
-  Blik: { Blik: { fundingSource: "blik" } },
+  Ideal: { fundingSource: "ideal" },
+  Bancontact: { fundingSource: "bancontact" },
+  Eps: { fundingSource: "eps" },
+  MyBank: { fundingSource: "mybank" },
+  P24: { fundingSource: "p24" },
+  Blik: { fundingSource: "blik" },
 };
 
 // The one true special case — only PayPal's own component with builderType: "express" needs

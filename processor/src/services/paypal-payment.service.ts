@@ -794,7 +794,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * authorize/capture/create-order outcome. Assumes the payment already carries the
    * paymentTypeKey custom type (see createPayment()).
    * Since this write can block on the same Payment resource the caller just wrote to, call it
-   * after (never alongside, e.g. in a Promise.all with) the real write, and never await it.
+   * after (never alongside, e.g. in a Promise.all with) the real write. Don't await it, unless another
+   * write to the same Payment follows (e.g. ensureOrderApproved before authorize/capture) — then
+   * awaiting keeps the two writes sequential.
    */
   private async logProcessorInteraction(
     paymentId: string,

@@ -6,7 +6,6 @@ import {
   PayPalCVVField,
   PayPalExpiryField,
   usePayPalCardFields,
-  usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import type { CardFieldsOnApproveData } from "@paypal/paypal-js";
 import type {
@@ -81,9 +80,6 @@ pay flow below). So in Checkout mode `vaultOnly` is forced off (see `vaultOnly` 
 `createVaultSetupTokenUrl`/`approveVaultSetupTokenUrl` were mistakenly supplied for it — a
 save-only flow there would have to go through a separate stored-payment-methods component/
 builder instead, not through `CardFields`.*/
-
-// How long after the SDK script resolves the card fields form may still legitimately be absent.
-const CARD_FIELDS_READY_TIMEOUT_MS = 3_000;
 
 // PayPal's Card Fields SDK invokes onApprove/onError as independent, fire-and-forget callbacks —
 // it gives no guarantee either one ever fires (e.g. its internal 3DS contingency handling can
@@ -178,7 +174,6 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
     fields: {},
   });
   const { form: cardFieldsForm, fields: cardFields } = cardFieldsState;
-  const [{ isResolved: isCardFieldsScriptResolved }] = usePayPalScriptReducer();
 
   const threeDSAuth = settings?.threeDSOption;
 
@@ -254,6 +249,10 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
       setPaying(false);
       isLoading(false);
       notify("Error", t("cardFields.tryAgain"));
+      onError?.({
+        code: "CARD_FIELDS_SUBMIT_TIMEOUT",
+        message: t("cardFields.tryAgain"),
+      });
       rejectCardProcessing(new Error("CARD_FIELDS_SUBMIT_TIMEOUT"));
     }, CARD_FIELDS_SUBMIT_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
