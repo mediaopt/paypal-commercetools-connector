@@ -4,14 +4,15 @@ import { usePayment } from "../../app/usePayment";
 import { useLoader } from "../../app/useLoader";
 import { redirectTo } from "../../helpers/redirectTo";
 
-import { FormComponentProps } from "../../types";
+import { CardFieldsProps, FormComponentProps } from "../../types";
 
 export type CardFieldsStoredMaskProps = Pick<
   FormComponentProps,
   "onRegisterSubmit"
-> & {
-  ppVaultTokenId: string;
-};
+> &
+  Pick<CardFieldsProps, "onError"> & {
+    ppVaultTokenId: string;
+  };
 
 /**
  * Checkout's own stored-payment-methods component already renders the saved card's
@@ -20,6 +21,7 @@ export type CardFieldsStoredMaskProps = Pick<
 export const CardFieldsStoredMask: FC<CardFieldsStoredMaskProps> = ({
   onRegisterSubmit,
   ppVaultTokenId,
+  onError,
 }) => {
   const { handleCreateOrder, orderDataLinks, orderId } = usePayment();
   const { isLoading } = useLoader();
@@ -27,12 +29,26 @@ export const CardFieldsStoredMask: FC<CardFieldsStoredMaskProps> = ({
   useEffect(() => {
     onRegisterSubmit?.(async () => {
       isLoading(true);
-      await handleCreateOrder({
-        paymentSource: "card",
-        storeInVault: false,
-        vaultId: ppVaultTokenId,
-      });
-      isLoading(false);
+      try {
+        // isCheckoutCard: rethrow instead of resolving "" — Checkout only has submit()'s promise
+        // to tell a failed charge apart from a successful one
+        await handleCreateOrder(
+          {
+            paymentSource: "card",
+            storeInVault: false,
+            vaultId: ppVaultTokenId,
+          },
+          true
+        );
+      } catch (error) {
+        // handleCreateOrder already showed its own notification
+        const message =
+          error instanceof Error ? error.message : String(error);
+        onError?.({ code: message, message });
+        throw error;
+      } finally {
+        isLoading(false);
+      }
     });
   }, []);
 

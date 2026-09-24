@@ -526,6 +526,75 @@ describe("paypal-payment.service", () => {
     expect(mockClientPost).not.toHaveBeenCalled();
   });
 
+  describe("createOrder: vaulted card settled synchronously (COMPLETED)", () => {
+    const mockCompletedOrder = (captureStatus: string) => ({
+      id: "paypal-order-id",
+      status: "COMPLETED",
+      payment_source: { card: { last_digits: "1111" } },
+      purchase_units: [
+        {
+          payments: { captures: [{ id: "capture-id", status: captureStatus }] },
+        },
+      ],
+    });
+
+    beforeEach(() => {
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "updatePayment")
+        .mockResolvedValue(mockPayment);
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        returnUrl: "https://merchant.example.com/result",
+      });
+    });
+
+    test("adds a Success Charge transaction and returns a merchantReturnUrl carrying paymentStatus=COMPLETED", async () => {
+      (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
+        mockCompletedOrder("COMPLETED") as never,
+      );
+
+      const result = await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "card", vaultId: "vault-123" },
+      });
+
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Charge",
+            state: "Success",
+            interactionId: "capture-id",
+          }),
+        }),
+      );
+      expect(result.merchantReturnUrl).toContain("paymentStatus=COMPLETED");
+    });
+
+    test("records a Failure Charge transaction and throws instead of returning a success redirect when the capture inside the COMPLETED order was DECLINED", async () => {
+      (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
+        mockCompletedOrder("DECLINED") as never,
+      );
+
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: { paymentSource: "card", vaultId: "vault-123" },
+        }),
+      ).rejects.toThrow(
+        `PayPal order paypal-order-id for payment ${mockPayment.id} completed with a DECLINED Charge`,
+      );
+
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Charge",
+            state: "Failure",
+          }),
+        }),
+      );
+    });
+  });
+
   describe("authorizeOrder", () => {
     const mockAuthorizedOrder = {
       id: "paypal-order-id",
@@ -561,6 +630,44 @@ describe("paypal-payment.service", () => {
           transaction: expect.objectContaining({ type: "Authorization" }),
         })
       );
+    });
+
+    test("returns the DENIED status without a merchantReturnUrl, after recording a Failure Authorization transaction, when the authorization inside the COMPLETED order was DENIED", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        returnUrl: "https://merchant.example.com/result",
+      });
+      (CommonConnect.authorizePayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockAuthorizedOrder,
+        purchase_units: [
+          {
+            payments: {
+              authorizations: [{ id: "auth-id", status: "DENIED" }],
+            },
+          },
+        ],
+      } as never);
+
+      const result = await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Failure",
+          }),
+        }),
+      );
+      expect(result).toEqual({
+        orderData: {
+          id: mockAuthorizedOrder.id,
+          status: "DENIED",
+          message: "PayPal Authorization DENIED",
+        },
+      });
     });
 
     test("links the vaulted card's PayPal customer id to the CT customer", async () => {
@@ -783,6 +890,42 @@ describe("paypal-payment.service", () => {
           transaction: expect.objectContaining({ type: "Charge" }),
         })
       );
+    });
+
+    test("returns the DECLINED status without a merchantReturnUrl, after recording a Failure Charge transaction, when the capture inside the COMPLETED order was DECLINED", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        returnUrl: "https://merchant.example.com/result",
+      });
+      (CommonConnect.capturePayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockCapturedOrder,
+        purchase_units: [
+          {
+            payments: { captures: [{ id: "capture-id", status: "DECLINED" }] },
+          },
+        ],
+      } as never);
+
+      const result = await paypalPaymentService.captureOrder({
+        paymentId: mockPayment.id,
+        orderID: mockCapturedOrder.id,
+      });
+
+      expect(paymentSDK.ctPaymentService.updatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Charge",
+            state: "Failure",
+          }),
+        }),
+      );
+      expect(result).toEqual({
+        orderData: {
+          id: mockCapturedOrder.id,
+          status: "DECLINED",
+          message: "PayPal Charge DECLINED",
+        },
+      });
     });
 
     test("links the vaulted card's PayPal customer id to the CT customer", async () => {

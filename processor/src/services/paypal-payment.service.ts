@@ -665,9 +665,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     // vaulted payment methods are captured/authorized immediately on create order
     if (response.status === "COMPLETED") {
+      const transactionConfig =
+        resolvePayPalIntentTransactionConfig(payPalIntent);
       await this.writeSettledOrderTransaction(payment, response, {
         operation: "createOrder",
-        ...resolvePayPalIntentTransactionConfig(payPalIntent),
+        ...transactionConfig,
       });
       void this.logProcessorInteraction(
         payment.id,

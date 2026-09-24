@@ -3,7 +3,11 @@ import { FC } from "react";
 import { PayPalContextProvider } from "../PayPalContextProvider";
 import { CardFieldsStoredButton } from "./CardFieldsStoredButton";
 
-import { GeneralComponentsProps, FormComponentProps } from "../../types";
+import {
+  GeneralComponentsProps,
+  FormComponentProps,
+  CardFieldsProps,
+} from "../../types";
 
 export type CardFieldsStoredProps = Pick<
   GeneralComponentsProps,
@@ -19,7 +23,8 @@ export type CardFieldsStoredProps = Pick<
   | "isStoredCheckoutComponent"
   | "initialPayment"
 > &
-  Pick<FormComponentProps, "onRegisterSubmit"> & {
+  Pick<FormComponentProps, "onRegisterSubmit"> &
+  Pick<CardFieldsProps, "onError"> & {
     ppVaultTokenId: string;
   };
 
@@ -37,6 +42,7 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
   initialPayment,
   onRegisterSubmit,
   ppVaultTokenId,
+  onError,
 }) => {
   return (
     <PayPalContextProvider
@@ -55,6 +61,7 @@ export const CardFieldsStored: FC<CardFieldsStoredProps> = ({
       <CardFieldsStoredButton
         onRegisterSubmit={onRegisterSubmit}
         ppVaultTokenId={ppVaultTokenId}
+        onError={onError}
       />
     </PayPalContextProvider>
   );

@@ -5,7 +5,7 @@ import {
   StoredComponentOptions,
 } from "../payment-enabler/interfaces/stored";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
-import { GenericMountProps } from "../types";
+import { GenericError, GenericMountProps } from "../types";
 import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { processorRequest } from "../services/processorRequest";
 import { storedPaymentMethodUrl } from "./constants";
@@ -36,6 +36,13 @@ class PayPalStoredComponent implements StoredComponent {
     const genericOptions: GenericMountProps = {
       requestHeader: sessionHeader(this.baseOptions.sessionId),
       initialUserIdToken: this.baseOptions.userIdToken,
+      // same wrapping as PayPalComponent.mount()
+      onError: this.baseOptions.onError
+        ? (error: GenericError) =>
+            this.baseOptions.onError?.(error, {
+              paymentReference: this.baseOptions.initialPayment?.id,
+            })
+        : undefined,
       onRegisterSubmit: (
         handler: (storePaymentDetails?: boolean) => Promise<void>
       ) => {
@@ -53,7 +60,14 @@ class PayPalStoredComponent implements StoredComponent {
   }
 
   async submit(): Promise<void> {
-    await this.submitHandler?.();
+    // Same as PayPalComponent.submit() for form-like types: resolving with nothing charged would
+    // read as a success to Checkout
+    if (!this.submitHandler) {
+      throw new Error(
+        "CardFieldsStored is not ready to submit — no handler registered"
+      );
+    }
+    await this.submitHandler();
   }
 
   async remove(): Promise<void> {
