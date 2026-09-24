@@ -595,6 +595,74 @@ describe("paypal-payment.service", () => {
     });
   });
 
+  describe("createOrder: PAYPAL_ORDER_EXPERIENCE_CONTEXT overrides", () => {
+    const overrides = {
+      user_action: "CONTINUE",
+      brand_name: "Acme",
+      customer_service_instructions: ["Call us"],
+      logo_url: "https://merchant.example.com/logo.png",
+      unknown_key: "ignored",
+    };
+
+    beforeEach(() => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        orderExperienceContext: overrides,
+      });
+    });
+
+    test("the wallet experience_context only receives wallet keys", async () => {
+      await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "paypal" },
+      });
+
+      const [orderRequest] = (CommonConnect.createPayPalOrder as jest.Mock)
+        .mock.calls[0] as [
+        { payment_source: { paypal: { experience_context: object } } }
+      ];
+      const experienceContext =
+        orderRequest.payment_source.paypal.experience_context;
+      expect(experienceContext).toMatchObject({
+        user_action: "CONTINUE",
+        brand_name: "Acme",
+      });
+      expect(experienceContext).not.toHaveProperty(
+        "customer_service_instructions"
+      );
+      expect(experienceContext).not.toHaveProperty("logo_url");
+      expect(experienceContext).not.toHaveProperty("unknown_key");
+    });
+
+    test("the pay_upon_invoice experience_context only receives PUI keys", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerEmail: "buyer@example.com",
+        billingAddress: { ...mockShippingAddress },
+      } as unknown as Cart);
+
+      await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { fraudNetSessionId: "fraudnet-session" },
+        paymentMethodType: "PayUponInvoice",
+      });
+
+      const [orderRequest] = (CommonConnect.createPayPalOrder as jest.Mock)
+        .mock.calls[0] as [
+        { payment_source: { pay_upon_invoice: { experience_context: object } } }
+      ];
+      const experienceContext =
+        orderRequest.payment_source.pay_upon_invoice.experience_context;
+      expect(experienceContext).toMatchObject({
+        brand_name: "Acme",
+        customer_service_instructions: ["Call us"],
+        logo_url: "https://merchant.example.com/logo.png",
+      });
+      expect(experienceContext).not.toHaveProperty("user_action");
+      expect(experienceContext).not.toHaveProperty("unknown_key");
+    });
+  });
+
   describe("authorizeOrder", () => {
     const mockAuthorizedOrder = {
       id: "paypal-order-id",
