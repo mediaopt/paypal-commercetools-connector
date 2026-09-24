@@ -27,7 +27,35 @@ If you would like to be notified whenever a new certified version is released, p
 
 ## Integration
 
-The connector is supposed to be used together with the PayPal client app. The client is available at [npm](https://www.npmjs.com/package/paypal-commercetools-client) and [github](https://github.com/mediaopt/paypal-commercetools-client). The connector is responsible for the backend integration with commercetools and PayPal, while the client is responsible for the frontend. If for some reasons the PayPal client app can't be used, the [PayPal JS SDK](https://developer.paypal.com/sdk/js/) should be used instead. The example of the integration with commercetools frontend is covered in [docs/usecases/README.md](docs/workflows/README.md) and the code can be seen in [github](https://github.com/mediaopt/paypal-commercetools-cofe-integration).
+The connector consists of five applications.
+
+Composable Commerce mode (backend-intended):
+
+- `paypal-commercetools-extension`: backend link between commercetools and PayPal
+- `paypal-commercetools-events`: syncs commercetools entities with PayPal events
+- `paypal-commercetools-custom-application`: allows to control some payment settings and frontend components design from merchant center
+
+commercetools Checkout mode:
+
+- `enabler`: frontend payment components
+- `processor`: backend-for-frontend for `enabler`
+
+The modes are compatible with each other and intended to be shipped together. Checkout payments can be fine-tuned via the extension module beyond what Checkout itself permits, are updated by the events module when a relevant action happens on the PayPal side, and the Checkout components' design can be adjusted in the custom application.
+
+See [docs/README.md](docs/README.md) for a detailed description of each application.
+
+An integration example is available on the [demo website](https://braintree-paypal-demo.mediao.pt/paypal).
+
+`enabler` replaces the discontinued [npm client](https://www.npmjs.com/package/paypal-commercetools-client). Merchants not using commercetools Checkout can still host its components themselves (called _legacy mode_ in this documentation), or use the [PayPal JS SDK](https://developer.paypal.com/sdk/js/) directly.
+Due to commercetools Checkout limitations, the following features are currently supported in legacy mode only:
+
+- vaulting a payment method without a payment ("pure vault")
+- storing PayPal and Venmo payment methods for future use (storing credit cards is fully supported in Checkout mode as well)
+- [multiple shipping mode](#limited-support-multiple-shipping-mode), which has limited support in general
+
+If you want to use these features in commercetools Checkout, please open an issue.
+
+See [enabler/README.md](enabler/README.md) for how legacy mode differs from Checkout mode.
 
 ## Prerequisites
 
@@ -59,6 +87,21 @@ Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP
 - SMTP_SENDER
 - SMTP_PASSWORD
 
+Additionally for checkout mode (`processor`), see [connect.yaml](connect.yaml) for the full list:
+
+| environmental variable | required | description                                                                                                 |
+| ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| CTP_AUTH_URL           | yes      | commercetools Auth URL, e.g. `https://auth.europe-west1.gcp.commercetools.com`                              |
+| CTP_API_URL            | yes      | commercetools API URL, e.g. `https://api.europe-west1.gcp.commercetools.com`                                |
+| CTP_SESSION_URL        | yes      | commercetools Session API URL, e.g. `https://session.europe-west1.gcp.commercetools.com`                    |
+| CTP_CHECKOUT_URL       | yes      | commercetools Checkout API URL, e.g. `https://checkout.europe-west1.gcp.commercetools.com`                  |
+| CTP_JWKS_URL           | yes      | JWKs URL for JWT validation, e.g. `https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json` |
+| CTP_JWT_ISSUER         | yes      | JWT issuer for JWT validation, e.g. `https://mc-api.europe-west1.gcp.commercetools.com`                     |
+
+See [processor/.env.template](processor/.env.template) for the format and defaults of the JSON variables and for the optional variables.
+
+The commercetools API client used by `processor` needs at least the following scopes (the processor health check fails otherwise): `manage_payments`, `view_sessions`, `view_api_clients`, `manage_orders`, `introspect_oauth_tokens`, `manage_checkout_payment_intents`, `manage_types`, plus `manage_payment_methods` if [stored payment methods](#stored-payment-methods) are enabled.
+
 If you already use custom types for commercetools payment, customer or payment_interaction please consider using the corresponding types keys for PAYMENT_TYPE_KEY, CUSTOMER_TYPE_KEY and PAYMENT_INTERACTION_TYPE_KEY. Please see the corresponding [commercetools tutorial](https://docs.commercetools.com/tutorials/composable-custom-types) for details.
 
 ## Instructions
@@ -77,6 +120,8 @@ The connector can be installed [directly from the commercetools marketplace](htt
 
 ### Local running
 
+#### Composable Commerce mode
+
 To run the connector locally for test purposes:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
@@ -86,9 +131,69 @@ To run the connector locally for test purposes:
 - for paypal-commercetools-extension run `npm run connector:post-deploy` to register the extension with the public ngrok url
 - run `npm run start:dev` to build the application
 
+#### Checkout mode
+
+- in both `processor` and `enabler` run `cp .env.template .env` and fill in the values
+- build the shared module: `cd common-connect`, `npm install`, `npm run build`
+- from the repository root run `docker compose up` to start:
+  - the local JWT mock server (`http://localhost:9002`)
+  - the processor (`http://localhost:8080`)
+  - the enabler development page (`http://localhost:3000`)
+- open `http://localhost:3000`, enter a cart id and the page creates a commercetools session and mounts the payment components
+
+`docker-compose.yaml` overrides `CTP_JWKS_URL`, `CTP_JWT_ISSUER` (`https://issuer.com`) and `VITE_PROCESSOR_URL`, so their `.env` values are not used locally. See [processor/README.md](processor/README.md) for authentication details, including how to get a local JWT.
+
+In production the [Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api) is called on commercetools' own Checkout host, which forwards to the processor's `POST /operations/payment-intents/:id` route. Locally there's no Checkout host in front of the processor, so that route can be called directly for testing. Note, that on stage/production commercetools order is required to reach the intents API.
+
 ### Hosting externally
 
 Please set your application url (see the example in [ngrok.sh](./paypal-commercetools-extension/bin/ngrok.sh)) in the `.env` file and run post-deploy script. The url should be accessible externally.
+
+### Using the connector without Checkout mode
+
+If you deploy the connector yourself (via the commercetools Connect API or other services), you can remove `processor` and `enabler` from `connect.yaml` and the repository to speed up the installation. `common-connect` must remain, as the extension module depends on it. If you use a package manager other than npm (e.g. yarn), replace the `"common-connect": "file:../common-connect"` dependency in `paypal-commercetools-extension` (and `processor`, if kept) with your package manager's equivalent (for yarn: `"common-connect": "link:../common-connect"`).
+
+### Checkout mode installation and configuration
+
+The `processor` is designed to be driven by the `enabler` only. The one part of its API meant to be triggered by the merchant is the [Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api) (`capturePayment`, `cancelPayment`, `refundPayment`), called on commercetools' own Checkout host (`checkout.<region>.commercetools.com/{projectKey}/payment-intents/{paymentId}`) — never on the processor directly. See [enabler/README.md](enabler/README.md#paypal-express-legal-review-requirement-paypal_redirect_on_approve) for how capture works after a PayPal Express review redirect.
+
+To use the commercetools Checkout compatible track (`processor`/`enabler`), create a checkout application in the [merchant center](https://docs.commercetools.com/checkout/overview#merchant-center-configuration). In the application payment integrations you can select this connector and configure the payment methods available. **The connector does not restrict which payment methods are offered to a buyer by country or currency — this is entirely your responsibility to configure**, via a payment integration predicate, in the merchant center → checkout application → payment integration screen.
+
+#### Payment methods and their restrictions
+
+| Category | Method                                   | checkout reference  | Recommended predicate                                                                                                                                                                                                                 |
+| -------- | ---------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Standard | PayPal                                   | `paypal`            | None needed                                                                                                                                                                                                                           |
+| Standard | Credit Card (`CardFields`)               | `card`              | None needed                                                                                                                                                                                                                           |
+| Standard | SEPA (`Sepa`)                            | *Sepa*¹             | must be determined based on PayPal merchant settings                                                                                                                                                                                  |
+| Standard | Pay Later (`PayLater`)                   | *PayLater*¹         | `billingAddress.country = "AU" or billingAddress.country = "US" or billingAddress.country = "FR" or billingAddress.country = "DE" or billingAddress.country = "IT" or billingAddress.country = "ES" or billingAddress.country = "GB"` |
+| Standard | Credit Card button (`PayPalCreditCard`)² | *PayPalCreditCard*¹ | None needed                                                                                                                                                                                                                           |
+| Standard | All funding sources (`AllButtons`)       | *AllButtons*¹       | None needed                                                                                                                                                                                                                           |
+| Standard | Venmo                                    | *Venmo*¹            | `billingAddress.country = "US" and totalPrice.currencyCode = "USD"`                                                                                                                                                                   |
+| Express  | PayPal Buy Now (via the express builder) | `paypal`            | None needed                                                                                                                                                                                                                           |
+| Standard | Pay Upon Invoice                         | *PayUponInvoice*³   | `billingAddress.country = "DE" and totalPrice.currencyCode = "EUR"`                                                                                                                                                                   |
+
+¹ Sepa, PayLater, PayPalCreditCard, AllButtons, and Venmo don't have a commercetools Checkout key yet, so no UI defaults are provided at the moment in merchant center. Some of these methods are supposed to be included in future commercetools releases and when the proper key will be available the merchant center reference will be set to match.
+
+² Only one of Credit Card (`CardFields`) and Credit Card button (`PayPalCreditCard`) can work at the same time, and PayPal officially recommends Credit Card (`CardFields`). If you require Credit Card button (`PayPalCreditCard`), please consult your PayPal manager.
+
+³ Pay Upon Invoice requires PayPal intent "Capture" and forces it even if the intent for connector is set to "Authorize" for all other methods. Also it has limitation for minimal and maximal cart price, which will be forced automatically.
+
+Configure these via [payment integration predicates](https://docs.commercetools.com/checkout/payment-integration-predicates#predicate-syntax). The "Recommended predicate" column above shows a starting point for each method — real-world eligibility (e.g. Pay Later's exact country/currency pairing) can vary by merchant account and change over time, so verify against your own PayPal account before relying on it in production.
+
+Venmo's browser/device support ([Safari on iOS or Chrome on Android; any browser on desktop](https://developer.paypal.com/v5/venmo/overview)) is the one exception the connector _does_ enforce itself, not something you need a predicate for — see `enabler/README.md`'s "Venmo eligibility is not enforced by the payment-method list" section for details.
+
+**A practical way to check which of PayPal buttons based methods are actually enabled for your PayPal account** is to temporarily add the `AllButtons` method to your payment integration with no predicate — PayPal's own SDK only ever renders funding sources it currently considers eligible for that account/currency, so whichever of Sepa/PayLater/PayPalCreditCard/Venmo/etc. actually show up there are the ones genuinely available; anything missing was already ineligible before any predicate could help. Keeping the payment integration accurate is your responsibility: leave out entirely any method you don't intend to accept, and use the recommended predicate above for any conditional method you do want to offer.
+
+#### Stored payment methods
+
+Only credit cards can be stored and reused in Checkout mode. To enable it:
+
+1. set `STORED_PAYMENT_METHODS_ENABLED=true` and optionally `STORED_PAYMENT_METHODS_PAYMENT_INTERFACE` (default `PayPal`) and `STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT`;
+2. give the processor's API client the additional `manage_payment_methods` scope;
+3. make sure `cart.customerId` is set before Checkout is instantiated.
+
+Changing the payment interface or interface account later means previously stored cards are no longer found and would need to be migrated manually. See [enabler/README.md](enabler/README.md#stored-cards-and-vaulting) for the Checkout behavior of stored cards.
 
 ## Technology Stack
 
@@ -109,7 +214,7 @@ In the docs folder you can find:
 
 ### Limited Support: Multiple Shipping Mode
 
-The connector provides limited support for the [`Multiple` shipping mode in commercetools](https://docs.commercetools.com/tutorials/multiple-shipping-addresses-methods). This feature is supported only for project level setting `"totalPriceDiscountDoesNotReduceExternalTax": false`,
+The connector provides limited support for the [`Multiple` shipping mode in commercetools](https://docs.commercetools.com/tutorials/multiple-shipping-addresses-methods) in legacy mode only. This feature is supported only for project level setting `"totalPriceDiscountDoesNotReduceExternalTax": false`,
 prices `"type": "centPrecision"` (lineItem variant prices can be any type) and a specific set of Cart level settings listed below.
 
 | Name                    | Value         |

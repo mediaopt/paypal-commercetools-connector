@@ -36,24 +36,37 @@ deployAs:
         - key: STORED_PAYMENT_METHODS_ENABLED
           description: Enable vault payment methods (true OR false)
           required: false
+        - key: STORED_PAYMENT_METHODS_PAYMENT_INTERFACE
+          description: commercetools payment interface name stored payment methods are recorded under. Only worth changing if the project has more than one payment interface
+          required: false
+          default: PayPal
+        - key: STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT
+          description: Interface account identifier for stored payment methods, if required by your setup
+          required: false
         - key: MERCHANT_RETURN_URL
           description: Merchant website return URL for redirect-based payment methods
           required: false
         - key: PAYPAL_ONAPPROVE_PREFIX
-          description: PayPal-Express-only override for the buyer redirect after approval, falling back to MERCHANT_RETURN_URL when unset
+          description: PayPal-Express-only target of the legal-review redirect on approval (setting it also enables that redirect), falling back to the session return url/MERCHANT_RETURN_URL when unset. Never used after the payment is authorized/captured
           required: false
         - key: PAYPAL_REDIRECT_ON_APPROVE
           description: For PayPal Express (Authorize or Capture intent), redirect to PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL on approval instead of finalizing the payment immediately (true OR false). REQUIRED to be true, with that review page actually built, for PayPal Express in Germany.
           required: false
           default: "false"
-        - key: PAYPAL_PER_METHOD_CONFIG
-          description: Per-method required config (non-style identifiers, unique per payment method), as a JSON object
+        - key: PAYPAL_ORDER_EXPERIENCE_CONTEXT
+          description: Merchant overrides for PayPal wallet experience_context on the Orders v2 createOrder request (e.g. user_action, payment_method_preference), as a JSON object. Defaults, unless overridden here, are user_action PAY_NOW (CONTINUE for Express with a review-step redirect configured) and payment_method_preference IMMEDIATE_PAYMENT_REQUIRED
+          required: false
+        - key: PAYPAL_BUTTON_CONFIG
+          description: Per payment method overrides (style, fundingSource, messagesStyle, disablePayLaterButton, applePayDisplayName, Google Pay fields, invoiceBenefitsMessage), keyed by payment method type plus a dedicated PayPalExpress slot, as a JSON object. Script components are not configurable here
           required: false
         - key: PAYPAL_SETTINGS
           description: Fallback merchant settings (button style, PayLater messaging, 3DS option, etc.) as a JSON object, used only when the paypal-commercetools-connector/settings custom object isn't available
           required: false
-        - key: PAYPAL_SDK_OPTIONS
-          description: PayPal JS SDK script options (currency, funding sources, etc.) per component/builder variant, as a JSON object
+        - key: PAYPAL_STANDARD_SCRIPT_OPTIONS
+          description: PayPal JS SDK script options (components, disableFunding, enableFunding, locale, etc.) shared by every standard component (PayPal-brand buttons, CardFields, ApplePay, GooglePay, PayUponInvoice), as a JSON object. Not configurable per payment method; currency/buyerCountry are taken from the cart when available
+          required: false
+        - key: PAYPAL_EXPRESS_SDK_OPTIONS
+          description: PayPal JS SDK script options (components, funding sources, locale, etc.) for PayPal Express only, as a JSON object; currency is taken from the cart when available
           required: false
   - name: paypal-commercetools-extension
     applicationType: service
