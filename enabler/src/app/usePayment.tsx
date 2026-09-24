@@ -58,7 +58,10 @@ type PaymentContextT = {
   paymentInfo: PaymentInfo;
   requestHeader: RequestHeader;
   clientToken: string;
-  handleCreateOrder: (orderData?: CustomOrderData) => Promise<string>;
+  handleCreateOrder: (
+    orderData?: CustomOrderData,
+    isCheckoutCard?: boolean
+  ) => Promise<string>;
   handleOnApprove: (data: CustomOnApproveData) => Promise<void>;
   vaultOnly: boolean;
   orderDataLinks?: OrderDataLinks;
@@ -321,9 +324,18 @@ export const PaymentProvider: FC<
       }
     };
 
-    const handleCreateOrder = async (orderData?: CustomOrderData) => {
-      if (!createOrderUrl) return "";
+    const handleCreateOrder = async (
+      orderData?: CustomOrderData,
+      isCheckoutCard?: boolean
+    ) => {
+      if (!createOrderUrl) {
+        if (isCheckoutCard) {
+          throw new Error(t("payPal.generalError"));
+        }
+        return "";
+      }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
+      let errorAlreadyShown = false;
       try {
         const relevantOrderData = setRelevantData(
           orderData,
@@ -337,7 +349,12 @@ export const PaymentProvider: FC<
         >(requestHeader, createOrderUrl, {
           paymentId: paymentInfo.id,
           paymentVersion: latestPaymentVersion,
-          payPalIntent: settings?.payPalIntent,
+          // PayUponInvoice must always submit Capture intent, regardless of the merchant's
+          // global setting — fraudNetSessionId is the only PUI-exclusive field on orderData, so
+          // its presence is a reliable signal this call originated from PUI.
+          payPalIntent: orderData?.fraudNetSessionId
+            ? "Capture"
+            : settings?.payPalIntent,
           builderType,
           paymentMethodType,
           orderData: {
@@ -364,6 +381,9 @@ export const PaymentProvider: FC<
         latestPaymentVersion = paymentVersion;
 
         if (!id) {
+          // For the card-fields checkout path, setRatepayMessage is always undefined, so
+          // handleResponseError (Ratepay/PUI-specific) always takes its `!showError` branch and
+          // throws directly — the catch below's isCheckoutCard rethrow already covers that case.
           handleResponseError(
             t,
             notify,
@@ -372,6 +392,11 @@ export const PaymentProvider: FC<
             setRatepayMessage
           );
           isLoading(false);
+          // PUI: handleResponseError surfaced the error itself instead of throwing
+          if (isCheckoutCard) {
+            errorAlreadyShown = true;
+            throw new Error(message ?? t("invoice.thirdPartyIssue"));
+          }
           return "";
         } else if (oldOrderData?.googlePayData) {
           //@ts-ignore
@@ -382,49 +407,60 @@ export const PaymentProvider: FC<
           });
           const { status } = confirmOrderResult;
           if (status === "APPROVED") {
-            handleOnApprove({ orderID: newOrderData.id }).then(() =>
-              onSuccess(newOrderData)
-            );
+            handleOnApprove({ orderID: newOrderData.id })
+              .then(() => onSuccess(newOrderData))
+              .catch((err) =>
+                console.error(
+                  "GooglePay: handleOnApprove (APPROVED) failed",
+                  err
+                )
+              );
           } else if (
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
           ) {
-            return "";
-            /*
             //@ts-ignore
             paypal
               .Googlepay()
-              .initiatePayerAction({ orderId: orderData.id })
-              .then(async () => {
-                handleAuthenticateThreeDSOrder(orderData.id, true).then(
-                  (result) => {
-                    if (!result) {
-                      notify("Error", "Please select different payment method");
-                      isLoading(false);
-                      return "";
-                    }
+              .initiatePayerAction({ orderId: newOrderData.id })
+              .then(() => {
+                handleAuthenticateThreeDSOrder(newOrderData.id, true)
+                  .then((result) => {
                     switch (result.toString(10)) {
                       case "2":
-                        handleOnApprove({ orderID: orderData.id }).then(() =>
-                          onSuccess(orderData)
-                        );
+                        handleOnApprove({ orderID: newOrderData.id })
+                          .then(() => onSuccess(newOrderData))
+                          .catch((err) =>
+                            console.error(
+                              "GooglePay: handleOnApprove (3DS approved) failed",
+                              err
+                            )
+                          );
                         break;
                       case "1":
-                        notify("Warning", "Try again");
+                        notify("Warning", t("cardFields.tryAgain"));
                         isLoading(false);
                         break;
                       case "0":
                       default:
                         notify(
                           "Error",
-                          "Please select different payment method"
+                          t("cardFields.selectDifferentMethod")
                         );
                         isLoading(false);
                         break;
                     }
-                  }
-                );
-              });*/
+                  })
+                  .catch((err) =>
+                    console.error(
+                      "GooglePay: handleAuthenticateThreeDSOrder failed",
+                      err
+                    )
+                  );
+              })
+              .catch((err: any) =>
+                console.error("GooglePay: initiatePayerAction failed", err)
+              );
           } else {
             return "";
           }
@@ -455,11 +491,16 @@ export const PaymentProvider: FC<
         }
         return id;
       } catch (error) {
-        notify(
-          "Error",
-          error instanceof Error ? error.message : t("interface.generalError")
-        );
+        if (!errorAlreadyShown) {
+          notify(
+            "Error",
+            error instanceof Error ? error.message : t("interface.generalError")
+          );
+        }
         isLoading(false);
+        if (isCheckoutCard) {
+          throw error;
+        }
         return "";
       }
     };
