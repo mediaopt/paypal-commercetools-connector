@@ -3,7 +3,9 @@ import {
   resolveApplePayOptions,
   resolveCardFieldsOptions,
   resolveCardFieldsStoredOptions,
+  resolveGooglePayOptions,
   resolvePayPalBrandOptions,
+  resolvePayUponInvoiceOptions,
 } from "./resolveOptions";
 
 const baseOptions = (overrides: Partial<BaseOptions> = {}): BaseOptions =>
@@ -274,5 +276,72 @@ describe("resolveCardFieldsStoredOptions", () => {
     );
 
     expect(result.enableVaulting).toBe(true);
+  });
+});
+
+describe("resolveGooglePayOptions", () => {
+  it.each([
+    ["Sandbox", "TEST"],
+    ["sandbox", "TEST"],
+    ["Live", "PRODUCTION"],
+    [undefined, "PRODUCTION"],
+  ])("environment %s resolves to %s", (environment, expected) => {
+    const result = resolveGooglePayOptions(baseOptions({ environment }));
+
+    expect(result.environment).toBe(expected);
+  });
+
+  it("verificationMethod comes from the shared threeDSOption setting", () => {
+    const result = resolveGooglePayOptions(
+      baseOptions({ settings: { threeDSOption: "SCA_WHEN_REQUIRED" } as any })
+    );
+
+    expect(result.verificationMethod).toBe("SCA_WHEN_REQUIRED");
+  });
+});
+
+describe("resolvePayUponInvoiceOptions", () => {
+  it.each([
+    ["Sandbox", true],
+    ["Live", false],
+    [undefined, false],
+  ])("environment %s resolves fraudNetSandbox to %s", (environment, expected) => {
+    const result = resolvePayUponInvoiceOptions(baseOptions({ environment }));
+
+    expect(result.fraudNetSandbox).toBe(expected);
+  });
+
+  it("merchantId prefers settings.PayUponInvoice.merchantId", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({
+        settings: {
+          merchantId: "GENERAL",
+          PayUponInvoice: { merchantId: "PUI" },
+        } as any,
+      })
+    );
+
+    expect(result.merchantId).toBe("PUI");
+  });
+
+  it("merchantId falls back to the top-level settings.merchantId, also when the PUI one is empty", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({
+        settings: {
+          merchantId: "GENERAL",
+          PayUponInvoice: { merchantId: "" },
+        } as any,
+      })
+    );
+
+    expect(result.merchantId).toBe("GENERAL");
+  });
+
+  it("merchantId is an empty string when neither is configured", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({ settings: { merchantId: "" } as any })
+    );
+
+    expect(result.merchantId).toBe("");
   });
 });

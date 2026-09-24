@@ -172,3 +172,72 @@ test("Form with invailid phone is not submitted", async () => {
   fireEvent.submit(screen.getByText("Pay"));
   await waitFor(() => expect(mockedHandler).not.toHaveBeenCalled());
 });
+
+describe("Checkout mode (onRegisterSubmit)", () => {
+  const renderCheckoutMask = (handleCreateOrder: jest.Mock) => {
+    cleanup();
+    (usePayment as jest.Mock).mockReturnValue({ handleCreateOrder });
+    const onRegisterSubmit = jest.fn();
+    render(
+      <PayUponInvoiceMask
+        fraudNetSessionId={fraudNetSessionId}
+        onRegisterSubmit={onRegisterSubmit}
+      />
+    );
+    // Re-registered on every field change, so the last call holds the current values
+    const latestSubmit = () =>
+      onRegisterSubmit.mock.calls[onRegisterSubmit.mock.calls.length - 1][0];
+    return latestSubmit;
+  };
+
+  const fillValidForm = () => {
+    fireEvent.change(screen.getByLabelText(phoneLabel), {
+      target: { value: validPhone },
+    });
+    fireEvent.change(screen.getByLabelText(birthDateLabel), {
+      target: { value: validBirthDate },
+    });
+  };
+
+  test("registered submit rejects without creating an order when the form is incomplete", async () => {
+    const handleCreateOrder = jest.fn();
+    const latestSubmit = renderCheckoutMask(handleCreateOrder);
+
+    await expect(latestSubmit()()).rejects.toThrow("invoice.missingBirthDate");
+    expect(handleCreateOrder).not.toHaveBeenCalled();
+  });
+
+  test("registered submit rejects when order creation fails", async () => {
+    const handleCreateOrder = jest.fn().mockRejectedValue(new Error("failed"));
+    const latestSubmit = renderCheckoutMask(handleCreateOrder);
+    fillValidForm();
+
+    await expect(latestSubmit()()).rejects.toThrow("failed");
+  });
+
+  test("registered submit resolves and forwards the form data when order creation succeeds", async () => {
+    const handleCreateOrder = jest.fn().mockResolvedValue("order-1");
+    const latestSubmit = renderCheckoutMask(handleCreateOrder);
+    fillValidForm();
+
+    await expect(latestSubmit()()).resolves.toBeUndefined();
+    expect(handleCreateOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fraudNetSessionId,
+        birthDate: validBirthDate,
+        countryCode: "49",
+        nationalNumber: "123456789",
+      }),
+      true
+    );
+  });
+
+  test("native form submit never creates an order in Checkout mode", async () => {
+    const handleCreateOrder = jest.fn();
+    renderCheckoutMask(handleCreateOrder);
+    fillValidForm();
+
+    fireEvent.submit(screen.getByRole("form"));
+    await waitFor(() => expect(handleCreateOrder).not.toHaveBeenCalled());
+  });
+});

@@ -168,10 +168,10 @@ describe("CardFieldsMask — Checkout-facing onError signal on payment failure",
 });
 
 // Regression coverage for: Card Fields checkout never completing when the PayPal order isn't
-// approved yet. isCheckoutCard (usePayment's new flag for handleCreateOrder/handleOnApprove) must
-// be derived from onRegisterSubmit — the same signal this file already uses everywhere else to
-// tell Checkout mode from legacy/self-hosted mode (see the header comment above).
-describe("CardFieldsMask — passes isCheckoutCard (derived from onRegisterSubmit) through to handleCreateOrder/handleOnApprove", () => {
+// approved yet. forceCheckoutReportError (usePayment's flag for handleCreateOrder/handleOnApprove)
+// must be derived from onRegisterSubmit — the same signal this file already uses everywhere else
+// to tell Checkout mode from legacy/self-hosted mode (see the header comment above).
+describe("CardFieldsMask — passes forceCheckoutReportError (derived from onRegisterSubmit) through to handleCreateOrder/handleOnApprove", () => {
   const mockHandleCreateOrder = jest.fn();
   const mockHandleOnApprove = jest.fn();
 
@@ -197,7 +197,7 @@ describe("CardFieldsMask — passes isCheckoutCard (derived from onRegisterSubmi
     });
   });
 
-  it("passes isCheckoutCard=true in Checkout mode (onRegisterSubmit supplied)", async () => {
+  it("passes forceCheckoutReportError=true in Checkout mode (onRegisterSubmit supplied)", async () => {
     render(<CardFieldsMask onRegisterSubmit={jest.fn()} />);
 
     capturedProviderProps.createOrder();
@@ -220,7 +220,7 @@ describe("CardFieldsMask — passes isCheckoutCard (derived from onRegisterSubmi
     );
   });
 
-  it("passes isCheckoutCard=false in legacy/self-hosted mode (no onRegisterSubmit)", async () => {
+  it("passes forceCheckoutReportError=false in legacy/self-hosted mode (no onRegisterSubmit)", async () => {
     render(<CardFieldsMask />);
     // The checkout-relevant createOrder/onApprove block only renders once a card is being
     // added — in legacy mode that's driven by picking "Add a new card" from the saved-card table.

@@ -39,13 +39,13 @@ const CreateOrderConsumer: FC = () => {
 
 const CreateOrderWithDataConsumer: FC<{
   orderData?: Record<string, unknown>;
-  isCheckoutCard?: boolean;
+  forceCheckoutReportError?: boolean;
   onResult?: (result: string) => void;
   onError?: (error: unknown) => void;
-}> = ({ orderData, isCheckoutCard, onResult, onError }) => {
+}> = ({ orderData, forceCheckoutReportError, onResult, onError }) => {
   const { handleCreateOrder } = usePayment();
   useEffect(() => {
-    handleCreateOrder(orderData as never, isCheckoutCard)
+    handleCreateOrder(orderData as never, forceCheckoutReportError)
       .then((result) => onResult?.(result))
       .catch((error) => onError?.(error));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,12 +54,12 @@ const CreateOrderWithDataConsumer: FC<{
 };
 
 const OnApproveConsumer: FC<{
-  isCheckoutCard?: boolean;
+  forceCheckoutReportError?: boolean;
   onError?: (error: unknown) => void;
-}> = ({ isCheckoutCard, onError }) => {
+}> = ({ forceCheckoutReportError, onError }) => {
   const { handleOnApprove } = usePayment();
   useEffect(() => {
-    handleOnApprove({ orderID: "order-1" }, isCheckoutCard).catch((error) =>
+    handleOnApprove({ orderID: "order-1" }, forceCheckoutReportError).catch((error) =>
       onError?.(error)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -930,18 +930,16 @@ describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInv
   });
 });
 
-// Regression coverage for: Card Fields checkout never completing when the PayPal order isn't
-// approved yet — handleOnApprove used to resolve normally (only flipping local result-display
-// state) for a non-COMPLETED status, and its catch block always swallowed errors after notifying.
-// Both silently told CardFieldsMask's approveTransaction the payment succeeded. isCheckoutCard
-// (passed only by CardFieldsMask, based on onRegisterSubmit) makes both paths reject instead.
-describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () => {
+// handleOnApprove resolves normally for a non-COMPLETED status and swallows errors after notifying,
+// which tells a Checkout caller the payment succeeded. forceCheckoutReportError (passed only in
+// Checkout mode) makes both paths reject instead.
+describe("PaymentProvider handleOnApprove forceCheckoutReportError error propagation", () => {
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
     mockNotify.mockReset();
   });
 
-  it("rejects and logs the order status when isCheckoutCard is true and the order isn't COMPLETED", async () => {
+  it("rejects and logs the order status when forceCheckoutReportError is true and the order isn't COMPLETED", async () => {
     const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
     // Keyed by URL rather than call order — OnApproveConsumer's effect (a child of
     // PaymentProvider) fires before PaymentProvider's own initial createPayment effect, so
@@ -972,7 +970,7 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
         shippingMethodId="standard"
         purchaseCallback={() => {}}
       >
-        <OnApproveConsumer isCheckoutCard onError={onError} />
+        <OnApproveConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
     );
 
@@ -986,7 +984,7 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
     consoleErrorSpy.mockRestore();
   });
 
-  it("resolves normally (no throw, no notify) for the same non-COMPLETED order when isCheckoutCard is not set — legacy/other callers unaffected", async () => {
+  it("resolves normally (no throw, no notify) for the same non-COMPLETED order when forceCheckoutReportError is not set — legacy/other callers unaffected", async () => {
     mockedProcessorRequest.mockImplementation((_header, url) =>
       (url as string).includes("/approve")
         ? Promise.resolve({
@@ -1024,7 +1022,7 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it("rethrows a failed processor call for isCheckoutCard callers instead of only notifying — any error, not just the non-COMPLETED case, must now fail the payment step", async () => {
+  it("rethrows a failed processor call for forceCheckoutReportError callers instead of only notifying — any error, not just the non-COMPLETED case, must now fail the payment step", async () => {
     mockedProcessorRequest.mockImplementation((_header, url) =>
       (url as string).includes("/approve")
         ? Promise.reject(new Error("network down"))
@@ -1049,7 +1047,7 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
         shippingMethodId="standard"
         purchaseCallback={() => {}}
       >
-        <OnApproveConsumer isCheckoutCard onError={onError} />
+        <OnApproveConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
     );
 
@@ -1059,7 +1057,7 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
     expect(mockNotify).toHaveBeenCalledWith("Error", "network down");
   });
 
-  it("does not rethrow a failed processor call when isCheckoutCard is not set — matches today's behavior for other builders", async () => {
+  it("does not rethrow a failed processor call when forceCheckoutReportError is not set — matches today's behavior for other builders", async () => {
     mockedProcessorRequest.mockImplementation((_header, url) =>
       (url as string).includes("/approve")
         ? Promise.reject(new Error("network down"))
@@ -1095,15 +1093,14 @@ describe("PaymentProvider handleOnApprove isCheckoutCard error propagation", () 
   });
 });
 
-// Regression coverage for the same swallow-and-continue pattern in handleCreateOrder, the other
-// checkout-relevant call CardFieldsMask makes (via its shared createOrder prop).
-describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", () => {
+// Same swallow-and-continue pattern in handleCreateOrder.
+describe("PaymentProvider handleCreateOrder forceCheckoutReportError error propagation", () => {
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
     mockNotify.mockReset();
   });
 
-  it("rejects when createOrderUrl is not configured and isCheckoutCard is true, instead of silently resolving to an empty string", async () => {
+  it("rejects when createOrderUrl is not configured and forceCheckoutReportError is true, instead of silently resolving to an empty string", async () => {
     mockedProcessorRequest.mockResolvedValueOnce({
       id: "payment-1",
       amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
@@ -1121,7 +1118,7 @@ describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", (
         purchaseCallback={() => {}}
       >
         <CreateOrderWithDataConsumer
-          isCheckoutCard
+          forceCheckoutReportError
           onResult={onResult}
           onError={onError}
         />
@@ -1138,7 +1135,7 @@ describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", (
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it("still silently resolves to an empty string when createOrderUrl is not configured and isCheckoutCard is not set — legacy/other callers unaffected", async () => {
+  it("still silently resolves to an empty string when createOrderUrl is not configured and forceCheckoutReportError is not set — legacy/other callers unaffected", async () => {
     mockedProcessorRequest.mockResolvedValueOnce({
       id: "payment-1",
       amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
@@ -1162,7 +1159,7 @@ describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", (
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it("rejects when the processor response is missing an order id and isCheckoutCard is true (handleResponseError's own throw now propagates instead of being swallowed)", async () => {
+  it("rejects when the processor response is missing an order id and forceCheckoutReportError is true (handleResponseError's own throw now propagates instead of being swallowed)", async () => {
     // Keyed by URL rather than call order — see the equivalent handleOnApprove tests above for why.
     mockedProcessorRequest.mockImplementation((_header, url) =>
       (url as string).includes("/order")
@@ -1191,7 +1188,7 @@ describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", (
         shippingMethodId="standard"
         purchaseCallback={() => {}}
       >
-        <CreateOrderWithDataConsumer isCheckoutCard onError={onError} />
+        <CreateOrderWithDataConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
     );
 
@@ -1199,5 +1196,166 @@ describe("PaymentProvider handleCreateOrder isCheckoutCard error propagation", (
       expect(onError).toHaveBeenCalledWith(expect.any(Error))
     );
     expect(mockNotify).toHaveBeenCalledWith("Error", "missing-id");
+  });
+});
+
+describe("PaymentProvider handleCreateOrder PayUponInvoice error response", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  const renderPuiOrder = (
+    forceCheckoutReportError: boolean | undefined,
+    onResult: jest.Mock,
+    onError: jest.Mock
+  ) => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { message: "UNKNOWN_RATEPAY_ERROR" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{
+            fraudNetSessionId: "session-1",
+            setRatepayMessage: jest.fn(),
+          }}
+          forceCheckoutReportError={forceCheckoutReportError}
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+  };
+
+  it("rejects with forceCheckoutReportError, notifying only once (handleResponseError already showed the error)", async () => {
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderPuiOrder(true, onResult, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(onResult).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves to an empty string without forceCheckoutReportError — legacy callers unaffected", async () => {
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderPuiOrder(undefined, onResult, onError);
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(""));
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PaymentProvider handleCreateOrder Google Pay APPROVED", () => {
+  const confirmOrder = jest.fn();
+
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+    confirmOrder.mockReset().mockResolvedValue({ status: "APPROVED" });
+    (globalThis as any).paypal = { Googlepay: () => ({ confirmOrder }) };
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).paypal;
+  });
+
+  const renderGooglePayOrder = (
+    approveStatus: string,
+    purchaseCallback: jest.Mock,
+    onResult: jest.Mock,
+    onError: jest.Mock
+  ) => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED" },
+          } as never)
+        : (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: approveStatus },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        onApproveUrl="https://processor.test/payments/approve"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={purchaseCallback}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{
+            paymentSource: "google_pay",
+            googlePayData: { paymentData: { paymentMethodData: {} } },
+          }}
+          forceCheckoutReportError
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+  };
+
+  it("waits for the approval and fires purchaseCallback exactly once on success", async () => {
+    const purchaseCallback = jest.fn();
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderGooglePayOrder("COMPLETED", purchaseCallback, onResult, onError);
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith("order-1"));
+    expect(purchaseCallback).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("rejects with forceCheckoutReportError when the approval doesn't complete, without firing purchaseCallback or a second notification", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    const purchaseCallback = jest.fn();
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderGooglePayOrder("DECLINED", purchaseCallback, onResult, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(purchaseCallback).not.toHaveBeenCalled();
+    expect(onResult).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    consoleErrorSpy.mockRestore();
   });
 });
