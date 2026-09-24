@@ -338,6 +338,7 @@ export const PaymentProvider: FC<
         return "";
       }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
+      let errorAlreadyShown = false;
       try {
         const relevantOrderData = setRelevantData(
           orderData,
@@ -394,6 +395,11 @@ export const PaymentProvider: FC<
             setRatepayMessage
           );
           isLoading(false);
+          // PUI: handleResponseError surfaced the error itself instead of throwing
+          if (isCheckoutCard) {
+            errorAlreadyShown = true;
+            throw new Error(message ?? t("invoice.thirdPartyIssue"));
+          }
           return "";
         } else if (oldOrderData?.googlePayData) {
           //@ts-ignore
@@ -488,10 +494,12 @@ export const PaymentProvider: FC<
         }
         return id;
       } catch (error) {
-        notify(
-          "Error",
-          error instanceof Error ? error.message : t("interface.generalError")
-        );
+        if (!errorAlreadyShown) {
+          notify(
+            "Error",
+            error instanceof Error ? error.message : t("interface.generalError")
+          );
+        }
         isLoading(false);
         if (isCheckoutCard) {
           throw error;

@@ -42,6 +42,7 @@ export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps & For
   minPayableAmount,
   maxPayableAmount,
   customLocale,
+  fraudNetSandbox = true,
 }) => {
   const [fraudNetSessionId, setFraudNetSessionId] = useState<string>();
 
@@ -58,11 +59,11 @@ export const PayUponInvoice: FC<SmartComponentsProps & PayUponInvoiceProps & For
 
   useEffect(() => {
     if (!fraudNetSessionId)
-      embeddFraudNet(merchantId, pageId, setFraudNetSessionId);
-  }, [merchantId, pageId, fraudNetSessionId]);
+      embeddFraudNet(merchantId, pageId, setFraudNetSessionId, fraudNetSandbox);
+  }, [merchantId, pageId, fraudNetSessionId, fraudNetSandbox]);
 
   useEffect(() => {
-    if (fraudNetSessionId === "") notify("Warning", t("thirdPartyIssue"));
+    if (fraudNetSessionId === "") notify("Warning", t("invoice.thirdPartyIssue"));
   }, [fraudNetSessionId, notify, t]);
 
   return (

@@ -355,6 +355,8 @@ export type PayUponInvoiceProps = ratepayPaymentRestrictions & {
   pageId: FraudnetPage;
   invoiceBenefitsMessage?: string;
   customLocale?: string;
+  // Legacy callers never set it, so it defaults to true there
+  fraudNetSandbox?: boolean;
 };
 
 export type PayUponInvoiceMaskProps = {
@@ -737,6 +739,7 @@ export type PayUponInvoiceResolvedOptions = BaseResolvedMethodOptions & {
   invoiceBenefitsMessage?: string;
   minPayableAmount: number;
   maxPayableAmount: number;
+  fraudNetSandbox: boolean;
 };
 
 /** Resolved options for <GooglePay/> — no style/fundingSource concept either; every field is

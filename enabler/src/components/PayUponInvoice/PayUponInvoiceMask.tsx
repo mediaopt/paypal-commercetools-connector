@@ -40,9 +40,6 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
 
   const [phone, setPhone] = useState("+49 ");
   const [birthDate, setBirthDate] = useState<string>();
-  const notifyWrongPhone = () => notify("Warning", t("invoice.wrongPhone"));
-  const notifyMissingBirthDate = () =>
-    notify("Warning", t("invoice.missingBirthDate"));
   let date = new Date();
   date.setFullYear(date.getFullYear() - 18);
   const maxDate = date.toJSON().slice(0, 10);
@@ -63,27 +60,39 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
     };
   };
 
-  const submitForm = async () => {
-    const { hasBirthDate, hasValidPhone, countryCallingCode, nationalNumber } =
-      getFormValidity();
-    if (!hasBirthDate) {
-      notifyMissingBirthDate();
-      return;
-    }
-    if (!hasValidPhone) {
-      notifyWrongPhone();
-      return;
-    }
+  const getFormError = () => {
+    const { hasBirthDate, hasValidPhone } = getFormValidity();
+    return !hasBirthDate
+      ? t("invoice.missingBirthDate")
+      : !hasValidPhone
+      ? t("invoice.wrongPhone")
+      : undefined;
+  };
+
+  const createOrder = (isCheckoutSubmit?: boolean) => {
+    const { countryCallingCode, nationalNumber } = getFormValidity();
     isLoading(true);
     setRatepayMessage("");
-    try {
-      await handleCreateOrder({
+    return handleCreateOrder(
+      {
         fraudNetSessionId,
         nationalNumber,
         countryCode: countryCallingCode,
         birthDate,
         setRatepayMessage,
-      });
+      },
+      isCheckoutSubmit
+    );
+  };
+
+  const submitForm = async () => {
+    const formError = getFormError();
+    if (formError) {
+      notify("Warning", formError);
+      return;
+    }
+    try {
+      await createOrder();
     } catch (err: any) {
       errorFunc(err, isLoading, notify, t);
     }
@@ -93,19 +102,25 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
   useEffect(() => {
     if (!onRegisterSubmit) return;
 
-    onRegisterSubmit(() => submitForm());
+    // Checkout only has submit()'s promise to tell a failed order apart from a successful one,
+    // so every failure must reject here; handleCreateOrder already showed its own notification
+    onRegisterSubmit(async () => {
+      const formError = getFormError();
+      if (formError) {
+        notify("Warning", formError);
+        throw new Error(formError);
+      }
+      try {
+        await createOrder(true);
+      } finally {
+        isLoading(false);
+      }
+    });
     onRegisterValidation?.({
-      isValid: async () => {
-        const { hasBirthDate, hasValidPhone } = getFormValidity();
-        return hasBirthDate && hasValidPhone;
-      },
+      isValid: async () => !getFormError(),
       showValidation: async () => {
-        const { hasBirthDate, hasValidPhone } = getFormValidity();
-        if (!hasBirthDate) {
-          notifyMissingBirthDate();
-        } else if (!hasValidPhone) {
-          notifyWrongPhone();
-        }
+        const formError = getFormError();
+        if (formError) notify("Warning", formError);
       },
     });
     // Must re-register on every phone/birthDate change, not just once on mount — onRegisterSubmit/

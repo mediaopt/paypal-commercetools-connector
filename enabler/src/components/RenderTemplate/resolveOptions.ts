@@ -256,5 +256,7 @@ export function resolvePayUponInvoiceOptions(
     invoiceBenefitsMessage:
       settings?.invoiceBenefitsMessage ??
       ENABLER_DEFAULT_CONFIG.PayUponInvoice.invoiceBenefitsMessage,
+    // Same sandbox/live source as resolveGooglePayOptions's environment
+    fraudNetSandbox: baseOptions.environment?.toLowerCase() === "sandbox",
   };
 }

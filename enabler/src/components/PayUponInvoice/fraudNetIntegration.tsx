@@ -10,11 +10,12 @@ const fraudnetParams = (
   fraudnetSessionId: string,
   merchantId: string,
   pageId: FraudnetPage,
+  sandbox: boolean,
 ) => {
   return {
     f: fraudnetSessionId.substring(0, 32),
     s: `${merchantId} ${pageId}`.substring(0, 32),
-    sandbox: true,
+    sandbox,
   };
 };
 
@@ -29,10 +30,11 @@ export const embeddFraudNet = async (
   merchantId: string,
   pageId: FraudnetPage,
   setFraudnetSessionId: (value: string | undefined) => void,
+  sandbox: boolean,
 ) => {
   const sessionId = uuidv4().substring(0, 32);
   const fnclsNetText = JSON.stringify(
-    fraudnetParams(sessionId, merchantId, pageId),
+    fraudnetParams(sessionId, merchantId, pageId, sandbox),
   );
   const noscriptImgSRC = noscriptSRC(sessionId, merchantId, pageId);
 
