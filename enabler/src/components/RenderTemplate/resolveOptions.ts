@@ -247,7 +247,9 @@ export function resolvePayUponInvoiceOptions(
     options: baseOptions.paypalScriptOptions,
     initialSettings: baseOptions.settings,
     enableVaulting: false,
-    merchantId: settings?.merchantId ?? "",
+    // An unconfigured merchantId is "" from the processor, so || rather than ??
+    merchantId:
+      settings?.merchantId || baseOptions.settings.merchantId || "",
     // Category 1 — hardcoded, non-overridable: see PAY_UPON_INVOICE_FRAUDNET_PAGE_ID/_MIN/
     // _MAX_PAYABLE_AMOUNT's own comment in constants.ts.
     pageId: PAY_UPON_INVOICE_FRAUDNET_PAGE_ID,

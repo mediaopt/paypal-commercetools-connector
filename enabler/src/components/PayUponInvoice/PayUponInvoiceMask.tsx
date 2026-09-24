@@ -69,7 +69,7 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
       : undefined;
   };
 
-  const createOrder = (isCheckoutSubmit?: boolean) => {
+  const createOrder = () => {
     const { countryCallingCode, nationalNumber } = getFormValidity();
     isLoading(true);
     setRatepayMessage("");
@@ -81,7 +81,7 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
         birthDate,
         setRatepayMessage,
       },
-      isCheckoutSubmit
+      !!onRegisterSubmit
     );
   };
 
@@ -111,7 +111,7 @@ export const PayUponInvoiceMask: FC<PayUponInvoiceMaskProps> = ({
         throw new Error(formError);
       }
       try {
-        await createOrder(true);
+        await createOrder();
       } finally {
         isLoading(false);
       }

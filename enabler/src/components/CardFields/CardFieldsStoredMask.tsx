@@ -30,15 +30,15 @@ export const CardFieldsStoredMask: FC<CardFieldsStoredMaskProps> = ({
     onRegisterSubmit?.(async () => {
       isLoading(true);
       try {
-        // isCheckoutCard: rethrow instead of resolving "" — Checkout only has submit()'s promise
-        // to tell a failed charge apart from a successful one
+        // forceCheckoutReportError: rethrow instead of resolving "" — Checkout only has submit()'s
+        // promise to tell a failed charge apart from a successful one
         await handleCreateOrder(
           {
             paymentSource: "card",
             storeInVault: false,
             vaultId: ppVaultTokenId,
           },
-          true
+          !!onRegisterSubmit
         );
       } catch (error) {
         // handleCreateOrder already showed its own notification

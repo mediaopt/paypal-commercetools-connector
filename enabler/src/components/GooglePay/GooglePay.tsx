@@ -10,6 +10,7 @@ export const GooglePay: FC<GooglePayComponentsProps> = ({
   getSettingsUrl,
   createOrderUrl,
   authorizeOrderUrl,
+  authenticateThreeDSOrderUrl,
   getUserInfoUrl,
 
   onApproveUrl,
@@ -46,6 +47,7 @@ export const GooglePay: FC<GooglePayComponentsProps> = ({
       getSettingsUrl={getSettingsUrl}
       purchaseCallback={purchaseCallback}
       authorizeOrderUrl={authorizeOrderUrl}
+      authenticateThreeDSOrderUrl={authenticateThreeDSOrderUrl}
       getUserInfoUrl={getUserInfoUrl}
       enableVaulting={enableVaulting}
       createVaultSetupTokenUrl={createVaultSetupTokenUrl}

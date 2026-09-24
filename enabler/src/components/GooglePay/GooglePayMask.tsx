@@ -35,7 +35,7 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
   const buttonCreated = useRef(false);
   const googlePayButton = useRef<HTMLDivElement>(null);
 
-  const { paymentInfo, handleCreateOrder } = usePayment();
+  const { paymentInfo, handleCreateOrder, processorUrl } = usePayment();
 
   const isProduction = environment === "PRODUCTION";
   const baseRequest = { apiVersion, apiVersionMinor };
@@ -62,16 +62,21 @@ export const GooglePayMask: FC<GooglePayMaskComponentProps> = ({
   const processPayment = async (paymentData: any) => {
     try {
       const { currencyCode, totalPrice } = getGoogleTransactionInfo();
-      await handleCreateOrder({
-        paymentSource: "google_pay",
-        verificationMethod,
-        googlePayData: {
-          purchase_units: [
-            { amount: { currency_code: currencyCode, value: totalPrice } },
-          ],
-          paymentData,
+      // processorUrl marks Checkout mode: rethrow instead of resolving "", so the sheet doesn't
+      // report a failed payment as SUCCESS
+      await handleCreateOrder(
+        {
+          paymentSource: "google_pay",
+          verificationMethod,
+          googlePayData: {
+            purchase_units: [
+              { amount: { currency_code: currencyCode, value: totalPrice } },
+            ],
+            paymentData,
+          },
         },
-      });
+        !!processorUrl
+      );
       return { transactionState: "SUCCESS" };
     } catch (err) {
       console.error("GooglePay: error processing payment", err);

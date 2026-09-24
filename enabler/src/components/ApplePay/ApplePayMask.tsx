@@ -30,7 +30,9 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
   const [addNew, setAddNew] = useState(false);
 
   const { settings, paymentTokens } = useSettings();
-  const { paymentInfo, handleCreateOrder, handleOnApprove } = usePayment();
+  const { paymentInfo, handleCreateOrder, handleOnApprove, processorUrl } =
+    usePayment();
+  const forceCheckoutReportError = !!processorUrl;
   const { isLoading } = useLoader();
 
   const applepayPaymentTokens = paymentTokens?.payment_tokens?.filter(
@@ -121,9 +123,14 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
 
     session.onpaymentauthorized = async (event: any) => {
       try {
-        const orderId = await handleCreateOrder({
-          paymentSource: "apple_pay",
-        });
+        // forceCheckoutReportError: rethrow instead of resolving, so the sheet doesn't report a
+        // failed payment as success
+        const orderId = await handleCreateOrder(
+          {
+            paymentSource: "apple_pay",
+          },
+          forceCheckoutReportError
+        );
 
         await pay.confirmOrder({
           orderId: orderId,
@@ -131,7 +138,7 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
           billingContact: event.payment.billingContact,
         });
 
-        await handleOnApprove({ orderID: orderId });
+        await handleOnApprove({ orderID: orderId }, forceCheckoutReportError);
 
         session.completePayment(applePaySession.STATUS_SUCCESS);
       } catch (error) {

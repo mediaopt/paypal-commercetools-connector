@@ -60,11 +60,11 @@ type PaymentContextT = {
   clientToken: string;
   handleCreateOrder: (
     orderData?: CustomOrderData,
-    isCheckoutCard?: boolean
+    forceCheckoutReportError?: boolean
   ) => Promise<string>;
   handleOnApprove: (
     data: CustomOnApproveData,
-    isCheckoutCard?: boolean
+    forceCheckoutReportError?: boolean
   ) => Promise<void>;
   vaultOnly: boolean;
   orderDataLinks?: OrderDataLinks;
@@ -81,6 +81,8 @@ type PaymentContextT = {
   resolveShippingOptionId: (selectedOptionId: string) => string;
   orderId?: string;
   builderType?: BuilderType;
+  // Set only in Checkout mode
+  processorUrl?: string;
 };
 
 const setRelevantData = (
@@ -329,10 +331,10 @@ export const PaymentProvider: FC<
 
     const handleCreateOrder = async (
       orderData?: CustomOrderData,
-      isCheckoutCard?: boolean
+      forceCheckoutReportError?: boolean
     ) => {
       if (!createOrderUrl) {
-        if (isCheckoutCard) {
+        if (forceCheckoutReportError) {
           throw new Error(t("payPal.generalError"));
         }
         return "";
@@ -386,7 +388,8 @@ export const PaymentProvider: FC<
         if (!id) {
           // For the card-fields checkout path, setRatepayMessage is always undefined, so
           // handleResponseError (Ratepay/PUI-specific) always takes its `!showError` branch and
-          // throws directly — the catch below's isCheckoutCard rethrow already covers that case.
+          // throws directly — the catch below's forceCheckoutReportError rethrow already covers that
+          // case.
           handleResponseError(
             t,
             notify,
@@ -396,7 +399,7 @@ export const PaymentProvider: FC<
           );
           isLoading(false);
           // PUI: handleResponseError surfaced the error itself instead of throwing
-          if (isCheckoutCard) {
+          if (forceCheckoutReportError) {
             errorAlreadyShown = true;
             throw new Error(message ?? t("invoice.thirdPartyIssue"));
           }
@@ -410,18 +413,18 @@ export const PaymentProvider: FC<
           });
           const { status } = confirmOrderResult;
           if (status === "APPROVED") {
-            handleOnApprove({ orderID: newOrderData.id })
-              .then(() => onSuccess(newOrderData))
-              .catch((err) =>
-                console.error(
-                  "GooglePay: handleOnApprove (APPROVED) failed",
-                  err
-                )
-              );
+            // handleOnApprove shows its own result and errors
+            errorAlreadyShown = true;
+            await handleOnApprove(
+              { orderID: newOrderData.id },
+              forceCheckoutReportError
+            );
           } else if (
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
           ) {
+            // 3DS needs the Google Pay sheet closed, so it continues after handleCreateOrder
+            // returns; handleOnApprove shows the final result itself
             //@ts-ignore
             paypal
               .Googlepay()
@@ -432,7 +435,6 @@ export const PaymentProvider: FC<
                     switch (result.toString(10)) {
                       case "2":
                         handleOnApprove({ orderID: newOrderData.id })
-                          .then(() => onSuccess(newOrderData))
                           .catch((err) =>
                             console.error(
                               "GooglePay: handleOnApprove (3DS approved) failed",
@@ -465,6 +467,9 @@ export const PaymentProvider: FC<
                 console.error("GooglePay: initiatePayerAction failed", err)
               );
           } else {
+            if (forceCheckoutReportError) {
+              throw new Error(t("payPal.generalError"));
+            }
             return "";
           }
         } else {
@@ -501,7 +506,7 @@ export const PaymentProvider: FC<
           );
         }
         isLoading(false);
-        if (isCheckoutCard) {
+        if (forceCheckoutReportError) {
           throw error;
         }
         return "";
@@ -510,7 +515,7 @@ export const PaymentProvider: FC<
 
     const handleOnApprove = async (
       data: CustomOnApproveData,
-      isCheckoutCard?: boolean
+      forceCheckoutReportError?: boolean
     ) => {
       const { orderID, saveCard } = data;
       isLoading(true);
@@ -597,9 +602,9 @@ export const PaymentProvider: FC<
           if (orderData) {
             setResultMessage(orderData.message);
           }
-          if (isCheckoutCard) {
+          if (forceCheckoutReportError) {
             console.error(
-              `[paypal-enabler] Card Fields checkout order not completed, status: ${orderData.status}`
+              `[paypal-enabler] Checkout order not completed, status: ${orderData.status}`
             );
             throw new Error(t("payPal.generalError"));
           }
@@ -609,7 +614,7 @@ export const PaymentProvider: FC<
           "Error",
           error instanceof Error ? error.message : t("interface.generalError")
         );
-        if (isCheckoutCard) {
+        if (forceCheckoutReportError) {
           throw error;
         }
       } finally {
@@ -757,6 +762,7 @@ export const PaymentProvider: FC<
       orderDataLinks,
       orderId,
       builderType,
+      processorUrl,
     };
   }, [
     paymentInfo,
@@ -772,6 +778,8 @@ export const PaymentProvider: FC<
     builderType,
     orderDataLinks,
     orderId,
+    // Constant for the provider's lifetime (set in Checkout, never in legacy mode); listed only for
+    // react-hooks/exhaustive-deps
     processorUrl,
   ]);
 
