@@ -1,7 +1,10 @@
 import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
+  resolveApplePayOptions,
   resolveCardFieldsOptions,
+  resolveGooglePayOptions,
   resolvePayPalBrandOptions,
+  resolvePayUponInvoiceOptions,
 } from "./resolveOptions";
 
 const baseOptions = (overrides: Partial<BaseOptions> = {}): BaseOptions =>
@@ -219,5 +222,109 @@ describe("resolveCardFieldsOptions", () => {
 
     expect(result.enableVaulting).toBe(true);
     expect(result.initialSettings.storeInVaultOnSuccess).toBe(true);
+  });
+});
+
+describe("resolveApplePayOptions", () => {
+  it("options is the shared paypalScriptOptions object as-is, same as every other standard resolver", () => {
+    const paypalScriptOptions = { clientId: "x", currency: "EUR" } as any;
+    const result = resolveApplePayOptions(
+      baseOptions({ paypalScriptOptions })
+    );
+
+    expect(result.options).toBe(paypalScriptOptions);
+  });
+
+  it("vaulting is always forced off, unconditionally — no stored/vaulted Apple Pay support", () => {
+    const result = resolveApplePayOptions(
+      baseOptions({ enableVaulting: true })
+    );
+
+    expect(result.enableVaulting).toBe(false);
+  });
+
+  it("applePayDisplayName falls back to the built-in default when settings doesn't configure one", () => {
+    const result = resolveApplePayOptions(baseOptions());
+
+    expect(result.applePayDisplayName).toBe("My Store");
+  });
+
+  it("applePayDisplayName honors settings.ApplePay.applePayDisplayName when configured", () => {
+    const result = resolveApplePayOptions(
+      baseOptions({
+        settings: {
+          ApplePay: { applePayDisplayName: "Acme Store" },
+        } as any,
+      })
+    );
+
+    expect(result.applePayDisplayName).toBe("Acme Store");
+  });
+});
+
+describe("resolveGooglePayOptions", () => {
+  it.each([
+    ["Sandbox", "TEST"],
+    ["sandbox", "TEST"],
+    ["Live", "PRODUCTION"],
+    [undefined, "PRODUCTION"],
+  ])("environment %s resolves to %s", (environment, expected) => {
+    const result = resolveGooglePayOptions(baseOptions({ environment }));
+
+    expect(result.environment).toBe(expected);
+  });
+
+  it("verificationMethod comes from the shared threeDSOption setting", () => {
+    const result = resolveGooglePayOptions(
+      baseOptions({ settings: { threeDSOption: "SCA_WHEN_REQUIRED" } as any })
+    );
+
+    expect(result.verificationMethod).toBe("SCA_WHEN_REQUIRED");
+  });
+});
+
+describe("resolvePayUponInvoiceOptions", () => {
+  it.each([
+    ["Sandbox", true],
+    ["Live", false],
+    [undefined, false],
+  ])("environment %s resolves fraudNetSandbox to %s", (environment, expected) => {
+    const result = resolvePayUponInvoiceOptions(baseOptions({ environment }));
+
+    expect(result.fraudNetSandbox).toBe(expected);
+  });
+
+  it("merchantId prefers settings.PayUponInvoice.merchantId", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({
+        settings: {
+          merchantId: "GENERAL",
+          PayUponInvoice: { merchantId: "PUI" },
+        } as any,
+      })
+    );
+
+    expect(result.merchantId).toBe("PUI");
+  });
+
+  it("merchantId falls back to the top-level settings.merchantId, also when the PUI one is empty", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({
+        settings: {
+          merchantId: "GENERAL",
+          PayUponInvoice: { merchantId: "" },
+        } as any,
+      })
+    );
+
+    expect(result.merchantId).toBe("GENERAL");
+  });
+
+  it("merchantId is an empty string when neither is configured", () => {
+    const result = resolvePayUponInvoiceOptions(
+      baseOptions({ settings: { merchantId: "" } as any })
+    );
+
+    expect(result.merchantId).toBe("");
   });
 });

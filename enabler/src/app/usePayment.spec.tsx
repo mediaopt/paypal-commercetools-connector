@@ -7,7 +7,7 @@ jest.mock("../services/processorRequest", () => ({
   processorRequest: jest.fn(),
 }));
 jest.mock("./useSettings", () => ({
-  useSettings: () => ({ settings: undefined }),
+  useSettings: jest.fn(() => ({ settings: undefined })),
 }));
 const mockNotify = jest.fn();
 jest.mock("./useNotifications", () => ({
@@ -19,12 +19,14 @@ jest.mock("../helpers/redirectTo", () => ({
 
 import { processorRequest } from "../services/processorRequest";
 import { redirectTo } from "../helpers/redirectTo";
+import { useSettings } from "./useSettings";
 import { PaymentProvider, usePayment } from "./usePayment";
 
 const mockedProcessorRequest = processorRequest as jest.MockedFunction<
   typeof processorRequest
 >;
 const mockedRedirectTo = redirectTo as jest.MockedFunction<typeof redirectTo>;
+const mockedUseSettings = useSettings as jest.Mock;
 
 const CreateOrderConsumer: FC = () => {
   const { handleCreateOrder } = usePayment();
@@ -35,10 +37,31 @@ const CreateOrderConsumer: FC = () => {
   return null;
 };
 
-const OnApproveConsumer: FC = () => {
+const CreateOrderWithDataConsumer: FC<{
+  orderData?: Record<string, unknown>;
+  forceCheckoutReportError?: boolean;
+  onResult?: (result: string) => void;
+  onError?: (error: unknown) => void;
+}> = ({ orderData, forceCheckoutReportError, onResult, onError }) => {
+  const { handleCreateOrder } = usePayment();
+  useEffect(() => {
+    handleCreateOrder(orderData as never, forceCheckoutReportError)
+      .then((result) => onResult?.(result))
+      .catch((error) => onError?.(error));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+};
+
+const OnApproveConsumer: FC<{
+  forceCheckoutReportError?: boolean;
+  onError?: (error: unknown) => void;
+}> = ({ forceCheckoutReportError, onError }) => {
   const { handleOnApprove } = usePayment();
   useEffect(() => {
-    handleOnApprove({ orderID: "order-1" });
+    handleOnApprove({ orderID: "order-1" }, forceCheckoutReportError).catch(
+      (error) => onError?.(error)
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;
@@ -879,5 +902,491 @@ describe("PaymentProvider resolveShippingOptionId", () => {
     );
 
     await waitFor(() => expect(onError).toHaveBeenCalled());
+  });
+});
+
+describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInvoice orders", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockedProcessorRequest.mockResolvedValue(false);
+    mockNotify.mockReset();
+    // Real merchant-configured intent — must not reach the processor unchanged for a PUI order.
+    mockedUseSettings.mockReturnValue({ settings: { payPalIntent: "Authorize" } });
+  });
+
+  afterEach(() => {
+    mockedUseSettings.mockReturnValue({ settings: undefined });
+  });
+
+  it("submits payPalIntent: 'Capture' when orderData.fraudNetSessionId is present (PUI signal), overriding the real settings.payPalIntent — regression test for the two-script-tag crash", async () => {
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{ fraudNetSessionId: "session-1" }}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+
+    const [, , body] = mockedProcessorRequest.mock.calls[0];
+    expect(body).toMatchObject({ payPalIntent: "Capture" });
+  });
+
+  it("leaves payPalIntent as the real settings.payPalIntent when orderData has no fraudNetSessionId (non-PUI orders)", async () => {
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderConsumer />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalled());
+
+    const [, , body] = mockedProcessorRequest.mock.calls[0];
+    expect(body).toMatchObject({ payPalIntent: "Authorize" });
+  });
+});
+
+// handleOnApprove resolves normally for a non-COMPLETED status and swallows errors after notifying,
+// which tells a Checkout caller the payment succeeded. forceCheckoutReportError (passed only in
+// Checkout mode) makes both paths reject instead.
+describe("PaymentProvider handleOnApprove forceCheckoutReportError error propagation", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("rejects and logs the order status when forceCheckoutReportError is true and the order isn't COMPLETED", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    // Keyed by URL rather than call order — OnApproveConsumer's effect (a child of
+    // PaymentProvider) fires before PaymentProvider's own initial createPayment effect, so
+    // queued mockResolvedValueOnce values would be consumed out of the order they're declared in.
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED", message: "pending" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer forceCheckoutReportError onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("CREATED")
+    );
+    // The existing notify(...) still fires before the new rethrow — checkout callers keep the
+    // same user-facing message, they just also now reject the promise.
+    expect(mockNotify).toHaveBeenCalledWith("Error", expect.any(String));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("resolves normally (no throw, no notify) for the same non-COMPLETED order when forceCheckoutReportError is not set — legacy/other callers unaffected", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED", message: "pending" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockedProcessorRequest).toHaveBeenCalledTimes(2)
+    );
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("rethrows a failed processor call for forceCheckoutReportError callers instead of only notifying — any error, not just the non-COMPLETED case, must now fail the payment step", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.reject(new Error("network down"))
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer forceCheckoutReportError onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Error", "network down");
+  });
+
+  it("does not rethrow a failed processor call when forceCheckoutReportError is not set — matches today's behavior for other builders", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.reject(new Error("network down"))
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        onApproveUrl="https://processor.test/payments/approve"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <OnApproveConsumer onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(mockNotify).toHaveBeenCalledWith("Error", "network down")
+    );
+    expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+// Same swallow-and-continue pattern in handleCreateOrder.
+describe("PaymentProvider handleCreateOrder forceCheckoutReportError error propagation", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it("rejects when createOrderUrl is not configured and forceCheckoutReportError is true, instead of silently resolving to an empty string", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    const onResult = jest.fn();
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          forceCheckoutReportError
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(onResult).not.toHaveBeenCalled();
+    // No processor call other than the initial createPayment — misconfiguration is detected
+    // before ever reaching the try/catch, so there's nothing for notify to report either.
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("still silently resolves to an empty string when createOrderUrl is not configured and forceCheckoutReportError is not set — legacy/other callers unaffected", async () => {
+    mockedProcessorRequest.mockResolvedValueOnce({
+      id: "payment-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    const onResult = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer onResult={onResult} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(""));
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the processor response is missing an order id and forceCheckoutReportError is true (handleResponseError's own throw now propagates instead of being swallowed)", async () => {
+    // Keyed by URL rather than call order — see the equivalent handleOnApprove tests above for why.
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { message: "missing-id" },
+            paymentVersion: 2,
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer forceCheckoutReportError onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Error", "missing-id");
+  });
+});
+
+describe("PaymentProvider handleCreateOrder PayUponInvoice error response", () => {
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+  });
+
+  const renderPuiOrder = (
+    forceCheckoutReportError: boolean | undefined,
+    onResult: jest.Mock,
+    onError: jest.Mock
+  ) => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { message: "UNKNOWN_RATEPAY_ERROR" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{
+            fraudNetSessionId: "session-1",
+            setRatepayMessage: jest.fn(),
+          }}
+          forceCheckoutReportError={forceCheckoutReportError}
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+  };
+
+  it("rejects with forceCheckoutReportError, notifying only once (handleResponseError already showed the error)", async () => {
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderPuiOrder(true, onResult, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(onResult).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves to an empty string without forceCheckoutReportError — legacy callers unaffected", async () => {
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderPuiOrder(undefined, onResult, onError);
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(""));
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PaymentProvider handleCreateOrder Google Pay APPROVED", () => {
+  const confirmOrder = jest.fn();
+
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+    confirmOrder.mockReset().mockResolvedValue({ status: "APPROVED" });
+    (globalThis as any).paypal = { Googlepay: () => ({ confirmOrder }) };
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).paypal;
+  });
+
+  const renderGooglePayOrder = (
+    approveStatus: string,
+    purchaseCallback: jest.Mock,
+    onResult: jest.Mock,
+    onError: jest.Mock
+  ) => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "CREATED" },
+          } as never)
+        : (url as string).includes("/approve")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: approveStatus },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        onApproveUrl="https://processor.test/payments/approve"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={purchaseCallback}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{
+            paymentSource: "google_pay",
+            googlePayData: { paymentData: { paymentMethodData: {} } },
+          }}
+          forceCheckoutReportError
+          onResult={onResult}
+          onError={onError}
+        />
+      </PaymentProvider>
+    );
+  };
+
+  it("waits for the approval and fires purchaseCallback exactly once on success", async () => {
+    const purchaseCallback = jest.fn();
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderGooglePayOrder("COMPLETED", purchaseCallback, onResult, onError);
+
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith("order-1"));
+    expect(purchaseCallback).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("rejects with forceCheckoutReportError when the approval doesn't complete, without firing purchaseCallback or a second notification", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    const purchaseCallback = jest.fn();
+    const onResult = jest.fn();
+    const onError = jest.fn();
+    renderGooglePayOrder("DECLINED", purchaseCallback, onResult, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(purchaseCallback).not.toHaveBeenCalled();
+    expect(onResult).not.toHaveBeenCalled();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    consoleErrorSpy.mockRestore();
   });
 });
