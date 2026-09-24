@@ -678,6 +678,18 @@ export class PayPalPaymentService extends AbstractPaymentService {
         response.id
       );
 
+      // The Failure transaction is already recorded above, but the buyer must not be sent to the
+      // success page — handleCreateOrder has no non-error channel for a failed outcome
+      const failedStatus = this.findFailedSettlementStatus(
+        response,
+        transactionConfig
+      );
+      if (failedStatus) {
+        throw new ErrorInvalidOperation(
+          `PayPal order ${response.id} for payment ${payment.id} completed with a ${failedStatus} ${transactionConfig.transactionType}`
+        );
+      }
+
       return {
         orderData: {
           id: response.id ?? "",
@@ -1244,6 +1256,19 @@ export class PayPalPaymentService extends AbstractPaymentService {
       throw error;
     }
 
+    // No merchantReturnUrl: handleOnApprove redirects on it before checking orderData.status, so
+    // the enabler's orderData.status !== "COMPLETED" handling shows a failure instead
+    const failedStatus = this.findFailedSettlementStatus(response, config);
+    if (failedStatus) {
+      return {
+        orderData: {
+          id: response.id ?? "",
+          status: failedStatus,
+          message: `PayPal ${config.transactionType} ${failedStatus}`,
+        },
+      };
+    }
+
     return {
       orderData: { id: response.id ?? "", status: response.status ?? "" },
       merchantReturnUrl: this.buildRedirectMerchantUrl(
@@ -1251,6 +1276,26 @@ export class PayPalPaymentService extends AbstractPaymentService {
         response.status
       ),
     };
+  }
+
+  /**
+   * A COMPLETED order can still carry a DECLINED/FAILED capture or authorization — returns that
+   * status when the purchase unit's transaction maps to a commercetools Failure, else undefined.
+   */
+  private findFailedSettlementStatus(
+    response: Order,
+    config: {
+      purchaseUnitKey: "authorizations" | "captures";
+      mapStatus: (status?: string) => TransactionState;
+    }
+  ): string | undefined {
+    const transaction = extractPayPalPurchaseUnitTransaction(
+      response.purchase_units,
+      config.purchaseUnitKey
+    );
+    return config.mapStatus(transaction?.status) === "Failure"
+      ? transaction?.status ?? "FAILED"
+      : undefined;
   }
 
   /**
