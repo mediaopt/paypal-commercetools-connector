@@ -284,6 +284,9 @@ export type CheckoutOnlyProps = {
    * self-hosted deployments, which fall back to usePayment.tsx's own direct createPaymentUrl
    * call. */
   initialPayment?: CreatePaymentResponse;
+  /** PayPal Express only — Checkout's ExpressOptions.onPayButtonClick. See usePayment.tsx's
+   * handleCreateOrder. */
+  onExpressPayButtonClick?: () => Promise<{ sessionId: string }>;
 };
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
@@ -692,6 +695,7 @@ export type GenericMountProps = FormComponentProps & {
   buttonText?: string;
   onError?: (error: GenericError) => void;
   initialAmount?: CTAmount;
+  onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];
   /** only for a stored-payment-method component (PayPalStoredBuilder) — PayPal's
    * vault payment-token id of the saved card */
   ppVaultTokenId?: string;

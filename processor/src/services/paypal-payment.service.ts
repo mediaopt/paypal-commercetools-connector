@@ -20,7 +20,10 @@ import {
 } from "./types/operation.type";
 
 import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-componets.dto";
-import { PaymentIntentResponseSchemaDTO, PaymentModificationStatus } from "../dtos/operations/payment-intents.dto";
+import {
+  PaymentIntentResponseSchemaDTO,
+  PaymentModificationStatus,
+} from "../dtos/operations/payment-intents.dto";
 import packageJSON from "../../package.json";
 
 import { AbstractPaymentService } from "./abstract-payment.service";

@@ -138,7 +138,8 @@ async function loadMethods() {
       ...(builder.componentHasSubmit
         ? {}
         : {
-            onPayButtonClick: async () => Promise.resolve(true),
+            onPayButtonClick: async () =>
+              category === "express" ? { sessionId } : true,
           }),
       ...(category === "express"
         ? {

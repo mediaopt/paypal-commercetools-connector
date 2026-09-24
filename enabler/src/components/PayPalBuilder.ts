@@ -5,6 +5,7 @@ import {
   PaymentComponentBuilder,
 } from "../payment-enabler/interfaces/enabler";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
+import { ExpressOptions } from "../payment-enabler/interfaces/express";
 import {
   BuilderType,
   GenericError,
@@ -82,7 +83,9 @@ class PayPalComponent implements PaymentComponent {
       showPayButton: this.config.showPayButton ?? true,
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,
-      // onError is a new, checkout-only prop — not supported for legacy enabler components
+      // onError is a new, checkout-only prop — not supported for legacy enabler components.
+      // For PayPal Express, paymentReference may be stale: onPayButtonClick switches to a new
+      // session and Payment, which this mount-time value doesn't follow. Refer to the logs.
       onError: this.baseOptions.onError
         ? (error: GenericError) =>
             this.baseOptions.onError?.(error, {
@@ -90,6 +93,11 @@ class PayPalComponent implements PaymentComponent {
             })
         : undefined,
       initialAmount: this.config.initialAmount,
+      // For express, Checkout passes ExpressOptions (not ComponentOptions) into build()
+      ...(this.builderType === "express" && {
+        onExpressPayButtonClick: (this.config as unknown as ExpressOptions)
+          .onPayButtonClick,
+      }),
       onRegisterSubmit: (
         handler: (storePaymentDetails?: boolean) => Promise<void>
       ) => {
