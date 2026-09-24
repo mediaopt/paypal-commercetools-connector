@@ -64,7 +64,7 @@ export const ApplePayMask: FC<ApplePayMaskComponentProps> = (props) => {
             setPayConfig(applepayConfig);
             setPay(applepay);
           } else {
-            console.warn("[ApplePay: not eligible");
+            console.warn("ApplePay: not eligible");
           }
         } catch (error) {
           console.warn("ApplePay: failed to fetch configuration", error);
