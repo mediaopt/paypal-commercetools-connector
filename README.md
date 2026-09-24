@@ -90,15 +90,17 @@ Optionally for sending PayPal Pay Upon Invoice custom emails please provide SMTP
 Additionally for checkout mode (`processor`), see [connect.yaml](connect.yaml) for the full list:
 
 | environmental variable | required | description                                                                                                 |
-| ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------- | --- |
+| ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
 | CTP_AUTH_URL           | yes      | commercetools Auth URL, e.g. `https://auth.europe-west1.gcp.commercetools.com`                              |
 | CTP_API_URL            | yes      | commercetools API URL, e.g. `https://api.europe-west1.gcp.commercetools.com`                                |
 | CTP_SESSION_URL        | yes      | commercetools Session API URL, e.g. `https://session.europe-west1.gcp.commercetools.com`                    |
 | CTP_CHECKOUT_URL       | yes      | commercetools Checkout API URL, e.g. `https://checkout.europe-west1.gcp.commercetools.com`                  |
 | CTP_JWKS_URL           | yes      | JWKs URL for JWT validation, e.g. `https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json` |
-| CTP_JWT_ISSUER         | yes      | JWT issuer for JWT validation, e.g. `https://mc-api.europe-west1.gcp.commercetools.com`                     |     |
+| CTP_JWT_ISSUER         | yes      | JWT issuer for JWT validation, e.g. `https://mc-api.europe-west1.gcp.commercetools.com`                     |
 
 See [processor/.env.template](processor/.env.template) for the format and defaults of the JSON variables and for the optional variables.
+
+The commercetools API client used by `processor` needs at least the following scopes (the processor health check fails otherwise): `manage_payments`, `view_sessions`, `view_api_clients`, `manage_orders`, `introspect_oauth_tokens`, `manage_checkout_payment_intents`, `manage_types`, plus `manage_payment_methods` if [stored payment methods](#stored-payment-methods) are enabled.
 
 If you already use custom types for commercetools payment, customer or payment_interaction please consider using the corresponding types keys for PAYMENT_TYPE_KEY, CUSTOMER_TYPE_KEY and PAYMENT_INTERACTION_TYPE_KEY. Please see the corresponding [commercetools tutorial](https://docs.commercetools.com/tutorials/composable-custom-types) for details.
 
@@ -118,6 +120,8 @@ The connector can be installed [directly from the commercetools marketplace](htt
 
 ### Local running
 
+#### Composable Commerce mode
+
 To run the connector locally for test purposes:
 
 - `cd paypal-commercetools-extension` or `cd paypal-commercetools-events`
@@ -127,11 +131,31 @@ To run the connector locally for test purposes:
 - for paypal-commercetools-extension run `npm run connector:post-deploy` to register the extension with the public ngrok url
 - run `npm run start:dev` to build the application
 
+#### Checkout mode
+
+- in both `processor` and `enabler` run `cp .env.template .env` and fill in the values
+- build the shared module: `cd common-connect`, `npm install`, `npm run build`
+- from the repository root run `docker compose up` to start:
+  - the local JWT mock server (`http://localhost:9002`)
+  - the processor (`http://localhost:8080`)
+  - the enabler development page (`http://localhost:3000`)
+- open `http://localhost:3000`, enter a cart id and the page creates a commercetools session and mounts the payment components
+
+`docker-compose.yaml` overrides `CTP_JWKS_URL`, `CTP_JWT_ISSUER` (`https://issuer.com`) and `VITE_PROCESSOR_URL`, so their `.env` values are not used locally. See [processor/README.md](processor/README.md) for authentication details, including how to get a local JWT.
+
+In production the [Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api) is called on commercetools' own Checkout host, which forwards to the processor's `POST /operations/payment-intents/:id` route. Locally there's no Checkout host in front of the processor, so that route can be called directly for testing. Note, that on stage/production commercetools order is required to reach the intents API.
+
 ### Hosting externally
 
 Please set your application url (see the example in [ngrok.sh](./paypal-commercetools-extension/bin/ngrok.sh)) in the `.env` file and run post-deploy script. The url should be accessible externally.
 
+### Using the connector without Checkout mode
+
+If you deploy the connector yourself (via the commercetools Connect API or other services), you can remove `processor` and `enabler` from `connect.yaml` and the repository to speed up the installation. `common-connect` must remain, as the extension module depends on it. If you use a package manager other than npm (e.g. yarn), replace the `"common-connect": "file:../common-connect"` dependency in `paypal-commercetools-extension` (and `processor`, if kept) with your package manager's equivalent (for yarn: `"common-connect": "link:../common-connect"`).
+
 ### Checkout mode installation and configuration
+
+The `processor` is designed to be driven by the `enabler` only. The one part of its API meant to be triggered by the merchant is the [Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api) (`capturePayment`, `cancelPayment`, `refundPayment`), called on commercetools' own Checkout host (`checkout.<region>.commercetools.com/{projectKey}/payment-intents/{paymentId}`) — never on the processor directly. See [enabler/README.md](enabler/README.md#paypal-express-legal-review-requirement-paypal_redirect_on_approve) for how capture works after a PayPal Express review redirect.
 
 To use the commercetools Checkout compatible track (`processor`/`enabler`), create a checkout application in the [merchant center](https://docs.commercetools.com/checkout/overview#merchant-center-configuration). In the application payment integrations you can select this connector and configure the payment methods available. **The connector does not restrict which payment methods are offered to a buyer by country or currency — this is entirely your responsibility to configure**, via a payment integration predicate, in the merchant center → checkout application → payment integration screen.
 
@@ -160,6 +184,16 @@ Configure these via [payment integration predicates](https://docs.commercetools.
 Venmo's browser/device support ([Safari on iOS or Chrome on Android; any browser on desktop](https://developer.paypal.com/v5/venmo/overview)) is the one exception the connector _does_ enforce itself, not something you need a predicate for — see `enabler/README.md`'s "Venmo eligibility is not enforced by the payment-method list" section for details.
 
 **A practical way to check which of PayPal buttons based methods are actually enabled for your PayPal account** is to temporarily add the `AllButtons` method to your payment integration with no predicate — PayPal's own SDK only ever renders funding sources it currently considers eligible for that account/currency, so whichever of Sepa/PayLater/PayPalCreditCard/Venmo/etc. actually show up there are the ones genuinely available; anything missing was already ineligible before any predicate could help. Keeping the payment integration accurate is your responsibility: leave out entirely any method you don't intend to accept, and use the recommended predicate above for any conditional method you do want to offer.
+
+#### Stored payment methods
+
+Only credit cards can be stored and reused in Checkout mode. To enable it:
+
+1. set `STORED_PAYMENT_METHODS_ENABLED=true` and optionally `STORED_PAYMENT_METHODS_PAYMENT_INTERFACE` (default `PayPal`) and `STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT`;
+2. give the processor's API client the additional `manage_payment_methods` scope;
+3. make sure `cart.customerId` is set before Checkout is instantiated.
+
+Changing the payment interface or interface account later means previously stored cards are no longer found and would need to be migrated manually. See [enabler/README.md](enabler/README.md#stored-cards-and-vaulting) for the Checkout behavior of stored cards.
 
 ## Technology Stack
 

@@ -39,9 +39,10 @@ This connector has five applications:
 - frontend payment components for commercetools Checkout
 - built from the former [npm client](https://www.npmjs.com/package/paypal-commercetools-client) and the [workflows integration example](workflows/README.md), which are no longer supported
 - merchants not using commercetools Checkout can still host the components themselves (legacy mode)
-- see [enabler/README.md](../enabler/README.md) for the differences between legacy mode and Checkout mode
+- see [enabler/README.md](../enabler/README.md) for the differences between legacy mode and Checkout mode and for [local development](../enabler/README.md#local-development)
 
 # processor
 
 - backend-for-frontend for `enabler`, which merchants previously had to build themselves
+- see [processor/README.md](../processor/README.md) for local development, required API scopes, endpoints and authentication
 - reached only through commercetools Checkout and the Payment Intents API, not called directly by the merchant

@@ -31,6 +31,23 @@ the standalone option, please open an issue.
 providing the URLs, but the request/response shape, auth and error handling behind each one
 (`src/components/constants.ts`).
 
+## Local development
+
+Run the following commands in the `enabler` folder:
+
+| Command         | Purpose                                                   |
+| --------------- | --------------------------------------------------------- |
+| `npm install`   | install dependencies                                      |
+| `npm run dev`   | start the development page at `http://localhost:3000`     |
+| `npm run build` | build the enabler (output in `public`)                    |
+| `npm test`      | run the automated tests                                   |
+
+The development page (`index.html`, `index.js`) mounts the components for a cart id you enter. It
+creates the commercetools session itself (`dev-utils/session.js`), using the `VITE_*` variables
+from `.env` (copy `.env.template`), and calls the processor at `VITE_PROCESSOR_URL`. To run it
+together with the processor and a JWT mock server, see the root
+[README.md](../README.md#checkout-mode) (`docker compose up`).
+
 ## Checkout mode is intentionally limited
 
 When these components are mounted inside commercetools Checkout, their functionality is
