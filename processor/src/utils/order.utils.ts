@@ -59,6 +59,35 @@ const PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS = [
   "It is merchant responsibility to set this message.",
 ];
 
+// PAYPAL_ORDER_EXPERIENCE_CONTEXT is shared by both payment sources, but PayPal rejects keys that
+// don't belong to the one it's sent with
+const PAYPAL_WALLET_EXPERIENCE_CONTEXT_KEYS: Array<
+  keyof NonNullable<PaypalWallet["experience_context"]>
+> = [
+  "brand_name",
+  "locale",
+  "shipping_preference",
+  "return_url",
+  "cancel_url",
+  "landing_page",
+  "user_action",
+  "payment_method_preference",
+];
+const PAY_UPON_INVOICE_EXPERIENCE_CONTEXT_KEYS = [
+  "brand_name",
+  "locale",
+  "logo_url",
+  "customer_service_instructions",
+];
+
+const pickExperienceContextOverrides = (
+  overrides: Record<string, unknown>,
+  keys: string[]
+) =>
+  Object.fromEntries(
+    Object.entries(overrides).filter(([key]) => keys.includes(key))
+  );
+
 export const buildOrderRequest = (
   payment: Payment,
   ctCart: Cart,
@@ -130,7 +159,10 @@ export const buildOrderRequest = (
     ...(shipping && !isExpress
       ? { shipping_preference: "SET_PROVIDED_ADDRESS" as const }
       : {}),
-    ...experienceContextOverrides,
+    ...pickExperienceContextOverrides(
+      experienceContextOverrides,
+      PAYPAL_WALLET_EXPERIENCE_CONTEXT_KEYS
+    ),
   } as PaypalWallet["experience_context"];
 
   const result = {
@@ -225,7 +257,10 @@ export const buildOrderRequest = (
                 customer_service_instructions:
                   PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS,
                 locale: ctCart.locale ?? PAY_UPON_INVOICE_DEFAULT_LOCALE,
-                ...experienceContextOverrides,
+                ...pickExperienceContextOverrides(
+                  experienceContextOverrides,
+                  PAY_UPON_INVOICE_EXPERIENCE_CONTEXT_KEYS
+                ),
               },
             },
           } as any,

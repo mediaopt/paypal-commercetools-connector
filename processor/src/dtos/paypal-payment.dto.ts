@@ -133,7 +133,9 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.String()),
-  paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
+  // Not the PaymentMethodType enum: the enabler also sends methods this processor keeps commented
+  // out, which must not be rejected with a 400
+  paymentMethodType: Type.Optional(Type.String()),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema

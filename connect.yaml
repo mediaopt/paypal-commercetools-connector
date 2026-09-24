@@ -47,7 +47,7 @@ deployAs:
           required: false
           default: "false"
         - key: PAYPAL_ORDER_EXPERIENCE_CONTEXT
-          description: Merchant overrides for PayPal wallet experience_context on the Orders v2 createOrder request (e.g. user_action, payment_method_preference), as a JSON object. Defaults, unless overridden here, are user_action PAY_NOW (CONTINUE for Express with a review-step redirect configured) and payment_method_preference IMMEDIATE_PAYMENT_REQUIRED
+          description: Merchant overrides for PayPal wallet experience_context on the Orders v2 createOrder request (e.g. user_action, payment_method_preference), as a JSON object. Defaults, unless overridden here, are user_action PAY_NOW (CONTINUE for Express with a review-step redirect configured) and payment_method_preference IMMEDIATE_PAYMENT_REQUIRED. PayUponInvoice customer_service_instructions/logo_url are set here too; each payment source only receives the keys PayPal accepts for it
           required: false
         - key: PAYPAL_BUTTON_CONFIG
           description: Per payment method overrides (style, fundingSource, messagesStyle, disablePayLaterButton, applePayDisplayName, Google Pay fields, invoiceBenefitsMessage), keyed by payment method type plus a dedicated PayPalExpress slot, as a JSON object. Script components are not configurable here
