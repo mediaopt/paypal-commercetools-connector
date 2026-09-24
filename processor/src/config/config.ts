@@ -35,8 +35,9 @@ const configuredStandardScriptOptions: {
     : {}),
 };
 
-// PayPal button config overrides (style/funding sources), keyed by componentType, plus a
-// dedicated PayPalExpress slot (see configuredSdkOptions above) — passed through as-is; the
+// PayPal button config overrides (style/fundingSource/...), keyed by componentType, plus a
+// dedicated PayPalExpress slot. Script `components` are not configurable here — see
+// configuredStandardScriptOptions/configuredExpressSdkOptions above. Passed through as-is; the
 // enabler owns merging this over its own built-in defaults and the general settings below (see
 // PAYPAL_BUTTON_CONFIG in processor/.env.template).
 const configuredButtonConfig = process.env.PAYPAL_BUTTON_CONFIG
@@ -90,13 +91,13 @@ export const config = {
 
   // Payment Providers config
   returnUrl: process.env.MERCHANT_RETURN_URL || "",
-  // PayPal-Express-only override for the buyer redirect after authorizeOrder()/captureOrder() (see
-  // buildRedirectMerchantUrl in paypal-payment.service.ts) — lets a merchant send the buyer to a
-  // different page for that one flow. Falls back to the generic MERCHANT_RETURN_URL/session return
-  // url when unset.
+  // PayPal-Express-only target of the pre-finalize (legal-review) redirect on approval — see
+  // expressApprove() in paypal-payment.service.ts. Setting it also enables that redirect. Never used
+  // for the post-authorizeOrder()/captureOrder() merchantReturnUrl (session return url, then
+  // MERCHANT_RETURN_URL). Falls back to the session return url/MERCHANT_RETURN_URL when unset but redirection enabled.
   onApprovePrefix: process.env.PAYPAL_ONAPPROVE_PREFIX || undefined,
   // Master switch for PayPal Express's pre-finalize redirect
-  // (see enabler/README.md's "PayPal-Express/ legal-review requirement" section).
+  // (see enabler/README.md's "PayPal Express legal-review requirement" section).
   redirectOnApprove: process.env.PAYPAL_REDIRECT_ON_APPROVE === "true",
   paymentInterface: PAYMENT_INTERFACE_NAME,
 

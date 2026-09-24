@@ -215,8 +215,8 @@ export const OnApproveRequestSchema = Type.Object({
   // Accepted for enabler-contract compatibility; not yet acted on — no CT-native PaymentMethod
   // "save" flow exists yet.
   saveCard: Type.Optional(Type.Boolean()),
-  // Lets finalizeOrder tell the PayPal Express flow apart, to decide whether to use
-  // onApprovePrefix for the response's merchantReturnUrl.
+  // Accepted for enabler-contract compatibility; finalizeOrder no longer branches on it
+  // (merchantReturnUrl never uses onApprovePrefix).
   builderType: Type.Optional(Type.String()),
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;

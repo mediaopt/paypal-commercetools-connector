@@ -193,10 +193,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolveUserIdToken(cartSummary?.customerId)
       : undefined;
 
-    // Per-component overrides (style/fundingSources/components), sourced from PAYPAL_BUTTON_CONFIG
+    // Per-component overrides (style/fundingSource/messagesStyle/...), sourced from PAYPAL_BUTTON_CONFIG
     // — already componentType-keyed (plus the dedicated PayPalExpress slot), passed through as-is;
     // the enabler merges these over its own defaults and the general settings above (see
-    // PayPalBuilder.ts's 4-layer resolution).
+    // enabler's RenderTemplate/resolveOptions.ts 4-layer resolution).
     const mergedSettings = {
       ...settings,
       ...getConfig().buttonConfig,

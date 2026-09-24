@@ -381,7 +381,7 @@ export type CustomPayPalButtonsComponentProps = Omit<
   | "fundingSource"
 > & {
   paypalMessages?: PayPalMessagesComponentProps;
-  // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
+  // A single funding source (not an array), see RenderTemplate/resolveOptions.ts's 4-layer
   // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
   fundingSource?: FUNDING_SOURCE;
   // Merchant-configurable style for the real (non-hardcoded) <PayPalMessages/> PayPalMask
@@ -628,7 +628,7 @@ type PayPalMethodStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
 // builderType: "express" — see RenderTemplate/resolveOptions.ts's 4-layer resolution. Every field
 // is wholesale-replace when present, not merged field-by-field with whatever a lower-priority
 // layer already resolved. Not every payment method uses every field — e.g. CardFields has no
-// button style/funding sources, only `components`.
+// button style/funding source.
 export type PayPalMethodConfig = {
   style?: PayPalMethodStyle;
   fundingSource?: FUNDING_SOURCE;
@@ -641,11 +641,6 @@ export type PayPalMethodConfig = {
   // standard PayPal button (gated together with settings.acceptPayLater — both must allow it).
   // Ops-only, set via PAYPAL_BUTTON_CONFIG; no merchant-center/custom-application equivalent.
   disablePayLaterButton?: boolean;
-  // PayPal JS SDK script `components` list for this payment method (e.g. "buttons,card-fields") —
-  // same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components, but resolved through this
-  // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
-  // RenderTemplate/resolveOptions.ts).
-  components?: string;
   // ApplePay only — the merchant-facing store name shown in Apple's native payment sheet.
   applePayDisplayName?: string;
   // PayUponInvoice only block

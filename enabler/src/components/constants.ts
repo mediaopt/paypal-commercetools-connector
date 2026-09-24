@@ -86,11 +86,12 @@ export const FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE: Partial<
 // config distinct from its own paymentMethodType entry (see ENABLER_DEFAULT_CONFIG below and
 // mount()'s express-first resolution). Not folded into the generic per-payment-method config map
 // below, since no other payment method is ever expected to need a second config slot like this.
-// Required over only PayPal-brand's own 3 fields — not the full PayPalMethodConfig — since
-// applePayDisplayName has nothing to do with PayPal Express.
+// Required over only PayPal-brand's own style/fundingSource — not the full PayPalMethodConfig —
+// since applePayDisplayName has nothing to do with PayPal Express. `components` is Express's
+// script-level default (overridable via PAYPAL_EXPRESS_SDK_OPTIONS), not a per-method override.
 export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<
-  Pick<PayPalMethodConfig, "style" | "fundingSource" | "components">
-> = {
+  Pick<PayPalMethodConfig, "style" | "fundingSource">
+> & { components: string } = {
   // buttonLabel here is only the pre-override default — it's forced back to "buynow"
   // unconditionally in mount() below regardless of what resolvedOverride/generalStyle supply, so
   // this value never actually changes in practice; kept for a type-required field's sake.
@@ -99,9 +100,9 @@ export const ENABLER_DEFAULT_EXPRESS_CONFIG: Required<
   components: "buttons,messages",
 };
 // Enabler's own built-in default, lowest-priority tier: what renders when the processor sends
-// nothing at all for this payment method. Flat, keyed by paymentMethodType — add a row here for a
-// future payment method needing only `components` (CardFields has no button style/funding
-// sources of its own — only `components` applies to it).
+// nothing at all for this payment method. Flat, keyed by paymentMethodType. Script `components`
+// are never per method — they're shared by every standard component
+// (PAYPAL_STANDARD_SCRIPT_OPTIONS); CardFields has no button style/funding source of its own.
 export const ENABLER_DEFAULT_CONFIG: Record<
   PayPalPaymentMethodType,
   PayPalMethodConfig

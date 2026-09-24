@@ -75,9 +75,10 @@ class PayPalStoredComponent implements StoredComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    // Shares the standard-component script now (see FIXED_SCRIPT_OPTIONS_BY_PAYMENT_METHOD_TYPE
-    // in constants.ts) — so "merchant doesn't accept cards" (which already strips "card-fields"
-    // out of the shared components list) also disables stored/vaulted cards, no separate config.
+    // Follows the shared standard-component script options (standardScriptOptions, from
+    // PAYPAL_STANDARD_SCRIPT_OPTIONS) — so "merchant doesn't accept cards" (which already strips
+    // "card-fields" out of the shared components list) also disables stored/vaulted cards, no
+    // separate config.
     return (
       this.baseOptions.standardScriptOptions?.components?.includes(
         "card-fields"
