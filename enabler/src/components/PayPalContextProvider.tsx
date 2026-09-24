@@ -40,6 +40,7 @@ export const PayPalContextProvider: FC<
   initialSettings,
   initialUserIdToken,
   redirectOnApprove,
+  isStoredCheckoutComponent,
   initialPayment,
 
   children,
@@ -56,6 +57,9 @@ export const PayPalContextProvider: FC<
           processorUrl={processorUrl}
           initialSettings={initialSettings}
           initialUserIdToken={initialUserIdToken}
+          isStoredCheckoutComponent={isStoredCheckoutComponent}
+          paymentMethodType={paymentMethodType}
+          builderType={builderType}
         >
           <PaymentProvider
             options={options}
@@ -80,6 +84,7 @@ export const PayPalContextProvider: FC<
             processorUrl={processorUrl}
             redirectOnApprove={redirectOnApprove}
             initialPayment={initialPayment}
+            isStoredCheckoutComponent={isStoredCheckoutComponent}
           >
             <RenderPurchase>{children}</RenderPurchase>
           </PaymentProvider>

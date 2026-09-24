@@ -8,7 +8,7 @@
     "start:dev": "node_modules/.bin/nodemon -q dist/main.js",
     "lint": "prettier --check \"**/**/*.{ts,js,json}\" && eslint src test",
     "lint:fix": "prettier --write \"**/**/*.{ts,js,json}\" && eslint --fix src test",
-    "build": "npm --prefix ../common-connect install && npm --prefix ../common-connect run build && rm -rf /dist && tsc",
+    "build": "npm --prefix ../common-connect install && npm --prefix ../common-connect run build && rm -rf dist && tsc",
     "dev": "ts-node src/main.ts",
     "watch": "nodemon --watch \"src/**\" --ext \"ts,json\" --ignore \"src/**/*.spec.ts\" --exec \"ts-node src/main.ts\"",
     "test": "npm run build && jest --detectOpenHandles",

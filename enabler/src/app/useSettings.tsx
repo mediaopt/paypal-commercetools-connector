@@ -6,7 +6,10 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import { PayPalScriptProvider } from "@paypal/react-paypal-js";
+import {
+  PayPalScriptProvider,
+  usePayPalScriptReducer,
+} from "@paypal/react-paypal-js";
 
 import {
   GetSettingsResponse,
@@ -35,6 +38,47 @@ const SettingsContext = createContext<SettingsContextT>({
   paymentTokens: {},
 });
 
+// Diagnostic only — logs PayPal JS SDK script-loading state transitions, tagged with the
+// component that mounted it. Must live inside <PayPalScriptProvider> to call
+// usePayPalScriptReducer(). react-paypal-js's own PayPalScriptProvider already console.errors a
+// genuine load rejection, but that log carries no indication of which mounted component it belongs to
+const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
+  const [scriptState] = usePayPalScriptReducer();
+  const { isInitial, isPending, isResolved, isRejected } = scriptState;
+
+  useEffect(() => {
+    const status = isRejected
+      ? "REJECTED"
+      : isResolved
+      ? "RESOLVED"
+      : isPending
+      ? "PENDING"
+      : isInitial
+      ? "INITIAL"
+      : "UNKNOWN";
+    if (isRejected) {
+      // loadingStatusErrorMessage exists on the underlying reducer state at runtime (it's on
+      // ScriptContextState) but isn't part of ScriptContextDerivedState's declared type.
+      const errorMessage = (
+        scriptState as { loadingStatusErrorMessage?: string }
+      ).loadingStatusErrorMessage;
+      console.error(
+        `[paypal-enabler][script:${tag ?? "unknown"}] script load rejected:`,
+        errorMessage
+      );
+    }
+    if (isResolved && !window.paypal) {
+      console.error(
+        `[paypal-enabler][script:${
+          tag ?? "unknown"
+        }] resolved but window.paypal is missing`
+      );
+    }
+  }, [isInitial, isPending, isResolved, isRejected]);
+
+  return null;
+};
+
 export const SettingsProvider: FC<
   React.PropsWithChildren<SettingsProviderProps>
 > = ({
@@ -47,7 +91,14 @@ export const SettingsProvider: FC<
   processorUrl,
   initialSettings,
   initialUserIdToken,
+  isStoredCheckoutComponent,
+  paymentMethodType,
+  builderType,
 }) => {
+  // Diagnostic-only tag for ScriptLoadLogger below — not used for any settings/payment logic.
+  const scriptLogTag = builderType
+    ? `${paymentMethodType}(${builderType})`
+    : paymentMethodType;
   // Seeds from the processor's /operations/config response when available (Checkout mode) — in
   // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
   // otherwise never populate these at all.
@@ -139,20 +190,35 @@ export const SettingsProvider: FC<
     }
   }, [settings]);
 
+  // isStoredCheckoutComponent is set once, at the source, by PayPalStoredBuilder (see its own
+  // comment) for every component it builds — none of them need the PayPal JS SDK to render —
+  // rather than inferred here from paymentMethodType/builderType.
   return (
     <SettingsContext.Provider value={value}>
       {settings || !getSettingsUrl ? (
-        <PayPalScriptProvider
-          options={{
-            ...options,
-            intent: settings?.payPalIntent?.toString().toLowerCase(),
-            dataUserIdToken: userIdToken,
-            dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-            merchantId: settings?.merchantId,
-          }}
-        >
-          {children}
-        </PayPalScriptProvider>
+        isStoredCheckoutComponent ? (
+          children
+        ) : (
+          <PayPalScriptProvider
+            options={{
+              // Non-null: every mount reaching this branch (i.e. every component not built by
+              // PayPalStoredBuilder, see isStoredCheckoutComponent above) always supplies a real
+              // `options`.
+              ...options!,
+              intent: settings?.payPalIntent?.toString().toLowerCase(),
+              dataUserIdToken: initialSettings ? undefined : userIdToken, //only stored cards by own ct interface are permitted in checkout mode
+              dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
+              // See payment-enabler-paypal.ts's matching comment — an unconfigured merchantId is
+              // "" from the processor, not undefined, and must be normalized here too.
+              merchantId: settings?.merchantId?.length
+                ? settings?.merchantId
+                : undefined,
+            }}
+          >
+            <ScriptLoadLogger tag={scriptLogTag} />
+            {children}
+          </PayPalScriptProvider>
+        )
       ) : (
         <></>
       )}

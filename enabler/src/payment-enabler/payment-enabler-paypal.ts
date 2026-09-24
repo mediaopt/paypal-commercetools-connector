@@ -27,7 +27,7 @@ import { CreatePaymentResponse } from "../types";
 export type {
   PayPalPaymentMethodType,
   PayPalPaymentMethodExpressType,
-} from "../components/types";
+} from "../types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
   setupData: Promise<{ baseOptions: BaseOptions }>;
@@ -70,14 +70,14 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
       const paypalScriptOptions: ReactPayPalScriptOptions = {
         clientId: configJson.clientId || "",
         currency: DEFAULT_SCRIPT_CURRENCY,
-        components: "buttons,card-fields",
-        // Enabler's own built-in defaults — mirrors what PayPalBuilder.ts
-        enableFunding: "paylater",
         ...configJson.standardScriptOptions,
         intent: configJson.settings?.payPalIntent?.toString().toLowerCase(),
-        dataUserIdToken: configJson.userIdToken,
         dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-        merchantId: configJson.settings?.merchantId,
+        // An unconfigured merchantId resolves to "" from the processor, not undefined, and must
+        // be normalized here (see useSettings.tsx's matching comment).
+        merchantId: configJson.settings?.merchantId?.length
+          ? configJson.settings?.merchantId
+          : undefined,
       };
 
       // One shared commercetools Payment per checkout page load, shared by every builder
@@ -107,10 +107,12 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           enableVaulting: !!configJson.enableVaulting,
           redirectOnApprove: !!configJson.redirectOnApprove,
           expressSdkOptions: configJson.expressSdkOptions,
+          standardScriptOptions: configJson.standardScriptOptions || {},
           paypalScriptOptions,
           clientId: configJson.clientId,
           settings: configJson.settings,
           userIdToken: configJson.userIdToken,
+          onError: options.onError,
           purchaseCallback:
             configJson.purchaseCallback ||
             options.onComplete ||

@@ -45,8 +45,8 @@ describe("makeRequest", () => {
     expect(rejection).toEqual(errorBody);
   });
 
-  test("logs the failure via console.log rather than letting it reach a user-facing notification", async () => {
-    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+  test("logs the failure via console.warn rather than letting it reach a user-facing notification", async () => {
+    const logSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     mockFetch.mockResolvedValue({
       ok: false,
       status: 400,

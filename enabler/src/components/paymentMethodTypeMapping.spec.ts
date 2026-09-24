@@ -10,6 +10,14 @@ describe("paymentMethodTypeMapping", () => {
       expect(toPayPalPaymentMethodType("paypal")).toBe("PayPal");
     });
 
+    it("maps the commercetools icon key for bancontact to Bancontact", () => {
+      expect(toPayPalPaymentMethodType("bancontactcard")).toBe("Bancontact");
+    });
+
+    it("maps the commercetools icon key for p24 to P24", () => {
+      expect(toPayPalPaymentMethodType("przelewy24")).toBe("P24");
+    });
+
     it("passes through an already-canonical value unchanged", () => {
       expect(toPayPalPaymentMethodType("CardFields")).toBe("CardFields");
       expect(toPayPalPaymentMethodType("PayPal")).toBe("PayPal");
