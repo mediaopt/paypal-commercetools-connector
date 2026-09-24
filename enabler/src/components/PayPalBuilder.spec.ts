@@ -167,6 +167,35 @@ describe("PayPalComponentBuilder", () => {
     });
   });
 
+  it("genericOptions.onExpressPayButtonClick is Checkout's ExpressOptions.onPayButtonClick for an express builder", async () => {
+    const onPayButtonClick = jest.fn();
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions(),
+      "express"
+    );
+    const component = builder.build({ onPayButtonClick } as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.genericOptions.onExpressPayButtonClick).toBe(
+      onPayButtonClick
+    );
+  });
+
+  it("genericOptions.onExpressPayButtonClick is absent for a non-express builder", async () => {
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions(),
+      undefined
+    );
+    const component = builder.build({ onPayButtonClick: jest.fn() } as never);
+    await component.mount("#paypal-container");
+
+    expect(
+      capturedElement.props.genericOptions
+    ).not.toHaveProperty("onExpressPayButtonClick");
+  });
+
   it("onRegisterSubmit wires component.submit() to the registered handler", async () => {
     const builder = new PayPalComponentBuilder(
       "PayPal",

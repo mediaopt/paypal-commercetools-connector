@@ -45,8 +45,8 @@ describe("makeRequest", () => {
     expect(rejection).toEqual(errorBody);
   });
 
-  test("logs the failure via console.log rather than letting it reach a user-facing notification", async () => {
-    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+  test("logs the failure via console.warn rather than letting it reach a user-facing notification", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     mockFetch.mockResolvedValue({
       ok: false,
       status: 400,
@@ -55,11 +55,11 @@ describe("makeRequest", () => {
 
     await makeRequest(requestHeader, "https://processor.example.com/payments/3ds", "POST").catch(() => {});
 
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("failed with status 400"),
       expect.objectContaining({ message: "stale payment version" }),
     );
-    logSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   test("omits Content-Type when no data is sent, e.g. a bodyless DELETE — Fastify rejects application/json with an empty body", async () => {
