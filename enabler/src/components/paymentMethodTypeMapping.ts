@@ -6,6 +6,8 @@ const CT_ICON_KEY_TO_PAYMENT_METHOD_TYPE: Record<
 > = {
   card: "CardFields",
   paypal: "PayPal",
+  applepay: "ApplePay",
+  googlepay: "GooglePay",
   ideal: "Ideal",
   bancontactcard: "Bancontact",
   eps: "Eps",

@@ -2,25 +2,31 @@ import { createElement, ComponentType, FC } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
+import { ApplePay } from "../ApplePay";
+import { PayUponInvoice } from "../PayUponInvoice";
+import { GooglePay } from "../GooglePay";
 // import {
-//   ApplePay,
-//   GooglePay,
-//   PayUponInvoice,
 //   PaymentTokens,
 // } from "paypal-commercetools-client";
 
 import { RenderPurchase } from "../RenderPurchase/RenderPurchase";
 import {
+  ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
   GenericMountProps,
+  GooglePayResolvedOptions,
   PayPalBrandResolvedOptions,
   PayPalPaymentMethodType,
+  PayUponInvoiceResolvedOptions,
 } from "../../types";
 import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
+  resolveApplePayOptions,
   resolveCardFieldsOptions,
+  resolveGooglePayOptions,
   resolvePayPalBrandOptions,
+  resolvePayUponInvoiceOptions,
 } from "./resolveOptions";
 import { processorUrls } from "../constants";
 
@@ -34,7 +40,12 @@ export function resolvePayPalComponent(
   builderType?: BuilderType
 ): {
   Component: ComponentType<any>;
-  options: PayPalBrandResolvedOptions | CardFieldsResolvedOptions;
+  options:
+    | PayPalBrandResolvedOptions
+    | CardFieldsResolvedOptions
+    | ApplePayResolvedOptions
+    | GooglePayResolvedOptions
+    | PayUponInvoiceResolvedOptions;
 } {
   switch (paymentMethodType) {
     case "PayPal":
@@ -68,12 +79,21 @@ export function resolvePayPalComponent(
       };
     // case "CardFieldsStored":
     //   return { Component: CardFieldsStored, options: resolveCardFieldsStoredOptions(baseOptions) };
-    // case "ApplePay":
-    //   return { Component: ApplePay, options: resolveApplePayOptions(baseOptions) };
-    // case "PayUponInvoice":
-    //   return { Component: PayUponInvoice, options: resolvePayUponInvoiceOptions(baseOptions) };
-    // case "GooglePay":
-    //   return { Component: GooglePay, options: resolveGooglePayOptions(baseOptions) };
+    case "ApplePay":
+      return {
+        Component: ApplePay,
+        options: resolveApplePayOptions(baseOptions),
+      };
+    case "PayUponInvoice":
+      return {
+        Component: PayUponInvoice,
+        options: resolvePayUponInvoiceOptions(baseOptions),
+      };
+    case "GooglePay":
+      return {
+        Component: GooglePay,
+        options: resolveGooglePayOptions(baseOptions),
+      };
     // case "PaymentTokens":
     //   return { Component: PaymentTokens, options: ... };
     default:

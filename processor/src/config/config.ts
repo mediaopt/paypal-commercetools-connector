@@ -25,7 +25,7 @@ const configuredStandardScriptOptions: {
   disableFunding?: string[];
   enableFunding?: string[];
 } & Record<string, unknown> = {
-  components: ["buttons", "card-fields", "messages"], //google pay, paylater and so on will be enabled in separate branches
+  components: ["buttons", "card-fields", "applepay", "googlepay", "messages"],
   ...(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS
     ? JSON.parse(process.env.PAYPAL_STANDARD_SCRIPT_OPTIONS)
     : {}),
@@ -45,6 +45,16 @@ const configuredExpressSdkOptions = process.env.PAYPAL_EXPRESS_SDK_OPTIONS
 // PAYPAL_BUTTON_CONFIG in processor/.env.template).
 const configuredButtonConfig = process.env.PAYPAL_BUTTON_CONFIG
   ? JSON.parse(process.env.PAYPAL_BUTTON_CONFIG)
+  : {};
+
+// Merchant overrides for PayPal wallet experience_context (payment_source.paypal.experience_context
+// on the Orders v2 createOrder request — e.g. user_action, payment_method_preference), as a single
+// flat JSON object. Spread over buildOrderRequest's own computed defaults (order.utils.ts) so any
+// key set here always wins — add new experience_context fields here as needed rather than growing
+// config.ts one flag at a time (see PAYPAL_ORDER_EXPERIENCE_CONTEXT in processor/.env.template).
+const configuredOrderExperienceContext: Record<string, unknown> = process.env
+  .PAYPAL_ORDER_EXPERIENCE_CONTEXT
+  ? JSON.parse(process.env.PAYPAL_ORDER_EXPERIENCE_CONTEXT)
   : {};
 
 const PAYMENT_INTERFACE_NAME = "PayPal";
@@ -92,6 +102,10 @@ export const config = {
   // Master switch for PayPal Express's pre-finalize redirect
   // (see enabler/README.md's "PayPal-Express/ legal-review requirement" section).
   redirectOnApprove: process.env.PAYPAL_REDIRECT_ON_APPROVE === "true",
+
+  // See configuredOrderExperienceContext comment above.
+  orderExperienceContext: configuredOrderExperienceContext,
+
   paymentInterface: PAYMENT_INTERFACE_NAME,
 
   // env variables related to stored payment methods feature

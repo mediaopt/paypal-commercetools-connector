@@ -6,9 +6,11 @@ import {
 const PAYMENT_METHOD_ICON_KEY_MAP: Record<PaymentMethodType, string> = {
   [StandardPaymentMethodType.CREDIT_CARD]: "card",
   [StandardPaymentMethodType.PAYPAL]: "paypal",
-  // APPLE_PAY: [StandardPaymentMethodType.APPLE_PAY]: "applepay",
-  // GOOGLE_PAY: [StandardPaymentMethodType.GOOGLE_PAY]: "googlepay",
-  // Venmo/PayUponInvoice have no commercetools icon-key equivalent — see paypal-payment.dto.ts.
+  [StandardPaymentMethodType.APPLE_PAY]: "applepay",
+  [StandardPaymentMethodType.GOOGLE_PAY]: "googlepay",
+  [StandardPaymentMethodType.PAY_UPON_INVOICE]:
+    StandardPaymentMethodType.PAY_UPON_INVOICE,
+  // Venmo has no commercetools icon-key equivalent — see paypal-payment.dto.ts.
 };
 
 export const toPaymentMethodIconKey = (type: PaymentMethodType): string =>
