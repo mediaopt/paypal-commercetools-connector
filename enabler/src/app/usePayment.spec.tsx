@@ -1552,3 +1552,116 @@ describe("PaymentProvider handleCreateOrder Google Pay APPROVED", () => {
     consoleErrorSpy.mockRestore();
   });
 });
+
+describe("PaymentProvider handleCreateOrder Google Pay 3DS failures reach onError", () => {
+  const initiatePayerAction = jest.fn();
+  const confirmOrder = jest.fn();
+
+  beforeEach(() => {
+    mockedProcessorRequest.mockReset();
+    mockNotify.mockReset();
+    confirmOrder
+      .mockReset()
+      .mockResolvedValue({ status: "PAYER_ACTION_REQUIRED" });
+    initiatePayerAction.mockReset().mockResolvedValue(undefined);
+    (globalThis as any).paypal = {
+      Googlepay: () => ({ confirmOrder, initiatePayerAction }),
+    };
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).paypal;
+  });
+
+  const renderGooglePay3DS = (
+    threeDSResponse: Record<string, unknown>,
+    onError: jest.Mock
+  ) => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/3ds")
+        ? Promise.resolve(threeDSResponse as never)
+        : (url as string).includes("/order")
+        ? Promise.resolve({
+            orderData: { id: "order-1", status: "PAYER_ACTION_REQUIRED" },
+          } as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    render(
+      <PaymentProvider
+        options={{} as any}
+        requestHeader={{}}
+        createPaymentUrl="https://processor.test/payments"
+        createOrderUrl="https://processor.test/payments/order"
+        authenticateThreeDSOrderUrl="https://processor.test/payments/3ds"
+        getSettingsUrl="https://processor.test/settings"
+        shippingMethodId="standard"
+        purchaseCallback={() => {}}
+        onError={onError}
+      >
+        <CreateOrderWithDataConsumer
+          orderData={{
+            paymentSource: "google_pay",
+            googlePayData: { paymentData: { paymentMethodData: {} } },
+          }}
+          forceCheckoutReportError
+        />
+      </PaymentProvider>
+    );
+  };
+
+  it("reports THREE_DS_DECLINED_RETRY when the 3DS result has no approve", async () => {
+    const onError = jest.fn();
+    renderGooglePay3DS({}, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "THREE_DS_DECLINED_RETRY" })
+      )
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Warning", expect.any(String));
+  });
+
+  it("reports THREE_DS_DECLINED when the 3DS result maps to 'select a different method'", async () => {
+    const onError = jest.fn();
+    // No settings.threeDSAction configured, so any approve result falls back to 0
+    renderGooglePay3DS(
+      {
+        approve: {
+          liability_shift: "NO",
+          three_d_secure: {
+            enrollment_status: "Y",
+            authentication_status: "N",
+          },
+        },
+      },
+      onError
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "THREE_DS_DECLINED" })
+      )
+    );
+  });
+
+  it("reports THREE_DS_FAILED when initiatePayerAction rejects", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+    initiatePayerAction.mockRejectedValue(new Error("sheet closed"));
+    const onError = jest.fn();
+    renderGooglePay3DS({}, onError);
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "THREE_DS_FAILED" })
+      )
+    );
+    consoleErrorSpy.mockRestore();
+  });
+});
