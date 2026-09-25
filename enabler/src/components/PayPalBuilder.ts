@@ -14,7 +14,7 @@ import {
 } from "../types";
 import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { isVenmoSupported } from "./venmoAvailability";
-// import { isApplePaySupported } from "./applePayAvailability";
+import { isApplePaySupported } from "./applePayAvailability";
 import { sessionHeader } from "../helpers/sessionHeader";
 import { FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE } from "./constants";
 
@@ -24,7 +24,7 @@ const AVAILABILITY_CHECKS: Partial<
   Record<PayPalPaymentMethodType, () => boolean>
 > = {
   Venmo: isVenmoSupported,
-  // ApplePay: isApplePaySupported,
+  ApplePay: isApplePaySupported,
 };
 
 // SDK "components" (not funding sources) each of these payment methods needs present in the
@@ -33,19 +33,19 @@ const REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE: Partial<
   Record<PayPalPaymentMethodType, string>
 > = {
   CardFields: "card-fields",
-  // ApplePay: "applepay",
-  // GooglePay: "googlepay",
+  ApplePay: "applepay",
+  GooglePay: "googlepay",
 };
 
 // Form-like components that use onRegisterSubmit instead of an internal pay button — Checkout
 // calls component.submit() to trigger payment for these types. Every other paymentMethodType
-// dispatched through this builder (PayPal, Sepa, PayLater, PayPalCreditCard, AllButtons, Venmo)
-// renders its own self-driving button and must NOT have this set, or Checkout will expect a
-// submit button/behavior these components never provide. Matches the braintree reference
+// dispatched through this builder (PayPal, Sepa, PayLater, PayPalCreditCard, AllButtons, Venmo,
+// ApplePay) renders its own self-driving button and must NOT have this set, or Checkout will
+// expect a submit button/behavior these components never provide. Matches the braintree reference
 // project's own BraintreeBuilder.SUBMIT_HAS_CALLBACK allowlist for the same distinction.
 const FORM_LIKE_PAYMENT_METHOD_TYPES: PayPalPaymentMethodType[] = [
   "CardFields",
-  // "PayUponInvoice",
+  "PayUponInvoice",
 ];
 
 class PayPalComponent implements PaymentComponent {

@@ -1,6 +1,19 @@
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
-import { PayPalMethodConfig, PayPalPaymentMethodType } from "../types";
+import {
+  FraudnetPage,
+  PayPalMethodConfig,
+  PayPalPaymentMethodType,
+  ThreeDSVerification,
+} from "../types";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
+
+// PayUponInvoice — category 1, hardcoded/non-overridable (see FIXED_SETTINGS_OVERRIDES_BY_
+// PAYMENT_METHOD_TYPE's own comment). PayPal's FraudNet page id for our one PUI mount point
+// (Checkout's own payment step), and RatePay's EUR-denominated payable-amount range — never
+// merchant-configurable. Amounts are in cents (centAmount) to match paymentInfo.amountPlanned.
+export const PAY_UPON_INVOICE_FRAUDNET_PAGE_ID: FraudnetPage = "checkout-page";
+export const PAY_UPON_INVOICE_MIN_PAYABLE_AMOUNT = 500; // 5 EUR
+export const PAY_UPON_INVOICE_MAX_PAYABLE_AMOUNT = 250000; // 2500 EUR
 
 /*
 IMPORTANT — if you deploy these payment components yourself, outside commercetools Checkout
@@ -105,6 +118,11 @@ export const ENABLER_DEFAULT_CONFIG: Record<
   // No fundingSource here — see FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE's comment on
   // AllButtons.
   AllButtons: {},
+  // No style/fundingSource. applePayDisplayName overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.ApplePay.applePayDisplayName.
+  ApplePay: {
+    applePayDisplayName: "My Store",
+  },
   Venmo: {},
   Credit: {
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
@@ -126,6 +144,22 @@ export const ENABLER_DEFAULT_CONFIG: Record<
   },
   Blik: {
     style: { buttonColor: "blue", buttonLabel: "pay", buttonShape: "rect" },
+  },
+  // No style/fundingSource. allowedCardNetworks/allowedCardAuthMethods/callbackIntents are Google
+  // Pay API constraints (not arbitrary merchant preferences), but stay overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.GooglePay the same way applePayDisplayName is.
+  GooglePay: {
+    allowedCardNetworks: ["VISA", "MASTERCARD"],
+    allowedCardAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+    callbackIntents: ["PAYMENT_AUTHORIZATION"],
+    verificationMethod: "SCA_ALWAYS" as ThreeDSVerification,
+  },
+  // No style/fundingSource. invoiceBenefitsMessage overridable per merchant via
+  // PAYPAL_BUTTON_CONFIG.PayUponInvoice.invoiceBenefitsMessage — pageId/min/maxPayableAmount are
+  // NOT merchant-configurable, see PAY_UPON_INVOICE_FRAUDNET_PAGE_ID/_MIN/_MAX_PAYABLE_AMOUNT above.
+  PayUponInvoice: {
+    invoiceBenefitsMessage:
+      "Once you place an order, pay within 30 days. Our partner Ratepay will send you the instructions.",
   },
 };
 

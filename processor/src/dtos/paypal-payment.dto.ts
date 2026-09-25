@@ -5,15 +5,11 @@ type ValuesOf<T extends object> = T[keyof T];
 export const StandardPaymentMethodType = {
   CREDIT_CARD: "CardFields",
   PAYPAL: "PayPal",
-
-  // TODO: implement ApplePay support once this connector is fully Checkout-compatible.
-  // APPLE_PAY: "ApplePay",
-  // TODO: implement GooglePay support once this connector is fully Checkout-compatible.
-  // GOOGLE_PAY: "GooglePay",
+  APPLE_PAY: "ApplePay",
+  GOOGLE_PAY: "GooglePay",
   // Venmo has no commercetools Checkout equivalent — not available in commercetools itself.
   // VENMO: "Venmo",
-  // PayUponInvoice has no commercetools Checkout equivalent — not available in commercetools itself.
-  // PAY_UPON_INVOICE: "PayUponInvoice",
+  PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
 export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType
@@ -137,6 +133,9 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.String()),
+  // Not the PaymentMethodType enum: the enabler also sends methods this processor keeps commented
+  // out, which must not be rejected with a 400
+  paymentMethodType: Type.Optional(Type.String()),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema

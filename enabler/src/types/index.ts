@@ -38,6 +38,9 @@ export type BuilderType = "dropin" | "express" | undefined;
 export type PayPalPaymentMethodType =
   | "PayPal"
   | "CardFields"
+  | "ApplePay"
+  | "GooglePay"
+  | "PayUponInvoice"
   | "Sepa"
   | "PayLater"
   | "PayPalCreditCard"
@@ -69,9 +72,6 @@ export type PayPalPaymentMethodType =
 // | "Sofort"
 // Out-of-scope payment method types (not yet implemented):
 // | "CardFieldsStored"
-// | "ApplePay"
-// | "GooglePay"
-// | "PayUponInvoice"
 // Not "PaymentTokens" — stored/vaulted payment methods have their own separate interface
 // (StoredComponentBuilder / createStoredPaymentMethodBuilder), not this one.
 
@@ -356,9 +356,11 @@ export type PayUponInvoiceProps = ratepayPaymentRestrictions & {
   pageId: FraudnetPage;
   invoiceBenefitsMessage?: string;
   customLocale?: string;
+  // Legacy callers never set it, so it defaults to true there
+  fraudNetSandbox?: boolean;
 };
 
-export type PayUponInvoiceMaskProps = {
+export type PayUponInvoiceMaskProps = FormComponentProps & {
   fraudNetSessionId: string;
 } & Pick<PayUponInvoiceProps, "invoiceBenefitsMessage">;
 
@@ -399,6 +401,9 @@ export type ApplePayProps = {
 };
 
 export type ApplePayComponentsProps = ApplePayProps & SmartComponentsProps;
+
+export type GooglePayComponentsProps = GooglePayOptionsType &
+  SmartComponentsProps;
 
 export type CartInformation = {
   account: {
@@ -635,6 +640,37 @@ export type PayPalMethodConfig = {
   // standard PayPal button (gated together with settings.acceptPayLater — both must allow it).
   // Ops-only, set via PAYPAL_BUTTON_CONFIG; no merchant-center/custom-application equivalent.
   disablePayLaterButton?: boolean;
+  // ApplePay only — the merchant-facing store name shown in Apple's native payment sheet.
+  applePayDisplayName?: string;
+  // PayUponInvoice only block
+  merchantId?: string; // FraudNet merchant configuration.
+  pageId?: string;
+  invoiceBenefitsMessage?: string; // merchant-facing invoice benefits message.
+  minPayableAmount?: number; // payment amount constraints.
+  maxPayableAmount?: number;
+  // GooglePay only — Google Pay API's own required/appearance fields, merchant-overridable the
+  // same way applePayDisplayName is (see resolveGooglePayOptions). Not merchant-configurable:
+  // verificationMethod (sourced from the shared threeDSOption setting) and environment (sourced
+  // from the processor's sandbox/live config).
+  allowedCardNetworks?: string[];
+  allowedCardAuthMethods?: string[];
+  callbackIntents?: string[];
+  buttonColor?: "default" | "white" | "black";
+  buttonType?:
+    | "book"
+    | "buy"
+    | "checkout"
+    | "donate"
+    | "order"
+    | "pay"
+    | "plain"
+    | "subscribe";
+  buttonRadius?: number;
+  buttonSizeMode?: "static" | "fill";
+  apiVersion?: number;
+  apiVersionMinor?: number;
+  totalPriceStatus?: "FINAL" | "ESTIMATED";
+  verificationMethod?: ThreeDSVerification;
   // PayPal JS SDK script `components` list for this payment method (e.g. "buttons,card-fields") —
   // same concern as PAYPAL_SDK_OPTIONS.<paymentMethodType>.components, but resolved through this
   // 4-layer chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see
@@ -747,6 +783,30 @@ export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
 /** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
  * PayPalBrandResolvedOptions. */
 export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
+
+/** Resolved options for <ApplePay/> — no style/fundingSource concept either, plus the one field
+ * unique to it: the merchant store name shown in the native Apple Pay sheet. */
+export type ApplePayResolvedOptions = BaseResolvedMethodOptions & {
+  applePayDisplayName: string;
+};
+
+/** Resolved options for <PayUponInvoice/> — no style/fundingSource concept, plus PUI-specific fields. */
+export type PayUponInvoiceResolvedOptions = BaseResolvedMethodOptions & {
+  merchantId: string;
+  pageId?: string;
+  invoiceBenefitsMessage?: string;
+  minPayableAmount: number;
+  maxPayableAmount: number;
+  fraudNetSandbox: boolean;
+};
+
+/** Resolved options for <GooglePay/> — no style/fundingSource concept either; every field is
+ * Google Pay's own API config (allowedCardNetworks/allowedCardAuthMethods/callbackIntents/button
+ * appearance), plus verificationMethod (sourced from the shared threeDSOption setting, same as
+ * CardFields) and environment (sourced from the processor's sandbox/live config, not merchant
+ * overridable). */
+export type GooglePayResolvedOptions = BaseResolvedMethodOptions &
+  GooglePayOptionsType;
 
 /** The 14 paymentMethodType values that render through the shared <PayPal/> component. */
 export type PayPalBrandButtonType = Extract<
