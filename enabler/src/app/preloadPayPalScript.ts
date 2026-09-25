@@ -7,10 +7,11 @@ import {
 } from "@paypal/react-paypal-js";
 
 /**
- * Loads the PayPal JS SDK exactly once per checkout page, before any payment component ever
- * mounts, to prevent the race between concurrently-mounted components.
- * Shared for standard components only — PayPal Express always mounts alone, on
- * its own page, so it keeps loading its own script independently via its own script options.
+ * Loads the PayPal JS SDK exactly once per checkout page, before any payment component ever mounts
+ * to prevent the concurrence between different PayPal scripts.
+ * Shared for standard components, separate for Express (as it is supposed
+ * to be used on different pages).
+ * Not needed for stored - it renders by ct and operates through processor.
  */
 
 const ScriptReadySignal: FC<{ onSettled: (error?: unknown) => void }> = ({

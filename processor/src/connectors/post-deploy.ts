@@ -20,9 +20,11 @@ import {
 import { paymentSDK } from "../payment-sdk";
 import { getConfig } from "../config/config";
 
-// Builds the TypeDraft processor itself needs for one custom type/shared with extension response logs
-// The actual create-if-missing add-missing-fields is provided by paymentSDK.ctCustomTypeService.createOrUpdate().
-// Never touches any of paypal-commercetools-extension's own fields — those stay the extension's job.
+// Builds the TypeDraft processor itself needs for one custom type — the actual create-if-missing /
+// add-missing-fields orchestration is delegated to paymentSDK.ctCustomTypeService.createOrUpdate()
+// below (built into @commercetools/connect-payments-sdk, which processor already depends on and
+// already constructs paymentSDK from) rather than hand-rolled here. Never touches any of
+// paypal-commercetools-extension's own fields — those stay the extension's job.
 const buildTypeDraft = (
   key: string,
   { name, resourceTypeIds }: CustomTypeShape,

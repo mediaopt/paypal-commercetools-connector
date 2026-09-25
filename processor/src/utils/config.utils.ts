@@ -17,24 +17,22 @@ export const isStoredPaymentMethodsEnabled = (cartSummary?: {
 };
 
 /**
- * Cart-derived overlay for the shared standard script config (PAYPAL_STANDARD_SCRIPT_OPTIONS) —
- * cart data wins over the configured/default values when available. currency comes from the
+ * Cart-derived overlay for the shared standard script config (PAYPAL_STANDARD_SCRIPT_OPTIONS)
+ * — cart data wins over the configured/default values when available. currency comes from the
  * cart's total price; buyerCountry only in sandbox — PayPal's own docs say not to pass it in
- * production at all ("used only in the sandbox"). Express is a separate page/script with its own
- * config (see buildExpressSdkOptions below) and doesn't share this overlay.
+ * production at all ("used only in the sandbox").
+ * Express is supposed to render on different page so gets own config
  */
 export const buildStandardScriptCartOverlay = (cartSummary?: {
   country?: string;
   currency?: string;
 }): Record<string, unknown> => {
-  const configured = getConfig().standardScriptOptions;
   if (!cartSummary) {
-    return configured;
+    return {};
   }
 
   const isSandbox = getConfig().paypalEnvironment.toLowerCase() === "sandbox";
   return {
-    ...configured,
     ...(cartSummary.currency ? { currency: cartSummary.currency } : {}),
     ...(isSandbox && cartSummary.country
       ? { buyerCountry: cartSummary.country }

@@ -1,5 +1,5 @@
-import { SessionHeaderAuthenticationHook } from '@commercetools/connect-payments-sdk';
-import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
+import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   InitPaymentRequestSchema,
   PaymentRequestSchemaDTO,
@@ -25,24 +25,30 @@ import {
   UpdateShippingRequestSchemaDTO,
   UpdateShippingResponseSchema,
   UpdateShippingResponseSchemaDTO,
-} from '../dtos/paypal-payment.dto';
+} from "../dtos/paypal-payment.dto";
 import {
   StoredPaymentMethodsResponse,
   StoredPaymentMethodsResponseSchema,
-} from '../dtos/stored-payment-methods.dto';
-import { PayPalPaymentService } from '../services/paypal-payment.service';
-import { Type } from '@sinclair/typebox';
-import { log } from '../libs/logger';
-import { getCartIdFromContext } from '../libs/fastify/context/context';
+} from "../dtos/stored-payment-methods.dto";
+import { PayPalPaymentService } from "../services/paypal-payment.service";
+import { Type } from "@sinclair/typebox";
+import { log } from "../libs/logger";
+import { getCartIdFromContext } from "../libs/fastify/context/context";
 
 type PaymentRoutesOptions = {
   paymentService: PayPalPaymentService;
   sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
 };
 
-export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPluginOptions & PaymentRoutesOptions) => {
-  fastify.post<{ Body: PaymentRequestSchemaDTO; Reply: PaymentResponseSchemaDTO }>(
-    '/payments',
+export const paymentRoutes = async (
+  fastify: FastifyInstance,
+  opts: FastifyPluginOptions & PaymentRoutesOptions
+) => {
+  fastify.post<{
+    Body: PaymentRequestSchemaDTO;
+    Reply: PaymentResponseSchemaDTO;
+  }>(
+    "/payments",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -53,14 +59,21 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
       },
     },
     async (request, reply) => {
-      const resp = await opts.paymentService.createPayment(request.body);
+      // Cast needed: PaymentRequestSchemaDTO is `{}`
+      // Body kept for legacy compatibility reasons
+      const resp = await opts.paymentService.createPayment(
+        request.body as PaymentRequestSchemaDTO
+      );
       log.info(`createPayment: success, paymentId: ${resp.id}`);
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: CreateOrderRequestSchemaDTO; Reply: CreateOrderResponseSchemaDTO }>(
-    '/payments/createOrder',
+  fastify.post<{
+    Body: CreateOrderRequestSchemaDTO;
+    Reply: CreateOrderResponseSchemaDTO;
+  }>(
+    "/payments/createOrder",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -76,11 +89,14 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         `createOrder: success, paymentId: ${request.body.paymentId}, orderId: ${resp.orderData.id}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: OnApproveRequestSchemaDTO; Reply: OnApproveResponseSchemaDTO }>(
-    '/payments/authorize',
+  fastify.post<{
+    Body: OnApproveRequestSchemaDTO;
+    Reply: OnApproveResponseSchemaDTO;
+  }>(
+    "/payments/authorize",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -96,11 +112,14 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         `authorizeOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: OnApproveRequestSchemaDTO; Reply: OnApproveResponseSchemaDTO }>(
-    '/payments/approve',
+  fastify.post<{
+    Body: OnApproveRequestSchemaDTO;
+    Reply: OnApproveResponseSchemaDTO;
+  }>(
+    "/payments/approve",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -116,11 +135,14 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         `captureOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: ExpressApproveRequestSchemaDTO; Reply: ExpressApproveResponseSchemaDTO }>(
-    '/payments/expressApprove',
+  fastify.post<{
+    Body: ExpressApproveRequestSchemaDTO;
+    Reply: ExpressApproveResponseSchemaDTO;
+  }>(
+    "/payments/expressApprove",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -136,11 +158,14 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         `expressApprove: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: AuthenticateThreeDSOrderRequestSchemaDTO; Reply: AuthenticateThreeDSOrderResponseSchemaDTO }>(
-    '/payments/3ds',
+  fastify.post<{
+    Body: AuthenticateThreeDSOrderRequestSchemaDTO;
+    Reply: AuthenticateThreeDSOrderResponseSchemaDTO;
+  }>(
+    "/payments/3ds",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -151,16 +176,21 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
       },
     },
     async (request, reply) => {
-      const resp = await opts.paymentService.authenticateThreeDSOrder(request.body);
+      const resp = await opts.paymentService.authenticateThreeDSOrder(
+        request.body
+      );
       log.info(
         `authenticateThreeDSOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
-  fastify.post<{ Body: UpdateShippingRequestSchemaDTO; Reply: UpdateShippingResponseSchemaDTO }>(
-    '/payments/updateShipping',
+  fastify.post<{
+    Body: UpdateShippingRequestSchemaDTO;
+    Reply: UpdateShippingResponseSchemaDTO;
+  }>(
+    "/payments/updateShipping",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -176,11 +206,11 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         `updateShipping: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
-    },
+    }
   );
 
   fastify.get<{ Reply: StoredPaymentMethodsResponse }>(
-    '/stored-payment-methods',
+    "/stored-payment-methods",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -197,11 +227,11 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
         }`
       );
       return reply.status(200).send(result);
-    },
+    }
   );
 
   fastify.delete<{ Params: { id: string } }>(
-    '/stored-payment-methods/:id',
+    "/stored-payment-methods/:id",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -214,6 +244,6 @@ export const paymentRoutes = async (fastify: FastifyInstance, opts: FastifyPlugi
     async (request, reply) => {
       await opts.paymentService.deleteStoredPaymentMethod(request.params.id);
       return reply.status(200).send({});
-    },
+    }
   );
 };

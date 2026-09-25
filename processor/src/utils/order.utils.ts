@@ -16,6 +16,7 @@ import {
   PaypalWallet,
   Authorization2StatusEnum,
   Capture2StatusEnum,
+  PayPalSettings,
 } from "common-connect";
 import {
   CreateOrderRequestSchemaDTO,
@@ -53,8 +54,9 @@ const PAY_UPON_INVOICE_DEFAULT_LOCALE = "de-DE";
 
 // PayPal requires payment_source.pay_upon_invoice.experience_context.customer_service_instructions
 // (400s with MISSING_REQUIRED_PARAMETER otherwise) — merchant-facing text shown to the buyer for
-// how to reach support about their RatePay invoice. Placeholder default; override via
-// PAYPAL_ORDER_EXPERIENCE_CONTEXT (see .env.template) — the merchant must set a real one.
+// how to reach support about their RatePay invoice. Placeholder default; override via the
+// merchant-center RatePay settings or PAYPAL_ORDER_EXPERIENCE_CONTEXT (see .env.template) — the
+// merchant must set a real one.
 const PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS = [
   "It is merchant responsibility to set this message.",
 ];
@@ -79,6 +81,22 @@ const PAY_UPON_INVOICE_EXPERIENCE_CONTEXT_KEYS = [
   "logo_url",
   "customer_service_instructions",
 ];
+
+// Merchant-center RatePay settings (German only, same as paypal-commercetools-extension), as
+// pay_upon_invoice experience_context keys. Empty strings are the custom object's defaults, so
+// they're skipped rather than sent.
+export const buildRatePayExperienceContext = (
+  settings?: Partial<PayPalSettings>
+): Record<string, unknown> => {
+  const brandName = settings?.ratePayBrandName?.de;
+  const logoUrl = settings?.ratePayLogoUrl?.de;
+  const instructions = settings?.ratePayCustomerServiceInstructions?.de;
+  return {
+    ...(brandName ? { brand_name: brandName } : {}),
+    ...(logoUrl ? { logo_url: logoUrl } : {}),
+    ...(instructions ? { customer_service_instructions: [instructions] } : {}),
+  };
+};
 
 const pickExperienceContextOverrides = (
   overrides: Record<string, unknown>,
@@ -249,10 +267,11 @@ export const buildOrderRequest = (
               },
               birth_date: orderData?.birthDate,
               // customer_service_instructions/locale are placeholder defaults — merchant-
-              // configurable via the same PAYPAL_ORDER_EXPERIENCE_CONTEXT env var used for the
-              // generic wallet experience_context above (e.g.
+              // configurable via the merchant-center RatePay settings (merged in by createOrder)
+              // or the same PAYPAL_ORDER_EXPERIENCE_CONTEXT env var used for the generic wallet
+              // experience_context above (e.g.
               // {"customer_service_instructions":["Contact us at support@mystore.example"]});
-              // an explicit key there always wins, same convention as experienceContext.
+              // an explicit env key always wins, same convention as experienceContext.
               experience_context: {
                 customer_service_instructions:
                   PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS,

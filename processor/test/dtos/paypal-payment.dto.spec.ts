@@ -4,7 +4,7 @@ import { CreateOrderRequestSchema } from "../../src/dtos/paypal-payment.dto";
 
 describe("CreateOrderRequestSchema", () => {
   test.each(["PayUponInvoice", "Sepa", "Venmo"])(
-    "accepts paymentMethodType %s, including methods this processor keeps commented out",
+    "accepts paymentMethodType %s",
     (paymentMethodType) => {
       expect(
         Value.Check(CreateOrderRequestSchema, {

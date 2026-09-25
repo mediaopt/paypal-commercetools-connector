@@ -208,24 +208,6 @@ export type EnablerOptions = {
 };
 
 /**
- * Represents the payment method code.
- */
-export enum PaymentMethod {
-  /* PayPal */
-  paypal = "PayPal",
-  /* Card Fields */
-  cardfields = "CardFields",
-  /* Apple Pay */
-  applepay = "ApplePay",
-  /* Google Pay */
-  googlepay = "GooglePay",
-  /* Pay Upon Invoice (RatePay) */
-  payuponinvoice = "PayUponInvoice",
-  /* Payment Tokens (Stored Methods) */
-  paymenttokens = "PaymentTokens",
-}
-
-/**
  * Represents the result of a payment.
  */
 export type PaymentResult =

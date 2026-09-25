@@ -5,6 +5,7 @@ import {
   PaymentComponentBuilder,
 } from "../payment-enabler/interfaces/enabler";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
+import { ExpressOptions } from "../payment-enabler/interfaces/express";
 import {
   BuilderType,
   GenericError,
@@ -82,7 +83,9 @@ class PayPalComponent implements PaymentComponent {
       showPayButton: this.config.showPayButton ?? true,
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,
-      // onError is a new, checkout-only prop — not supported for legacy enabler components
+      // onError is a new, checkout-only prop — not supported for legacy enabler components.
+      // For PayPal Express, paymentReference may be stale: onPayButtonClick switches to a new
+      // session and Payment, which this mount-time value doesn't follow. Refer to the logs.
       onError: this.baseOptions.onError
         ? (error: GenericError) =>
             this.baseOptions.onError?.(error, {
@@ -90,6 +93,11 @@ class PayPalComponent implements PaymentComponent {
             })
         : undefined,
       initialAmount: this.config.initialAmount,
+      // For express, Checkout passes ExpressOptions (not ComponentOptions) into build()
+      ...(this.builderType === "express" && {
+        onExpressPayButtonClick: (this.config as unknown as ExpressOptions)
+          .onPayButtonClick,
+      }),
       onRegisterSubmit: (
         handler: (storePaymentDetails?: boolean) => Promise<void>
       ) => {
@@ -117,10 +125,11 @@ class PayPalComponent implements PaymentComponent {
     // if it registers a submit handler via onRegisterSubmit, delegate to that instead.
     if (!this.submitHandler) {
       if (this.isFormLike()) {
-        // A form-like component (CardFields) with nothing registered means its Mask either never
-        // mounted or unmounted after a state change — either way there is nothing to submit.
-        // Silently resolving here used to leave Checkout waiting forever for a completion signal
-        // that would never come (an infinite loader) instead of surfacing an error.
+        // A form-like component (CardFields/PayUponInvoice) with nothing registered means its
+        // Mask either never mounted (e.g. PayUponInvoice showing an ineligible-cart message
+        // instead of its form) or unmounted after a state change — either way there is nothing to
+        // submit. Silently resolving here used to leave Checkout waiting forever for a completion
+        // signal that would never come (an infinite loader) instead of surfacing an error.
         throw new Error(
           `${this.paymentMethodType} is not ready to submit — no handler registered`
         );
@@ -138,9 +147,9 @@ class PayPalComponent implements PaymentComponent {
     if (this.validationHandlers) {
       return await this.validationHandlers.isValid();
     }
-    // Self-driving buttons (PayPal, etc.) never register validation handlers at all, so "nothing
-    // registered" correctly means "always valid" for them. A form-like component with nothing
-    // registered means it isn't actually ready/eligible — see submit()'s own comment.
+    // Self-driving buttons (PayPal, ApplePay, etc.) never register validation handlers at all, so
+    // "nothing registered" correctly means "always valid" for them. A form-like component with
+    // nothing registered means it isn't actually ready/eligible — see submit()'s own comment.
     return !this.isFormLike();
   }
 
@@ -153,8 +162,8 @@ class PayPalComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    // Browser/device-capability precondition (Venmo) — checked first, unrelated to the merchant's
-    // shared script config.
+    // Browser/device-capability precondition (Venmo/ApplePay) — checked first, unrelated to the
+    // merchant's shared script config.
     const browserCheck = AVAILABILITY_CHECKS[this.paymentMethodType];
     if (browserCheck && !browserCheck()) {
       console.warn(
@@ -180,7 +189,7 @@ class PayPalComponent implements PaymentComponent {
       return false;
     }
 
-    // CardFields is a separate SDK component, not a funding source — gated by the shared
+    // CardFields/ApplePay are separate SDK components, not funding sources — gated by the shared
     // standardScriptOptions.components list instead.
     const requiredComponent =
       REQUIRED_SDK_COMPONENT_BY_PAYMENT_METHOD_TYPE[this.paymentMethodType];

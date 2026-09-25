@@ -36,6 +36,13 @@ deployAs:
         - key: STORED_PAYMENT_METHODS_ENABLED
           description: Enable vault payment methods (true OR false)
           required: false
+        - key: STORED_PAYMENT_METHODS_PAYMENT_INTERFACE
+          description: commercetools payment interface name stored payment methods are recorded under. Only worth changing if the project has more than one payment interface
+          required: false
+          default: PayPal
+        - key: STORED_PAYMENT_METHODS_INTERFACE_ACCOUNT
+          description: Interface account identifier for stored payment methods, if required by your setup
+          required: false
         - key: MERCHANT_RETURN_URL
           description: Merchant website return URL for redirect-based payment methods
           required: false

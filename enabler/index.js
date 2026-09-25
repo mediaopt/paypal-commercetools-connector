@@ -18,6 +18,11 @@ const methodsStore = new Map();
 const STORED_TYPE_MAP = {
   card: "card",
 };
+// Vaulting (storePaymentDetails) is only supported end-to-end for CardFields — see CLAUDE.md's
+// "Stored payment methods (vaulted credit cards)" section. getSupportedPaymentComponents()
+// reports components by their commercetools icon key (toPaymentMethodIconKey), not the internal
+// PaymentMethodType name, so CardFields shows up here as "card".
+const ALLOW_STORE_PAYMENT_METHOD_TYPES = ["card"];
 
 const btnLoadOthers = document.getElementById("loadComponents");
 const btnClear = document.getElementById("clearComponents");
@@ -72,6 +77,16 @@ async function onMethodSelected(methodId) {
   containerExternal.innerHTML = "";
   containerInternal.innerHTML = "";
 
+  const storeContainer = document.getElementById(
+    "storePaymentMethod-container",
+  );
+  const storeCheckbox = document.getElementById("storePaymentMethod");
+  const canStorePaymentMethod =
+    method.category === "component" &&
+    ALLOW_STORE_PAYMENT_METHOD_TYPES.includes(method.type);
+  storeContainer.classList.toggle("d-none", !canStorePaymentMethod);
+  storeCheckbox.checked = false;
+
   const builder = method.builder;
   const component = method.component;
   if (builder.componentHasSubmit) {
@@ -123,7 +138,8 @@ async function loadMethods() {
       ...(builder.componentHasSubmit
         ? {}
         : {
-            onPayButtonClick: async () => Promise.resolve(true),
+            onPayButtonClick: async () =>
+              category === "express" ? { sessionId } : true,
           }),
       ...(category === "express"
         ? {
