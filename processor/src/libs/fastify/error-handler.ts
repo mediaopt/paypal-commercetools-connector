@@ -146,6 +146,18 @@ const transformValidationErrors = (
   req: FastifyRequest
 ): Errorx[] => {
   const errorxList: Errorx[] = [];
+  // Type.Enum compiles to anyOf over const branches, and Ajv reports each failed branch too
+  const anyOfPaths = new Set(
+    errors.filter((err) => err.keyword === "anyOf").map((err) => err.instancePath)
+  );
+  const invalidField = (err: FastifySchemaValidationError, allowed: string) =>
+    new ErrorInvalidField(
+      getKeys(err.instancePath).join(".") || "body",
+      err.instancePath
+        ? getPropertyFromPath(err.instancePath, req.body)
+        : req.body,
+      allowed
+    );
 
   for (const err of errors) {
     switch (err.keyword) {
@@ -162,6 +174,15 @@ const transformValidationErrors = (
             err.params.allowedValues as string
           )
         );
+        break;
+      case "anyOf":
+      case "type":
+        errorxList.push(invalidField(err, err.message ?? ""));
+        break;
+      case "const":
+        if (!anyOfPaths.has(err.instancePath)) {
+          errorxList.push(invalidField(err, String(err.params.allowedValue)));
+        }
         break;
     }
   }
@@ -181,7 +202,7 @@ const getPropertyFromPath = (path: string, obj: any): any => {
   const keys = getKeys(path);
   let value = obj;
   for (const key of keys) {
-    value = value[key];
+    value = value?.[key];
   }
   return value;
 };

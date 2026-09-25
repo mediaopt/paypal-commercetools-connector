@@ -162,6 +162,12 @@ describe("paypal-payment.service", () => {
         },
       });
 
+  const postedActions = () =>
+    mockClientPost.mock.calls.flatMap(
+      ([request]) =>
+        (request as { body: { actions: { action: string }[] } }).body.actions
+    );
+
   afterEach(() => {
     (paymentSDK.ctAPI as any).client = savedClient;
     jest.restoreAllMocks();
@@ -605,6 +611,40 @@ describe("paypal-payment.service", () => {
           }),
         }),
       );
+    });
+
+    test("leaves interfaceId unset after a declined charge, so the same payment accepts a new createOrder", async () => {
+      (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
+        mockCompletedOrder("DECLINED") as never,
+      );
+
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: { paymentSource: "card", vaultId: "vault-123" },
+        }),
+      ).rejects.toThrow();
+
+      expect(postedActions()).not.toContainEqual(
+        expect.objectContaining({ action: "setInterfaceId" }),
+      );
+
+      // The payment stays unlinked, so a retry isn't rejected by createOrder's interfaceId guard
+      (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
+        mockCompletedOrder("COMPLETED") as never,
+      );
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: { paymentSource: "card", vaultId: "vault-456" },
+        }),
+      ).resolves.toMatchObject({
+        orderData: { status: "COMPLETED" },
+      });
+      expect(postedActions()).toContainEqual({
+        action: "setInterfaceId",
+        interfaceId: "paypal-order-id",
+      });
     });
   });
 
@@ -1165,6 +1205,34 @@ describe("paypal-payment.service", () => {
           }),
         })
       );
+    });
+
+    test("does not link interfaceId when the authorization is denied, so the payment can take a new order", async () => {
+      (CommonConnect.authorizePayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockAuthorizedOrder,
+        purchase_units: [
+          {
+            payments: {
+              authorizations: [{ id: "auth-id", status: "DENIED" }],
+            },
+          },
+        ],
+      } as never);
+
+      await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+
+      expect(postedActions()).not.toContainEqual(
+        expect.objectContaining({ action: "setInterfaceId" })
+      );
+      // The attempt itself is still recorded
+      expect(postedActions()).toContainEqual({
+        action: "setCustomField",
+        name: "PayPalOrderId",
+        value: mockAuthorizedOrder.id,
+      });
     });
 
     test("regression: authorizes successfully against the second, actually-approved order after an earlier popup was closed without approving — no interfaceId was ever set for the first (abandoned) order, so there's nothing stale to reject", async () => {

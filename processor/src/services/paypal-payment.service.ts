@@ -1215,8 +1215,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       writeTransactionPromise,
       this.linkVaultedCardCustomer(payment, response),
     ]);
+    // A failed authorize/capture doesn't link interfaceId: it can never change once set, and
+    // createOrder refuses a payment that has one, so linking the failed order would block every
+    // retry on this payment. The Failure transaction and status still record the attempt.
     await retryCTSync(
-      () => this.syncPayPalOrderStatus(payment.id, response, true),
+      () =>
+        this.syncPayPalOrderStatus(payment.id, response, newState !== "Failure"),
       config.operation,
       payment.id,
       response.status ?? ""
