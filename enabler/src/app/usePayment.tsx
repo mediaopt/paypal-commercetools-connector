@@ -9,6 +9,7 @@ import React, {
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
 
 import { redirectTo } from "../helpers/redirectTo";
+import { sessionHeader } from "../helpers/sessionHeader";
 import { Result } from "../components/Result";
 import {
   GeneralComponentsProps,
@@ -53,6 +54,26 @@ const PaymentInfoInitialObject: PaymentInfo = {
   amountPlanned: { centAmount: 0, currencyCode: "", fractionDigits: 0 },
   cartInformation: CartInformationInitial,
 };
+
+const toPaymentInfo = (
+  payment: CreatePaymentResponse,
+  cartInformation: PaymentInfo["cartInformation"]
+): PaymentInfo => ({
+  id: payment.id,
+  amountPlanned: payment.amountPlanned,
+  lineItems: payment.lineItems,
+  email: payment.email,
+  firstName: payment.firstName,
+  lastName: payment.lastName,
+  countryCode: payment.countryCode,
+  shippingAddress: payment.shippingAddress,
+  shippingOptions: payment.shippingOptions,
+  priceBreakdown: payment.priceBreakdown,
+  ctCustomerId: payment.ctCustomerId,
+  customerVersion: payment.customerVersion,
+  version: payment.version,
+  cartInformation,
+});
 
 type PaymentContextT = {
   paymentInfo: PaymentInfo;
@@ -142,7 +163,7 @@ export const PaymentProvider: FC<
   approveVaultSetupTokenUrl,
 
   getClientTokenUrl,
-  requestHeader,
+  requestHeader: initialRequestHeader,
   shippingMethodId,
   cartInformation,
 
@@ -152,7 +173,10 @@ export const PaymentProvider: FC<
   processorUrl,
   redirectOnApprove,
   initialPayment,
+  onExpressPayButtonClick,
 }) => {
+  // Replaced only by handleCreateOrder's PayPal Express session switch
+  const [requestHeader, setRequestHeader] = useState(initialRequestHeader);
   const [clientToken, setClientToken] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [resultSuccess, setResultSuccess] = useState<boolean>();
@@ -168,22 +192,7 @@ export const PaymentProvider: FC<
   // below instead (self-hosted/legacy mode).
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>(
     initialPayment
-      ? {
-          id: initialPayment.id,
-          amountPlanned: initialPayment.amountPlanned,
-          lineItems: initialPayment.lineItems,
-          email: initialPayment.email,
-          firstName: initialPayment.firstName,
-          lastName: initialPayment.lastName,
-          countryCode: initialPayment.countryCode,
-          shippingAddress: initialPayment.shippingAddress,
-          shippingOptions: initialPayment.shippingOptions,
-          priceBreakdown: initialPayment.priceBreakdown,
-          ctCustomerId: initialPayment.ctCustomerId,
-          customerVersion: initialPayment.customerVersion,
-          version: initialPayment.version,
-          cartInformation: cartInformation,
-        }
+      ? toPaymentInfo(initialPayment, cartInformation)
       : PaymentInfoInitialObject
   );
 
@@ -216,6 +225,50 @@ export const PaymentProvider: FC<
     createVaultSetupTokenUrl && approveVaultSetupTokenUrl
   );
 
+  const createPayment = async (header: RequestHeader) => {
+    const createPaymentResult = await processorRequest<
+      {},
+      CreatePaymentResponse
+    >(
+      header,
+      createPaymentUrl,
+      // Checkout mode: processor's InitPaymentRequestSchema is {}
+      processorUrl
+        ? {}
+        : {
+            ...cartInformation,
+            shippingMethodId: shippingMethodId,
+            paymentMethodType,
+            builderType,
+          }
+    );
+
+    if (!createPaymentResult) {
+      throw new Error(t("payPal.generalError"));
+    }
+
+    let paymentVersion: number | undefined = createPaymentResult.version;
+    if (getClientTokenUrl) {
+      const clientTokenResult = (await processorRequest<
+        ClientTokenRequest,
+        ClientTokenResponse
+      >(header, getClientTokenUrl, {
+        paymentId: createPaymentResult.id,
+        paymentVersion: createPaymentResult.version,
+        braintreeCustomerId: createPaymentResult.braintreeCustomerId,
+        merchantAccountId: undefined,
+      })) as ClientTokenResponse;
+      setClientToken(clientTokenResult.clientToken);
+      paymentVersion = clientTokenResult.paymentVersion;
+    }
+
+    setPaymentInfo({
+      ...toPaymentInfo(createPaymentResult, cartInformation),
+      version: paymentVersion,
+    });
+    return createPaymentResult;
+  };
+
   // Self-hosted/legacy mode only — Checkout mode always has initialPayment already seeded above
   // by the time this component mounts (resolved in _Setup(), before any builder is ever
   // constructed), so this fetch never runs there.
@@ -225,51 +278,7 @@ export const PaymentProvider: FC<
     const initPayment = async () => {
       isLoading(true);
       try {
-        const createPaymentResult = await processorRequest<
-          {},
-          CreatePaymentResponse
-        >(requestHeader, createPaymentUrl, {
-          ...cartInformation,
-          shippingMethodId: shippingMethodId,
-          paymentMethodType,
-          builderType,
-        });
-
-        if (!createPaymentResult) {
-          throw new Error(t("payPal.generalError"));
-        }
-
-        let paymentVersion: number | undefined = createPaymentResult.version;
-        if (getClientTokenUrl) {
-          const clientTokenResult = (await processorRequest<
-            ClientTokenRequest,
-            ClientTokenResponse
-          >(requestHeader, getClientTokenUrl, {
-            paymentId: createPaymentResult.id,
-            paymentVersion: createPaymentResult.version,
-            braintreeCustomerId: createPaymentResult.braintreeCustomerId,
-            merchantAccountId: undefined,
-          })) as ClientTokenResponse;
-          setClientToken(clientTokenResult.clientToken);
-          paymentVersion = clientTokenResult.paymentVersion;
-        }
-
-        setPaymentInfo({
-          id: createPaymentResult.id,
-          amountPlanned: createPaymentResult.amountPlanned,
-          lineItems: createPaymentResult.lineItems,
-          email: createPaymentResult.email,
-          firstName: createPaymentResult.firstName,
-          lastName: createPaymentResult.lastName,
-          countryCode: createPaymentResult.countryCode,
-          shippingAddress: createPaymentResult.shippingAddress,
-          shippingOptions: createPaymentResult.shippingOptions,
-          priceBreakdown: createPaymentResult.priceBreakdown,
-          ctCustomerId: createPaymentResult.ctCustomerId,
-          customerVersion: createPaymentResult.customerVersion,
-          version: paymentVersion,
-          cartInformation: cartInformation,
-        });
+        await createPayment(requestHeader);
       } catch (error) {
         notify(
           "Error",
@@ -348,11 +357,30 @@ export const PaymentProvider: FC<
           enableVaulting
         );
 
+        // PayPal Express only. Checkout's session from before the click has no checkout
+        // transaction item, so a Payment created under it can't trigger Order creation. Switches
+        // to the session onPayButtonClick hands back and creates a new Payment under it; this
+        // request uses both directly, later calls pick them up from state.
+        let orderRequestHeader = requestHeader;
+        let orderPaymentId = paymentInfo.id;
+        if (builderType === "express" && onExpressPayButtonClick) {
+          const clickResult = await onExpressPayButtonClick();
+          if (clickResult?.sessionId) {
+            orderRequestHeader = sessionHeader(clickResult.sessionId);
+            setRequestHeader(orderRequestHeader);
+            orderPaymentId = (await createPayment(orderRequestHeader)).id;
+          } else {
+            console.warn(
+              "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
+            );
+          }
+        }
+
         const createOrderResult = await processorRequest<
           CreateOrderRequest,
           CreateOrderResponse
-        >(requestHeader, createOrderUrl, {
-          paymentId: paymentInfo.id,
+        >(orderRequestHeader, createOrderUrl, {
+          paymentId: orderPaymentId,
           paymentVersion: latestPaymentVersion,
           // PayUponInvoice must always submit Capture intent, regardless of the merchant's
           // global setting — fraudNetSessionId is the only PUI-exclusive field on orderData, so
@@ -448,10 +476,7 @@ export const PaymentProvider: FC<
                         break;
                       case "0":
                       default:
-                        notify(
-                          "Error",
-                          t("cardFields.selectDifferentMethod")
-                        );
+                        notify("Error", t("cardFields.selectDifferentMethod"));
                         isLoading(false);
                         break;
                     }
@@ -781,6 +806,7 @@ export const PaymentProvider: FC<
     // Constant for the provider's lifetime (set in Checkout, never in legacy mode); listed only for
     // react-hooks/exhaustive-deps
     processorUrl,
+    onExpressPayButtonClick,
   ]);
 
   return (

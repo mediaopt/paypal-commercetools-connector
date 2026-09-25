@@ -42,6 +42,7 @@ export const PayPalContextProvider: FC<
   redirectOnApprove,
   isStoredCheckoutComponent,
   initialPayment,
+  onExpressPayButtonClick,
 
   children,
 }) => {
@@ -84,6 +85,7 @@ export const PayPalContextProvider: FC<
             processorUrl={processorUrl}
             redirectOnApprove={redirectOnApprove}
             initialPayment={initialPayment}
+            onExpressPayButtonClick={onExpressPayButtonClick}
             isStoredCheckoutComponent={isStoredCheckoutComponent}
           >
             <RenderPurchase>{children}</RenderPurchase>
