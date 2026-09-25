@@ -2836,6 +2836,22 @@ describe("paypal-payment.service", () => {
 
       await expect(paypalPaymentService.config()).resolves.toBeDefined();
     });
+
+    test("doesn't force venmo into enableFunding when the script options disable it", async () => {
+      jest.spyOn(ConfigModule, "getConfig").mockReturnValue({
+        ...ConfigModule.getConfig(),
+        standardScriptOptions: {
+          ...ConfigModule.getConfig().standardScriptOptions,
+          disableFunding: ["venmo"],
+        },
+      });
+
+      const result = await paypalPaymentService.config();
+
+      expect(result.standardScriptOptions.enableFunding ?? []).not.toContain(
+        "venmo"
+      );
+    });
     test("warns when Apple Pay is enabled without a configured applePayDisplayName", async () => {
       const warnSpy = jest.spyOn(log, "warn").mockImplementation(() => log);
 
