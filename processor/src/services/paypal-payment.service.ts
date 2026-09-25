@@ -941,6 +941,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
               method: StandardPaymentMethodType.CREDIT_CARD,
               paymentInterface:
                 getStoredPaymentMethodsConfig().config.paymentInterface,
+              interfaceAccount:
+                getStoredPaymentMethodsConfig().config.interfaceAccount,
             })
             .catch((e) =>
               log.warn(
@@ -2212,6 +2214,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
               customerId: ctCart.customerId,
               paymentInterface:
                 getStoredPaymentMethodsConfig().config.paymentInterface,
+              interfaceAccount:
+                getStoredPaymentMethodsConfig().config.interfaceAccount,
             })
             .then((result) => result.results)
             .catch(() => [])
@@ -2298,6 +2302,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
           tokenValue: token,
           paymentInterface:
             getStoredPaymentMethodsConfig().config.paymentInterface,
+          interfaceAccount:
+            getStoredPaymentMethodsConfig().config.interfaceAccount,
         })
         .then((ctPaymentMethod) =>
           this.ctPaymentMethodService.delete({

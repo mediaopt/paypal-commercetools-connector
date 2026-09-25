@@ -38,6 +38,7 @@ import { PayPalCustomerService } from "../../src/services/paypal-customer.servic
 import { PayPalPaymentServiceOptions } from "../../src/services/types/paypal-payment.type";
 import * as FastifyContext from "../../src/libs/fastify/context/context";
 import * as ConfigModule from "../../src/config/config";
+import * as StoredPaymentMethodsConfigModule from "../../src/config/stored-payment-methods.config";
 import { log } from "../../src/libs/logger";
 import { buildPlaceholderInteractionId } from "../../src/utils/order.utils";
 
@@ -148,6 +149,18 @@ describe("paypal-payment.service", () => {
       }),
     };
   });
+
+  const mockStoredPaymentMethodsInterfaceAccount = () =>
+    jest
+      .spyOn(StoredPaymentMethodsConfigModule, "getStoredPaymentMethodsConfig")
+      .mockReturnValue({
+        enabled: true,
+        config: {
+          paymentInterface: "PayPal",
+          interfaceAccount: "paypal-account-1",
+          allowedPaymentMethods: [],
+        },
+      });
 
   afterEach(() => {
     (paymentSDK.ctAPI as any).client = savedClient;
@@ -994,6 +1007,46 @@ describe("paypal-payment.service", () => {
       expect(linkSpy).toHaveBeenCalledWith(
         "ct-customer-id",
         "paypal-vault-customer-id"
+      );
+    });
+
+    test("saves the commercetools PaymentMethod record with the configured interfaceAccount", async () => {
+      mockStoredPaymentMethodsInterfaceAccount();
+      jest
+        .spyOn(PayPalCustomerService.prototype, "linkPayPalCustomerId")
+        .mockResolvedValue();
+      const saveSpy = jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "save")
+        .mockResolvedValue({} as never);
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        customer: { typeId: "customer", id: "ct-customer-id" },
+      } as Payment);
+      (CommonConnect.authorizePayPalOrder as jest.Mock).mockResolvedValue({
+        ...mockAuthorizedOrder,
+        payment_source: {
+          card: {
+            attributes: {
+              vault: {
+                id: "paypal-token-id",
+                customer: { id: "paypal-vault-customer-id" },
+              },
+            },
+          },
+        },
+      } as never);
+
+      await paypalPaymentService.authorizeOrder({
+        paymentId: mockPayment.id,
+        orderID: mockAuthorizedOrder.id,
+      });
+
+      expect(saveSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          token: "paypal-token-id",
+          paymentInterface: "PayPal",
+          interfaceAccount: "paypal-account-1",
+        })
       );
     });
 
@@ -2927,6 +2980,27 @@ describe("paypal-payment.service", () => {
       expect(findSpy).toHaveBeenCalledTimes(1);
     });
 
+    test("filters the commercetools PaymentMethod lookup by the configured interfaceAccount", async () => {
+      mockStoredPaymentMethodsInterfaceAccount();
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      (CommonConnect.getPaymentTokens as jest.Mock).mockResolvedValue({
+        payment_tokens: [mockPaymentToken],
+      } as never);
+      const findSpy = jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "find")
+        .mockResolvedValue({ results: [] } as never);
+
+      await paypalPaymentService.getStoredPaymentMethods();
+
+      expect(findSpy).toHaveBeenCalledWith({
+        customerId: "ct-customer-id",
+        paymentInterface: "PayPal",
+        interfaceAccount: "paypal-account-1",
+      });
+    });
+
     test("returns empty when the PayPal call fails", async () => {
       jest
         .spyOn(paymentSDK.ctCartService, "getCart")
@@ -3056,6 +3130,33 @@ describe("paypal-payment.service", () => {
         customerId: "ct-customer-id",
         id: "ct-payment-method-id",
         version: 1,
+      });
+    });
+
+    test("looks up the commercetools PaymentMethod record by the configured interfaceAccount", async () => {
+      mockStoredPaymentMethodsInterfaceAccount();
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        customerId: "ct-customer-id",
+      } as unknown as Cart);
+      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
+        status: "success",
+      } as never);
+      const getByTokenValueSpy = jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
+        .mockResolvedValue({ id: "ct-payment-method-id", version: 1 } as never);
+      jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "delete")
+        .mockResolvedValue({} as never);
+
+      await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
+      await new Promise(process.nextTick);
+
+      expect(getByTokenValueSpy).toHaveBeenCalledWith({
+        customerId: "ct-customer-id",
+        tokenValue: "paypal-token-id",
+        paymentInterface: "PayPal",
+        interfaceAccount: "paypal-account-1",
       });
     });
 
