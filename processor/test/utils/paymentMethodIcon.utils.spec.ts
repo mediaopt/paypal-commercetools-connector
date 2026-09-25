@@ -10,6 +10,8 @@ describe("paymentMethodIcon.utils", () => {
     test.each<[PaymentMethodType, string]>([
       [StandardPaymentMethodType.CREDIT_CARD, "card"],
       [StandardPaymentMethodType.PAYPAL, "paypal"],
+      [StandardPaymentMethodType.BANCONTACT, "bancontactcard"],
+      [StandardPaymentMethodType.P24, "przelewy24"],
     ])("maps %s to %s", (methodType, expectedIcon) => {
       expect(toPaymentMethodIconKey(methodType)).toBe(expectedIcon);
     });

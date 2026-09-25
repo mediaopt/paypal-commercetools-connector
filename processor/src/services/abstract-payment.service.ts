@@ -12,8 +12,8 @@ import {
 } from "./types/operation.type";
 
 import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-componets.dto";
+import { PaymentIntentResponseSchemaDTO } from "../dtos/operations/payment-intents.dto";
 import {
-  PaymentUpdateResponseSchemaDTO,
   PaymentRequestSchemaDTO,
   PaymentResponseSchemaDTO,
   CreateOrderRequestSchemaDTO,
@@ -117,7 +117,7 @@ export abstract class AbstractPaymentService {
    * @remarks
    * Creates a commercetools payment for the current cart and returns SDK options plus cart/customer details for the enabler to render the payment button.
    *
-   * @param request - payment configuration including payment method type, builder type
+   * @param request - empty; createPayment uses session cart and provides identical result for all components
    * @returns Promise with PayPal SDK options and payment object with cart/customer details
    */
   abstract createPayment(
@@ -200,7 +200,7 @@ export abstract class AbstractPaymentService {
    */
   abstract refundPayment(
     request: ModifyPaymentWithTransactionRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO>;
+  ): Promise<PaymentIntentResponseSchemaDTO>;
 
   /**
    * Settlement (Capture)
@@ -213,7 +213,7 @@ export abstract class AbstractPaymentService {
    */
   abstract settlement(
     request: ModifyPaymentWithTransactionRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO>;
+  ): Promise<PaymentIntentResponseSchemaDTO>;
 
   /**
    * Cancel payment (void)
@@ -226,7 +226,7 @@ export abstract class AbstractPaymentService {
    */
   abstract void(
     request: CancelPaymentRequest
-  ): Promise<PaymentUpdateResponseSchemaDTO>;
+  ): Promise<PaymentIntentResponseSchemaDTO>;
 
   /**
    * Modify payment
@@ -249,7 +249,7 @@ export abstract class AbstractPaymentService {
 
   public async modifyPayment(
     opts: ModifyPayment
-  ): Promise<PaymentUpdateResponseSchemaDTO> {
+  ): Promise<PaymentIntentResponseSchemaDTO> {
     const ctPayment = await this.ctPaymentService.getPayment({
       id: opts.paymentId,
     });

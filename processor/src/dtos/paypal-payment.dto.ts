@@ -5,20 +5,49 @@ type ValuesOf<T extends object> = T[keyof T];
 export const StandardPaymentMethodType = {
   CREDIT_CARD: "CardFields",
   PAYPAL: "PayPal",
+
+  // Funding-source variants of the standard PayPal smart button (see enabler's PayPalBuilder.ts
+  // FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE) — none of these have a commercetools icon-key
+  // equivalent, see paymentMethodIcon.utils.ts.
+  SEPA: "Sepa",
+  PAY_LATER: "PayLater",
+  PAYPAL_CREDIT_CARD: "PayPalCreditCard",
+  ALL_BUTTONS: "AllButtons",
+  // Venmo has no commercetools icon-key equivalent — see paymentMethodIcon.utils.ts. PayPal's
+  // Venmo funding source is USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
+  VENMO: "Venmo",
+  CREDIT: "Credit",
+
+  // Local payment methods (APMs) — active only.
+  IDEAL: "Ideal",
+  BANCONTACT: "Bancontact",
+  EPS: "Eps",
+  MYBANK: "MyBank",
+  P24: "P24",
+  BLIK: "Blik",
+
   APPLE_PAY: "ApplePay",
   GOOGLE_PAY: "GooglePay",
-  // Venmo has no commercetools Checkout equivalent — not available in commercetools itself.
-  // VENMO: "Venmo",
   PAY_UPON_INVOICE: "PayUponInvoice",
 } as const;
 export type StandardPaymentMethodType = ValuesOf<
   typeof StandardPaymentMethodType
 >;
 
+// Exists only so createPayment/createOrder's paymentMethodType schema accepts it,
+// since PayPalStoredBuilder.mount() sets this paymentMethodType when charging a stored card.
+export const StoredPaymentMethodType = {
+  CREDIT_CARD_STORED: "CardFieldsStored",
+} as const;
+export type StoredPaymentMethodType = ValuesOf<typeof StoredPaymentMethodType>;
+
 export const PaymentMethodType = {
   ...StandardPaymentMethodType,
+  ...StoredPaymentMethodType,
 } as const;
-export type PaymentMethodType = StandardPaymentMethodType;
+export type PaymentMethodType =
+  | StandardPaymentMethodType
+  | StoredPaymentMethodType;
 
 export const CustomBuilderType = {
   EXPRESS: "express",
@@ -91,27 +120,15 @@ const PayPalIntentSchema = Type.Optional(
   Type.Union([Type.Literal("Authorize"), Type.Literal("Capture")])
 );
 
-// paymentMethodType is optional: PayPalPaymentEnabler._Setup() now calls createPayment once per
-// checkout page load, before any component/builder is chosen, so it can't supply a real one —
-// see createPayment()'s own comment for how it handles that case. Self-hosted/legacy mode still
-// supplies a real value per-component call.
-export const InitPaymentRequestSchema = Type.Object({
-  paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
-  builderType: Type.Optional(Type.String()),
-});
+// Empty on purpose — creates cart-based payment same for all components on builder init.
+// If ever changed - enabler createPayment has to match the types.
+// For merchants using payment only mode and having no user email provided a log.warn
+// is at createOrder step.
+// Body kept for legacy compatibility reasons
+export const InitPaymentRequestSchema = Type.Object({});
 
 export type PaymentRequestSchemaDTO = Static<typeof InitPaymentRequestSchema>;
 export type PaymentResponseSchemaDTO = Static<typeof InitPaymentResponseSchema>;
-
-export const PaymentUpdateResponseSchema = Type.Object({
-  message: Type.Optional(Type.String()),
-  success: Type.Boolean(),
-  paymentReference: Type.Optional(Type.String()),
-  merchantReturnUrl: Type.Optional(Type.String()),
-});
-export type PaymentUpdateResponseSchemaDTO = Static<
-  typeof PaymentUpdateResponseSchema
->;
 
 // Mirrors enabler's CreatePayPalOrderData — the full field set is kept for future payment
 // methods (see enabler/src/types/index.ts's FUNDING_SOURCE), even though only
@@ -133,9 +150,9 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.String()),
-  // Not the PaymentMethodType enum: the enabler also sends methods this processor keeps commented
-  // out, which must not be rejected with a 400
-  paymentMethodType: Type.Optional(Type.String()),
+  // Lets createOrder() apply payment-method-specific order constraints (e.g. Venmo's USD-only
+  // requirement) — see paypal-payment.service.ts's validateVenmoOrderParams.
+  paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
 });
 export type CreateOrderRequestSchemaDTO = Static<
   typeof CreateOrderRequestSchema
@@ -151,7 +168,8 @@ export const CreateOrderResponseSchema = Type.Object({
     message: Type.Optional(Type.String()),
   }),
   // Buyer redirect target for orders that settle synchronously inside createOrder itself (e.g. a
-  // vaulted card) — same convention as OnApproveResponseSchema.merchantReturnUrl.
+  // vaulted card) — same convention as OnApproveResponseSchema.merchantReturnUrl, see
+  // buildRedirectMerchantUrl in paypal-payment.service.ts.
   merchantReturnUrl: Type.Optional(Type.String()),
   ok: Type.Optional(Type.Boolean()),
 });
@@ -197,8 +215,8 @@ export const OnApproveRequestSchema = Type.Object({
   // Accepted for enabler-contract compatibility; not yet acted on — no CT-native PaymentMethod
   // "save" flow exists yet.
   saveCard: Type.Optional(Type.Boolean()),
-  // Lets finalizeOrder tell the PayPal Express flow apart, to decide whether to use
-  // onApprovePrefix for the response's merchantReturnUrl.
+  // Accepted for enabler-contract compatibility; finalizeOrder no longer branches on it
+  // (merchantReturnUrl never uses onApprovePrefix).
   builderType: Type.Optional(Type.String()),
 });
 export type OnApproveRequestSchemaDTO = Static<typeof OnApproveRequestSchema>;
