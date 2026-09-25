@@ -21,13 +21,23 @@ function isFastifyValidationError(error: Error): error is FastifyError {
   return (error as unknown as FastifyError).validation != undefined;
 }
 
-// Get Fastify errors propagated instead of default error 500
+// Get Fastify's own 4xx errors (FST_ERR_*) propagated instead of default error 500. Other errors
+// carrying a statusCode (PayPal via common-connect, commercetools SDK) stay 500s.
 function isClientFastifyError(error: Error): error is FastifyError {
-  const statusCode = (error as unknown as FastifyError).statusCode;
+  const { statusCode, code } = error as unknown as FastifyError;
   return (
-    typeof statusCode === "number" && statusCode >= 400 && statusCode < 500
+    typeof code === "string" &&
+    code.startsWith("FST_") &&
+    typeof statusCode === "number" &&
+    statusCode >= 400 &&
+    statusCode < 500
   );
 }
+
+const FASTIFY_JSON_BODY_ERROR_CODES = [
+  "FST_ERR_CTP_INVALID_JSON_BODY",
+  "FST_ERR_CTP_EMPTY_JSON_BODY",
+];
 
 export const errorHandler = (
   error: Error,
@@ -48,10 +58,19 @@ export const errorHandler = (
   } else if (isClientFastifyError(error)) {
     return handleErrors(
       [
-        new ErrorInvalidJsonInput(error.message, {
-          cause: error,
-          skipLog: false,
-        }),
+        FASTIFY_JSON_BODY_ERROR_CODES.includes(error.code)
+          ? new ErrorInvalidJsonInput(error.message, {
+              cause: error,
+              skipLog: false,
+            })
+          : // Keeps e.g. 404/405/413/415 meaningful instead of reporting them as invalid JSON
+            new Errorx({
+              message: error.message,
+              code: error.code,
+              httpErrorStatus: error.statusCode as number,
+              cause: error,
+              skipLog: false,
+            }),
       ],
       reply
     );

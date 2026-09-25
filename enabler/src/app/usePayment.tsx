@@ -352,6 +352,7 @@ export const PaymentProvider: FC<
       }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
       let errorAlreadyShown = false;
+      let orderRequestHeader = requestHeader;
       try {
         const relevantOrderData = setRelevantData(
           orderData,
@@ -363,7 +364,6 @@ export const PaymentProvider: FC<
         // transaction item, so a Payment created under it can't trigger Order creation. Switches
         // to the session onPayButtonClick hands back and creates a new Payment under it; this
         // request uses both directly, later calls pick them up from state.
-        let orderRequestHeader = requestHeader;
         let orderPaymentId = paymentInfo.id;
         if (builderType === "express" && onExpressPayButtonClick) {
           const clickResult = await onExpressPayButtonClick();
@@ -556,6 +556,17 @@ export const PaymentProvider: FC<
           notify(
             "Error",
             error instanceof Error ? error.message : t("interface.generalError")
+          );
+        }
+        // Checkout mode: a failed attempt may already have linked this Payment to its PayPal order
+        // (e.g. a declined stored-card charge), which blocks any retry on it. createPayment hands
+        // back the same Payment if it's still unused, otherwise a new one for the next attempt.
+        if (processorUrl) {
+          await createPayment(orderRequestHeader).catch((refreshError) =>
+            console.error(
+              "[paypal-enabler] could not refresh the payment after a failed attempt",
+              refreshError
+            )
           );
         }
         isLoading(false);

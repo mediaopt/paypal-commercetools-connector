@@ -220,8 +220,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
         (component) =>
           component !== "card-fields" || settings.acceptCredit !== false
       ),
-      // venmo fails isEligible unless it is explicitely added in enableFunding. If it is eligibility is checked correct
-      ...(settings.acceptVenmo !== false && {
+      // venmo fails isEligible unless it is explicitely added in enableFunding. If it is eligibility is checked correct.
+      // Not added when the merchant disabled it in the script options, which the conflict check
+      // below would otherwise reject
+      ...(settings.acceptVenmo !== false &&
+        !getConfig().standardScriptOptions.disableFunding?.includes("venmo") && {
         enableFunding: Array.from(
           new Set([
             ...(getConfig().standardScriptOptions.enableFunding ?? []),
