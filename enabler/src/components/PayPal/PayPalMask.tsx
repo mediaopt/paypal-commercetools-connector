@@ -1,5 +1,5 @@
-import React, { useMemo, useRef } from "react";
-import { PayPalButtons, PayPalMessages } from "@paypal/react-paypal-js";
+import React, { useEffect, useMemo, useRef } from "react";
+import { PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps } from "../../types";
 
 import { usePayment } from "../../app/usePayment";
@@ -8,6 +8,10 @@ import { useLoader } from "../../app/useLoader";
 import { useNotifications } from "../../app/useNotifications";
 import { errorFunc } from "../errorNotification";
 import { useTranslation } from "react-i18next";
+import { isVenmoSupported } from "../venmoAvailability";
+import { PayLaterButton } from "./PayLaterButton";
+import { useFundingSourceEligible } from "./useFundingSourceEligible";
+import { PayPalMessagesWidget } from "./PayPalMessagesWidget";
 
 // Wraps a PayPal Express shipping callback so a thrown/rejected error also calls the
 // SDK's own actions.reject()
@@ -34,16 +38,53 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     builderType,
     handleUpdateShipping,
     resolveShippingOptionId,
+    paymentInfo,
   } = usePayment();
   const { settings, paymentTokens } = useSettings();
   const isExpress = builderType === "express";
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
   const { t } = useTranslation();
-  const { enableVaulting, paypalMessages, ...restprops } = props;
+  const {
+    enableVaulting,
+    paypalMessages,
+    messagesStyle,
+    disablePayLaterButton,
+    ...restprops
+  } = props;
   const save = useRef<HTMLInputElement>(null);
+  const [{ isResolved }] = usePayPalScriptReducer();
 
   const storeInVaultOnSuccess = settings?.storeInVaultOnSuccess;
+  const logTag = restprops.fundingSource ?? "PayPal";
+
+  // by PayPal requirement unless requested by merchant PayLater should be placed together with PayPal pay button
+  const payLaterButtonAllowed =
+    restprops.fundingSource === "paypal" &&
+    !vaultOnly &&
+    !isExpress &&
+    settings?.acceptPayLater !== false &&
+    disablePayLaterButton !== true;
+
+  // Traceable script-resolution visibility for this specific button
+  useEffect(() => {
+    if (!isResolved) {
+      return;
+    }
+    if (!window.paypal?.Buttons) {
+      console.error(
+        `[paypal-enabler][${logTag}] script resolved but window.paypal.Buttons is missing — the button will not render`
+      );
+    }
+  }, [isResolved]);
+
+  // Silent-render safety net: a funding-source-restricted button (Sepa/PayLater/PayPalCreditCard/
+  // Venmo) renders nothing at all when PayPal's own SDK decides the buyer/cart isn't eligible for
+  // it (e.g. Venmo for a EUR cart) — notification is not an option for checkout - as it loads all methods and show error regardless if venmo is selected.
+  const isPayPalEligible = useFundingSourceEligible(restprops.fundingSource);
+  const isFundingSourceEligible =
+    isPayPalEligible &&
+    (restprops.fundingSource !== "venmo" || isVenmoSupported());
 
   const hasPaypalToken = useMemo(() => {
     if (paymentTokens?.payment_tokens) {
@@ -63,9 +104,10 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
       styles.label = settings.paypalButtonConfig.buttonLabel;
       // Only apply the merchant's configured brand color to PayPal's own funding sources — a
       // fixed color could clash with another funding source's own branding (e.g. Venmo blue).
-      if (!restprops.fundingSource||
+      if (
+        !restprops.fundingSource ||
         (restprops.fundingSource &&
-        ["paypal", "paylater"].includes(restprops.fundingSource))
+          ["paypal", "paylater"].includes(restprops.fundingSource))
       ) {
         styles.color = settings.paypalButtonConfig.buttonColor;
       }
@@ -119,14 +161,25 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     }
   }
 
+  const onError = (err: Record<string, unknown>) =>
+    errorFunc(err, isLoading, notify, t);
+
   return (
     <>
       <PayPalButtons
         {...restprops}
         style={style}
         {...actions}
-        onError={(err) => errorFunc(err, isLoading, notify, t)}
+        onError={onError}
       />
+      {payLaterButtonAllowed && (
+        <PayLaterButton
+          restprops={restprops}
+          style={style}
+          actions={actions}
+          onError={onError}
+        />
+      )}
       {!vaultOnly &&
         builderType !== "express" &&
         !hasPaypalToken &&
@@ -143,7 +196,19 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
           </label>
         )}
 
-      {paypalMessages && <PayPalMessages {...paypalMessages} />}
+      {!vaultOnly && (
+        <PayPalMessagesWidget
+          paypalMessages={paypalMessages}
+          fundingSource={restprops.fundingSource}
+          paymentInfo={paymentInfo}
+          isExpress={isExpress}
+          messagesStyle={messagesStyle}
+        />
+      )}
+
+      {restprops.fundingSource && !isFundingSourceEligible && (
+        <div>{t("payPal.notEligible")}</div>
+      )}
     </>
   );
 };

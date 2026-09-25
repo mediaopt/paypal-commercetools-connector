@@ -13,6 +13,7 @@ import {
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import { BaseOptions } from "./interfaces/baseOptions";
 import { PayPalComponentBuilder } from "../components/PayPalBuilder";
+import { PayPalStoredBuilder } from "../components/PayPalStoredBuilder";
 import {
   DEFAULT_SCRIPT_CURRENCY,
   processorUrls,
@@ -27,7 +28,7 @@ import { CreatePaymentResponse } from "../types";
 export type {
   PayPalPaymentMethodType,
   PayPalPaymentMethodExpressType,
-} from "../components/types";
+} from "../types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
   setupData: Promise<{ baseOptions: BaseOptions }>;
@@ -40,13 +41,6 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     options: EnablerOptions
   ): Promise<{ baseOptions: BaseOptions }> => {
     try {
-      console.log(
-        "[paypal-enabler] processorUrl:",
-        options.processorUrl,
-        "| sessionId:",
-        options.sessionId
-      ); //TODO - remove logs after final tests success
-
       // Fetch SDK config from processor
       const configResponse = await fetch(
         options.processorUrl + "/operations/config",
@@ -62,29 +56,29 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
 
       const configJson = await configResponse.json();
 
-      // Every standard (non-express) component shares this ONE script config, see BaseOptions.paypalScriptOptions.
-      // Deliberately built to be byte-identical to what useSettings.tsx's own <PayPalScriptProvider>
-      // merge later produces for a standard component (same intent/dataPartnerAttributionId/
-      // merchantId, computed the same way), so the preload below and every component's own later
-      // request resolve to the identical script id.
+      // Every standard (non-express, non-stored) component shares this ONE script config,
+      // resolved once here instead of per-component in resolveOptions.ts — see
+      // BaseOptions.paypalScriptOptions for the full reasoning. Deliberately built to be
+      // byte-identical to what useSettings.tsx's own <PayPalScriptProvider> merge later produces
+      // for a standard component (same intent/dataPartnerAttributionId/merchantId, computed the
+      // same way) — see that merge's own comment for why matching matters here.
       const paypalScriptOptions: ReactPayPalScriptOptions = {
         clientId: configJson.clientId || "",
         currency: DEFAULT_SCRIPT_CURRENCY,
-        components: "buttons,card-fields",
-        // Enabler's own built-in defaults — mirrors what PayPalBuilder.ts
-        enableFunding: "paylater",
         ...configJson.standardScriptOptions,
         intent: configJson.settings?.payPalIntent?.toString().toLowerCase(),
-        dataUserIdToken: configJson.userIdToken,
         dataPartnerAttributionId: PARTNER_ATTRIBUTION_ID,
-        merchantId: configJson.settings?.merchantId,
+        // An unconfigured merchantId resolves to "" from the processor
+        merchantId: configJson.settings?.merchantId?.length
+          ? configJson.settings?.merchantId
+          : undefined,
       };
 
-      // One shared commercetools Payment per checkout page load, shared by every builder
-      // resolving this same setupData; and the one PayPal JS SDK script load above — independent
-      // of each other, so run together instead of sequentially. Both fatal on failure.
-      // paymentMethodType/builderType are omitted: at this point no component/builder has been
-      // chosen yet — see processor's createPayment() for how it handles that.
+      // One shared commercetools Payment per checkout page load, shared by every standard/stored/
+      // express builder resolving this same setupData; and the one PayPal JS SDK script load
+      // above — independent of each other, so run together instead of sequentially. Both fatal on failure.
+      // No request body at all: payment is based on cart in session.
+      // If ever changed - processor's InitPaymentRequestSchema has to match exactly
       const [paymentResult] = await Promise.all([
         processorRequest<{}, CreatePaymentResponse>(
           sessionHeader(options.sessionId),
@@ -107,21 +101,29 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           enableVaulting: !!configJson.enableVaulting,
           redirectOnApprove: !!configJson.redirectOnApprove,
           expressSdkOptions: configJson.expressSdkOptions,
+          standardScriptOptions: configJson.standardScriptOptions,
           paypalScriptOptions,
           clientId: configJson.clientId,
+          environment: configJson.environment,
           settings: configJson.settings,
           userIdToken: configJson.userIdToken,
+          onError: options.onError,
           purchaseCallback:
             configJson.purchaseCallback ||
             options.onComplete ||
             ((result: any, options: any) => {
-              console.log("Payment completed", result, options);
+              console.warn(
+                "Please configure merchant return url for checkout mode or purchaceCallback for legacy mode",
+                result,
+                options
+              );
             }),
         },
       };
-    } catch (error) {
-      console.error("[paypal-enabler] setup failed:", error);
-      throw error;
+    } catch (err) {
+      // Rethrown unchanged; this only adds visibility.
+      console.error(`[paypal-enabler][setup] _Setup failed:`, err);
+      throw err;
     }
   };
 
@@ -159,11 +161,9 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     const { baseOptions } = await this.setupData;
     const normalizedType = toPayPalPaymentMethodType(type);
 
-    // For PayPal, we support card tokens
+    // Only credit cards are vaulted/stored — see Checkout-mode scope.
     if (normalizedType === "CardFields") {
-      // Return a builder for stored card payment methods
-      // This would be implemented similar to payment component builder
-      throw new Error("Stored payment method builder not yet implemented");
+      return new PayPalStoredBuilder(baseOptions);
     }
 
     throw new Error(`Unsupported stored payment method type: ${type}`);

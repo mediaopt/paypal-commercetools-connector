@@ -16,6 +16,7 @@ i18n.use(initReactI18next).init({
         invoice: {
           wrongPhone:
             "Could not identify country code or national phone number, please check the data.",
+          missingBirthDate: "Please enter your birth date.",
           thirdPartyIssue:
             "Pay upon invoice is currently not available. Please try again later.",
           merchantIssue: "Pay upon invoice is not available at the moment.",
@@ -38,6 +39,7 @@ i18n.use(initReactI18next).init({
             "Your address could not be validated. Please correct your data and try again.",
           generalError:
             "Something went wrong. Please check your data and try again.",
+          notEligible: "This payment method is not available for your cart.",
         },
         cardFields: {
           pay: "Pay",
@@ -61,6 +63,7 @@ i18n.use(initReactI18next).init({
         invoice: {
           wrongPhone:
             "Die Landesvorwahl oder die nationale Telefonnummer konnte nicht identifiziert werden, bitte überprüfen Sie die Daten",
+          missingBirthDate: "Bitte geben Sie Ihr Geburtsdatum ein.",
           thirdPartyIssue:
             "Zahlung auf Rechnung ist derzeit nicht verfügbar. Bitte versuchen Sie es später noch einmal.",
           merchantIssue: "Zahlung auf Rechnung ist zur Zeit nicht verfügbar.",
@@ -83,6 +86,8 @@ i18n.use(initReactI18next).init({
             "Ihre Adresse konnte nicht validiert werden. Bitte korrigieren Sie Ihre Daten und versuchen Sie es erneut.",
           generalError:
             "Etwas ist schief gelaufen. Bitte überprüfen Sie Ihre Daten und versuchen Sie es erneut.",
+          notEligible:
+            "Diese Zahlungsart ist für Ihren Warenkorb nicht verfügbar.",
         },
         cardFields: {
           pay: "Zahlen",

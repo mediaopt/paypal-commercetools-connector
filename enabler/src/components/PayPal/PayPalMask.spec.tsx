@@ -9,6 +9,7 @@ jest.mock("@paypal/react-paypal-js", () => ({
     return null;
   },
   PayPalMessages: () => null,
+  usePayPalScriptReducer: () => [{ isResolved: true }, jest.fn()],
 }));
 
 const mockHandleUpdateShipping = jest.fn();
@@ -27,6 +28,9 @@ const basePaymentMock = {
   handleApproveVaultSetupToken: jest.fn(),
   handleUpdateShipping: mockHandleUpdateShipping,
   resolveShippingOptionId: mockResolveShippingOptionId,
+  paymentInfo: {
+    amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+  },
 };
 
 const mockUseSettings = jest.fn();

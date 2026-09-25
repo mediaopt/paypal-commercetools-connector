@@ -5,6 +5,7 @@ import {
   PayPalMessagesComponentProps,
 } from "@paypal/react-paypal-js";
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
+import { CTAmount } from "../payment-enabler/interfaces/general";
 
 export type ValidationHandlers = {
   isValid: () => Promise<boolean>;
@@ -33,6 +34,50 @@ export type GenericError = {
 };
 
 export type BuilderType = "dropin" | "express" | undefined;
+
+export type PayPalPaymentMethodType =
+  | "PayPal"
+  | "CardFields"
+  | "CardFieldsStored"
+  | "ApplePay"
+  | "GooglePay"
+  | "PayUponInvoice"
+  | "Venmo"
+  | "Sepa"
+  | "PayLater"
+  | "PayPalCreditCard"
+  | "AllButtons"
+  | "Credit"
+  // Local payment methods (APMs) — active.Supported by previous iteration of his connector and not deprecated per PayPal's own payment-methods documentation.
+  | "Ideal"
+  | "Bancontact"
+  | "Eps"
+  | "MyBank"
+  | "P24"
+  | "Blik";
+// Local payment methods (APMs) — not supported yet: were not offered and configured for previous connector edition
+// can be included upon merchant request after minimal test phase due to shared local mechanism
+// | "Verkkopankki"
+// | "PayU"
+// | "Trustly"
+// | "Zimpler"
+// | "Maxima"
+// | "Oxxo"
+// | "BoletoBancario"
+// | "WeChatPay"
+// | "MercadoPago"
+// | "Multibanco"
+// | "Itau"
+// Local payment methods (APMs) — obsolete, discontinued by PayPal
+// | "Giropay"
+// | "Sofort"
+// Not "PaymentTokens" — stored/vaulted payment methods have their own separate interface
+// (StoredComponentBuilder / createStoredPaymentMethodBuilder), not this one.
+
+export type PayPalPaymentMethodExpressType = Extract<
+  PayPalPaymentMethodType,
+  "PayPal"
+>;
 
 export type CreateVaultSetupTokenRequest = { paymentSource: FUNDING_SOURCE };
 export type CreateVaultSetupTokenResponse = {
@@ -73,8 +118,8 @@ export type CreateOrderRequest = {
   builderType?: BuilderType;
   /** The same paymentMethodType already sent on the initial /payments request (see
    * PaymentRequestSchemaDTO's paymentMethodType) — lets the processor apply payment-method-specific
-   * order constraints. */
-  paymentMethodType?: string;
+   * order constraints, e.g. Venmo's USD-only requirement. */
+  paymentMethodType?: PayPalPaymentMethodType;
 };
 
 export type CreateOrderData = {
@@ -189,16 +234,21 @@ export type RequestHeader = { [key: string]: string };
 
 /** Category 1 — basic data every payment component needs. */
 export type BasicComponentProps = {
-  options: ReactPayPalScriptOptions;
+  // Optional since stored payment components never load the PayPal JS SDK script at all (charging a saved
+  // method is a plain processor HTTP call — see useSettings.tsx's isStoredCheckoutComponent) and so has no
+  // script options to receive; every other component still always supplies a real value.
+  options?: ReactPayPalScriptOptions;
   requestHeader: RequestHeader;
   enableVaulting?: boolean;
 };
 
-/** Category 2 — per-endpoint URLs. In Checkout mode, `processorUrl` + `processorUrls()` derive
- * these same named props instead of a self-hosted merchant filling them in directly — the two
- * deployment modes converge on identical prop names, just from different sources (no
- * `@deprecated` marking needed — nothing here is being phased out, it's just populated one way or
- * the other). */
+/** Category 2 — per-endpoint URLs. In Checkout mode, RenderTemplate injects all of these (via
+ * processorUrls()) into the same named props a self-hosted merchant would otherwise fill in
+ * directly — the two deployment modes converge on identical prop names, just from different
+ * sources. `createPaymentUrl` is the one field the standalone client always required; the other 4
+ * were always optional there too, and usePayment.tsx restores that same required/optional split
+ * and its original silent-no-op-when-missing behavior (no `@deprecated` marking needed — nothing
+ * here is being phased out, it's just populated one way or the other). */
 export type LegacyEndpointUrlProps = {
   createPaymentUrl: string;
   onApproveUrl?: string;
@@ -211,7 +261,7 @@ export type LegacyEndpointUrlProps = {
 
 /** Category 3 — Checkout-only fields, no standalone-client equivalent. */
 export type CheckoutOnlyProps = {
-  paymentMethodType?: string;
+  paymentMethodType?: PayPalPaymentMethodType;
   builderType?: BuilderType;
   processorUrl?: string;
   /** Seeds SettingsProvider's `settings` state from the processor's `/operations/config` response. */
@@ -221,11 +271,27 @@ export type CheckoutOnlyProps = {
   /** PayPal Express only, from the processor's `/operations/config` `redirectOnApprove` (its
    * PAYPAL_REDIRECT_ON_APPROVE) — see `usePayment.tsx`'s `handleOnApprove`. */
   redirectOnApprove?: boolean;
-  /** Seeds `PaymentProvider`'s `paymentInfo` state synchronously — the commercetools Payment for
-   * this checkout page load, created once in `PayPalPaymentEnabler._Setup()` and shared by every
-   * component, instead of each component creating its own on mount. */
+  /** Set only by PayPalStoredBuilder-produced mounts (see PayPalStoredBuilder.ts/RenderTemplate.tsx)
+   * — true for any component the stored builder builds (today just CardFieldsStored, but this is
+   * universal for ct side rendered components. Consumed by
+   * useSettings.tsx's SettingsProvider to skip <PayPalScriptProvider> entirely. */
+  isStoredCheckoutComponent?: boolean;
+  /** Injected by RenderTemplate.tsx from BaseOptions, same as `processorUrl` — the commercetools
+   * Payment for this checkout page load, already resolved (in PayPalPaymentEnabler._Setup(),
+   * alongside the /operations/config fetch) by the time any component mounts. Lets every
+   * concurrently-mounted component share one Payment instead of each
+   * creating its own, with no async fetch needed inside PaymentProvider at all. Absent for
+   * self-hosted deployments, which fall back to usePayment.tsx's own direct createPaymentUrl
+   * call. */
   initialPayment?: CreatePaymentResponse;
+  /** PayPal Express only — Checkout's ExpressOptions.onPayButtonClick. See usePayment.tsx's
+   * handleCreateOrder. */
+  onExpressPayButtonClick?: () => Promise<{ sessionId: string }>;
 };
+
+/** Checkout's EnablerOptions.onError, adapted in PayPalBuilder.ts. Given to PaymentProvider only
+ * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed. */
+export type ProviderErrorProps = Pick<GenericMountProps, "onError">;
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
  * will be kept for backward compatibility, but it is strongly suggested to
@@ -233,8 +299,9 @@ export type CheckoutOnlyProps = {
  * to processor-like structure for support*/
 export type LegacyReplaceableProps = {
   purchaseCallback?: (result: any, options?: any) => void; //see `MERCHANT_RETURN_URL` instead
-  shippingMethodId?: string; // see processor createPayment instead
-  getSettingsUrl: string; // see processor config instead
+  // deprecated, see processor module for recommended bff handling
+  shippingMethodId?: string;
+  getSettingsUrl?: string; // see processor config instead
   getOrderUrl?: string; //included directly where relevant in processor calls
   onApproveRedirectionUrl?: string; //see processor `PAYPAL_ONAPPROVE_PREFIX` (or the generic `MERCHANT_RETURN_URL`)
 } & CartInformationProps; //see enabler PaymentData instead
@@ -269,7 +336,9 @@ export type HostedFieldsProps = Pick<
 >;
 
 export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting"> &
-  FormComponentProps;
+  FormComponentProps & {
+    onError?: (error: GenericError) => void;
+  };
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
   HostedFieldsThreeDSAuth;
@@ -293,10 +362,16 @@ export type PayUponInvoiceProps = ratepayPaymentRestrictions & {
   pageId: FraudnetPage;
   invoiceBenefitsMessage?: string;
   customLocale?: string;
+  // Legacy callers never set it, so it defaults to true there
+  fraudNetSandbox?: boolean;
 };
 
 export type PayUponInvoiceMaskProps = {
   fraudNetSessionId: string;
+  onRegisterSubmit?: (
+    handler: (storePaymentDetails?: boolean) => Promise<void>
+  ) => void;
+  onRegisterValidation?: (handlers: ValidationHandlers) => void;
 } & Pick<PayUponInvoiceProps, "invoiceBenefitsMessage">;
 
 export type PayUponInvoiceButtonProps = ratepayPaymentRestrictions &
@@ -315,13 +390,17 @@ export type CustomPayPalButtonsComponentProps = Omit<
   | "fundingSource"
 > & {
   paypalMessages?: PayPalMessagesComponentProps;
-  // Always an array — one <PayPalButtons/> renders per entry, see PayPalBuilder.ts's 4-layer
+  // A single funding source (not an array), see RenderTemplate/resolveOptions.ts's 4-layer
   // resolution of settings.PayPal/PayPalExpress and PayPalMask.tsx's rendering of it.
   fundingSource?: FUNDING_SOURCE;
-  // Which PayPal funding-source identity this mounted component's createOrder call should use —
-  // see PayPalBuilder.ts's DEFAULT_PAYMENT_SOURCE_BY_COMPONENT and PayPalMask.tsx's
-  // handleCreateOrder. Falls back to "paypal" when absent.
-  paymentSource?: FUNDING_SOURCE;
+  // Merchant-configurable style for the real (non-hardcoded) <PayPalMessages/> PayPalMask
+  // renders for the standard PayPal button — resolved the same way as PayPalMethodConfig.style,
+  // just a different shape (layout/logo/text/ratio vs. button color/label/shape).
+  messagesStyle?: PayPalMessagesComponentProps["style"];
+  // Mirrors PayPalMethodConfig.disablePayLaterButton — resolved once per mount in
+  // resolveOptions.ts and arrives here as a real prop (like messagesStyle above), not read via
+  // useSettings().
+  disablePayLaterButton?: boolean;
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -332,6 +411,10 @@ export type ApplePayProps = {
 };
 
 export type ApplePayComponentsProps = ApplePayProps & SmartComponentsProps;
+
+export type GooglePayComponentsProps = GooglePayOptionsType &
+  SmartComponentsProps &
+  ProviderErrorProps;
 
 export type CartInformation = {
   account: {
@@ -416,6 +499,7 @@ export type ShippingAddress = {
 };
 
 export type PaymentData = {
+  /** For this connector: the commercetools Payment id, from createPayment()'s response. */
   id: string;
   amountPlanned: {
     centAmount: number;
@@ -544,23 +628,155 @@ type PayPalButtonConfig = {
   buttonLabel: "paypal" | "checkout" | "buynow" | "pay" | "installment";
 };
 
-// One PayPal builder variant's fully-resolved style — mirrors the PayPal JS SDK's own `style`
-// prop shape (color/label/shape together), so it can be applied to <PayPalButtons/> as one unit.
-type PayPalVariantStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
+// One PayPal payment method's fully-resolved style (or PayPalExpress's) — mirrors the PayPal JS
+// SDK's own `style` prop shape (color/label/shape together), so it can be applied to
+// <PayPalButtons/> as one unit.
+type PayPalMethodStyle = PayPalButtonConfig & { buttonShape: "rect" | "pill" };
 
-// A component/variant's processor-configured override (PAYPAL_BUTTON_CONFIG in
-// processor/.env.template, keyed by component then, for PayPal, variant) — see PayPalBuilder.ts's
-// 4-layer resolution. Every field is wholesale-replace when present, not merged field-by-field
-// with whatever a lower-priority layer already resolved. Not every component uses every field —
-// e.g. CardFields has no button style/funding sources, only `components`.
-export type PayPalVariantConfig = {
-  style?: PayPalVariantStyle;
+// A payment method's processor-configured override (PAYPAL_BUTTON_CONFIG in
+// processor/.env.template), keyed by paymentMethodType, with a dedicated PayPalExpress slot for
+// builderType: "express" — see RenderTemplate/resolveOptions.ts's 4-layer resolution. Every field
+// is wholesale-replace when present, not merged field-by-field with whatever a lower-priority
+// layer already resolved. Not every payment method uses every field — e.g. CardFields has no
+// button style/funding source.
+export type PayPalMethodConfig = {
+  style?: PayPalMethodStyle;
   fundingSource?: FUNDING_SOURCE;
-  // PayPal JS SDK script `components` list for this component/variant (e.g. "buttons,card-fields")
-  // — same concern as PAYPAL_SDK_OPTIONS.<component>.components, but resolved through this 4-layer
-  // chain instead; PAYPAL_SDK_OPTIONS still wins if it also sets `components` (see PayPalBuilder.ts).
-  components?: string;
+  // PayPal-brand only — style for the <PayPalMessages/> Pay-Later-style widget PayPalMask renders
+  // alongside the standard PayPal button. A different shape entirely from `style` above
+  // (layout/logo/text/ratio, not button color/label/shape).
+  messagesStyle?: PayPalMessagesComponentProps["style"];
+  // PayPal-brand only, "PayPal" paymentMethodType — when true, suppresses the extra
+  // <PayPalButtons fundingSource="paylater"/> PayPalMask otherwise renders directly below the
+  // standard PayPal button (gated together with settings.acceptPayLater — both must allow it).
+  // Ops-only, set via PAYPAL_BUTTON_CONFIG; no merchant-center/custom-application equivalent.
+  disablePayLaterButton?: boolean;
+  // ApplePay only — the merchant-facing store name shown in Apple's native payment sheet.
+  applePayDisplayName?: string;
+  // PayUponInvoice only block
+  merchantId?: string; //FraudNet merchant configuration.
+  pageId?: string;
+  invoiceBenefitsMessage?: string; // merchant-facing invoice benefits message.
+  minPayableAmount?: number; //payment amount constraints.
+  maxPayableAmount?: number;
+  // GooglePay only — Google Pay API's own required/appearance fields, merchant-overridable the
+  // same way applePayDisplayName is (see resolveGooglePayOptions). Not merchant-configurable:
+  // verificationMethod (sourced from the shared threeDSOption setting) and environment (sourced
+  // from the processor's sandbox/live config).
+  allowedCardNetworks?: string[];
+  allowedCardAuthMethods?: string[];
+  callbackIntents?: string[];
+  buttonColor?: "default" | "white" | "black";
+  buttonType?:
+    | "book"
+    | "buy"
+    | "checkout"
+    | "donate"
+    | "order"
+    | "pay"
+    | "plain"
+    | "subscribe";
+  buttonRadius?: number;
+  buttonSizeMode?: "static" | "fill";
+  apiVersion?: number;
+  apiVersionMinor?: number;
+  totalPriceStatus?: "FINAL" | "ESTIMATED";
+  verificationMethod?: ThreeDSVerification;
 };
+
+/** Method-independent props every mounted component receives — assembled once by
+ * PayPalComponent.mount() from BaseOptions/ComponentOptions, with zero per-payment-method
+ * branching. Handed to RenderTemplate as-is and merged with whichever resolved options
+ * RenderTemplate/resolveOptions.ts produces for the given paymentMethodType. */
+export type GenericMountProps = FormComponentProps & {
+  requestHeader: RequestHeader;
+  // deprecated, see processor module for recommended bff handling
+  shippingMethodId?: string;
+  purchaseCallback?: (result: any, options?: any) => void;
+  redirectOnApprove?: boolean;
+  initialUserIdToken?: string;
+  showPayButton?: boolean;
+  fullWidth?: boolean;
+  buttonText?: string;
+  onError?: (error: GenericError) => void;
+  initialAmount?: CTAmount;
+  onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];
+  /** only for a stored-payment-method component (PayPalStoredBuilder) — PayPal's
+   * vault payment-token id of the saved card */
+  ppVaultTokenId?: string;
+};
+
+export type BaseResolvedMethodOptions = {
+  options: ReactPayPalScriptOptions;
+  // BaseOptions.settings is guaranteed present by the time mount() runs (see its own comment) —
+  // spreading it here can safely be typed as the full GetSettingsResponse, not a Partial.
+  initialSettings: GetSettingsResponse;
+  enableVaulting: boolean;
+};
+
+/** Resolved options for the shared <PayPal/> smart-button component (PayPal, Sepa, PayLater,
+ * PayPalCreditCard, AllButtons, Venmo). */
+export type PayPalBrandResolvedOptions = BaseResolvedMethodOptions & {
+  fundingSource?: FUNDING_SOURCE;
+  messagesStyle?: PayPalMessagesComponentProps["style"];
+  disablePayLaterButton?: boolean;
+};
+
+/** Resolved options for <CardFields/> — no style/fundingSource concept at all, unlike
+ * PayPalBrandResolvedOptions. */
+export type CardFieldsResolvedOptions = BaseResolvedMethodOptions;
+
+/** Resolved options for <CardFieldsStored/> — no `options` (PayPal JS SDK script options) at all,
+ * unlike every other resolved-options type: charging an already-vaulted card is a plain processor
+ * HTTP call (see usePayment.tsx's handleCreateOrder), so there's no script to configure — see
+ * useSettings.tsx's isStoredCheckoutComponent, which skips <PayPalScriptProvider> for this type entirely. */
+export type CardFieldsStoredResolvedOptions = Pick<
+  BaseResolvedMethodOptions,
+  "initialSettings" | "enableVaulting"
+>;
+
+/** Resolved options for <ApplePay/> — no style/fundingSource concept either, plus the one field
+ * unique to it: the merchant store name shown in the native Apple Pay sheet. */
+export type ApplePayResolvedOptions = BaseResolvedMethodOptions & {
+  applePayDisplayName: string;
+};
+
+/** Resolved options for <PayUponInvoice/> — no style/fundingSource concept, plus PUI-specific fields. */
+export type PayUponInvoiceResolvedOptions = BaseResolvedMethodOptions & {
+  merchantId: string;
+  pageId?: string;
+  invoiceBenefitsMessage?: string;
+  minPayableAmount: number;
+  maxPayableAmount: number;
+  fraudNetSandbox: boolean;
+};
+
+/** Resolved options for <GooglePay/> — no style/fundingSource concept either; every field is
+ * Google Pay's own API config (allowedCardNetworks/allowedCardAuthMethods/callbackIntents/button
+ * appearance), plus verificationMethod (sourced from the shared threeDSOption setting, same as
+ * CardFields) and environment (sourced from the processor's sandbox/live config, not merchant
+ * overridable). */
+export type GooglePayResolvedOptions = BaseResolvedMethodOptions &
+  GooglePayOptionsType;
+
+/** The 6 paymentMethodType values that render through the shared <PayPal/> component. */
+export type PayPalBrandButtonType = Extract<
+  PayPalPaymentMethodType,
+  | "PayPal"
+  | "Sepa"
+  | "PayLater"
+  | "PayPalCreditCard"
+  | "AllButtons"
+  | "Venmo"
+  | "Credit"
+  // Local payment methods (APMs)
+  | "Ideal"
+  | "Bancontact"
+  | "Eps"
+  | "MyBank"
+  | "P24"
+  | "Blik"
+>;
 
 // Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
 // custom object shape, read via getSettings()). Duplicated here rather than imported since the
@@ -612,17 +828,21 @@ type PayPalLegacySettings = {
   threeDSAction: Record<string, any>;
 };
 
-// New — processor-only per-component overrides (PAYPAL_BUTTON_CONFIG in
+// New — processor-only per-payment-method overrides (PAYPAL_BUTTON_CONFIG in
 // processor/.env.template), not part of the CT custom object/PayPalLegacySettings above.
-// Has higher priority for relevant component. Keyed by componentType directly (e.g. "PayPal",
-// "CardFields", a future "Venmo") — PayPalExpress is the one dedicated exception, since only
-// PayPal's own express builder variant needs a config slot separate from its own componentType
-// entry (see PayPalBuilder.ts's express-first resolution).
-type PayPalComponentOverrides = Partial<Record<string, PayPalVariantConfig>> & {
-  PayPalExpress?: PayPalVariantConfig;
-};
+// Has higher priority for relevant payment method. Keyed by paymentMethodType directly (e.g.
+// "PayPal", "CardFields", "Venmo") — "PayPalExpress" is the one dedicated addition, since only
+// PayPal's own component with builderType: "express" needs a config slot separate from its own
+// paymentMethodType entry (see RenderTemplate/resolveOptions.ts's express-first resolution). A
+// closed union of literal keys, not a generic `string` index signature — the latter would force
+// every other GetSettingsResponse field (e.g. storeInVaultOnSuccess: boolean) to also satisfy
+// PayPalMethodConfig wherever an object literal is checked against GetSettingsResponse.
+type PayPalComponentOverrides = Partial<
+  Record<PayPalPaymentMethodType | "PayPalExpress", PayPalMethodConfig>
+>;
 
-export type GetSettingsResponse = PayPalLegacySettings & PayPalComponentOverrides;
+export type GetSettingsResponse = PayPalLegacySettings &
+  PayPalComponentOverrides;
 
 export type CustomOnApproveData = {
   orderID: string;
@@ -663,6 +883,10 @@ export type SettingsProviderProps = Pick<
   | "processorUrl"
   | "initialSettings"
   | "initialUserIdToken"
+  | "isStoredCheckoutComponent"
+  // Diagnostic-only, used to tag script-load logging — not used for any settings/payment logic.
+  | "paymentMethodType"
+  | "builderType"
 >;
 
 export type RemovePaymentTokenRequest = { paymentTokenId: string };
@@ -695,7 +919,10 @@ export type GooglePayOptionsType = {
     | "subscribe";
   buttonRadius?: number;
   buttonSizeMode?: "static" | "fill";
-  verificationMethod: ThreeDSVerification;
+  // Sourced from the shared threeDSOption merchant setting (see resolveGooglePayOptions), the same
+  // as CardFieldsMask.tsx's own threeDSAuth — not every merchant configures 3DS, so this is
+  // optional here unlike the reference project's own fixed-test-value usage.
+  verificationMethod?: ThreeDSVerification;
 };
 
 export type ApplePaySession = any;

@@ -1,5 +1,5 @@
 import { FC, createElement, useEffect } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import {
   PayPalScriptProvider,
   ReactPayPalScriptOptions,
@@ -7,10 +7,11 @@ import {
 } from "@paypal/react-paypal-js";
 
 /**
- * Loads the PayPal JS SDK exactly once per checkout page, before any payment component ever
- * mounts, to prevent the race between concurrently-mounted components.
- * Shared for standard components only — PayPal Express always mounts alone, on
- * its own page, so it keeps loading its own script independently via its own script options.
+ * Loads the PayPal JS SDK exactly once per checkout page, before any payment component ever mounts
+ * to prevent the concurrence between different PayPal scripts.
+ * Shared for standard components, separate for Express (as it is supposed
+ * to be used on different pages).
+ * Not needed for stored - it renders by ct and operates through processor.
  */
 
 const ScriptReadySignal: FC<{ onSettled: (error?: unknown) => void }> = ({
@@ -32,7 +33,17 @@ const ScriptReadySignal: FC<{ onSettled: (error?: unknown) => void }> = ({
   return null;
 };
 
-let cached: { optionsKey: string; promise: Promise<void> } | null = null;
+let cached: {
+  optionsKey: string;
+  promise: Promise<void>;
+  root: Root;
+  host: HTMLDivElement;
+} | null = null;
+
+const dispose = ({ root, host }: { root: Root; host: HTMLDivElement }) => {
+  root.unmount();
+  host.remove();
+};
 
 /**
  * Idempotent per unique `options` value: PayPalPaymentEnabler._Setup() can run more than once per
@@ -49,12 +60,19 @@ export const preloadPayPalScript = (
     return cached.promise;
   }
 
-  const promise = new Promise<void>((resolve, reject) => {
-    const host = document.createElement("div");
-    host.style.display = "none";
-    document.body.appendChild(host);
+  // A superseded preload's hidden provider would otherwise stay mounted for the rest of the page.
+  // Disposed only once settled, so a caller still awaiting it isn't left hanging.
+  const superseded = cached;
+  if (superseded) {
+    superseded.promise.catch(() => undefined).then(() => dispose(superseded));
+  }
 
-    const root = createRoot(host);
+  const host = document.createElement("div");
+  host.style.display = "none";
+  document.body.appendChild(host);
+  const root = createRoot(host);
+
+  const promise = new Promise<void>((resolve, reject) => {
     root.render(
       createElement(
         PayPalScriptProvider,
@@ -66,11 +84,14 @@ export const preloadPayPalScript = (
     );
   });
 
-  cached = { optionsKey, promise };
+  cached = { optionsKey, promise, root, host };
   return promise;
 };
 
 /** Test-only: module-level cache would otherwise leak between cases. */
 export const resetPayPalScriptPreloadCache = (): void => {
+  if (cached) {
+    dispose(cached);
+  }
   cached = null;
 };

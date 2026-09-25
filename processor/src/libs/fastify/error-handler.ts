@@ -1,7 +1,7 @@
-import { FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
+import { FastifyError, type FastifyReply, type FastifyRequest } from "fastify";
 
-import { FastifySchemaValidationError } from 'fastify/types/schema';
-import { log } from '../logger';
+import { FastifySchemaValidationError } from "fastify/types/schema";
+import { log } from "../logger";
 import {
   ErrorAuthErrorResponse,
   ErrorGeneral,
@@ -10,29 +10,88 @@ import {
   ErrorRequiredField,
   Errorx,
   MultiErrorx,
-} from '@commercetools/connect-payments-sdk';
-import { TAuthErrorResponse, TErrorObject, TErrorResponse } from './dtos/error.dto';
+} from "@commercetools/connect-payments-sdk";
+import {
+  TAuthErrorResponse,
+  TErrorObject,
+  TErrorResponse,
+} from "./dtos/error.dto";
 
 function isFastifyValidationError(error: Error): error is FastifyError {
   return (error as unknown as FastifyError).validation != undefined;
 }
 
-export const errorHandler = (error: Error, req: FastifyRequest, reply: FastifyReply) => {
+// Get Fastify's own 4xx errors (FST_ERR_*) propagated instead of default error 500. Other errors
+// carrying a statusCode (PayPal via common-connect, commercetools SDK) stay 500s.
+function isClientFastifyError(error: Error): error is FastifyError {
+  const { statusCode, code } = error as unknown as FastifyError;
+  return (
+    typeof code === "string" &&
+    code.startsWith("FST_") &&
+    typeof statusCode === "number" &&
+    statusCode >= 400 &&
+    statusCode < 500
+  );
+}
+
+const FASTIFY_JSON_BODY_ERROR_CODES = [
+  "FST_ERR_CTP_INVALID_JSON_BODY",
+  "FST_ERR_CTP_EMPTY_JSON_BODY",
+];
+
+export const errorHandler = (
+  error: Error,
+  req: FastifyRequest,
+  reply: FastifyReply
+) => {
   if (isFastifyValidationError(error) && error.validation) {
-    return handleErrors(transformValidationErrors(error.validation, req), reply);
+    return handleErrors(
+      transformValidationErrors(error.validation, req),
+      reply
+    );
   } else if (error instanceof ErrorAuthErrorResponse) {
     return handleAuthError(error, reply);
   } else if (error instanceof Errorx) {
     return handleErrors([error], reply);
   } else if (error instanceof MultiErrorx) {
     return handleErrors(error.errors, reply);
+  } else if (isClientFastifyError(error)) {
+    return handleErrors(
+      [
+        FASTIFY_JSON_BODY_ERROR_CODES.includes(error.code)
+          ? new ErrorInvalidJsonInput(error.message, {
+              cause: error,
+              skipLog: false,
+            })
+          : // Keeps e.g. 404/405/413/415 meaningful instead of reporting them as invalid JSON
+            new Errorx({
+              message: error.message,
+              code: error.code,
+              httpErrorStatus: error.statusCode as number,
+              cause: error,
+              skipLog: false,
+            }),
+      ],
+      reply
+    );
   }
 
   // If it isn't any of the cases above (for example a normal Error is thrown) then fallback to a general 500 internal server error
-  return handleErrors([new ErrorGeneral('Internal server error.', { cause: error, skipLog: false })], reply);
+  return handleErrors(
+    [
+      new ErrorGeneral("Internal server error.", {
+        cause: error,
+        skipLog: false,
+      }),
+    ],
+    reply
+  );
 };
 
-const handleAuthError = (error: ErrorAuthErrorResponse, reply: FastifyReply) => {
+const handleAuthError = (
+  error: ErrorAuthErrorResponse,
+  reply: FastifyReply
+) => {
   const transformedErrors: TErrorObject[] = transformErrorxToHTTPModel([error]);
 
   const response: TAuthErrorResponse = {
@@ -47,7 +106,8 @@ const handleAuthError = (error: ErrorAuthErrorResponse, reply: FastifyReply) => 
 };
 
 const handleErrors = (errorxList: Errorx[], reply: FastifyReply) => {
-  const transformedErrors: TErrorObject[] = transformErrorxToHTTPModel(errorxList);
+  const transformedErrors: TErrorObject[] =
+    transformErrorxToHTTPModel(errorxList);
 
   // Based on CoCo specs, the root level message attribute is always set to the values from the first error. MultiErrorx enforces the same HTTP status code.
   const response: TErrorResponse = {
@@ -81,22 +141,48 @@ const transformErrorxToHTTPModel = (errors: Errorx[]): TErrorObject[] => {
   return errorObjectList;
 };
 
-const transformValidationErrors = (errors: FastifySchemaValidationError[], req: FastifyRequest): Errorx[] => {
+const transformValidationErrors = (
+  errors: FastifySchemaValidationError[],
+  req: FastifyRequest
+): Errorx[] => {
   const errorxList: Errorx[] = [];
+  // Type.Enum compiles to anyOf over const branches, and Ajv reports each failed branch too
+  const anyOfPaths = new Set(
+    errors.filter((err) => err.keyword === "anyOf").map((err) => err.instancePath)
+  );
+  const invalidField = (err: FastifySchemaValidationError, allowed: string) =>
+    new ErrorInvalidField(
+      getKeys(err.instancePath).join(".") || "body",
+      err.instancePath
+        ? getPropertyFromPath(err.instancePath, req.body)
+        : req.body,
+      allowed
+    );
 
   for (const err of errors) {
     switch (err.keyword) {
-      case 'required':
-        errorxList.push(new ErrorRequiredField(err.params.missingProperty as string));
+      case "required":
+        errorxList.push(
+          new ErrorRequiredField(err.params.missingProperty as string)
+        );
         break;
-      case 'enum':
+      case "enum":
         errorxList.push(
           new ErrorInvalidField(
-            getKeys(err.instancePath).join('.'),
+            getKeys(err.instancePath).join("."),
             getPropertyFromPath(err.instancePath, req.body),
-            err.params.allowedValues as string,
-          ),
+            err.params.allowedValues as string
+          )
         );
+        break;
+      case "anyOf":
+      case "type":
+        errorxList.push(invalidField(err, err.message ?? ""));
+        break;
+      case "const":
+        if (!anyOfPaths.has(err.instancePath)) {
+          errorxList.push(invalidField(err, String(err.params.allowedValue)));
+        }
         break;
     }
   }
@@ -109,14 +195,14 @@ const transformValidationErrors = (errors: FastifySchemaValidationError[], req: 
   return errorxList;
 };
 
-const getKeys = (path: string) => path.replace(/^\//, '').split('/');
+const getKeys = (path: string) => path.replace(/^\//, "").split("/");
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getPropertyFromPath = (path: string, obj: any): any => {
   const keys = getKeys(path);
   let value = obj;
   for (const key of keys) {
-    value = value[key];
+    value = value?.[key];
   }
   return value;
 };

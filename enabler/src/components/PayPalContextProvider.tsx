@@ -6,10 +6,10 @@ import { SettingsProvider } from "../app/useSettings";
 import { LoaderProvider } from "../app/useLoader";
 import { RenderPurchase } from "./RenderPurchase/RenderPurchase";
 
-import { GeneralComponentsProps } from "../types";
+import { GeneralComponentsProps, ProviderErrorProps } from "../types";
 
 export const PayPalContextProvider: FC<
-  React.PropsWithChildren<GeneralComponentsProps>
+  React.PropsWithChildren<GeneralComponentsProps & ProviderErrorProps>
 > = ({
   options,
   requestHeader,
@@ -40,7 +40,10 @@ export const PayPalContextProvider: FC<
   initialSettings,
   initialUserIdToken,
   redirectOnApprove,
+  isStoredCheckoutComponent,
   initialPayment,
+  onExpressPayButtonClick,
+  onError,
 
   children,
 }) => {
@@ -56,6 +59,9 @@ export const PayPalContextProvider: FC<
           processorUrl={processorUrl}
           initialSettings={initialSettings}
           initialUserIdToken={initialUserIdToken}
+          isStoredCheckoutComponent={isStoredCheckoutComponent}
+          paymentMethodType={paymentMethodType}
+          builderType={builderType}
         >
           <PaymentProvider
             options={options}
@@ -80,6 +86,9 @@ export const PayPalContextProvider: FC<
             processorUrl={processorUrl}
             redirectOnApprove={redirectOnApprove}
             initialPayment={initialPayment}
+            onExpressPayButtonClick={onExpressPayButtonClick}
+            onError={onError}
+            isStoredCheckoutComponent={isStoredCheckoutComponent}
           >
             <RenderPurchase>{children}</RenderPurchase>
           </PaymentProvider>

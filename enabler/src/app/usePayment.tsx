@@ -9,9 +9,11 @@ import React, {
 import type { FUNDING_SOURCE } from "@paypal/paypal-js/types/components/funding-eligibility";
 
 import { redirectTo } from "../helpers/redirectTo";
+import { sessionHeader } from "../helpers/sessionHeader";
 import { Result } from "../components/Result";
 import {
   GeneralComponentsProps,
+  ProviderErrorProps,
   PaymentInfo,
   CartInformationInitial,
   CreatePaymentResponse,
@@ -54,12 +56,38 @@ const PaymentInfoInitialObject: PaymentInfo = {
   cartInformation: CartInformationInitial,
 };
 
+const toPaymentInfo = (
+  payment: CreatePaymentResponse,
+  cartInformation: PaymentInfo["cartInformation"]
+): PaymentInfo => ({
+  id: payment.id,
+  amountPlanned: payment.amountPlanned,
+  lineItems: payment.lineItems,
+  email: payment.email,
+  firstName: payment.firstName,
+  lastName: payment.lastName,
+  countryCode: payment.countryCode,
+  shippingAddress: payment.shippingAddress,
+  shippingOptions: payment.shippingOptions,
+  priceBreakdown: payment.priceBreakdown,
+  ctCustomerId: payment.ctCustomerId,
+  customerVersion: payment.customerVersion,
+  version: payment.version,
+  cartInformation,
+});
+
 type PaymentContextT = {
   paymentInfo: PaymentInfo;
   requestHeader: RequestHeader;
   clientToken: string;
-  handleCreateOrder: (orderData?: CustomOrderData) => Promise<string>;
-  handleOnApprove: (data: CustomOnApproveData) => Promise<void>;
+  handleCreateOrder: (
+    orderData?: CustomOrderData,
+    forceCheckoutReportError?: boolean
+  ) => Promise<string>;
+  handleOnApprove: (
+    data: CustomOnApproveData,
+    forceCheckoutReportError?: boolean
+  ) => Promise<void>;
   vaultOnly: boolean;
   orderDataLinks?: OrderDataLinks;
   handleCreateVaultSetupToken: (
@@ -75,6 +103,8 @@ type PaymentContextT = {
   resolveShippingOptionId: (selectedOptionId: string) => string;
   orderId?: string;
   builderType?: BuilderType;
+  // Set only in Checkout mode
+  processorUrl?: string;
 };
 
 const setRelevantData = (
@@ -116,7 +146,7 @@ const PaymentContext = createContext<PaymentContextT>({
 });
 
 export const PaymentProvider: FC<
-  React.PropsWithChildren<GeneralComponentsProps>
+  React.PropsWithChildren<GeneralComponentsProps & ProviderErrorProps>
 > = ({
   children,
   purchaseCallback,
@@ -134,7 +164,7 @@ export const PaymentProvider: FC<
   approveVaultSetupTokenUrl,
 
   getClientTokenUrl,
-  requestHeader,
+  requestHeader: initialRequestHeader,
   shippingMethodId,
   cartInformation,
 
@@ -144,7 +174,11 @@ export const PaymentProvider: FC<
   processorUrl,
   redirectOnApprove,
   initialPayment,
+  onExpressPayButtonClick,
+  onError,
 }) => {
+  // Replaced only by handleCreateOrder's PayPal Express session switch
+  const [requestHeader, setRequestHeader] = useState(initialRequestHeader);
   const [clientToken, setClientToken] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [resultSuccess, setResultSuccess] = useState<boolean>();
@@ -160,22 +194,7 @@ export const PaymentProvider: FC<
   // below instead (self-hosted/legacy mode).
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>(
     initialPayment
-      ? {
-          id: initialPayment.id,
-          amountPlanned: initialPayment.amountPlanned,
-          lineItems: initialPayment.lineItems,
-          email: initialPayment.email,
-          firstName: initialPayment.firstName,
-          lastName: initialPayment.lastName,
-          countryCode: initialPayment.countryCode,
-          shippingAddress: initialPayment.shippingAddress,
-          shippingOptions: initialPayment.shippingOptions,
-          priceBreakdown: initialPayment.priceBreakdown,
-          ctCustomerId: initialPayment.ctCustomerId,
-          customerVersion: initialPayment.customerVersion,
-          version: initialPayment.version,
-          cartInformation: cartInformation,
-        }
+      ? toPaymentInfo(initialPayment, cartInformation)
       : PaymentInfoInitialObject
   );
 
@@ -208,6 +227,50 @@ export const PaymentProvider: FC<
     createVaultSetupTokenUrl && approveVaultSetupTokenUrl
   );
 
+  const createPayment = async (header: RequestHeader) => {
+    const createPaymentResult = await processorRequest<
+      {},
+      CreatePaymentResponse
+    >(
+      header,
+      createPaymentUrl,
+      // Checkout mode: processor's InitPaymentRequestSchema is {}
+      processorUrl
+        ? {}
+        : {
+            ...cartInformation,
+            shippingMethodId: shippingMethodId,
+            paymentMethodType,
+            builderType,
+          }
+    );
+
+    if (!createPaymentResult) {
+      throw new Error(t("payPal.generalError"));
+    }
+
+    let paymentVersion: number | undefined = createPaymentResult.version;
+    if (getClientTokenUrl) {
+      const clientTokenResult = (await processorRequest<
+        ClientTokenRequest,
+        ClientTokenResponse
+      >(header, getClientTokenUrl, {
+        paymentId: createPaymentResult.id,
+        paymentVersion: createPaymentResult.version,
+        braintreeCustomerId: createPaymentResult.braintreeCustomerId,
+        merchantAccountId: undefined,
+      })) as ClientTokenResponse;
+      setClientToken(clientTokenResult.clientToken);
+      paymentVersion = clientTokenResult.paymentVersion;
+    }
+
+    setPaymentInfo({
+      ...toPaymentInfo(createPaymentResult, cartInformation),
+      version: paymentVersion,
+    });
+    return createPaymentResult;
+  };
+
   // Self-hosted/legacy mode only — Checkout mode always has initialPayment already seeded above
   // by the time this component mounts (resolved in _Setup(), before any builder is ever
   // constructed), so this fetch never runs there.
@@ -217,51 +280,7 @@ export const PaymentProvider: FC<
     const initPayment = async () => {
       isLoading(true);
       try {
-        const createPaymentResult = await processorRequest<
-          {},
-          CreatePaymentResponse
-        >(requestHeader, createPaymentUrl, {
-          ...cartInformation,
-          shippingMethodId: shippingMethodId,
-          paymentMethodType,
-          builderType,
-        });
-
-        if (!createPaymentResult) {
-          throw new Error(t("payPal.generalError"));
-        }
-
-        let paymentVersion: number | undefined = createPaymentResult.version;
-        if (getClientTokenUrl) {
-          const clientTokenResult = (await processorRequest<
-            ClientTokenRequest,
-            ClientTokenResponse
-          >(requestHeader, getClientTokenUrl, {
-            paymentId: createPaymentResult.id,
-            paymentVersion: createPaymentResult.version,
-            braintreeCustomerId: createPaymentResult.braintreeCustomerId,
-            merchantAccountId: undefined,
-          })) as ClientTokenResponse;
-          setClientToken(clientTokenResult.clientToken);
-          paymentVersion = clientTokenResult.paymentVersion;
-        }
-
-        setPaymentInfo({
-          id: createPaymentResult.id,
-          amountPlanned: createPaymentResult.amountPlanned,
-          lineItems: createPaymentResult.lineItems,
-          email: createPaymentResult.email,
-          firstName: createPaymentResult.firstName,
-          lastName: createPaymentResult.lastName,
-          countryCode: createPaymentResult.countryCode,
-          shippingAddress: createPaymentResult.shippingAddress,
-          shippingOptions: createPaymentResult.shippingOptions,
-          priceBreakdown: createPaymentResult.priceBreakdown,
-          ctCustomerId: createPaymentResult.ctCustomerId,
-          customerVersion: createPaymentResult.customerVersion,
-          version: paymentVersion,
-          cartInformation: cartInformation,
-        });
+        await createPayment(requestHeader);
       } catch (error) {
         notify(
           "Error",
@@ -321,9 +340,18 @@ export const PaymentProvider: FC<
       }
     };
 
-    const handleCreateOrder = async (orderData?: CustomOrderData) => {
-      if (!createOrderUrl) return "";
+    const handleCreateOrder = async (
+      orderData?: CustomOrderData,
+      forceCheckoutReportError?: boolean
+    ) => {
+      if (!createOrderUrl) {
+        if (forceCheckoutReportError) {
+          throw new Error(t("payPal.generalError"));
+        }
+        return "";
+      }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
+      let errorAlreadyShown = false;
       try {
         const relevantOrderData = setRelevantData(
           orderData,
@@ -331,13 +359,37 @@ export const PaymentProvider: FC<
           enableVaulting
         );
 
+        // PayPal Express only. Checkout's session from before the click has no checkout
+        // transaction item, so a Payment created under it can't trigger Order creation. Switches
+        // to the session onPayButtonClick hands back and creates a new Payment under it; this
+        // request uses both directly, later calls pick them up from state.
+        let orderRequestHeader = requestHeader;
+        let orderPaymentId = paymentInfo.id;
+        if (builderType === "express" && onExpressPayButtonClick) {
+          const clickResult = await onExpressPayButtonClick();
+          if (clickResult?.sessionId) {
+            orderRequestHeader = sessionHeader(clickResult.sessionId);
+            setRequestHeader(orderRequestHeader);
+            orderPaymentId = (await createPayment(orderRequestHeader)).id;
+          } else {
+            console.warn(
+              "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
+            );
+          }
+        }
+
         const createOrderResult = await processorRequest<
           CreateOrderRequest,
           CreateOrderResponse
-        >(requestHeader, createOrderUrl, {
-          paymentId: paymentInfo.id,
+        >(orderRequestHeader, createOrderUrl, {
+          paymentId: orderPaymentId,
           paymentVersion: latestPaymentVersion,
-          payPalIntent: settings?.payPalIntent,
+          // PayUponInvoice must always submit Capture intent, regardless of the merchant's
+          // global setting — fraudNetSessionId is the only PUI-exclusive field on orderData, so
+          // its presence is a reliable signal this call originated from PUI.
+          payPalIntent: orderData?.fraudNetSessionId
+            ? "Capture"
+            : settings?.payPalIntent,
           builderType,
           paymentMethodType,
           orderData: {
@@ -364,6 +416,10 @@ export const PaymentProvider: FC<
         latestPaymentVersion = paymentVersion;
 
         if (!id) {
+          // For the card-fields checkout path, setRatepayMessage is always undefined, so
+          // handleResponseError (Ratepay/PUI-specific) always takes its `!showError` branch and
+          // throws directly — the catch below's forceCheckoutReportError rethrow already covers that
+          // case.
           handleResponseError(
             t,
             notify,
@@ -372,6 +428,11 @@ export const PaymentProvider: FC<
             setRatepayMessage
           );
           isLoading(false);
+          // PUI: handleResponseError surfaced the error itself instead of throwing
+          if (forceCheckoutReportError) {
+            errorAlreadyShown = true;
+            throw new Error(message ?? t("invoice.thirdPartyIssue"));
+          }
           return "";
         } else if (oldOrderData?.googlePayData) {
           //@ts-ignore
@@ -382,50 +443,86 @@ export const PaymentProvider: FC<
           });
           const { status } = confirmOrderResult;
           if (status === "APPROVED") {
-            handleOnApprove({ orderID: newOrderData.id }).then(() =>
-              onSuccess(newOrderData)
+            // handleOnApprove shows its own result and errors
+            errorAlreadyShown = true;
+            await handleOnApprove(
+              { orderID: newOrderData.id },
+              forceCheckoutReportError
             );
           } else if (
             oldOrderData?.googlePayData &&
             status === "PAYER_ACTION_REQUIRED"
           ) {
-            return "";
-            /*
+            // 3DS needs the Google Pay sheet closed, so it continues after handleCreateOrder
+            // returns; handleOnApprove shows the final result itself. The sheet has already been
+            // told SUCCESS by then, so failures reach Checkout only through onError.
             //@ts-ignore
             paypal
               .Googlepay()
-              .initiatePayerAction({ orderId: orderData.id })
-              .then(async () => {
-                handleAuthenticateThreeDSOrder(orderData.id, true).then(
-                  (result) => {
-                    if (!result) {
-                      notify("Error", "Please select different payment method");
-                      isLoading(false);
-                      return "";
-                    }
+              .initiatePayerAction({ orderId: newOrderData.id })
+              .then(() => {
+                handleAuthenticateThreeDSOrder(newOrderData.id, true)
+                  .then((result) => {
                     switch (result.toString(10)) {
                       case "2":
-                        handleOnApprove({ orderID: orderData.id }).then(() =>
-                          onSuccess(orderData)
-                        );
+                        handleOnApprove(
+                          { orderID: newOrderData.id },
+                          forceCheckoutReportError
+                        ).catch((err) => {
+                          console.error(
+                            "GooglePay: handleOnApprove (3DS approved) failed",
+                            err
+                          );
+                          onError?.({
+                            code: "GOOGLE_PAY_APPROVE_FAILED",
+                            message:
+                              err instanceof Error
+                                ? err.message
+                                : t("interface.generalError"),
+                          });
+                        });
                         break;
                       case "1":
-                        notify("Warning", "Try again");
+                        notify("Warning", t("cardFields.tryAgain"));
                         isLoading(false);
+                        onError?.({
+                          code: "THREE_DS_DECLINED_RETRY",
+                          message: t("cardFields.tryAgain"),
+                        });
                         break;
                       case "0":
                       default:
-                        notify(
-                          "Error",
-                          "Please select different payment method"
-                        );
+                        notify("Error", t("cardFields.selectDifferentMethod"));
                         isLoading(false);
+                        onError?.({
+                          code: "THREE_DS_DECLINED",
+                          message: t("cardFields.selectDifferentMethod"),
+                        });
                         break;
                     }
-                  }
-                );
-              });*/
+                  })
+                  .catch((err) => {
+                    console.error(
+                      "GooglePay: handleAuthenticateThreeDSOrder failed",
+                      err
+                    );
+                    onError?.({
+                      code: "THREE_DS_FAILED",
+                      message: t("interface.generalError"),
+                    });
+                  });
+              })
+              .catch((err: any) => {
+                console.error("GooglePay: initiatePayerAction failed", err);
+                onError?.({
+                  code: "THREE_DS_FAILED",
+                  message: t("interface.generalError"),
+                });
+              });
           } else {
+            if (forceCheckoutReportError) {
+              throw new Error(t("payPal.generalError"));
+            }
             return "";
           }
         } else {
@@ -455,16 +552,24 @@ export const PaymentProvider: FC<
         }
         return id;
       } catch (error) {
-        notify(
-          "Error",
-          error instanceof Error ? error.message : t("interface.generalError")
-        );
+        if (!errorAlreadyShown) {
+          notify(
+            "Error",
+            error instanceof Error ? error.message : t("interface.generalError")
+          );
+        }
         isLoading(false);
+        if (forceCheckoutReportError) {
+          throw error;
+        }
         return "";
       }
     };
 
-    const handleOnApprove = async (data: CustomOnApproveData) => {
+    const handleOnApprove = async (
+      data: CustomOnApproveData,
+      forceCheckoutReportError?: boolean
+    ) => {
       const { orderID, saveCard } = data;
       isLoading(true);
 
@@ -550,12 +655,21 @@ export const PaymentProvider: FC<
           if (orderData) {
             setResultMessage(orderData.message);
           }
+          if (forceCheckoutReportError) {
+            console.error(
+              `[paypal-enabler] Checkout order not completed, status: ${orderData.status}`
+            );
+            throw new Error(t("payPal.generalError"));
+          }
         }
       } catch (error) {
         notify(
           "Error",
           error instanceof Error ? error.message : t("interface.generalError")
         );
+        if (forceCheckoutReportError) {
+          throw error;
+        }
       } finally {
         isLoading(false);
       }
@@ -701,6 +815,7 @@ export const PaymentProvider: FC<
       orderDataLinks,
       orderId,
       builderType,
+      processorUrl,
     };
   }, [
     paymentInfo,
@@ -716,7 +831,11 @@ export const PaymentProvider: FC<
     builderType,
     orderDataLinks,
     orderId,
+    // Constant for the provider's lifetime (set in Checkout, never in legacy mode); listed only for
+    // react-hooks/exhaustive-deps
     processorUrl,
+    onExpressPayButtonClick,
+    onError,
   ]);
 
   return (
