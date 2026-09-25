@@ -98,6 +98,7 @@ import {
 } from "../utils/error.utils";
 import {
   buildOrderRequest,
+  buildRatePayExperienceContext,
   buildPayPalAmount,
   extractPayPalPurchaseUnitTransaction,
   findAuthorizationTransactionId,
@@ -591,11 +592,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
       this.validateVenmoOrderParams(payment);
     }
 
-    const ctCart = await this.ctCartService.getCart({
-      id: getCartIdFromContext(),
-    });
+    const isPayUponInvoice =
+      paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE;
+    const [ctCart, settings] = await Promise.all([
+      this.ctCartService.getCart({ id: getCartIdFromContext() }),
+      // Only PUI reads merchant-center settings here (its RatePay texts)
+      isPayUponInvoice ? this.resolveSettings() : Promise.resolve(undefined),
+    ]);
 
-    if (paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE) {
+    if (isPayUponInvoice) {
       this.validatePayUponInvoiceOrderParams(payment, ctCart);
     }
 
@@ -639,7 +644,13 @@ export class PayPalPaymentService extends AbstractPaymentService {
       showContinueReview,
       returnUrl,
       cancelUrl,
-      getConfig().orderExperienceContext,
+      // PAYPAL_ORDER_EXPERIENCE_CONTEXT wins over the merchant-center RatePay settings
+      isPayUponInvoice
+        ? {
+            ...buildRatePayExperienceContext(settings),
+            ...getConfig().orderExperienceContext,
+          }
+        : getConfig().orderExperienceContext,
       paymentMethodType
     );
 
