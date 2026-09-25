@@ -33,7 +33,7 @@ const mockConfigModule = () => {
     get: jest.fn(() => apiRequest),
     post: jest.fn(() => apiRequest),
   };
-  jest.mock('../src/client/create.client', () => {
+  jest.mock('common-connect/dist/client/create.client', () => {
     return {
       createApiRoot: () => apiRoot,
     };

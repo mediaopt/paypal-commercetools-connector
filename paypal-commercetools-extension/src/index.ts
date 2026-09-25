@@ -5,16 +5,18 @@ import bodyParser from 'body-parser';
 import express, { Express } from 'express';
 
 // Import routes
-import ServiceRoutes, { PAYPAL_EXTENSION_PATH } from './routes/service.route';
-import PayPalWebhookRouter, {
-  PAYPAL_WEBHOOKS_PATH,
-} from './routes/webhook.route';
+import ServiceRoutes from './routes/service.route';
+import PayPalWebhookRouter from './routes/webhook.route';
 
 // Import logger
-import { logger } from './utils/logger.utils';
+import {
+  logger,
+  PAYPAL_EXTENSION_PATH,
+  PAYPAL_WEBHOOKS_PATH,
+  readConfiguration,
+} from 'common-connect/dist';
 
 import { errorMiddleware } from './middleware/error.middleware';
-import { readConfiguration } from './utils/config.utils';
 
 // Read env variables
 readConfiguration();

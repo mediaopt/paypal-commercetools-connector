@@ -17,7 +17,7 @@ const mockConfigModule = () => {
     get: jest.fn(() => apiRequest),
     post: jest.fn(() => apiRequest),
   };
-  jest.mock('../src/client/create.client', () => {
+  jest.mock('common-connect/dist/client/create.client', () => {
     return {
       createApiRoot: () => apiRoot,
     };
@@ -37,7 +37,7 @@ describe('Testing post deploy', () => {
         webhooksList: jest.fn(() => ({ data: { webhooks: [] } })),
         webhooksPost: jest.fn(() => ({ data: { id: 1 } })),
       };
-      jest.mock('../src/paypal/webhooks_api', () => ({
+      jest.mock('common-connect/dist/paypal/webhooks_api', () => ({
         WebhooksApi: jest.fn().mockImplementation(() => webhooksApi),
       }));
       require('../src/connector/post-deploy');

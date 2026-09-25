@@ -1,0 +1,80 @@
+import { FC } from "react";
+
+import { PayPalContextProvider } from "../PayPalContextProvider";
+import { CardFieldsButton } from "./CardFieldsButton";
+
+import {
+  FormComponentProps,
+  GenericError,
+  SmartComponentsProps,
+} from "../../types";
+
+export const CardFields: FC<
+  SmartComponentsProps &
+    FormComponentProps & { onError?: (error: GenericError) => void }
+> = ({
+  options,
+
+  createPaymentUrl,
+  getSettingsUrl,
+  createOrderUrl,
+  authorizeOrderUrl,
+  authenticateThreeDSOrderUrl,
+  getUserInfoUrl,
+
+  onApproveUrl,
+  onApproveRedirectionUrl,
+
+  createVaultSetupTokenUrl,
+  approveVaultSetupTokenUrl,
+
+  requestHeader,
+  shippingMethodId,
+  cartInformation,
+  purchaseCallback,
+  enableVaulting,
+  paymentMethodType,
+  builderType,
+  processorUrl,
+  initialSettings,
+  initialUserIdToken,
+  initialPayment,
+
+  onRegisterSubmit,
+  onRegisterValidation,
+  onError,
+}) => {
+  return (
+    <PayPalContextProvider
+      options={options}
+      requestHeader={requestHeader}
+      shippingMethodId={shippingMethodId}
+      cartInformation={cartInformation}
+      createPaymentUrl={createPaymentUrl}
+      createOrderUrl={createOrderUrl}
+      onApproveUrl={onApproveUrl}
+      getSettingsUrl={getSettingsUrl}
+      purchaseCallback={purchaseCallback}
+      authorizeOrderUrl={authorizeOrderUrl}
+      authenticateThreeDSOrderUrl={authenticateThreeDSOrderUrl}
+      getUserInfoUrl={getUserInfoUrl}
+      enableVaulting={enableVaulting}
+      createVaultSetupTokenUrl={createVaultSetupTokenUrl}
+      approveVaultSetupTokenUrl={approveVaultSetupTokenUrl}
+      onApproveRedirectionUrl={onApproveRedirectionUrl}
+      paymentMethodType={paymentMethodType}
+      builderType={builderType}
+      processorUrl={processorUrl}
+      initialSettings={initialSettings}
+      initialUserIdToken={initialUserIdToken}
+      initialPayment={initialPayment}
+    >
+      <CardFieldsButton
+        enableVaulting={enableVaulting}
+        onRegisterSubmit={onRegisterSubmit}
+        onRegisterValidation={onRegisterValidation}
+        onError={onError}
+      />
+    </PayPalContextProvider>
+  );
+};
