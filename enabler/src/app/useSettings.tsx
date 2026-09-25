@@ -44,7 +44,7 @@ const SettingsContext = createContext<SettingsContextT>({
 // genuine load rejection, but that log carries no indication of which mounted component it belongs to
 const ScriptLoadLogger: FC<{ tag?: string }> = ({ tag }) => {
   const [scriptState] = usePayPalScriptReducer();
-  const { isInitial, isPending, isResolved, isRejected } = scriptState;
+  const { isInitial, isPending, isResolved, isRejected, options } = scriptState;
 
   useEffect(() => {
     const status = isRejected
@@ -102,8 +102,12 @@ export const SettingsProvider: FC<
   // Seeds from the processor's /operations/config response when available (Checkout mode) — in
   // that mode getSettingsUrl/getUserInfoUrl are never set, so handleGetSettings below would
   // otherwise never populate these at all.
-  const [settings, setSettings] = useState<GetSettingsResponse | undefined>(initialSettings);
-  const [userIdToken, setUserIdToken] = useState<string | undefined>(initialUserIdToken);
+  const [settings, setSettings] = useState<GetSettingsResponse | undefined>(
+    initialSettings
+  );
+  const [userIdToken, setUserIdToken] = useState<string | undefined>(
+    initialUserIdToken
+  );
   const [paymentTokens, setPaymentTokens] = useState<PaymentTokens>();
   const { isLoading } = useLoader();
   const { notify } = useNotifications();
@@ -116,7 +120,12 @@ export const SettingsProvider: FC<
         const { userIdToken, paymentTokens } = (await processorRequest<
           undefined,
           GetUserInfoResponse
-        >(requestHeader, getUserInfoUrl, undefined, "GET")) as GetUserInfoResponse;
+        >(
+          requestHeader,
+          getUserInfoUrl,
+          undefined,
+          "GET"
+        )) as GetUserInfoResponse;
 
         setPaymentTokens(paymentTokens);
         setUserIdToken(userIdToken);
@@ -126,10 +135,7 @@ export const SettingsProvider: FC<
         const getSettingsResult = (await processorRequest<
           undefined,
           GetSettingsResponse
-        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<
-          any,
-          any
-        >;
+        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<any, any>;
 
         if (
           !getSettingsResult ||

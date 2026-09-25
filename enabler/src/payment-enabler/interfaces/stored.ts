@@ -15,7 +15,7 @@ export interface StoredComponentBuilder {
 export type StoredComponentOptions = {
   showPayButton?: boolean;
   onPayButtonClick?: () => Promise<void>;
-  id: string;
+  id: string; //For this connector: PayPal's vault payment-token id (not a vault customer id)
   brands: string[];
 };
 
@@ -25,7 +25,7 @@ type BaseStoredDisplayOptions = {
 };
 
 type BaseStoredPaymentMethod = {
-  id: string;
+  id: string; //For this connector: PayPal's vault payment-token id (not a vault customer id).
   type: string;
   createdAt: string; // ISO date string
   isDefault: boolean;
