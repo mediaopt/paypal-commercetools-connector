@@ -2,6 +2,7 @@ import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
   resolveApplePayOptions,
   resolveCardFieldsOptions,
+  resolveCardFieldsStoredOptions,
   resolveGooglePayOptions,
   resolvePayPalBrandOptions,
   resolvePayUponInvoiceOptions,
@@ -259,6 +260,22 @@ describe("resolveApplePayOptions", () => {
     );
 
     expect(result.applePayDisplayName).toBe("Acme Store");
+  });
+});
+
+describe("resolveCardFieldsStoredOptions", () => {
+  it("never computes PayPal JS SDK script options — charging a vaulted card is processor-only", () => {
+    const result = resolveCardFieldsStoredOptions(baseOptions());
+
+    expect(result).not.toHaveProperty("options");
+  });
+
+  it("vaulting respects merchant config, same as resolveCardFieldsOptions", () => {
+    const result = resolveCardFieldsStoredOptions(
+      baseOptions({ enableVaulting: true })
+    );
+
+    expect(result.enableVaulting).toBe(true);
   });
 });
 

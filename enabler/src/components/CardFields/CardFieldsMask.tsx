@@ -208,7 +208,7 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
           rejectCardProcessing(err);
         });
     } else {
-      handleOnApprove(approveData as CustomOnApproveData)
+      handleOnApprove(approveData as CustomOnApproveData, !!onRegisterSubmit)
         .then(() => resolveCardProcessing())
         .catch((err) => {
           setPaying(false);
@@ -486,11 +486,14 @@ export const CardFieldsMask: React.FC<CardFieldsProps> = ({
         ) : (
           <PayPalCardFieldsProvider
             createOrder={() =>
-              handleCreateOrder({
-                paymentSource: "card",
-                storeInVault: shouldStoreInVault(),
-                verificationMethod: threeDSAuth || undefined,
-              })
+              handleCreateOrder(
+                {
+                  paymentSource: "card",
+                  storeInVault: shouldStoreInVault(),
+                  verificationMethod: threeDSAuth || undefined,
+                },
+                !!onRegisterSubmit
+              )
             }
             onApprove={handleApprove}
             onError={handleError}

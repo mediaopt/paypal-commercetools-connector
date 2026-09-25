@@ -3,6 +3,7 @@ import {
   ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
+  CardFieldsStoredResolvedOptions,
   GooglePayResolvedOptions,
   PayPalBrandButtonType,
   PayPalBrandResolvedOptions,
@@ -25,8 +26,8 @@ import {
 // (settings.paypalButtonConfig/buttonShape; PayPal only — CardFields has no equivalent),
 // 3) this payment method's processor override (settings.PayPal/PayPalExpress/CardFields, from
 // PAYPAL_BUTTON_CONFIG), 4) FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE (category 1,
-// below). Each layer is a shallow, whole-object replace — "style"/"fundingSources"/
-// "components" are independent of each other, but neither is merged field-by-field with what
+// below). Each layer is a shallow, whole-object replace — "style"/"fundingSource"/
+// "messagesStyle" are independent of each other, but none is merged field-by-field with what
 // a lower layer produced (see enabler/README.md for the worked example).
 export function resolvePayPalBrandOptions(
   paymentMethodType: PayPalBrandButtonType,
@@ -51,7 +52,7 @@ export function resolvePayPalBrandOptions(
         baseOptions,
         {
           // ENABLER_DEFAULT_EXPRESS_CONFIG.components's own fallback, lowest priority
-          components: resolvedDefaults.components,
+          components: ENABLER_DEFAULT_EXPRESS_CONFIG.components,
           ...baseOptions.expressSdkOptions,
         },
         true
@@ -149,6 +150,18 @@ export function resolveCardFieldsOptions(
   // tree ever reads initialSettings.paypalButtonConfig/buttonShape or a fundingSource prop).
   return {
     options: baseOptions.paypalScriptOptions,
+    initialSettings: baseOptions.settings,
+    enableVaulting: baseOptions.enableVaulting ?? false,
+  };
+}
+
+export function resolveCardFieldsStoredOptions(
+  baseOptions: BaseOptions
+): CardFieldsStoredResolvedOptions {
+  // Unlike every other resolver, no script options (PAYPAL_STANDARD_SCRIPT_OPTIONS) here at all —
+  // charging an already-vaulted card never touches the PayPal JS SDK client-side (see
+  // useSettings.tsx's isStoredCheckoutComponent), so there's no script to configure.
+  return {
     initialSettings: baseOptions.settings,
     enableVaulting: baseOptions.enableVaulting ?? false,
   };

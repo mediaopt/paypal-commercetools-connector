@@ -8,9 +8,9 @@ import {
   useCallback,
   useEffect,
 } from "react";
+import { createPortal } from "react-dom";
 import { NotificationType } from "../components/Notifications";
 import { NotificationTypeBanner } from "../components/Notifications/NotificationTypeBanner";
-import { createPortal } from "react-dom";
 
 type NotificationWithId = { id: string; text: string; type: NotificationType };
 
@@ -67,9 +67,9 @@ export const NotificationsProvider: FC<React.PropsWithChildren> = ({
     };
   }, [notifications]);
 
+  //z-1000000001 is for render exactly above checkout
   return (
     <NotificationContext.Provider value={value}>
-      {/* z-1000000001 is for render exactly above checkout */}
       {createPortal(
         <div className="fixed bottom-0 left-0 right-0 z-1000000001 w-full">
           {notifications.map((n) => (

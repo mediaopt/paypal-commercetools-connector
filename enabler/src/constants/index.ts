@@ -40,7 +40,7 @@ export const testCommonParams = {
   getClientTokenUrl: `${ENDPOINT_URL}/payment/getClientToken`,
   createPaymentUrl: `${ENDPOINT_URL}/payment/createPayment`,
   purchaseCallback: (result: any, options: any) => {
-    console.log("Do something", result, options);
+    console.warn("Test callback", result, options);
   },
 };
 

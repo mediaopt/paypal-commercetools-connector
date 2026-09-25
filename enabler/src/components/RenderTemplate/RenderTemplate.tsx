@@ -2,6 +2,7 @@ import { createElement, ComponentType, FC } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { PayPal } from "../PayPal";
 import { CardFields } from "../CardFields";
+import { CardFieldsStored } from "../CardFields/CardFieldsStored";
 import { ApplePay } from "../ApplePay";
 import { PayUponInvoice } from "../PayUponInvoice";
 import { GooglePay } from "../GooglePay";
@@ -14,6 +15,7 @@ import {
   ApplePayResolvedOptions,
   BuilderType,
   CardFieldsResolvedOptions,
+  CardFieldsStoredResolvedOptions,
   GenericMountProps,
   GooglePayResolvedOptions,
   PayPalBrandResolvedOptions,
@@ -24,6 +26,7 @@ import { BaseOptions } from "../../payment-enabler/interfaces/baseOptions";
 import {
   resolveApplePayOptions,
   resolveCardFieldsOptions,
+  resolveCardFieldsStoredOptions,
   resolveGooglePayOptions,
   resolvePayPalBrandOptions,
   resolvePayUponInvoiceOptions,
@@ -43,6 +46,7 @@ export function resolvePayPalComponent(
   options:
     | PayPalBrandResolvedOptions
     | CardFieldsResolvedOptions
+    | CardFieldsStoredResolvedOptions
     | ApplePayResolvedOptions
     | GooglePayResolvedOptions
     | PayUponInvoiceResolvedOptions;
@@ -77,8 +81,11 @@ export function resolvePayPalComponent(
         Component: CardFields,
         options: resolveCardFieldsOptions(baseOptions),
       };
-    // case "CardFieldsStored":
-    //   return { Component: CardFieldsStored, options: resolveCardFieldsStoredOptions(baseOptions) };
+    case "CardFieldsStored":
+      return {
+        Component: CardFieldsStored,
+        options: resolveCardFieldsStoredOptions(baseOptions),
+      };
     case "ApplePay":
       return {
         Component: ApplePay,
