@@ -289,6 +289,10 @@ export type CheckoutOnlyProps = {
   onExpressPayButtonClick?: () => Promise<{ sessionId: string }>;
 };
 
+/** Checkout's EnablerOptions.onError, adapted in PayPalBuilder.ts. Given to PaymentProvider only
+ * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed. */
+export type ProviderErrorProps = Pick<GenericMountProps, "onError">;
+
 /** Category 4 — legacy fields with no `processorUrl` migration path.
  * will be kept for backward compatibility, but it is strongly suggested to
  * use commercetools checkout for access to fast APIs or at least update the self-hosted bff
@@ -409,7 +413,8 @@ export type ApplePayProps = {
 export type ApplePayComponentsProps = ApplePayProps & SmartComponentsProps;
 
 export type GooglePayComponentsProps = GooglePayOptionsType &
-  SmartComponentsProps;
+  SmartComponentsProps &
+  ProviderErrorProps;
 
 export type CartInformation = {
   account: {

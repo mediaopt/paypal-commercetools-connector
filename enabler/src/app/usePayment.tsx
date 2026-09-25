@@ -13,6 +13,7 @@ import { sessionHeader } from "../helpers/sessionHeader";
 import { Result } from "../components/Result";
 import {
   GeneralComponentsProps,
+  ProviderErrorProps,
   PaymentInfo,
   CartInformationInitial,
   CreatePaymentResponse,
@@ -145,7 +146,7 @@ const PaymentContext = createContext<PaymentContextT>({
 });
 
 export const PaymentProvider: FC<
-  React.PropsWithChildren<GeneralComponentsProps>
+  React.PropsWithChildren<GeneralComponentsProps & ProviderErrorProps>
 > = ({
   children,
   purchaseCallback,
@@ -174,6 +175,7 @@ export const PaymentProvider: FC<
   redirectOnApprove,
   initialPayment,
   onExpressPayButtonClick,
+  onError,
 }) => {
   // Replaced only by handleCreateOrder's PayPal Express session switch
   const [requestHeader, setRequestHeader] = useState(initialRequestHeader);
@@ -452,7 +454,8 @@ export const PaymentProvider: FC<
             status === "PAYER_ACTION_REQUIRED"
           ) {
             // 3DS needs the Google Pay sheet closed, so it continues after handleCreateOrder
-            // returns; handleOnApprove shows the final result itself
+            // returns; handleOnApprove shows the final result itself. The sheet has already been
+            // told SUCCESS by then, so failures reach Checkout only through onError.
             //@ts-ignore
             paypal
               .Googlepay()
@@ -462,35 +465,60 @@ export const PaymentProvider: FC<
                   .then((result) => {
                     switch (result.toString(10)) {
                       case "2":
-                        handleOnApprove({ orderID: newOrderData.id })
-                          .catch((err) =>
-                            console.error(
-                              "GooglePay: handleOnApprove (3DS approved) failed",
-                              err
-                            )
+                        handleOnApprove(
+                          { orderID: newOrderData.id },
+                          forceCheckoutReportError
+                        ).catch((err) => {
+                          console.error(
+                            "GooglePay: handleOnApprove (3DS approved) failed",
+                            err
                           );
+                          onError?.({
+                            code: "GOOGLE_PAY_APPROVE_FAILED",
+                            message:
+                              err instanceof Error
+                                ? err.message
+                                : t("interface.generalError"),
+                          });
+                        });
                         break;
                       case "1":
                         notify("Warning", t("cardFields.tryAgain"));
                         isLoading(false);
+                        onError?.({
+                          code: "THREE_DS_DECLINED_RETRY",
+                          message: t("cardFields.tryAgain"),
+                        });
                         break;
                       case "0":
                       default:
                         notify("Error", t("cardFields.selectDifferentMethod"));
                         isLoading(false);
+                        onError?.({
+                          code: "THREE_DS_DECLINED",
+                          message: t("cardFields.selectDifferentMethod"),
+                        });
                         break;
                     }
                   })
-                  .catch((err) =>
+                  .catch((err) => {
                     console.error(
                       "GooglePay: handleAuthenticateThreeDSOrder failed",
                       err
-                    )
-                  );
+                    );
+                    onError?.({
+                      code: "THREE_DS_FAILED",
+                      message: t("interface.generalError"),
+                    });
+                  });
               })
-              .catch((err: any) =>
-                console.error("GooglePay: initiatePayerAction failed", err)
-              );
+              .catch((err: any) => {
+                console.error("GooglePay: initiatePayerAction failed", err);
+                onError?.({
+                  code: "THREE_DS_FAILED",
+                  message: t("interface.generalError"),
+                });
+              });
           } else {
             if (forceCheckoutReportError) {
               throw new Error(t("payPal.generalError"));
@@ -807,6 +835,7 @@ export const PaymentProvider: FC<
     // react-hooks/exhaustive-deps
     processorUrl,
     onExpressPayButtonClick,
+    onError,
   ]);
 
   return (

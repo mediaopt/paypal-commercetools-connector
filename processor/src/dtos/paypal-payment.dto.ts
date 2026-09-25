@@ -178,7 +178,8 @@ export type CreateOrderResponseSchemaDTO = Static<
 >;
 
 // Enabler's handleAuthenticateThreeDSOrder request body must match this shape (usePayment.tsx).
-// isGPay is accepted for enabler-contract compatibility but not currently branched on.
+// isGPay is accepted for enabler-contract compatibility but not currently branched on — the
+// processor reads a Google Pay order's authentication_result from its own payment_source instead.
 export const AuthenticateThreeDSOrderRequestSchema = Type.Object({
   paymentId: Type.String(),
   orderID: Type.String(),

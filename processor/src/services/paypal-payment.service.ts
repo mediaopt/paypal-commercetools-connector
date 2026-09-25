@@ -720,6 +720,14 @@ export class PayPalPaymentService extends AbstractPaymentService {
         response.id ?? "",
         transactionType
       );
+      // PayPalOrderId is what the extension's webhook handling looks the payment up by. PUI has
+      // no separate approval step, so interfaceId is linked here too.
+      await retryCTSync(
+        () => this.syncPayPalOrderStatus(payment.id, response, true),
+        "createOrder",
+        payment.id,
+        response.status ?? ""
+      );
       void this.logProcessorInteraction(
         payment.id,
         "createPayPalOrder",
@@ -1520,8 +1528,23 @@ export class PayPalPaymentService extends AbstractPaymentService {
       orderID
     );
 
+    type AuthenticationResult = NonNullable<
+      NonNullable<Order["payment_source"]>["card"]
+    >["authentication_result"];
+    // Google Pay returns it under payment_source.google_pay.card, which common-connect's
+    // PaymentSourceResponse doesn't declare
+    const googlePaySource = (
+      order.payment_source as
+        | {
+            google_pay?: {
+              card?: { authentication_result?: AuthenticationResult };
+            };
+          }
+        | undefined
+    )?.google_pay;
     const authenticationResult =
-      order.payment_source?.card?.authentication_result;
+      order.payment_source?.card?.authentication_result ??
+      googlePaySource?.card?.authentication_result;
 
     return {
       ...(authenticationResult && {

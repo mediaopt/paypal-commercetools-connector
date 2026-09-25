@@ -31,6 +31,7 @@ export const GooglePay: FC<GooglePayComponentsProps> = ({
   initialUserIdToken,
   redirectOnApprove,
   initialPayment,
+  onError,
 
   ...restProps
 }) => {
@@ -60,6 +61,7 @@ export const GooglePay: FC<GooglePayComponentsProps> = ({
       initialUserIdToken={initialUserIdToken}
       redirectOnApprove={redirectOnApprove}
       initialPayment={initialPayment}
+      onError={onError}
     >
       <GooglePayButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>
