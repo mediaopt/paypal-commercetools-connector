@@ -1306,6 +1306,21 @@ export class PayPalPaymentService extends AbstractPaymentService {
    * A COMPLETED order can still carry a DECLINED/FAILED capture or authorization — returns that
    * status when the purchase unit's transaction maps to a commercetools Failure, else undefined.
    */
+  private resolveOrderTransactionState(
+    response: Order,
+    config: {
+      purchaseUnitKey: "authorizations" | "captures";
+      mapStatus: (status?: string) => TransactionState;
+    }
+  ): TransactionState {
+    return config.mapStatus(
+      extractPayPalPurchaseUnitTransaction(
+        response.purchase_units,
+        config.purchaseUnitKey
+      )?.status
+    );
+  }
+
   private findFailedSettlementStatus(
     response: Order,
     config: {
@@ -1927,12 +1942,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
           `Payment ${ctPayment.id} has no associated PayPal order to settle`
         );
       }
-      await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
-        operation: "authorizeOrder",
-        callPayPal: (id) => authorizePayPalOrder(id, {}),
-        ...resolvePayPalIntentTransactionConfig("Authorize"),
-      });
-      return { outcome: PaymentModificationStatus.APPROVED };
+      const authorizeConfig = resolvePayPalIntentTransactionConfig("Authorize");
+      const authorizeResponse = await this.applyPayPalOrderTransaction(
+        ctPayment,
+        ctPayment.interfaceId,
+        {
+          operation: "authorizeOrder",
+          callPayPal: (id) => authorizePayPalOrder(id, {}),
+          ...authorizeConfig,
+        }
+      );
+      // capturePayment was requested but only authorized: nothing is captured yet, so never
+      // approved — received unless the authorization itself failed
+      return this.resolveOrderTransactionState(
+        authorizeResponse,
+        authorizeConfig
+      ) === "Failure"
+        ? { outcome: PaymentModificationStatus.REJECTED }
+        : { outcome: PaymentModificationStatus.RECEIVED };
     }
 
     if (authorizationTransaction) {
@@ -1974,15 +2001,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
         );
       }
 
+      const captureState = mapPayPalCaptureStatusToCommercetoolsTransactionState(
+        response.status
+      );
       await this.ctPaymentService.updatePayment({
         id: ctPayment.id,
         transaction: {
           type: "Charge",
           amount,
           interactionId: response.id,
-          state: mapPayPalCaptureStatusToCommercetoolsTransactionState(
-            response.status
-          ),
+          state: captureState,
         },
       });
       // Logged after, unawaited — same reasoning as applyPayPalOrderTransaction/createOrder.
@@ -1996,7 +2024,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
         "settlement"
       );
 
-      return { outcome: PaymentModificationStatus.APPROVED };
+      return {
+        outcome:
+          this.convertTransactionStateToPaymentModificationOutcome(captureState),
+      };
     }
 
     // intent === Capture, nothing authorized (e.g. first call under Capture intent via the
@@ -2006,12 +2037,21 @@ export class PayPalPaymentService extends AbstractPaymentService {
         `Payment ${ctPayment.id} has no associated PayPal order to settle`
       );
     }
-    await this.applyPayPalOrderTransaction(ctPayment, ctPayment.interfaceId, {
-      operation: "captureOrder",
-      callPayPal: (id) => capturePayPalOrder(id, {}),
-      ...resolvePayPalIntentTransactionConfig("Capture"),
-    });
-    return { outcome: PaymentModificationStatus.APPROVED };
+    const captureConfig = resolvePayPalIntentTransactionConfig("Capture");
+    const captureResponse = await this.applyPayPalOrderTransaction(
+      ctPayment,
+      ctPayment.interfaceId,
+      {
+        operation: "captureOrder",
+        callPayPal: (id) => capturePayPalOrder(id, {}),
+        ...captureConfig,
+      }
+    );
+    return {
+      outcome: this.convertTransactionStateToPaymentModificationOutcome(
+        this.resolveOrderTransactionState(captureResponse, captureConfig)
+      ),
+    };
   }
 
   async refundPayment(
@@ -2046,15 +2086,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
+    const refundState = mapPayPalRefundStatusToCommercetoolsTransactionState(
+      response.status
+    );
     await this.ctPaymentService.updatePayment({
       id: ctPayment.id,
       transaction: {
         type: "Refund",
         amount,
         interactionId: response.id,
-        state: mapPayPalRefundStatusToCommercetoolsTransactionState(
-          response.status
-        ),
+        state: refundState,
       },
     });
     void this.logProcessorInteraction(
@@ -2066,7 +2107,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctPayment.interfaceId
     );
 
-    return { outcome: PaymentModificationStatus.APPROVED };
+    return {
+      outcome: this.convertTransactionStateToPaymentModificationOutcome(refundState),
+    };
   }
 
   async void(
@@ -2094,15 +2137,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
+    const voidState = mapPayPalVoidStatusToCommercetoolsTransactionState(
+      response.status
+    );
     await this.ctPaymentService.updatePayment({
       id: ctPayment.id,
       transaction: {
         amount: transaction.amount,
         type: "CancelAuthorization",
         interactionId: transaction.interactionId,
-        state: mapPayPalVoidStatusToCommercetoolsTransactionState(
-          response.status
-        ),
+        state: voidState,
       },
     });
     void this.logProcessorInteraction(
@@ -2114,7 +2158,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ctPayment.interfaceId
     );
 
-    return { outcome: PaymentModificationStatus.APPROVED };
+    return {
+      outcome: this.convertTransactionStateToPaymentModificationOutcome(voidState),
+    };
   }
 
   public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {

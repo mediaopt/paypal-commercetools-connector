@@ -12,7 +12,11 @@ import {
 } from "./types/operation.type";
 
 import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-componets.dto";
-import { PaymentIntentResponseSchemaDTO } from "../dtos/operations/payment-intents.dto";
+import {
+  PaymentIntentResponseSchemaDTO,
+  PaymentModificationStatus,
+} from "../dtos/operations/payment-intents.dto";
+import { TransactionState } from "@commercetools/platform-sdk";
 import {
   PaymentRequestSchemaDTO,
   PaymentResponseSchemaDTO,
@@ -298,6 +302,18 @@ export abstract class AbstractPaymentService {
       default: {
         throw new ErrorInvalidOperation(`Operation not supported.`);
       }
+    }
+  }
+
+  protected convertTransactionStateToPaymentModificationOutcome(
+    state: TransactionState
+  ): PaymentModificationStatus {
+    if (state === "Success") {
+      return PaymentModificationStatus.APPROVED;
+    } else if (state === "Failure") {
+      return PaymentModificationStatus.REJECTED;
+    } else {
+      return PaymentModificationStatus.RECEIVED;
     }
   }
 
