@@ -438,7 +438,10 @@ describe('PayPal breakdown mapping', () => {
 
       const discountValue = paypalPrice.discount?.value || '0.00';
 
-      expect(dummyCart.totalPrice.centAmount).toBe(
+      expect(
+        dummyCart.taxedPrice?.totalGross?.centAmount ||
+          dummyCart.totalPrice.centAmount
+      ).toBe(
         paypalToCTEur(paypalPrice.item_total?.value) +
           paypalToCTEur(paypalPrice.tax_total?.value) +
           paypalToCTEur(paypalPrice.shipping?.value) -
