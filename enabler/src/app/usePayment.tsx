@@ -271,11 +271,11 @@ export const PaymentProvider: FC<
     return createPaymentResult;
   };
 
-  // Self-hosted/legacy mode only — Checkout mode always has initialPayment already seeded above
-  // by the time this component mounts (resolved in _Setup(), before any builder is ever
-  // constructed), so this fetch never runs there.
+  // Self-hosted/legacy mode only — Checkout mode has initialPayment already seeded above (resolved
+  // in _SetupPayment(), before any standard/stored builder is constructed), and PayPal Express
+  // creates its Payment in handleCreateOrder instead, under onPayButtonClick's session.
   useEffect(() => {
-    if (vaultOnly || initialPayment) return;
+    if (vaultOnly || initialPayment || builderType === "express") return;
 
     const initPayment = async () => {
       isLoading(true);

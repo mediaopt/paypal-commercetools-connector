@@ -108,10 +108,26 @@ class PayPalComponent implements PaymentComponent {
       },
     };
 
+    // Express's session may have no Cart before the click, so the processor can't derive the
+    // currency from it
+    const expressCurrency =
+      this.builderType === "express"
+        ? (this.config as unknown as ExpressOptions).initialAmount?.currencyCode
+        : undefined;
+    const baseOptions = expressCurrency
+      ? {
+          ...this.baseOptions,
+          expressSdkOptions: {
+            ...this.baseOptions.expressSdkOptions,
+            currency: expressCurrency,
+          },
+        }
+      : this.baseOptions;
+
     this.root = mountRenderTemplate(selector, {
       paymentMethodType: this.paymentMethodType,
       builderType: this.builderType,
-      baseOptions: this.baseOptions,
+      baseOptions,
       genericOptions,
     });
   }

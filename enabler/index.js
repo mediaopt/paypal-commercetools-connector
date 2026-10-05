@@ -162,10 +162,21 @@ async function loadMethods() {
     });
   }
 
+  // One failing method must not hide the others. With an invalid cart, standard components already
+  // fail here (no Payment can be created for them). PayPal Express must still render, and fail only
+  // AFTER the button click, when it creates its own Payment.
+  async function tryRegisterMethod(category, type, meta) {
+    try {
+      await registerMethod(category, type, meta);
+    } catch (err) {
+      console.error(`[dev] ${category}-${type} could not be loaded:`, err);
+    }
+  }
+
   for (const m of paymentMethods.components)
-    await registerMethod("component", m.type, m);
+    await tryRegisterMethod("component", m.type, m);
   for (const m of paymentMethods.express)
-    await registerMethod("express", m.type, m);
+    await tryRegisterMethod("express", m.type, m);
 
   methodsContainer.innerHTML = "";
   for (const [methodId, method] of methodsStore.entries())

@@ -49,7 +49,9 @@ export type BaseOptions = {
   paypalScriptOptions: ReactPayPalScriptOptions;
   /** When true express PayPal payment is redirected to merchant side for approval */
   redirectOnApprove?: boolean;
-  /** The commercetools Payment for this checkout page load — created once in PayPalPaymentEnabler._Setup(),
-   * alongside the /operations/config fetch, and shared by every builder resolving this same BaseOptions object.*/
-  initialPayment: CreatePaymentResponse;
+  /** The commercetools Payment for this checkout page load — created once in
+   * PayPalPaymentEnabler._SetupPayment(), and shared by every standard/stored builder. Absent for
+   * PayPal Express: its session may have no Cart before the click, and onPayButtonClick's session
+   * gets its own Payment (see usePayment.tsx's handleCreateOrder).*/
+  initialPayment?: CreatePaymentResponse;
 };
