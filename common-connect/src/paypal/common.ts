@@ -190,11 +190,12 @@ export const createRequestFunction = function (
   return <T = unknown, R = AxiosResponse<T>>(
     axios: AxiosInstance = globalAxios,
     basePath: string = BASE_PATH
-  ) => {
+  ): Promise<R> => {
     const axiosRequestArgs = {
       ...axiosArgs.options,
       url: (configuration?.basePath || basePath) + axiosArgs.url,
     };
-    return axios.request<T, R>(axiosRequestArgs);
+    // axios >=1.20 wraps R in a conditional type that resolves to R for any explicit R
+    return axios.request<T, R>(axiosRequestArgs) as Promise<R>;
   };
 };
