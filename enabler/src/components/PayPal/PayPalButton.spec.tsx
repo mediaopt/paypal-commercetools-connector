@@ -14,7 +14,7 @@ const renderButton = (context: Record<string, unknown>) => {
   mockUsePayment.mockReturnValue({
     paymentInfo: { id: "" },
     vaultOnly: false,
-    builderType: undefined,
+    createsPaymentOnClick: false,
     ...context,
   });
   return render(<PayPalButton {...({} as never)} />);
@@ -43,7 +43,7 @@ describe("PayPalButton render gate", () => {
   });
 
   it("renders for PayPal Express without a Payment — handleCreateOrder creates it on click", () => {
-    const { queryByTestId } = renderButton({ builderType: "express" });
+    const { queryByTestId } = renderButton({ createsPaymentOnClick: true });
 
     expect(queryByTestId("paypal-mask")).not.toBeNull();
   });

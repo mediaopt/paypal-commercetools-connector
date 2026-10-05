@@ -199,7 +199,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   }: {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
-    const { baseOptions } = await this.getStandardSetup();
+    const { baseOptions } = await this.getConfigSetup();
     const url = processorUrls(
       baseOptions.processorUrl
     ).getStoredPaymentMethodsURL;
@@ -218,7 +218,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   }
 
   async isStoredPaymentMethodsEnabled(): Promise<boolean> {
-    const { baseOptions } = await this.getStandardSetup();
+    const { baseOptions } = await this.getConfigSetup();
     return baseOptions.storedPaymentMethodsEnabled ?? false;
   }
 

@@ -277,12 +277,12 @@ export type CheckoutOnlyProps = {
    * useSettings.tsx's SettingsProvider to skip <PayPalScriptProvider> entirely. */
   isStoredCheckoutComponent?: boolean;
   /** Injected by RenderTemplate.tsx from BaseOptions, same as `processorUrl` — the commercetools
-   * Payment for this checkout page load, already resolved (in PayPalPaymentEnabler._Setup(),
-   * alongside the /operations/config fetch) by the time any component mounts. Lets every
-   * concurrently-mounted component share one Payment instead of each
+   * Payment for this checkout page load, already resolved (in
+   * PayPalPaymentEnabler._SetupPayment(), standard/stored only) by the time any component mounts.
+   * Lets every concurrently-mounted component share one Payment instead of each
    * creating its own, with no async fetch needed inside PaymentProvider at all. Absent for
    * self-hosted deployments, which fall back to usePayment.tsx's own direct createPaymentUrl
-   * call. */
+   * call, and for PayPal Express, which creates its Payment on click. */
   initialPayment?: CreatePaymentResponse;
   /** PayPal Express only — Checkout's ExpressOptions.onPayButtonClick. See usePayment.tsx's
    * handleCreateOrder. */

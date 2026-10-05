@@ -168,7 +168,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
     expect(body).toHaveProperty("builderType");
   });
 
-  it("does not auto-trigger createPayment on mount for PayPal Express — its session may have no Cart yet, so handleCreateOrder creates the Payment on click", async () => {
+  it("does not auto-trigger createPayment on mount for PayPal Express in Checkout — its session may have no Cart yet, so handleCreateOrder creates the Payment on click", async () => {
     render(
       <PaymentProvider
         options={{} as any}
@@ -179,6 +179,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
         purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
+        onExpressPayButtonClick={jest.fn() as never}
       >
         {null}
       </PaymentProvider>
@@ -320,9 +321,12 @@ describe("PaymentProvider missing endpoint configuration", () => {
         "https://merchant.example.com/review?order_id=order-1"
       )
     );
-    // The onApproveRedirectionUrl branch never calls the processor for approve/authorize, and
-    // Express creates no Payment on mount.
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    // Only the initial createPayment call should have reached the processor — the
+    // onApproveRedirectionUrl branch itself never calls it for approve/authorize.
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
+    );
   });
 
   it("handleOnApprove short-circuits to the redirect when the response has a merchantReturnUrl, without running the normal success handling", async () => {
@@ -568,9 +572,11 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
       )
     );
     // No legacy onApproveRedirectionUrl, and no authorizeOrderUrl/onApproveUrl configured either —
-    // falls through to the silent no-op restored from the original client, not a notify. Express
-    // creates no Payment on mount, so the processor is never called.
-    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    // falls through to the silent no-op restored from the original client, not a notify.
+    await waitFor(() => expect(mockedProcessorRequest).toHaveBeenCalledTimes(1));
+    expect(mockedProcessorRequest.mock.calls[0][1]).toBe(
+      "https://processor.test/payments"
+    );
     expect(mockNotify).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
@@ -620,6 +626,7 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
   const renderProvider = (
     onExpressPayButtonClick: jest.Mock,
     builderType: "express" | undefined,
+    // null mounts without any initialPayment (undefined would fall back to the default)
     payment: unknown = initialPayment
   ) =>
     render(
@@ -633,7 +640,7 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
         purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType={builderType}
-        initialPayment={payment as never}
+        initialPayment={(payment ?? undefined) as never}
         onExpressPayButtonClick={onExpressPayButtonClick}
       >
         <ContextCapture />
@@ -688,7 +695,7 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     const onExpressPayButtonClick = jest
       .fn()
       .mockResolvedValue({ sessionId: "session-new" });
-    renderProvider(onExpressPayButtonClick, "express", undefined);
+    renderProvider(onExpressPayButtonClick, "express", null);
 
     // No mount-time createPayment
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -733,6 +740,30 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
       oldHeader,
       "https://processor.test/payments/order",
       expect.objectContaining({ paymentId: "payment-old" })
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("creates the Payment under the current session when onPayButtonClick returns no sessionId and there is no Payment yet", async () => {
+    const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
+    const onExpressPayButtonClick = jest.fn().mockResolvedValue(undefined);
+    renderProvider(onExpressPayButtonClick, "express", null);
+
+    await act(async () => {
+      await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(mockedProcessorRequest).toHaveBeenNthCalledWith(
+      1,
+      oldHeader,
+      "https://processor.test/payments",
+      {}
+    );
+    expect(mockedProcessorRequest).toHaveBeenNthCalledWith(
+      2,
+      oldHeader,
+      "https://processor.test/payments/order",
+      expect.objectContaining({ paymentId: "payment-new" })
     );
     consoleWarnSpy.mockRestore();
   });

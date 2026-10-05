@@ -6,9 +6,8 @@ import { CustomPayPalButtonsComponentProps } from "../../types";
 import { PayPalMask } from "./PayPalMask";
 
 export const PayPalButton: FC<CustomPayPalButtonsComponentProps> = (props) => {
-  const { paymentInfo, vaultOnly, builderType } = usePayment();
-  // PayPal Express has no Payment before the click — handleCreateOrder creates it
-  return paymentInfo.id || vaultOnly || builderType === "express" ? (
+  const { paymentInfo, vaultOnly, createsPaymentOnClick } = usePayment();
+  return paymentInfo.id || vaultOnly || createsPaymentOnClick ? (
     <PayPalMask {...props} />
   ) : (
     <></>

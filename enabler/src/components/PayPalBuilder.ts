@@ -112,7 +112,7 @@ class PayPalComponent implements PaymentComponent {
     // currency from it
     const expressCurrency =
       this.builderType === "express"
-        ? (this.config as unknown as ExpressOptions).initialAmount?.currencyCode
+        ? this.config.initialAmount?.currencyCode
         : undefined;
     const baseOptions = expressCurrency
       ? {

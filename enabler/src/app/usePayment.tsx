@@ -89,6 +89,8 @@ type PaymentContextT = {
     forceCheckoutReportError?: boolean
   ) => Promise<void>;
   vaultOnly: boolean;
+  /** PayPal Express in Checkout — no Payment before the click; handleCreateOrder creates it */
+  createsPaymentOnClick: boolean;
   orderDataLinks?: OrderDataLinks;
   handleCreateVaultSetupToken: (
     paymentSource: FUNDING_SOURCE
@@ -128,6 +130,7 @@ const PaymentContext = createContext<PaymentContextT>({
   handleCreateOrder: (orderData?: CustomOrderData) => Promise.resolve(""),
   handleOnApprove: () => Promise.resolve(),
   vaultOnly: false,
+  createsPaymentOnClick: false,
   handleCreateVaultSetupToken: (paymentSource: FUNDING_SOURCE) =>
     Promise.resolve(""),
   handleApproveVaultSetupToken: (data?: ApproveVaultSetupTokenData) =>
@@ -188,10 +191,10 @@ export const PaymentProvider: FC<
 
   const { settings } = useSettings();
 
-  // Seeded synchronously from initialPayment when present (Checkout mode — already resolved in
-  // PayPalPaymentEnabler._Setup() before this component ever mounts, see BaseOptions's own
-  // comment). Falls back to PaymentInfoInitialObject otherwise, populated by the mount effect
-  // below instead (self-hosted/legacy mode).
+  // Seeded synchronously from initialPayment when present (Checkout standard/stored — already
+  // resolved in PayPalPaymentEnabler._SetupPayment() before this component ever mounts, see
+  // BaseOptions's own comment). Falls back to PaymentInfoInitialObject otherwise, populated by the
+  // mount effect below (self-hosted/legacy mode) or by handleCreateOrder (createsPaymentOnClick).
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>(
     initialPayment
       ? toPaymentInfo(initialPayment, cartInformation)
@@ -226,6 +229,8 @@ export const PaymentProvider: FC<
   const vaultOnly: boolean = !!(
     createVaultSetupTokenUrl && approveVaultSetupTokenUrl
   );
+  const createsPaymentOnClick =
+    builderType === "express" && !!onExpressPayButtonClick;
 
   const createPayment = async (header: RequestHeader) => {
     const createPaymentResult = await processorRequest<
@@ -275,7 +280,7 @@ export const PaymentProvider: FC<
   // in _SetupPayment(), before any standard/stored builder is constructed), and PayPal Express
   // creates its Payment in handleCreateOrder instead, under onPayButtonClick's session.
   useEffect(() => {
-    if (vaultOnly || initialPayment || builderType === "express") return;
+    if (vaultOnly || initialPayment || createsPaymentOnClick) return;
 
     const initPayment = async () => {
       isLoading(true);
@@ -365,8 +370,8 @@ export const PaymentProvider: FC<
         // request uses both directly, later calls pick them up from state.
         let orderRequestHeader = requestHeader;
         let orderPaymentId = paymentInfo.id;
-        if (builderType === "express" && onExpressPayButtonClick) {
-          const clickResult = await onExpressPayButtonClick();
+        if (createsPaymentOnClick) {
+          const clickResult = await onExpressPayButtonClick!();
           if (clickResult?.sessionId) {
             orderRequestHeader = sessionHeader(clickResult.sessionId);
             setRequestHeader(orderRequestHeader);
@@ -375,6 +380,9 @@ export const PaymentProvider: FC<
             console.warn(
               "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
             );
+            if (!orderPaymentId) {
+              orderPaymentId = (await createPayment(orderRequestHeader)).id;
+            }
           }
         }
 
@@ -807,6 +815,7 @@ export const PaymentProvider: FC<
       handleOnApprove,
       handleCreateOrder,
       vaultOnly,
+      createsPaymentOnClick,
       handleCreateVaultSetupToken,
       handleApproveVaultSetupToken,
       handleAuthenticateThreeDSOrder,
