@@ -3752,4 +3752,75 @@ describe("paypal-payment.service", () => {
       expect(CommonConnect.updatePayPalOrder).toHaveBeenCalledTimes(2);
     });
   });
+
+  // SDK >=1.3.0 authenticates a session without a Cart (PayPal Express before the click)
+  describe("session without a Cart", () => {
+    beforeEach(() => {
+      jest
+        .spyOn(FastifyContext, "getCartIdFromContext")
+        .mockReturnValue(undefined);
+    });
+
+    test("config: skips the cart lookup and still returns the config", async () => {
+      const result = await paypalPaymentService.config();
+
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(result.settings).toEqual(
+        CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES
+      );
+      expect(result.userIdToken).toBeUndefined();
+    });
+
+    test("createPayment: throws instead of looking up an undefined cart", async () => {
+      await expect(
+        paypalPaymentService.createPayment({} as never)
+      ).rejects.toThrow(
+        new ErrorInvalidOperation("no cart found for the checkout session")
+      );
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+    });
+
+    test("createOrder: throws with the payment id", async () => {
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: { paymentSource: "paypal" },
+        })
+      ).rejects.toThrow(`no cart found for ${mockPayment.id}`);
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("updateShipping: throws with the payment id", async () => {
+      await expect(
+        paypalPaymentService.updateShipping({
+          paymentId: mockPayment.id,
+          orderID: mockPayPalOrder.id,
+          shippingMethodId: "standard",
+        })
+      ).rejects.toThrow(`no cart found for ${mockPayment.id}`);
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(CommonConnect.updatePayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("getStoredPaymentMethods: throws — not supported for Express Checkout", async () => {
+      await expect(
+        paypalPaymentService.getStoredPaymentMethods()
+      ).rejects.toThrow("no cart found for the checkout session");
+      expect(CommonConnect.getPaymentTokens).not.toHaveBeenCalled();
+    });
+
+    test("deleteStoredPaymentMethod: still deletes at PayPal, skipping the cart lookup", async () => {
+      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
+        status: "success",
+      } as never);
+
+      await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
+
+      expect(CommonConnect.deletePaymentToken).toHaveBeenCalledWith(
+        "paypal-token-id"
+      );
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+    });
+  });
 });

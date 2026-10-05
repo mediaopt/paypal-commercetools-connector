@@ -196,6 +196,48 @@ describe("PayPalComponentBuilder", () => {
     ).not.toHaveProperty("onExpressPayButtonClick");
   });
 
+  it("express: overrides expressSdkOptions.currency with initialAmount.currencyCode — a session without a Cart gives the processor no currency", async () => {
+    const options = baseOptions({
+      expressSdkOptions: { currency: "USD", components: "buttons" },
+    });
+    const builder = new PayPalComponentBuilder("PayPal", options, "express");
+    const component = builder.build({
+      initialAmount: { centAmount: 2000, currencyCode: "EUR", fractionDigits: 2 },
+    } as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions.expressSdkOptions).toEqual({
+      currency: "EUR",
+      components: "buttons",
+    });
+    expect(capturedElement.props.baseOptions.sessionId).toBe("session-id");
+    // The shared baseOptions object stays untouched for every other builder
+    expect(options.expressSdkOptions).toEqual({
+      currency: "USD",
+      components: "buttons",
+    });
+  });
+
+  it("express: keeps baseOptions as-is when initialAmount has no currency", async () => {
+    const options = baseOptions({ expressSdkOptions: { currency: "USD" } });
+    const builder = new PayPalComponentBuilder("PayPal", options, "express");
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions).toBe(options);
+  });
+
+  it("non-express: ignores initialAmount.currencyCode for the script options", async () => {
+    const options = baseOptions({ expressSdkOptions: { currency: "USD" } });
+    const builder = new PayPalComponentBuilder("PayPal", options, undefined);
+    const component = builder.build({
+      initialAmount: { centAmount: 2000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions).toBe(options);
+  });
+
   it("onRegisterSubmit wires component.submit() to the registered handler", async () => {
     const builder = new PayPalComponentBuilder(
       "PayPal",
