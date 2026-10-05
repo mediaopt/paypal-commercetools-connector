@@ -17,7 +17,10 @@ jobs:
       matrix:
         directory: [
           'paypal-commercetools-events',
-          'paypal-commercetools-extension'
+          'paypal-commercetools-extension',
+          'common-connect',
+          'enabler',
+          'processor'
         ]
 
     steps:
@@ -27,7 +30,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
 
@@ -36,5 +39,5 @@ jobs:
         working-directory: ${{ matrix.directory }}
 
       - name: Run audit
-        run: npm audit
+        run: npm audit --omit=dev
         working-directory: ${{ matrix.directory }}

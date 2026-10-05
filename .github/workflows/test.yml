@@ -18,7 +18,10 @@ jobs:
         directory: [
           'paypal-commercetools-events',
           'paypal-commercetools-extension',
-          'paypal-commercetools-custom-application'
+          'paypal-commercetools-custom-application',
+          'common-connect',
+          'enabler',
+          'processor'
         ]
 
     steps:
@@ -28,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
 
