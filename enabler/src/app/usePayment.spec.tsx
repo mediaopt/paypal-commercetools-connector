@@ -812,6 +812,24 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     );
   });
 
+  it("does not report the previous click's Payment when createPayment fails under a new session", async () => {
+    mockedProcessorRequest.mockResolvedValue(false as never);
+    const onError = jest.fn();
+    const onExpressPayButtonClick = jest
+      .fn()
+      .mockResolvedValue({ sessionId: "session-new" });
+    renderProvider(onExpressPayButtonClick, "express", initialPayment, onError);
+
+    await act(async () => {
+      await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
+      { paymentReference: undefined }
+    );
+  });
+
   it("does not call onError for a failed createOrder of a non-express builder", async () => {
     mockedProcessorRequest.mockResolvedValue(false as never);
     const onError = jest.fn();

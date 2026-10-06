@@ -376,6 +376,7 @@ export const PaymentProvider: FC<
           if (clickResult?.sessionId) {
             orderRequestHeader = sessionHeader(clickResult.sessionId);
             setRequestHeader(orderRequestHeader);
+            orderPaymentId = "";
             orderPaymentId = (await createPayment(orderRequestHeader)).id;
           } else {
             console.warn(
