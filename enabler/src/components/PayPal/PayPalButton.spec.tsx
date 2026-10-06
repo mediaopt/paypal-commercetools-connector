@@ -17,7 +17,7 @@ const renderButton = (context: Record<string, unknown>) => {
     createsPaymentOnClick: false,
     ...context,
   });
-  return render(<PayPalButton {...({} as never)} />);
+  return render(<PayPalButton />);
 };
 
 describe("PayPalButton render gate", () => {

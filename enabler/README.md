@@ -282,8 +282,8 @@ method is not available for your cart." message (`useFundingSourceEligible.ts`).
   Whether stored methods are offered at all follows the processor's `STORED_PAYMENT_METHODS_ENABLED`.
 - `CardFieldsStored` renders no UI of its own — Checkout's stored-payment-methods component shows
   the saved card. It charges the card without loading the PayPal SDK; the charge may still require
-  buyer action (`PAYER_ACTION_REQUIRED`). `remove()` throws if the deletion fails. Not available in
-  legacy mode.
+  buyer action (`PAYER_ACTION_REQUIRED`). `remove()` throws if the deletion fails, including when
+  the card doesn't belong to the session cart's customer. Not available in legacy mode.
 - The "save this card" option is never offered to anonymous shoppers. Checkout's own
   `storePaymentDetails` choice and the component's checkbox are combined (either saves the card).
 - The saved-card list inside `CardFields` is shown in legacy mode only.

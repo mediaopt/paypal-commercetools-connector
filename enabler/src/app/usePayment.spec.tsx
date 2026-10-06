@@ -600,6 +600,11 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     "Content-Type": "application/json",
     "X-Session-Id": "session-new",
   };
+  // createPayment's response for the Payment created on click
+  const newPayment = {
+    id: "payment-new",
+    amountPlanned: { centAmount: 1000, currencyCode: "EUR", fractionDigits: 2 },
+  } as never;
 
   beforeEach(() => {
     mockedProcessorRequest.mockReset();
@@ -612,14 +617,7 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
           } as never)
         : (url as string).endsWith("/payments/updateShipping")
         ? Promise.resolve({ shippingOptions: [] } as never)
-        : Promise.resolve({
-            id: "payment-new",
-            amountPlanned: {
-              centAmount: 1000,
-              currencyCode: "EUR",
-              fractionDigits: 2,
-            },
-          } as never)
+        : Promise.resolve(newPayment)
     );
   });
 
@@ -627,7 +625,8 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     onExpressPayButtonClick: jest.Mock,
     builderType: "express" | undefined,
     // null mounts without any initialPayment (undefined would fall back to the default)
-    payment: unknown = initialPayment
+    payment: unknown = initialPayment,
+    onError?: jest.Mock
   ) =>
     render(
       <PaymentProvider
@@ -642,6 +641,7 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
         builderType={builderType}
         initialPayment={(payment ?? undefined) as never}
         onExpressPayButtonClick={onExpressPayButtonClick}
+        onError={onError}
       >
         <ContextCapture />
       </PaymentProvider>
@@ -766,6 +766,74 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
       expect.objectContaining({ paymentId: "payment-new" })
     );
     consoleWarnSpy.mockRestore();
+  });
+
+  it("reports a failed createOrder to Checkout's onError as EXPRESS_CREATE_ORDER_FAILED, with the Payment created on click", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).endsWith("/payments/order")
+        ? Promise.resolve(false as never)
+        : Promise.resolve(newPayment)
+    );
+    const onError = jest.fn();
+    const onExpressPayButtonClick = jest
+      .fn()
+      .mockResolvedValue({ sessionId: "session-new" });
+    renderProvider(onExpressPayButtonClick, "express", null, onError);
+
+    let orderId: string | undefined;
+    await act(async () => {
+      orderId = await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(orderId).toBe("");
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
+      { paymentReference: "payment-new" }
+    );
+    expect(mockNotify).toHaveBeenCalledWith("Error", expect.any(String));
+  });
+
+  it("reports a failed click-time createPayment to onError without a paymentReference", async () => {
+    mockedProcessorRequest.mockResolvedValue(false as never);
+    const onError = jest.fn();
+    const onExpressPayButtonClick = jest
+      .fn()
+      .mockResolvedValue({ sessionId: "session-new" });
+    renderProvider(onExpressPayButtonClick, "express", null, onError);
+
+    await act(async () => {
+      await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
+      { paymentReference: undefined }
+    );
+  });
+
+  it("does not call onError for a failed createOrder of a non-express builder", async () => {
+    mockedProcessorRequest.mockResolvedValue(false as never);
+    const onError = jest.fn();
+    renderProvider(jest.fn(), undefined, initialPayment, onError);
+
+    await act(async () => {
+      await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("does not call onError for a failed createOrder of legacy Express (no onExpressPayButtonClick)", async () => {
+    mockedProcessorRequest.mockResolvedValue(false as never);
+    const onError = jest.fn();
+    renderProvider(undefined as never, "express", initialPayment, onError);
+
+    await act(async () => {
+      await latestContext.current!.handleCreateOrder();
+    });
+
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("never calls onExpressPayButtonClick for a non-express builder", async () => {

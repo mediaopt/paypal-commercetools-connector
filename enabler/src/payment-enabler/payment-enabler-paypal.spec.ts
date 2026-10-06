@@ -47,10 +47,11 @@ const mockFetchOk = (json: Record<string, unknown>) => {
   });
 };
 
-const buildEnabler = () =>
+const buildEnabler = (overrides: Record<string, unknown> = {}) =>
   new PayPalPaymentEnabler({
     processorUrl: "https://processor.example",
     sessionId: "session-id",
+    ...overrides,
   } as any);
 
 const lastBuilderArgs = (): [string, BaseOptions, string | undefined] =>
@@ -250,6 +251,12 @@ describe("PayPalPaymentEnabler Express setup (via createExpressBuilder)", () => 
     expect(builderType).toBe("express");
     expect(baseOptions.initialPayment).toBeUndefined();
     expect(baseOptions.expressSdkOptions).toEqual({ currency: "USD" });
+  });
+
+  it("passes Checkout's EnablerOptions.countryCode through to baseOptions", async () => {
+    await buildEnabler({ countryCode: "DE" }).createExpressBuilder("paypal");
+
+    expect(lastBuilderArgs()[1].countryCode).toBe("DE");
   });
 
   it("still resolves when payment creation would fail for this session (e.g. a session without a Cart)", async () => {

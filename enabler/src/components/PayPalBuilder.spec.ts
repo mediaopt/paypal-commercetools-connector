@@ -167,6 +167,41 @@ describe("PayPalComponentBuilder", () => {
     });
   });
 
+  it("genericOptions.onError prefers the caller's paymentReference (PayPal Express's Payment created on click)", async () => {
+    const enablerOnError = jest.fn();
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions({
+        onError: enablerOnError,
+        initialPayment: { id: "payment-id" } as BaseOptions["initialPayment"],
+      }),
+      "express"
+    );
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    const error = { code: "EXPRESS_CREATE_ORDER_FAILED", message: "failed" };
+    capturedElement.props.genericOptions.onError(error, {
+      paymentReference: "click-payment-id",
+    });
+
+    expect(enablerOnError).toHaveBeenCalledWith(error, {
+      paymentReference: "click-payment-id",
+    });
+  });
+
+  it("genericOptions.countryCode is Checkout's EnablerOptions.countryCode from baseOptions", async () => {
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions({ countryCode: "DE" }),
+      "express"
+    );
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.genericOptions.countryCode).toBe("DE");
+  });
+
   it("genericOptions.onExpressPayButtonClick is Checkout's ExpressOptions.onPayButtonClick for an express builder", async () => {
     const onPayButtonClick = jest.fn();
     const builder = new PayPalComponentBuilder(
