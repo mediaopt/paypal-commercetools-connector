@@ -465,6 +465,7 @@ export const complexCartsData: CartTestData[] = [
         },
         giftLineItem,
       ],
+      cartPrice: { gross: 16181, net: 16181, tax: 0 },
       discount: { amount: 2418 },
       customCardProps: {
         taxCalculationMode: 'UnitPriceLevel',
@@ -572,6 +573,47 @@ export const complexCartsData: CartTestData[] = [
     expectedDiscount: 13874,
     expectedShipping: 1000,
     expectedTax: 16879,
+  },
+  {
+    cartData: {
+      lineItemsData: [
+        { itemType: 'defaultItem', quantity: 1, gross: 18, net: 15, tax: 3 },
+        { itemType: 'defaultItem', quantity: 1, gross: 65, net: 55, tax: 10 },
+        giftLineItemData,
+        {
+          itemType: 'productDiscountItem',
+          quantity: 1,
+          gross: 77,
+          net: 65,
+          tax: 12,
+        },
+        { itemType: 'defaultItem', quantity: 1, gross: 110, net: 92, tax: 18 },
+        {
+          itemType: 'taxNotIncludedInBasePrice',
+          quantity: 1,
+          gross: 142,
+          net: 77,
+          tax: 65,
+        },
+        {
+          itemType: 'defaultItem',
+          quantity: 200,
+          gross: 4753000,
+          net: 4753000,
+          tax: 0,
+        },
+      ],
+      cartPrice: { gross: 4610810, net: 4610705, tax: 105 },
+      discount: { gross: 142602, net: 142599, amount: 142600 },
+      customCardProps: {
+        taxCalculationMode: 'UnitPriceLevel',
+        totalPrice: centPrice(4610747), // differs from total gross because one item has tax not included in price
+      },
+    },
+    testDescription:
+      'unit price level cart mixing included and not included tax with gift and total discount',
+    expectedDiscount: 142602,
+    expectedTax: 108,
   },
 ];
 
