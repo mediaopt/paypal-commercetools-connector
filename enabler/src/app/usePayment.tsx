@@ -357,6 +357,8 @@ export const PaymentProvider: FC<
       }
       const setRatepayMessage = orderData?.setRatepayMessage ?? undefined;
       let errorAlreadyShown = false;
+      // Outside the try so the catch can report the Payment created on click
+      let orderPaymentId = paymentInfo.id;
       try {
         const relevantOrderData = setRelevantData(
           orderData,
@@ -369,7 +371,6 @@ export const PaymentProvider: FC<
         // to the session onPayButtonClick hands back and creates a new Payment under it; this
         // request uses both directly, later calls pick them up from state.
         let orderRequestHeader = requestHeader;
-        let orderPaymentId = paymentInfo.id;
         if (createsPaymentOnClick) {
           const clickResult = await onExpressPayButtonClick!();
           if (clickResult?.sessionId) {
@@ -569,13 +570,16 @@ export const PaymentProvider: FC<
         isLoading(false);
         // Checkout already started its transaction in onPayButtonClick; this is its only failure signal
         if (createsPaymentOnClick) {
-          onError?.({
-            code: "EXPRESS_CREATE_ORDER_FAILED",
-            message:
-              error instanceof Error
-                ? error.message
-                : t("interface.generalError"),
-          });
+          onError?.(
+            {
+              code: "EXPRESS_CREATE_ORDER_FAILED",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : t("interface.generalError"),
+            },
+            { paymentReference: orderPaymentId || undefined }
+          );
         }
         if (forceCheckoutReportError) {
           throw error;

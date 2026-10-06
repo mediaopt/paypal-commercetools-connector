@@ -81,14 +81,16 @@ This list highlights the most consequential differences — it isn't exhaustive.
 
 ## Checkout setup and lifecycle
 
-`PayPalPaymentEnabler._Setup()` (`src/payment-enabler/payment-enabler-paypal.ts`) runs once per
-checkout page, in parallel:
+`PayPalPaymentEnabler` (`src/payment-enabler/payment-enabler-paypal.ts`) sets itself up lazily, on
+the first builder call, in two steps that each run once per checkout page:
 
-- fetches `GET {processorUrl}/operations/config` (settings, client id, script options),
-- creates one commercetools Payment for the session cart, shared by every mounted component,
-- preloads the PayPal JS SDK (`src/app/preloadPayPalScript.ts`).
+- `_Setup()` fetches `GET {processorUrl}/operations/config` (settings, client id, script options).
+  Every builder waits for it; for PayPal Express it is the only step.
+- `_SetupPayment()`, for standard and stored builders only, then creates one commercetools Payment
+  for the session cart, shared by every mounted component, and in parallel preloads the PayPal JS
+  SDK (`src/app/preloadPayPalScript.ts`).
 
-Any failure here is fatal for the enabler.
+A failure rejects every builder that waits for the failed step.
 
 After a successful payment the processor redirects the buyer to a result page (see
 [Buyer redirect](#buyer-redirect-after-approval-merchantreturnurl)). Only if no result url is
@@ -191,14 +193,17 @@ Passing these props to a non-form component (e.g. `<PayPal/>`) has no effect.
 Checkout mode only; not supported for legacy components. Checkout's `EnablerOptions.onError` is
 called with `paymentReference` (the commercetools Payment id) added. `CardFields` reports 3DS
 outcomes through it as `THREE_DS_DECLINED_RETRY` / `THREE_DS_DECLINED`, and a stuck submission as
-`CARD_FIELDS_SUBMIT_TIMEOUT` (see [3DS](#3ds-credit-card)).
+`CARD_FIELDS_SUBMIT_TIMEOUT` (see [3DS](#3ds-credit-card)). PayPal Express reports
+`EXPRESS_CREATE_ORDER_FAILED` when `onPayButtonClick`, creating the Payment or creating the order
+fails after the click; its `paymentReference` is the Payment created on click, if any.
 
 ### PayPal JS SDK script options (currency, funding sources, etc.)
 
 In Checkout mode every standard component — the PayPal-brand buttons (including AllButtons, Credit
 and the local payment methods), `CardFields`, Apple Pay, Google Pay and Pay Upon Invoice — shares
-one PayPal JS SDK script load, resolved once in `_Setup()` and loaded before any component mounts
-(`src/app/preloadPayPalScript.ts`). `CardFieldsStored` loads no script at all.
+one PayPal JS SDK script load, built in `_Setup()` and preloaded in `_SetupPayment()` before any
+standard component mounts (`src/app/preloadPayPalScript.ts`). `CardFieldsStored` loads no script at
+all.
 
 Its options (`currency`, `components`, `enableFunding`/`disableFunding`, `buyerCountry`, `locale`,
 `vault`, …) were component props in the standalone client; in Checkout mode they come from the
@@ -294,6 +299,9 @@ method is not available for your cart." message (`useFundingSourceEligible.ts`).
   on the component instead.
 - Before a Payment exists, the button shows Checkout's `initialAmount`. Checkout must create the
   cart in `onPayButtonClick`.
+- No Payment is created before the click: the session may have no cart yet. On click the button
+  calls `onPayButtonClick` and creates the Payment under the session it returns.
+- Stored payment methods aren't supported for Express.
 
 ### Buyer redirect after approval (`merchantReturnUrl`)
 
@@ -352,7 +360,8 @@ tells the merchant to call `capturePayment` again once ready to collect funds.
   buyer countries US, AU, CA, FR, DE, IT, ES, GB, and only if `messages` is in the script
   `components`. Placement is `product` for Express and `payment` otherwise.
 - In Checkout the message amount comes from the cart; in legacy mode the merchant provides the
-  message content. If the cart currency differs from the PayPal account currency, no message is
+  message content. Before the click, PayPal Express uses Checkout's `initialAmount` and
+  `EnablerOptions.countryCode` instead; without a country, PayPal decides eligibility itself. If the cart currency differs from the PayPal account currency, no message is
   shown (PayPal's own error may name a different reason).
 - Style comes from the custom application's `payLater*` settings, or
   `PAYPAL_BUTTON_CONFIG.<type>.messagesStyle`. The layout is fixed to `text`; if you need `flex`,

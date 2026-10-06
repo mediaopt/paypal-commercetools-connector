@@ -84,12 +84,13 @@ class PayPalComponent implements PaymentComponent {
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,
       // onError is a new, checkout-only prop — not supported for legacy enabler components.
-      // For PayPal Express, paymentReference may be stale: onPayButtonClick switches to a new
-      // session and Payment, which this mount-time value doesn't follow. Refer to the logs.
+      // PayPal Express passes the Payment created on click; others use the setup-time one.
       onError: this.baseOptions.onError
-        ? (error: GenericError) =>
+        ? (error: GenericError, context?: { paymentReference?: string }) =>
             this.baseOptions.onError?.(error, {
-              paymentReference: this.baseOptions.initialPayment?.id,
+              paymentReference:
+                context?.paymentReference ??
+                this.baseOptions.initialPayment?.id,
             })
         : undefined,
       initialAmount: this.config.initialAmount,

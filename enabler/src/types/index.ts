@@ -337,7 +337,10 @@ export type HostedFieldsProps = Pick<
 
 export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting"> &
   FormComponentProps & {
-    onError?: (error: GenericError) => void;
+    onError?: (
+    error: GenericError,
+    context?: { paymentReference?: string }
+  ) => void;
   };
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
@@ -701,7 +704,10 @@ export type GenericMountProps = FormComponentProps & {
   showPayButton?: boolean;
   fullWidth?: boolean;
   buttonText?: string;
-  onError?: (error: GenericError) => void;
+  onError?: (
+    error: GenericError,
+    context?: { paymentReference?: string }
+  ) => void;
   initialAmount?: CTAmount;
   countryCode?: string;
   onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];
