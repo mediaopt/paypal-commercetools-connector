@@ -292,7 +292,8 @@ export type CheckoutOnlyProps = {
 };
 
 /** Checkout's EnablerOptions.onError, adapted in PayPalBuilder.ts. Given to PaymentProvider only
- * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed. */
+ * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed, and by
+ * PayPal.tsx, for Express create-order failures after Checkout's onPayButtonClick. */
 export type ProviderErrorProps = Pick<GenericMountProps, "onError">;
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.

@@ -2307,16 +2307,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // Without a commercetools record, PayPal's own list for this customer decides ownership
     if (!ctPaymentMethod) {
       const paypalTokens = paypalCustomerId
-        ? (
-            await getPaymentTokens(paypalCustomerId).catch((e) => {
+        ? await getPaymentTokens(paypalCustomerId)
+            .then((response) => response.payment_tokens)
+            .catch((e) => {
               log.warn(
-                `deleteStoredPaymentMethod: token list lookup failed for customer ${customerId} — ${errorMessage(
+                `deleteStoredPaymentMethod: token list lookup failed for PayPal customer ${paypalCustomerId} (CT customer ${customerId}) — ${errorMessage(
                   e
                 )}${payPalDebugIdSuffix(e)}`
               );
               return undefined;
             })
-          )?.payment_tokens
         : undefined;
       if (!paypalTokens?.some((paymentToken) => paymentToken.id === token)) {
         log.warn(
