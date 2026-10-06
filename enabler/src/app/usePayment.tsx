@@ -567,6 +567,16 @@ export const PaymentProvider: FC<
           );
         }
         isLoading(false);
+        // Checkout already started its transaction in onPayButtonClick; this is its only failure signal
+        if (createsPaymentOnClick) {
+          onError?.({
+            code: "EXPRESS_CREATE_ORDER_FAILED",
+            message:
+              error instanceof Error
+                ? error.message
+                : t("interface.generalError"),
+          });
+        }
         if (forceCheckoutReportError) {
           throw error;
         }
