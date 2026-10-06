@@ -5,6 +5,7 @@ import {
   usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps, PaymentInfo } from "../../types";
+import { CTAmount } from "../../payment-enabler/interfaces/general";
 import { PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES } from "./messagesConstants";
 
 export type PayPalMessagesWidgetProps = {
@@ -13,6 +14,9 @@ export type PayPalMessagesWidgetProps = {
   paymentInfo: PaymentInfo;
   isExpress: boolean;
   messagesStyle: PayPalMessagesComponentProps["style"] | undefined;
+  // PayPal Express before the click — Checkout's own values, no Payment exists yet
+  initialAmount?: CTAmount;
+  initialCountryCode?: string;
 };
 
 // In legacy mode it is merchant responsibility to provide messages content,
@@ -25,6 +29,8 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
   paymentInfo,
   isExpress,
   messagesStyle,
+  initialAmount,
+  initialCountryCode,
 }) => {
   const [{ isResolved }] = usePayPalScriptReducer();
   // Messages is not part of the default script components list, so window.paypal.Messages
@@ -43,22 +49,37 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
     if (paypalMessages) {
       return paypalMessages;
     }
+    const beforeClick = !paymentInfo.id && !!initialAmount;
+    const countryCode = beforeClick
+      ? initialCountryCode
+      : paymentInfo.countryCode;
     if (
       fundingSource !== "paypal" ||
-      !paymentInfo.countryCode ||
-      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(paymentInfo.countryCode)
+      // No country before the click: PayPal decides eligibility itself
+      (countryCode
+        ? !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(countryCode)
+        : !beforeClick)
     ) {
       return undefined;
     }
-    const { centAmount, currencyCode, fractionDigits } =
-      paymentInfo.amountPlanned;
+    const { centAmount, currencyCode, fractionDigits } = beforeClick
+      ? initialAmount
+      : paymentInfo.amountPlanned;
     return {
       ...(messagesStyle && { style: messagesStyle }),
       amount: (centAmount / 10 ** fractionDigits).toFixed(fractionDigits),
       currency: currencyCode as PayPalMessagesComponentProps["currency"],
       placement: isExpress ? "product" : "payment",
     };
-  }, [paypalMessages, fundingSource, paymentInfo, isExpress, messagesStyle]);
+  }, [
+    paypalMessages,
+    fundingSource,
+    paymentInfo,
+    isExpress,
+    messagesStyle,
+    initialAmount,
+    initialCountryCode,
+  ]);
 
   if (!resolved || !isMessagesEligible) {
     return null;

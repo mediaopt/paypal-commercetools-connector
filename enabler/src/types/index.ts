@@ -401,6 +401,9 @@ export type CustomPayPalButtonsComponentProps = Omit<
   // resolveOptions.ts and arrives here as a real prop (like messagesStyle above), not read via
   // useSettings().
   disablePayLaterButton?: boolean;
+  // From GenericMountProps — PayPal Express's Pay Later message before a Payment exists
+  initialAmount?: CTAmount;
+  countryCode?: string;
 } & Pick<BasicComponentProps, "enableVaulting">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
@@ -700,6 +703,7 @@ export type GenericMountProps = FormComponentProps & {
   buttonText?: string;
   onError?: (error: GenericError) => void;
   initialAmount?: CTAmount;
+  countryCode?: string;
   onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];
   /** only for a stored-payment-method component (PayPalStoredBuilder) — PayPal's
    * vault payment-token id of the saved card */

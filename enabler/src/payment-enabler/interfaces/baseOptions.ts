@@ -47,6 +47,8 @@ export type BaseOptions = {
    * PayPal Express is excluded — it always must mount alone (no concurrent-mount risk) and needs
    * genuinely different options*/
   paypalScriptOptions: ReactPayPalScriptOptions;
+  /** Checkout's country (EnablerOptions.countryCode) — the only country before a Cart exists (PayPal Express) */
+  countryCode?: string;
   /** When true express PayPal payment is redirected to merchant side for approval */
   redirectOnApprove?: boolean;
   /** The commercetools Payment for this checkout page load — created once in

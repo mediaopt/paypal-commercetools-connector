@@ -91,6 +91,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
         baseOptions: {
           processorUrl: options.processorUrl,
           sessionId: options.sessionId,
+          countryCode: options.countryCode,
           storedPaymentMethodsEnabled:
             !!configJson.storedPaymentMethodsConfig?.isEnabled,
           enableVaulting: !!configJson.enableVaulting,

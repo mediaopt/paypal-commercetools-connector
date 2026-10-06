@@ -93,6 +93,7 @@ class PayPalComponent implements PaymentComponent {
             })
         : undefined,
       initialAmount: this.config.initialAmount,
+      countryCode: this.baseOptions.countryCode,
       // For express, Checkout passes ExpressOptions (not ComponentOptions) into build()
       ...(this.builderType === "express" && {
         onExpressPayButtonClick: (this.config as unknown as ExpressOptions)
