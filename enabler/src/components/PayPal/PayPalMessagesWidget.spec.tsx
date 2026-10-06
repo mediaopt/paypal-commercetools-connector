@@ -142,42 +142,39 @@ describe("PayPalMessagesWidget PayPal Express before the click", () => {
     (window as any).paypal = originalPaypal;
   });
 
-  it("uses Checkout's initialAmount for a supported countryCode", () => {
-    renderWidget({ countryCode: "DE" });
+  it.each<[string, Record<string, unknown>, Record<string, unknown>]>([
+    [
+      "uses Checkout's initialAmount for a supported countryCode",
+      { countryCode: "DE" },
+      { currency: "EUR", amount: "20.00", placement: "product" },
+    ],
+    [
+      "lets PayPal decide eligibility when Checkout passed no countryCode",
+      {},
+      { amount: "20.00", currency: "EUR" },
+    ],
+    [
+      "switches to the cart's amount once the click created the Payment",
+      { countryCode: "DE", paymentInfo: { ...paymentInfo, id: "payment-1" } },
+      { amount: "10.00", currency: "EUR" },
+    ],
+  ])("%s", (_, props, expected) => {
+    renderWidget(props);
 
-    expect(capturedProps).toMatchObject({
-      currency: "EUR",
-      amount: "20.00",
-      placement: "product",
-    });
+    expect(capturedProps).toMatchObject(expected);
   });
 
-  it("renders nothing for an unsupported countryCode", () => {
-    renderWidget({ countryCode: "NL" });
-
-    expect(capturedProps).toBeUndefined();
-  });
-
-  it("lets PayPal decide eligibility when Checkout passed no countryCode", () => {
-    renderWidget({});
-
-    expect(capturedProps).toMatchObject({ amount: "20.00", currency: "EUR" });
-  });
-
-  it("switches to the cart's amount once the click created the Payment", () => {
-    renderWidget({
-      countryCode: "DE",
-      paymentInfo: { ...paymentInfo, id: "payment-1" },
-    });
-
-    expect(capturedProps).toMatchObject({ amount: "10.00", currency: "EUR" });
-  });
-
-  it("switches to the cart's country once the click created the Payment", () => {
-    renderWidget({
-      countryCode: "DE",
-      paymentInfo: { ...paymentInfo, id: "payment-1", countryCode: "NL" },
-    });
+  it.each<[string, Record<string, unknown>]>([
+    ["renders nothing for an unsupported countryCode", { countryCode: "NL" }],
+    [
+      "switches to the cart's country once the click created the Payment",
+      {
+        countryCode: "DE",
+        paymentInfo: { ...paymentInfo, id: "payment-1", countryCode: "NL" },
+      },
+    ],
+  ])("%s", (_, props) => {
+    renderWidget(props);
 
     expect(capturedProps).toBeUndefined();
   });

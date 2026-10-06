@@ -63,6 +63,13 @@ const standardBaseOptions = async (enabler = buildEnabler()) => {
   return lastBuilderArgs()[1];
 };
 
+const resetMocksWithWorkingSetup = () => {
+  jest.clearAllMocks();
+  mockedPreload.mockResolvedValue(undefined);
+  mockedProcessorRequest.mockResolvedValue({ id: "payment-id" } as any);
+  mockFetchOk(baseConfigJson);
+};
+
 describe("PayPalPaymentEnabler standard setup (via createComponentBuilder)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -184,12 +191,7 @@ describe("PayPalPaymentEnabler standard setup (via createComponentBuilder)", () 
 });
 
 describe("PayPalPaymentEnabler lazy, shared setup", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockedPreload.mockResolvedValue(undefined);
-    mockedProcessorRequest.mockResolvedValue({ id: "payment-id" } as any);
-    mockFetchOk(baseConfigJson);
-  });
+  beforeEach(resetMocksWithWorkingSetup);
 
   it("does nothing on construction — no config fetch, no payment, no script", () => {
     buildEnabler();
@@ -222,12 +224,7 @@ describe("PayPalPaymentEnabler lazy, shared setup", () => {
 });
 
 describe("PayPalPaymentEnabler Express setup (via createExpressBuilder)", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockedPreload.mockResolvedValue(undefined);
-    mockedProcessorRequest.mockResolvedValue({ id: "payment-id" } as any);
-    mockFetchOk(baseConfigJson);
-  });
+  beforeEach(resetMocksWithWorkingSetup);
 
   it("fetches only /operations/config with the session header — no createPayment, no standard script preload", async () => {
     await buildEnabler().createExpressBuilder("paypal");

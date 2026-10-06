@@ -376,15 +376,15 @@ export const PaymentProvider: FC<
           if (clickResult?.sessionId) {
             orderRequestHeader = sessionHeader(clickResult.sessionId);
             setRequestHeader(orderRequestHeader);
+            // The current Payment belongs to the previous session
             orderPaymentId = "";
-            orderPaymentId = (await createPayment(orderRequestHeader)).id;
           } else {
             console.warn(
               "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
             );
-            if (!orderPaymentId) {
-              orderPaymentId = (await createPayment(orderRequestHeader)).id;
-            }
+          }
+          if (!orderPaymentId) {
+            orderPaymentId = (await createPayment(orderRequestHeader)).id;
           }
         }
 

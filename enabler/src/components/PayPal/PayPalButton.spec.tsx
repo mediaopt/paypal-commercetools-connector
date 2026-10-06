@@ -27,23 +27,15 @@ describe("PayPalButton render gate", () => {
     expect(queryByTestId("paypal-mask")).toBeNull();
   });
 
-  it("renders once the Payment exists", () => {
-    const { queryByTestId } = renderButton({
-      paymentInfo: { id: "payment-1" },
-    });
-
-    expect(queryByTestId("paypal-mask")).not.toBeNull();
-  });
-
-  it("renders for vaultOnly without a Payment", () => {
-    //legacy mode only
-    const { queryByTestId } = renderButton({ vaultOnly: true });
-
-    expect(queryByTestId("paypal-mask")).not.toBeNull();
-  });
-
-  it("renders for PayPal Express without a Payment — handleCreateOrder creates it on click", () => {
-    const { queryByTestId } = renderButton({ createsPaymentOnClick: true });
+  it.each<[string, Record<string, unknown>]>([
+    ["once the Payment exists", { paymentInfo: { id: "payment-1" } }],
+    ["for vaultOnly (legacy mode only) without a Payment", { vaultOnly: true }],
+    [
+      "for PayPal Express without a Payment — handleCreateOrder creates it on click",
+      { createsPaymentOnClick: true },
+    ],
+  ])("renders %s", (_, context) => {
+    const { queryByTestId } = renderButton(context);
 
     expect(queryByTestId("paypal-mask")).not.toBeNull();
   });

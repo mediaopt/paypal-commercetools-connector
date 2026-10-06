@@ -171,28 +171,33 @@ export class PayPalPaymentService extends AbstractPaymentService {
       : getConfig().settingsFallback;
   }
 
-  public async config(): Promise<ConfigResponse> {
+  private async getConfigCartSummary() {
     // PayPal Express's session may have no Cart before the click
     const cartId = getCartIdFromContext();
+    if (!cartId) {
+      return undefined;
+    }
+    return this.ctCartService
+      .getCart({ id: cartId })
+      .then((ctCart) => ({
+        customerId: ctCart.customerId,
+        country: ctCart.country,
+        currency: ctCart.totalPrice?.currencyCode,
+      }))
+      .catch((e) => {
+        log.warn(
+          `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
+            e
+          )}`
+        );
+        return undefined;
+      });
+  }
+
+  public async config(): Promise<ConfigResponse> {
     const [settings, cartSummary] = await Promise.all([
       this.resolveSettings(),
-      cartId
-        ? this.ctCartService
-            .getCart({ id: cartId })
-            .then((ctCart) => ({
-              customerId: ctCart.customerId,
-              country: ctCart.country,
-              currency: ctCart.totalPrice?.currencyCode,
-            }))
-            .catch((e) => {
-              log.warn(
-                `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
-                  e
-                )}`
-              );
-              return undefined;
-            })
-        : Promise.resolve(undefined),
+      this.getConfigCartSummary(),
     ]);
 
     // Only worth resolving when vaulting is actually enabled — otherwise nothing uses the token

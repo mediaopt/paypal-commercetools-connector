@@ -28,6 +28,16 @@ const mockedProcessorRequest = processorRequest as jest.MockedFunction<
 const mockedRedirectTo = redirectTo as jest.MockedFunction<typeof redirectTo>;
 const mockedUseSettings = useSettings as jest.Mock;
 
+// Props most renders share; a test overrides one (or sets it to undefined) when it differs
+const mockProviderProps = {
+  options: {} as any,
+  requestHeader: {},
+  createPaymentUrl: "https://processor.test/payments",
+  getSettingsUrl: "https://processor.test/settings",
+  shippingMethodId: "standard",
+  purchaseCallback: () => {},
+};
+
 const CreateOrderConsumer: FC = () => {
   const { handleCreateOrder } = usePayment();
   useEffect(() => {
@@ -148,12 +158,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
   it("includes paymentMethodType and builderType in the createPayment request body — regression test for 'A value is required for field paymentMethodType'", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
         paymentMethodType="PayPal"
         builderType={undefined}
       >
@@ -171,12 +176,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
   it("does not auto-trigger createPayment on mount for PayPal Express in Checkout — its session may have no Cart yet, so handleCreateOrder creates the Payment on click", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
         paymentMethodType="PayPal"
         builderType="express"
         onExpressPayButtonClick={jest.fn() as never}
@@ -205,12 +205,7 @@ describe("PaymentProvider auto-triggers createPayment on mount", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
         paymentMethodType="PayPal"
       >
         <PaymentInfoConsumer onPaymentInfo={onPaymentInfo} />
@@ -260,12 +255,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
   it("handleCreateOrder silently no-ops (no processor call, no notify) when createOrderUrl is not configured", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
       >
         <CreateOrderConsumer />
       </PaymentProvider>
@@ -282,12 +272,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
   it("handleOnApprove silently no-ops (no processor call, no notify) when no approve/authorize/redirect URL is configured", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
       >
         <OnApproveConsumer />
       </PaymentProvider>
@@ -303,12 +288,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
   it("handleOnApprove takes the legacy onApproveRedirectionUrl branch unchanged (no approve/authorize processor call)", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
         onApproveRedirectionUrl="https://merchant.example.com/review"
         builderType="express"
       >
@@ -339,12 +319,8 @@ describe("PaymentProvider missing endpoint configuration", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
+        {...mockProviderProps}
         onApproveUrl="https://processor.test/payments/approve"
-        shippingMethodId="standard"
         purchaseCallback={purchaseCallback}
       >
         <OnApproveConsumer />
@@ -384,12 +360,8 @@ describe("PaymentProvider missing endpoint configuration", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/createOrder"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
         purchaseCallback={purchaseCallback}
       >
         <CreateOrderConsumer />
@@ -410,12 +382,7 @@ describe("PaymentProvider missing endpoint configuration", () => {
     const onResult = jest.fn();
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
       >
         <VaultSetupTokenConsumer onResult={onResult} />
       </PaymentProvider>
@@ -457,11 +424,7 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
+        {...mockProviderProps}
         purchaseCallback={purchaseCallback}
         processorUrl="https://processor.test"
         builderType="express"
@@ -507,12 +470,7 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
         processorUrl="https://processor.test"
         builderType="express"
         redirectOnApprove={true}
@@ -552,12 +510,7 @@ describe("PaymentProvider PayPal Express redirect-before-finalize (expressApprov
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         builderType="express"
         redirectOnApprove={true}
       >
@@ -630,13 +583,11 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
   ) =>
     render(
       <PaymentProvider
-        options={{} as any}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         requestHeader={oldHeader}
-        createPaymentUrl="https://processor.test/payments"
         createOrderUrl="https://processor.test/payments/order"
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType={builderType}
         initialPayment={(payment ?? undefined) as never}
@@ -794,65 +745,52 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     expect(mockNotify).toHaveBeenCalledWith("Error", expect.any(String));
   });
 
-  it("reports a failed click-time createPayment to onError without a paymentReference", async () => {
-    mockedProcessorRequest.mockResolvedValue(false as never);
-    const onError = jest.fn();
-    const onExpressPayButtonClick = jest
-      .fn()
-      .mockResolvedValue({ sessionId: "session-new" });
-    renderProvider(onExpressPayButtonClick, "express", null, onError);
+  it.each<[string, unknown]>([
+    ["no Payment yet", null],
+    ["the previous click's Payment", initialPayment],
+  ])(
+    "reports a failed click-time createPayment to onError without a paymentReference (%s)",
+    async (_, payment) => {
+      mockedProcessorRequest.mockResolvedValue(false as never);
+      const onError = jest.fn();
+      const onExpressPayButtonClick = jest
+        .fn()
+        .mockResolvedValue({ sessionId: "session-new" });
+      renderProvider(onExpressPayButtonClick, "express", payment, onError);
 
-    await act(async () => {
-      await latestContext.current!.handleCreateOrder();
-    });
+      await act(async () => {
+        await latestContext.current!.handleCreateOrder();
+      });
 
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
-      { paymentReference: undefined }
-    );
-  });
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
+        { paymentReference: undefined }
+      );
+    }
+  );
 
-  it("does not report the previous click's Payment when createPayment fails under a new session", async () => {
-    mockedProcessorRequest.mockResolvedValue(false as never);
-    const onError = jest.fn();
-    const onExpressPayButtonClick = jest
-      .fn()
-      .mockResolvedValue({ sessionId: "session-new" });
-    renderProvider(onExpressPayButtonClick, "express", initialPayment, onError);
+  it.each<[string, jest.Mock | undefined, "express" | undefined]>([
+    ["a non-express builder", jest.fn(), undefined],
+    ["legacy Express (no onExpressPayButtonClick)", undefined, "express"],
+  ])(
+    "does not call onError for a failed createOrder of %s",
+    async (_, onExpressPayButtonClick, builderType) => {
+      mockedProcessorRequest.mockResolvedValue(false as never);
+      const onError = jest.fn();
+      renderProvider(
+        onExpressPayButtonClick as jest.Mock,
+        builderType,
+        initialPayment,
+        onError
+      );
 
-    await act(async () => {
-      await latestContext.current!.handleCreateOrder();
-    });
+      await act(async () => {
+        await latestContext.current!.handleCreateOrder();
+      });
 
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
-      { paymentReference: undefined }
-    );
-  });
-
-  it("does not call onError for a failed createOrder of a non-express builder", async () => {
-    mockedProcessorRequest.mockResolvedValue(false as never);
-    const onError = jest.fn();
-    renderProvider(jest.fn(), undefined, initialPayment, onError);
-
-    await act(async () => {
-      await latestContext.current!.handleCreateOrder();
-    });
-
-    expect(onError).not.toHaveBeenCalled();
-  });
-
-  it("does not call onError for a failed createOrder of legacy Express (no onExpressPayButtonClick)", async () => {
-    mockedProcessorRequest.mockResolvedValue(false as never);
-    const onError = jest.fn();
-    renderProvider(undefined as never, "express", initialPayment, onError);
-
-    await act(async () => {
-      await latestContext.current!.handleCreateOrder();
-    });
-
-    expect(onError).not.toHaveBeenCalled();
-  });
+      expect(onError).not.toHaveBeenCalled();
+    }
+  );
 
   it("never calls onExpressPayButtonClick for a non-express builder", async () => {
     const onExpressPayButtonClick = jest
@@ -888,13 +826,9 @@ describe("PaymentProvider vaultOnly with legacy-only vault URLs", () => {
     const onResult = jest.fn();
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
         createVaultSetupTokenUrl="https://legacy.test/create-vault-setup-token"
         approveVaultSetupTokenUrl="https://legacy.test/approve-vault-setup-token"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <VaultSetupTokenConsumer onResult={onResult} />
       </PaymentProvider>
@@ -913,14 +847,9 @@ describe("PaymentProvider vaultOnly with legacy-only vault URLs", () => {
   it("does not auto-trigger createPayment on mount when vaultOnly", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createVaultSetupTokenUrl="https://legacy.test/create-vault-setup-token"
         approveVaultSetupTokenUrl="https://legacy.test/approve-vault-setup-token"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         {null}
       </PaymentProvider>
@@ -968,11 +897,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={shippingPayment}
@@ -1015,11 +942,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={{ ...(shippingPayment as object), shippingOptions: cachedOptions } as never}
@@ -1049,11 +974,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={{ ...(shippingPayment as object), shippingOptions: cachedOptions } as never}
@@ -1077,11 +1000,9 @@ describe("PaymentProvider handleUpdateShipping", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={shippingPayment}
@@ -1121,11 +1042,9 @@ describe("PaymentProvider resolveShippingOptionId", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={resolvePayment}
@@ -1145,11 +1064,9 @@ describe("PaymentProvider resolveShippingOptionId", () => {
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
+        getSettingsUrl={undefined}
         processorUrl="https://processor.test"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         paymentMethodType="PayPal"
         builderType="express"
         initialPayment={resolvePayment}
@@ -1181,12 +1098,8 @@ describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInv
   it("submits payPalIntent: 'Capture' when orderData.fraudNetSessionId is present (PUI signal), overriding the real settings.payPalIntent — regression test for the two-script-tag crash", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <CreateOrderWithDataConsumer
           orderData={{ fraudNetSessionId: "session-1" }}
@@ -1203,12 +1116,8 @@ describe("PaymentProvider handleCreateOrder forces Capture intent for PayUponInv
   it("leaves payPalIntent as the real settings.payPalIntent when orderData has no fraudNetSessionId (non-PUI orders)", async () => {
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <CreateOrderConsumer />
       </PaymentProvider>
@@ -1253,13 +1162,8 @@ describe("PaymentProvider handleOnApprove forceCheckoutReportError error propaga
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
+        {...mockProviderProps}
         onApproveUrl="https://processor.test/payments/approve"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <OnApproveConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
@@ -1294,13 +1198,8 @@ describe("PaymentProvider handleOnApprove forceCheckoutReportError error propaga
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
+        {...mockProviderProps}
         onApproveUrl="https://processor.test/payments/approve"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <OnApproveConsumer onError={onError} />
       </PaymentProvider>
@@ -1330,13 +1229,8 @@ describe("PaymentProvider handleOnApprove forceCheckoutReportError error propaga
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
+        {...mockProviderProps}
         onApproveUrl="https://processor.test/payments/approve"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <OnApproveConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
@@ -1365,13 +1259,8 @@ describe("PaymentProvider handleOnApprove forceCheckoutReportError error propaga
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
+        {...mockProviderProps}
         onApproveUrl="https://processor.test/payments/approve"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <OnApproveConsumer onError={onError} />
       </PaymentProvider>
@@ -1401,12 +1290,7 @@ describe("PaymentProvider handleCreateOrder forceCheckoutReportError error propa
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
       >
         <CreateOrderWithDataConsumer
           forceCheckoutReportError
@@ -1435,12 +1319,7 @@ describe("PaymentProvider handleCreateOrder forceCheckoutReportError error propa
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
+        {...mockProviderProps}
       >
         <CreateOrderWithDataConsumer onResult={onResult} />
       </PaymentProvider>
@@ -1471,13 +1350,8 @@ describe("PaymentProvider handleCreateOrder forceCheckoutReportError error propa
 
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <CreateOrderWithDataConsumer forceCheckoutReportError onError={onError} />
       </PaymentProvider>
@@ -1517,13 +1391,8 @@ describe("PaymentProvider handleCreateOrder PayUponInvoice error response", () =
     );
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
       >
         <CreateOrderWithDataConsumer
           orderData={{
@@ -1601,13 +1470,9 @@ describe("PaymentProvider handleCreateOrder Google Pay APPROVED", () => {
     );
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
         onApproveUrl="https://processor.test/payments/approve"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
         purchaseCallback={purchaseCallback}
       >
         <CreateOrderWithDataConsumer
@@ -1693,14 +1558,9 @@ describe("PaymentProvider handleCreateOrder Google Pay 3DS failures reach onErro
     );
     render(
       <PaymentProvider
-        options={{} as any}
-        requestHeader={{}}
-        createPaymentUrl="https://processor.test/payments"
+        {...mockProviderProps}
         createOrderUrl="https://processor.test/payments/order"
         authenticateThreeDSOrderUrl="https://processor.test/payments/3ds"
-        getSettingsUrl="https://processor.test/settings"
-        shippingMethodId="standard"
-        purchaseCallback={() => {}}
         onError={onError}
       >
         <CreateOrderWithDataConsumer
