@@ -3277,6 +3277,21 @@ describe("paypal-payment.service", () => {
         expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
       });
 
+      test("refuses with a 400 instead of a 500 when PayPal's token list lookup fails (e.g. 404 for an unknown PayPal customer)", async () => {
+        (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+          new Error("Request failed with status code 404") as never
+        );
+
+        await expect(
+          paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+        ).rejects.toThrow(
+          new ErrorInvalidOperation(
+            "payment token paypal-token-id does not belong to customer ct-customer-id"
+          )
+        );
+        expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
+      });
+
       test("refuses without listing PayPal tokens when the customer has no PayPalUserId", async () => {
         mockCustomerGetExecute.mockResolvedValue({
           body: { ...mockCtCustomer, custom: undefined },

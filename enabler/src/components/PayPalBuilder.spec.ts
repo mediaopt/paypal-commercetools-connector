@@ -306,10 +306,10 @@ describe("PayPalComponentBuilder", () => {
       isValid,
     });
 
-    await component.showValidation();
+    await component.showValidation!();
     expect(showValidation).toHaveBeenCalled();
 
-    await expect(component.isValid()).resolves.toBe(false);
+    await expect(component.isValid!()).resolves.toBe(false);
   });
 
   it("isValid() defaults to true before any validation handler is registered", async () => {
@@ -320,7 +320,7 @@ describe("PayPalComponentBuilder", () => {
     );
     const component = builder.build({});
 
-    await expect(component.isValid()).resolves.toBe(true);
+    await expect(component.isValid!()).resolves.toBe(true);
   });
 
   describe("isAvailable()", () => {
@@ -356,7 +356,7 @@ describe("PayPalComponentBuilder", () => {
         );
         const component = builder.build({});
 
-        await expect(component.isAvailable()).resolves.toBe(false);
+        await expect(component.isAvailable!()).resolves.toBe(false);
       }
     );
 
@@ -387,7 +387,7 @@ describe("PayPalComponentBuilder", () => {
         );
         const component = builder.build({});
 
-        await expect(component.isAvailable()).resolves.toBe(true);
+        await expect(component.isAvailable!()).resolves.toBe(true);
       }
     );
 
@@ -406,7 +406,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
 
       Object.defineProperty(navigator, "userAgent", {
         value: originalUserAgent,
@@ -424,7 +424,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
     });
 
     it("CardFields is available when 'card-fields' is present in standardScriptOptions.components", async () => {
@@ -437,7 +437,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(true);
+      await expect(component.isAvailable!()).resolves.toBe(true);
     });
 
     it("ApplePay is unavailable when 'applepay' is absent from standardScriptOptions.components, even when the browser itself supports Apple Pay", async () => {
@@ -454,7 +454,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
 
       delete (window as any).ApplePaySession;
     });
@@ -472,7 +472,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(true);
+      await expect(component.isAvailable!()).resolves.toBe(true);
     });
   });
 });
