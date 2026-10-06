@@ -1,6 +1,10 @@
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import { PaymentResult } from "./enabler";
-import { CreatePaymentResponse, GetSettingsResponse } from "../../types";
+import {
+  CreatePaymentResponse,
+  GetSettingsResponse,
+  OnErrorContext,
+} from "../../types";
 
 type ComponentSdkOptions = Record<string, unknown>;
 
@@ -11,7 +15,7 @@ export type BaseOptions = {
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;
   /** commercetools Checkout's own construction-time failure channel (EnablerOptions.onError)*/
-  onError?: (error: any, context?: { paymentReference?: string }) => void;
+  onError?: (error: any, context?: OnErrorContext) => void;
   /** PayPal Express's own PayPal JS SDK script options, from the processor's
    * PAYPAL_EXPRESS_SDK_OPTIONS — see resolveOptions.ts's express branch. Flat, not keyed by
    * paymentMethodType: Express is the only paymentMethodType that ever reads this field, since

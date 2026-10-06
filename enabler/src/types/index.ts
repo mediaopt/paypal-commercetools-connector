@@ -33,6 +33,8 @@ export type GenericError = {
   message: string;
 };
 
+export type OnErrorContext = { paymentReference?: string };
+
 export type BuilderType = "dropin" | "express" | undefined;
 
 export type PayPalPaymentMethodType =
@@ -337,10 +339,7 @@ export type HostedFieldsProps = Pick<
 
 export type CardFieldsProps = Pick<BasicComponentProps, "enableVaulting"> &
   FormComponentProps & {
-    onError?: (
-    error: GenericError,
-    context?: { paymentReference?: string }
-  ) => void;
+    onError?: (error: GenericError) => void;
   };
 
 export type HostedFieldsSmartComponentProps = SmartComponentsProps &
@@ -404,10 +403,9 @@ export type CustomPayPalButtonsComponentProps = Omit<
   // resolveOptions.ts and arrives here as a real prop (like messagesStyle above), not read via
   // useSettings().
   disablePayLaterButton?: boolean;
-  // From GenericMountProps — PayPal Express's Pay Later message before a Payment exists
-  initialAmount?: CTAmount;
-  countryCode?: string;
-} & Pick<BasicComponentProps, "enableVaulting">;
+} & Pick<BasicComponentProps, "enableVaulting"> &
+  // PayPal Express's Pay Later message before a Payment exists
+  Pick<GenericMountProps, "initialAmount" | "countryCode">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
   GeneralComponentsProps;
@@ -704,10 +702,7 @@ export type GenericMountProps = FormComponentProps & {
   showPayButton?: boolean;
   fullWidth?: boolean;
   buttonText?: string;
-  onError?: (
-    error: GenericError,
-    context?: { paymentReference?: string }
-  ) => void;
+  onError?: (error: GenericError, context?: OnErrorContext) => void;
   initialAmount?: CTAmount;
   countryCode?: string;
   onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];

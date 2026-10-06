@@ -2189,13 +2189,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
+  // Stored payment methods aren't supported for commercetools Express Checkout, whose session may
+  // have no Cart. Supporting them would need commercetools to support it as well. Please open an
+  // issue if you are interested in stored payment methods for Express Checkout.
+  private getStoredPaymentMethodsCart(): Promise<Cart> {
+    return this.ctCartService.getCart({ id: this.requireCartIdFromContext() });
+  }
+
   public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {
-    // Stored payment methods aren't supported for commercetools Express Checkout, whose session may
-    // have no Cart. Supporting them would need commercetools to support it as well. Please open an
-    // issue if you are interested in stored payment methods for Express Checkout.
-    const ctCart = await this.ctCartService.getCart({
-      id: this.requireCartIdFromContext(),
-    });
+    const ctCart = await this.getStoredPaymentMethodsCart();
 
     if (!ctCart.customerId) {
       log.warn(
@@ -2275,12 +2277,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   public async deleteStoredPaymentMethod(token: string): Promise<void> {
-    // Stored payment methods aren't supported for commercetools Express Checkout, whose session may
-    // have no Cart. Supporting them would need commercetools to support it as well. Please open an
-    // issue if you are interested in stored payment methods for Express Checkout.
-    const ctCart = await this.ctCartService.getCart({
-      id: this.requireCartIdFromContext(),
-    });
+    const ctCart = await this.getStoredPaymentMethodsCart();
     const customerId = ctCart.customerId;
     if (!customerId) {
       throw new ErrorInvalidOperation(
@@ -2304,12 +2301,10 @@ export class PayPalPaymentService extends AbstractPaymentService {
     ]);
     // Without a commercetools record, PayPal's own list for this customer decides ownership
     if (!ctPaymentMethod) {
-      const owned =
-        !!paypalCustomerId &&
-        !!(await getPaymentTokens(paypalCustomerId)).payment_tokens?.some(
-          (paymentToken) => paymentToken.id === token
-        );
-      if (!owned) {
+      const paypalTokens = paypalCustomerId
+        ? (await getPaymentTokens(paypalCustomerId)).payment_tokens
+        : undefined;
+      if (!paypalTokens?.some((paymentToken) => paymentToken.id === token)) {
         log.warn(
           `deleteStoredPaymentMethod: token ${token} not owned by customer ${customerId}`
         );

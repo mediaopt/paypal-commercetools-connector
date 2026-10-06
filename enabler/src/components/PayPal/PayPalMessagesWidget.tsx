@@ -7,6 +7,7 @@ import {
 import { CustomPayPalButtonsComponentProps, PaymentInfo } from "../../types";
 import { CTAmount } from "../../payment-enabler/interfaces/general";
 import { PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES } from "./messagesConstants";
+import { usePayment } from "../../app/usePayment";
 
 export type PayPalMessagesWidgetProps = {
   paypalMessages: PayPalMessagesComponentProps | undefined;
@@ -16,7 +17,7 @@ export type PayPalMessagesWidgetProps = {
   messagesStyle: PayPalMessagesComponentProps["style"] | undefined;
   // PayPal Express before the click — Checkout's own values, no Payment exists yet
   initialAmount?: CTAmount;
-  initialCountryCode?: string;
+  countryCode?: string;
 };
 
 // In legacy mode it is merchant responsibility to provide messages content,
@@ -30,9 +31,10 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
   isExpress,
   messagesStyle,
   initialAmount,
-  initialCountryCode,
+  countryCode: initialCountryCode,
 }) => {
   const [{ isResolved }] = usePayPalScriptReducer();
+  const { createsPaymentOnClick } = usePayment();
   // Messages is not part of the default script components list, so window.paypal.Messages
   // may be missing even after the script resolves - guard rather than crash on render.
   const isMessagesEligible = isResolved && !!window.paypal?.Messages;
@@ -49,16 +51,21 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
     if (paypalMessages) {
       return paypalMessages;
     }
-    const beforeClick = !paymentInfo.id && !!initialAmount;
+    const beforeClick =
+      createsPaymentOnClick && !paymentInfo.id && !!initialAmount;
     const countryCode = beforeClick
       ? initialCountryCode
       : paymentInfo.countryCode;
+    if (fundingSource !== "paypal") {
+      return undefined;
+    }
+    // No country before the click: PayPal decides eligibility itself
+    if (!countryCode && !beforeClick) {
+      return undefined;
+    }
     if (
-      fundingSource !== "paypal" ||
-      // No country before the click: PayPal decides eligibility itself
-      (countryCode
-        ? !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(countryCode)
-        : !beforeClick)
+      countryCode &&
+      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(countryCode)
     ) {
       return undefined;
     }
@@ -79,6 +86,7 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
     messagesStyle,
     initialAmount,
     initialCountryCode,
+    createsPaymentOnClick,
   ]);
 
   if (!resolved || !isMessagesEligible) {

@@ -10,6 +10,7 @@ import {
   BuilderType,
   GenericError,
   GenericMountProps,
+  OnErrorContext,
   PayPalPaymentMethodType,
   ValidationHandlers,
 } from "../types";
@@ -86,7 +87,7 @@ class PayPalComponent implements PaymentComponent {
       // onError is a new, checkout-only prop — not supported for legacy enabler components.
       // PayPal Express passes the Payment created on click; others use the setup-time one.
       onError: this.baseOptions.onError
-        ? (error: GenericError, context?: { paymentReference?: string }) =>
+        ? (error: GenericError, context?: OnErrorContext) =>
             this.baseOptions.onError?.(error, {
               paymentReference:
                 context?.paymentReference ??

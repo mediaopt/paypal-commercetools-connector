@@ -39,7 +39,6 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     handleUpdateShipping,
     resolveShippingOptionId,
     paymentInfo,
-    createsPaymentOnClick,
   } = usePayment();
   const { settings, paymentTokens } = useSettings();
   const isExpress = builderType === "express";
@@ -206,10 +205,8 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
           paymentInfo={paymentInfo}
           isExpress={isExpress}
           messagesStyle={messagesStyle}
-          {...(createsPaymentOnClick && {
-            initialAmount,
-            initialCountryCode: countryCode,
-          })}
+          initialAmount={initialAmount}
+          countryCode={countryCode}
         />
       )}
 
