@@ -333,9 +333,10 @@ describe("PayPalComponentBuilder", () => {
         configurable: true,
       });
 
+      // An eligible US/USD cart, so only the browser check decides.
       const builder = new PayPalComponentBuilder(
         "Venmo",
-        baseOptions(),
+        baseOptions({ initialPayment: initialPayment("US", "USD") }),
         undefined
       );
       const component = builder.build({});
@@ -423,6 +424,28 @@ describe("PayPalComponentBuilder", () => {
           paymentMethodType,
           baseOptions({
             initialPayment: initialPayment(countryCode, currencyCode),
+          }),
+          undefined
+        );
+        const component = builder.build({});
+
+        await expect(component.isAvailable()).resolves.toBe(expected);
+      }
+    );
+
+    it.each<["PayUponInvoice" | "Venmo", string, boolean]>([
+      ["PayUponInvoice", "EUR", false],
+      ["Venmo", "USD", true],
+    ])(
+      "%s with a %s cart without a country is available: %s",
+      async (paymentMethodType, currencyCode, expected) => {
+        const builder = new PayPalComponentBuilder(
+          paymentMethodType,
+          baseOptions({
+            initialPayment: {
+              ...initialPayment("US", currencyCode),
+              countryCode: undefined,
+            },
           }),
           undefined
         );
