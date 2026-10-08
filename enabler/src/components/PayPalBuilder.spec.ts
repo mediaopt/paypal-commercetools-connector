@@ -12,12 +12,23 @@ import { PayPalComponentBuilder } from "./PayPalBuilder";
 import { RenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { BaseOptions } from "../payment-enabler/interfaces/baseOptions";
 
+const initialPayment = (
+  countryCode = "DE",
+  currencyCode = "EUR"
+): BaseOptions["initialPayment"] =>
+  ({
+    id: "payment-id",
+    countryCode,
+    amountPlanned: { centAmount: 1000, currencyCode, fractionDigits: 2 },
+  } as BaseOptions["initialPayment"]);
+
 const baseOptions = (overrides: Partial<BaseOptions> = {}): BaseOptions =>
   ({
     processorUrl: "https://processor.example",
     sessionId: "session-id",
     sdkOptions: {},
     settings: {},
+    initialPayment: initialPayment(),
     ...overrides,
   } as BaseOptions);
 
@@ -391,6 +402,40 @@ describe("PayPalComponentBuilder", () => {
             components: [],
           },
         } as any),
+        undefined
+      );
+      const component = builder.build({});
+
+      await expect(component.isAvailable()).resolves.toBe(true);
+    });
+
+    it.each<["PayUponInvoice" | "Venmo", string, string, boolean]>([
+      ["PayUponInvoice", "DE", "EUR", true],
+      ["PayUponInvoice", "AT", "EUR", false],
+      ["PayUponInvoice", "DE", "USD", false],
+      ["Venmo", "US", "USD", true],
+      ["Venmo", "DE", "USD", false],
+      ["Venmo", "US", "EUR", false],
+    ])(
+      "%s with a %s/%s cart is available: %s",
+      async (paymentMethodType, countryCode, currencyCode, expected) => {
+        const builder = new PayPalComponentBuilder(
+          paymentMethodType,
+          baseOptions({
+            initialPayment: initialPayment(countryCode, currencyCode),
+          }),
+          undefined
+        );
+        const component = builder.build({});
+
+        await expect(component.isAvailable()).resolves.toBe(expected);
+      }
+    );
+
+    it("a method without a cart eligibility entry ignores the cart's country/currency", async () => {
+      const builder = new PayPalComponentBuilder(
+        "Blik",
+        baseOptions({ initialPayment: initialPayment("US", "USD") }),
         undefined
       );
       const component = builder.build({});
