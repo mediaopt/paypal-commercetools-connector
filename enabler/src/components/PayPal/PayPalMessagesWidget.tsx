@@ -5,7 +5,9 @@ import {
   usePayPalScriptReducer,
 } from "@paypal/react-paypal-js";
 import { CustomPayPalButtonsComponentProps, PaymentInfo } from "../../types";
+import { CTAmount } from "../../payment-enabler/interfaces/general";
 import { PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES } from "./messagesConstants";
+import { usePayment } from "../../app/usePayment";
 
 export type PayPalMessagesWidgetProps = {
   paypalMessages: PayPalMessagesComponentProps | undefined;
@@ -13,6 +15,9 @@ export type PayPalMessagesWidgetProps = {
   paymentInfo: PaymentInfo;
   isExpress: boolean;
   messagesStyle: PayPalMessagesComponentProps["style"] | undefined;
+  // PayPal Express before the click — Checkout's own values, no Payment exists yet
+  initialAmount?: CTAmount;
+  countryCode?: string;
 };
 
 // In legacy mode it is merchant responsibility to provide messages content,
@@ -25,8 +30,11 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
   paymentInfo,
   isExpress,
   messagesStyle,
+  initialAmount,
+  countryCode: initialCountryCode,
 }) => {
   const [{ isResolved }] = usePayPalScriptReducer();
+  const { createsPaymentOnClick } = usePayment();
   // Messages is not part of the default script components list, so window.paypal.Messages
   // may be missing even after the script resolves - guard rather than crash on render.
   const isMessagesEligible = isResolved && !!window.paypal?.Messages;
@@ -43,22 +51,43 @@ export const PayPalMessagesWidget: React.FC<PayPalMessagesWidgetProps> = ({
     if (paypalMessages) {
       return paypalMessages;
     }
+    const beforeClick =
+      createsPaymentOnClick && !paymentInfo.id && !!initialAmount;
+    const countryCode = beforeClick
+      ? initialCountryCode
+      : paymentInfo.countryCode;
+    if (fundingSource !== "paypal") {
+      return undefined;
+    }
+    // No country before the click: PayPal decides eligibility itself
+    if (!countryCode && !beforeClick) {
+      return undefined;
+    }
     if (
-      fundingSource !== "paypal" ||
-      !paymentInfo.countryCode ||
-      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(paymentInfo.countryCode)
+      countryCode &&
+      !PAY_LATER_MESSAGES_SUPPORTED_COUNTRIES.has(countryCode)
     ) {
       return undefined;
     }
-    const { centAmount, currencyCode, fractionDigits } =
-      paymentInfo.amountPlanned;
+    const { centAmount, currencyCode, fractionDigits } = beforeClick
+      ? initialAmount
+      : paymentInfo.amountPlanned;
     return {
       ...(messagesStyle && { style: messagesStyle }),
       amount: (centAmount / 10 ** fractionDigits).toFixed(fractionDigits),
       currency: currencyCode as PayPalMessagesComponentProps["currency"],
       placement: isExpress ? "product" : "payment",
     };
-  }, [paypalMessages, fundingSource, paymentInfo, isExpress, messagesStyle]);
+  }, [
+    paypalMessages,
+    fundingSource,
+    paymentInfo,
+    isExpress,
+    messagesStyle,
+    initialAmount,
+    initialCountryCode,
+    createsPaymentOnClick,
+  ]);
 
   if (!resolved || !isMessagesEligible) {
     return null;

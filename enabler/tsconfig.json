@@ -15,12 +15,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "declaration": true,
-    "typeRoots": [
-      "index.d.ts",
-      "node_modules/@types",
-      "node_modules/@testing-library"
-    ],
-    "types": ["node", "jest", "jest-dom"],
+    "types": ["node", "jest", "@testing-library/jest-dom"],
     "paths": {
       "@paypal/paypal-js/types/components/funding-eligibility": ["./node_modules/@paypal/paypal-js/types/components/funding-eligibility.d.ts"]
     }

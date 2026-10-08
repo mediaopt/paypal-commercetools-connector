@@ -9,6 +9,10 @@ jest.mock("@paypal/react-paypal-js", () => ({
   },
   usePayPalScriptReducer: () => mockUsePayPalScriptReducer(),
 }));
+const mockUsePayment = jest.fn(() => ({ createsPaymentOnClick: false }));
+jest.mock("../../app/usePayment", () => ({
+  usePayment: () => mockUsePayment(),
+}));
 
 import { PayPalMessagesWidget } from "./PayPalMessagesWidget";
 
@@ -94,5 +98,92 @@ describe("PayPalMessagesWidget eligibility guard", () => {
       amount: "10.00",
       placement: "product",
     });
+  });
+});
+
+describe("PayPalMessagesWidget PayPal Express before the click", () => {
+  const originalPaypal = (window as any).paypal;
+  // No Payment yet: PaymentInfoInitialObject-like
+  const emptyPaymentInfo = {
+    id: "",
+    amountPlanned: { centAmount: 0, currencyCode: "", fractionDigits: 2 },
+  } as any;
+  const initialAmount = {
+    centAmount: 2000,
+    currencyCode: "EUR",
+    fractionDigits: 2,
+  };
+
+  const renderWidget = (props: Record<string, unknown>) =>
+    render(
+      <PayPalMessagesWidget
+        paypalMessages={undefined}
+        fundingSource="paypal"
+        paymentInfo={emptyPaymentInfo}
+        isExpress
+        messagesStyle={undefined}
+        initialAmount={initialAmount}
+        {...props}
+      />
+    );
+
+  beforeEach(() => {
+    capturedProps = undefined;
+    mockUsePayment.mockReturnValue({ createsPaymentOnClick: true });
+    mockUsePayPalScriptReducer.mockReturnValue([
+      { isResolved: true },
+      jest.fn(),
+    ]);
+    (window as any).paypal = { Messages: jest.fn() };
+  });
+
+  afterAll(() => {
+    mockUsePayment.mockReturnValue({ createsPaymentOnClick: false });
+    (window as any).paypal = originalPaypal;
+  });
+
+  it.each<[string, Record<string, unknown>, Record<string, unknown>]>([
+    [
+      "uses Checkout's initialAmount for a supported countryCode",
+      { countryCode: "DE" },
+      { currency: "EUR", amount: "20.00", placement: "product" },
+    ],
+    [
+      "lets PayPal decide eligibility when Checkout passed no countryCode",
+      {},
+      { amount: "20.00", currency: "EUR" },
+    ],
+    [
+      "switches to the cart's amount once the click created the Payment",
+      { countryCode: "DE", paymentInfo: { ...paymentInfo, id: "payment-1" } },
+      { amount: "10.00", currency: "EUR" },
+    ],
+  ])("%s", (_, props, expected) => {
+    renderWidget(props);
+
+    expect(capturedProps).toMatchObject(expected);
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["renders nothing for an unsupported countryCode", { countryCode: "NL" }],
+    [
+      "switches to the cart's country once the click created the Payment",
+      {
+        countryCode: "DE",
+        paymentInfo: { ...paymentInfo, id: "payment-1", countryCode: "NL" },
+      },
+    ],
+  ])("%s", (_, props) => {
+    renderWidget(props);
+
+    expect(capturedProps).toBeUndefined();
+  });
+
+  it("ignores initialAmount for a component that doesn't create its Payment on click", () => {
+    mockUsePayment.mockReturnValue({ createsPaymentOnClick: false });
+
+    renderWidget({});
+
+    expect(capturedProps).toBeUndefined();
   });
 });

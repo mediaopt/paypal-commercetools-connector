@@ -2,7 +2,7 @@ import { DropinType, PaymentDropinBuilder } from "./dropin";
 import { PaymentExpressBuilder } from "./express";
 import { StoredComponentBuilder, StoredPaymentMethod } from "./stored";
 import { CTAmount } from "./general";
-import { FormComponentProps, GenericError } from "../../types";
+import { FormComponentProps, GenericError, OnErrorContext } from "../../types";
 
 /**
  * Represents the payment enabler. The payment enabler is the entry point for creating the components.
@@ -188,6 +188,11 @@ export type EnablerOptions = {
   locale?: string;
 
   /**
+   * The country code for the payment.
+   */
+  countryCode?: string;
+
+  /**
    * A callback function that is called when an action is required during the payment process.
    * @returns A promise that resolves when the action is completed.
    */
@@ -204,7 +209,7 @@ export type EnablerOptions = {
    * @param error - The error that occurred.
    * @param paymentReference - The payment reference.
    */
-  onError?: (error: any, context?: { paymentReference?: string }) => void;
+  onError?: (error: any, context?: OnErrorContext) => void;
 };
 
 /**

@@ -171,24 +171,33 @@ export class PayPalPaymentService extends AbstractPaymentService {
       : getConfig().settingsFallback;
   }
 
+  private async getConfigCartSummary() {
+    // PayPal Express's session may have no Cart before the click
+    const cartId = getCartIdFromContext();
+    if (!cartId) {
+      return undefined;
+    }
+    return this.ctCartService
+      .getCart({ id: cartId })
+      .then((ctCart) => ({
+        customerId: ctCart.customerId,
+        country: ctCart.country,
+        currency: ctCart.totalPrice?.currencyCode,
+      }))
+      .catch((e) => {
+        log.warn(
+          `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
+            e
+          )}`
+        );
+        return undefined;
+      });
+  }
+
   public async config(): Promise<ConfigResponse> {
     const [settings, cartSummary] = await Promise.all([
       this.resolveSettings(),
-      this.ctCartService
-        .getCart({ id: getCartIdFromContext() })
-        .then((ctCart) => ({
-          customerId: ctCart.customerId,
-          country: ctCart.country,
-          currency: ctCart.totalPrice?.currencyCode,
-        }))
-        .catch((e) => {
-          log.warn(
-            `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
-              e
-            )}`
-          );
-          return undefined;
-        }),
+      this.getConfigCartSummary(),
     ]);
 
     // Only worth resolving when vaulting is actually enabled — otherwise nothing uses the token
@@ -394,6 +403,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
     return handler.body;
   }
 
+  // For flows that can't work without a Cart; paymentId only identifies the failing request
+  private requireCartIdFromContext(paymentId?: string): string {
+    const cartId = getCartIdFromContext();
+    if (!cartId) {
+      throw new ErrorInvalidOperation(
+        `no cart found for ${paymentId ?? "the checkout session"}`
+      );
+    }
+    return cartId;
+  }
+
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
       dropins: [],
@@ -412,7 +432,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
   ): Promise<PaymentResponseSchemaDTO> {
     // Expanded so a still-relevant last-linked payment (i.e. if payment method change was triggered) can be reused
     const ctCart = await this.ctCartService.getCart({
-      id: getCartIdFromContext(),
+      id: this.requireCartIdFromContext(),
       expand: ["paymentInfo.payments[*]"],
     });
 
@@ -598,7 +618,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const isPayUponInvoice =
       paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE;
     const [ctCart, settings] = await Promise.all([
-      this.ctCartService.getCart({ id: getCartIdFromContext() }),
+      this.ctCartService.getCart({
+        id: this.requireCartIdFromContext(paymentId),
+      }),
       // Only PUI reads merchant-center settings here (its RatePay texts)
       isPayUponInvoice ? this.resolveSettings() : Promise.resolve(undefined),
     ]);
@@ -1791,7 +1813,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     }
 
     const ctCart = await this.ctCartService.getCart({
-      id: getCartIdFromContext(),
+      id: this.requireCartIdFromContext(paymentId),
     });
 
     const { updatedCtCart, shippingOptions } =
@@ -2172,10 +2194,15 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
+  // Stored payment methods aren't supported for commercetools Express Checkout, whose session may
+  // have no Cart. Supporting them would need commercetools to support it as well. Please open an
+  // issue if you are interested in stored payment methods for Express Checkout.
+  private getStoredPaymentMethodsCart(): Promise<Cart> {
+    return this.ctCartService.getCart({ id: this.requireCartIdFromContext() });
+  }
+
   public async getStoredPaymentMethods(): Promise<StoredPaymentMethodsResponse> {
-    const ctCart = await this.ctCartService.getCart({
-      id: getCartIdFromContext(),
-    });
+    const ctCart = await this.getStoredPaymentMethodsCart();
 
     if (!ctCart.customerId) {
       log.warn(
@@ -2255,55 +2282,17 @@ export class PayPalPaymentService extends AbstractPaymentService {
   }
 
   public async deleteStoredPaymentMethod(token: string): Promise<void> {
-    const cartId = getCartIdFromContext();
-    // Promise.allSettled (not Promise.all) — unlike Promise.all, this keeps the cart (and thus
-    // customerId) available below even when the PayPal delete itself rejects, so the failure can
-    // still be logged onto the CT customer. The cart is only ever used best-effort here (mirror
-    // cleanup, and now audit logging), never to authorize the deletion itself.
-    const [deleteResult, cartResult] = await Promise.allSettled([
-      deletePaymentToken(token),
-      this.ctCartService.getCart({ id: cartId }).catch(() => undefined),
-    ]);
-    const ctCart: Cart | undefined =
-      cartResult.status === "fulfilled" ? cartResult.value : undefined;
-
-    if (deleteResult.status === "rejected") {
-      const e = deleteResult.reason;
-      log.error(
-        `deleteStoredPaymentMethod: failed, cartId: ${
-          ctCart?.id ?? cartId ?? "unavailable"
-        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
+    const ctCart = await this.getStoredPaymentMethodsCart();
+    const customerId = ctCart.customerId;
+    if (!customerId) {
+      throw new ErrorInvalidOperation(
+        `payment token ${token} cannot be deleted: cart has no customer`
       );
-      if (ctCart?.customerId) {
-        void this.logProcessorCustomerInteraction(
-          ctCart.customerId,
-          "deletePaymentToken",
-          { paymentToken: token },
-          buildErrorResponsePayload(e)
-        );
-      }
-      throw e;
     }
 
-    log.info(
-      `deleteStoredPaymentMethod: success, cartId: ${
-        ctCart?.id ?? cartId ?? "unavailable"
-      }`
-    );
-
-    if (ctCart?.customerId) {
-      const customerId = ctCart.customerId;
-      void this.logProcessorCustomerInteraction(
-        customerId,
-        "deletePaymentToken",
-        { paymentToken: token },
-        deleteResult.value
-      );
-
-      // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one
-      // exists. The PayPal deletion above already succeeded and is the authoritative action;
-      // this fire-and-forget cleanup just keeps commercetools from holding a stale reference.
-      void this.ctPaymentMethodService
+    // Independent lookups, run in parallel; the commercetools record is a best-effort mirror
+    const [ctPaymentMethod, paypalCustomerId] = await Promise.all([
+      this.ctPaymentMethodService
         .getByTokenValue({
           customerId,
           tokenValue: token,
@@ -2312,16 +2301,72 @@ export class PayPalPaymentService extends AbstractPaymentService {
           interfaceAccount:
             getStoredPaymentMethodsConfig().config.interfaceAccount,
         })
-        .then((ctPaymentMethod) =>
-          this.ctPaymentMethodService.delete({
-            customerId,
-            id: ctPaymentMethod.id,
-            version: ctPaymentMethod.version,
-          })
-        )
+        .catch(() => undefined),
+      this.resolvePayPalCustomerId(customerId).catch(() => undefined),
+    ]);
+    // Without a commercetools record, PayPal's own list for this customer decides ownership
+    if (!ctPaymentMethod) {
+      const paypalTokens = paypalCustomerId
+        ? await getPaymentTokens(paypalCustomerId)
+            .then((response) => response.payment_tokens)
+            .catch((e) => {
+              log.warn(
+                `deleteStoredPaymentMethod: token list lookup failed for PayPal customer ${paypalCustomerId} (CT customer ${customerId}) — ${errorMessage(
+                  e
+                )}${payPalDebugIdSuffix(e)}`
+              );
+              return undefined;
+            })
+        : undefined;
+      if (!paypalTokens?.some((paymentToken) => paymentToken.id === token)) {
+        log.warn(
+          `deleteStoredPaymentMethod: token ${token} not owned by customer ${customerId}`
+        );
+        throw new ErrorInvalidOperation(
+          `payment token ${token} does not belong to customer ${customerId}`
+        );
+      }
+    }
+
+    let deleteResponse;
+    try {
+      deleteResponse = await deletePaymentToken(token);
+    } catch (e) {
+      log.error(
+        `deleteStoredPaymentMethod: failed, cartId: ${ctCart.id} — ${errorMessage(
+          e
+        )}${payPalDebugIdSuffix(e)}`
+      );
+      void this.logProcessorCustomerInteraction(
+        customerId,
+        "deletePaymentToken",
+        { paymentToken: token },
+        buildErrorResponsePayload(e)
+      );
+      throw e;
+    }
+
+    log.info(`deleteStoredPaymentMethod: success, cartId: ${ctCart.id}`);
+    void this.logProcessorCustomerInteraction(
+      customerId,
+      "deletePaymentToken",
+      { paymentToken: token },
+      deleteResponse
+    );
+
+    // Best-effort mirror cleanup of the commercetools-native PaymentMethod record, if one exists.
+    // The PayPal deletion above already succeeded and is the authoritative action; this
+    // fire-and-forget cleanup just keeps commercetools from holding a stale reference.
+    if (ctPaymentMethod) {
+      void this.ctPaymentMethodService
+        .delete({
+          customerId,
+          id: ctPaymentMethod.id,
+          version: ctPaymentMethod.version,
+        })
         .catch((e) =>
           log.warn(
-            `deleteStoredPaymentMethod: no matching commercetools PaymentMethod record: ${errorMessage(
+            `deleteStoredPaymentMethod: could not delete commercetools PaymentMethod record: ${errorMessage(
               e
             )}`
           )

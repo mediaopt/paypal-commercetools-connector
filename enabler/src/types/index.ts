@@ -33,6 +33,8 @@ export type GenericError = {
   message: string;
 };
 
+export type OnErrorContext = { paymentReference?: string };
+
 export type BuilderType = "dropin" | "express" | undefined;
 
 export type PayPalPaymentMethodType =
@@ -277,12 +279,12 @@ export type CheckoutOnlyProps = {
    * useSettings.tsx's SettingsProvider to skip <PayPalScriptProvider> entirely. */
   isStoredCheckoutComponent?: boolean;
   /** Injected by RenderTemplate.tsx from BaseOptions, same as `processorUrl` — the commercetools
-   * Payment for this checkout page load, already resolved (in PayPalPaymentEnabler._Setup(),
-   * alongside the /operations/config fetch) by the time any component mounts. Lets every
-   * concurrently-mounted component share one Payment instead of each
+   * Payment for this checkout page load, already resolved (in
+   * PayPalPaymentEnabler._SetupPayment(), standard/stored only) by the time any component mounts.
+   * Lets every concurrently-mounted component share one Payment instead of each
    * creating its own, with no async fetch needed inside PaymentProvider at all. Absent for
    * self-hosted deployments, which fall back to usePayment.tsx's own direct createPaymentUrl
-   * call. */
+   * call, and for PayPal Express, which creates its Payment on click. */
   initialPayment?: CreatePaymentResponse;
   /** PayPal Express only — Checkout's ExpressOptions.onPayButtonClick. See usePayment.tsx's
    * handleCreateOrder. */
@@ -290,7 +292,8 @@ export type CheckoutOnlyProps = {
 };
 
 /** Checkout's EnablerOptions.onError, adapted in PayPalBuilder.ts. Given to PaymentProvider only
- * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed. */
+ * by GooglePay.tsx, for 3DS failures that happen after the payment sheet has already closed, and by
+ * PayPal.tsx, for Express create-order failures after Checkout's onPayButtonClick. */
 export type ProviderErrorProps = Pick<GenericMountProps, "onError">;
 
 /** Category 4 — legacy fields with no `processorUrl` migration path.
@@ -401,7 +404,9 @@ export type CustomPayPalButtonsComponentProps = Omit<
   // resolveOptions.ts and arrives here as a real prop (like messagesStyle above), not read via
   // useSettings().
   disablePayLaterButton?: boolean;
-} & Pick<BasicComponentProps, "enableVaulting">;
+} & Pick<BasicComponentProps, "enableVaulting"> &
+  // PayPal Express's Pay Later message before a Payment exists
+  Pick<GenericMountProps, "initialAmount" | "countryCode">;
 
 export type SmartComponentsProps = CustomPayPalButtonsComponentProps &
   GeneralComponentsProps;
@@ -698,8 +703,9 @@ export type GenericMountProps = FormComponentProps & {
   showPayButton?: boolean;
   fullWidth?: boolean;
   buttonText?: string;
-  onError?: (error: GenericError) => void;
+  onError?: (error: GenericError, context?: OnErrorContext) => void;
   initialAmount?: CTAmount;
+  countryCode?: string;
   onExpressPayButtonClick?: CheckoutOnlyProps["onExpressPayButtonClick"];
   /** only for a stored-payment-method component (PayPalStoredBuilder) — PayPal's
    * vault payment-token id of the saved card */

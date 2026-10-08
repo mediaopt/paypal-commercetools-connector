@@ -46,8 +46,8 @@ const dispose = ({ root, host }: { root: Root; host: HTMLDivElement }) => {
 };
 
 /**
- * Idempotent per unique `options` value: PayPalPaymentEnabler._Setup() can run more than once per
- * page (e.g. Checkout re-triggering setup on a payment-method switch), and re-preloading with the
+ * Idempotent per unique `options` value: PayPalPaymentEnabler._SetupPayment() can run more than once
+ * per page (e.g. Checkout re-triggering setup on a payment-method switch), and re-preloading with the
  * same options would otherwise mount a second, redundant persistent provider for no reason — the
  * cache returns the same in-flight/settled promise instead. A genuinely different `options` value
  * across such re-runs (e.g. the cart's currency changed) falls through to a fresh preload.

@@ -65,6 +65,11 @@ describe("paypal-payment.service", () => {
     },
   } as unknown as Cart;
 
+  const mockCartWithCustomer = {
+    ...mockCart,
+    customerId: "ct-customer-id",
+  } as unknown as Cart;
+
   const mockPayment = {
     id: "payment-id",
     version: 3,
@@ -2946,10 +2951,6 @@ describe("paypal-payment.service", () => {
   });
 
   describe("getStoredPaymentMethods", () => {
-    const mockCartWithCustomer = {
-      ...mockCart,
-      customerId: "ct-customer-id",
-    } as unknown as Cart;
 
     const mockPaymentToken = {
       id: "paypal-token-id",
@@ -3184,33 +3185,40 @@ describe("paypal-payment.service", () => {
   });
 
   describe("deleteStoredPaymentMethod", () => {
-    test("deletes the token from PayPal and mirrors the cleanup onto commercetools when a record exists", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerId: "ct-customer-id",
-      } as unknown as Cart);
+    const mockCtPaymentMethod = { id: "ct-payment-method-id", version: 1 };
+    let getByTokenValueSpy: jest.SpiedFunction<
+      typeof paymentSDK.ctPaymentMethodService.getByTokenValue
+    >;
+    let ctPaymentMethodDeleteSpy: jest.SpiedFunction<
+      typeof paymentSDK.ctPaymentMethodService.delete
+    >;
+
+    // Owned token, commercetools record present, PayPal delete succeeds
+    beforeEach(() => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCartWithCustomer);
+      getByTokenValueSpy = jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
+        .mockResolvedValue(mockCtPaymentMethod as never);
+      ctPaymentMethodDeleteSpy = jest
+        .spyOn(paymentSDK.ctPaymentMethodService, "delete")
+        .mockResolvedValue({} as never);
       (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
         status: "success",
       } as never);
-      jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
-        .mockResolvedValue({
-          id: "ct-payment-method-id",
-          version: 1,
-        } as never);
-      const deleteSpy = jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "delete")
-        .mockResolvedValue({} as never);
+    });
 
+    test("record present: deletes the token from PayPal and the found commercetools record, without listing PayPal tokens", async () => {
       await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
-
-      // Fire-and-forget cleanup — flush pending microtasks before asserting.
-      await new Promise(process.nextTick);
 
       expect(CommonConnect.deletePaymentToken).toHaveBeenCalledWith(
         "paypal-token-id"
       );
-      expect(deleteSpy).toHaveBeenCalledWith({
+      expect(CommonConnect.getPaymentTokens).not.toHaveBeenCalled();
+      // The cleanup reuses the record found by the ownership check
+      expect(getByTokenValueSpy).toHaveBeenCalledTimes(1);
+      expect(ctPaymentMethodDeleteSpy).toHaveBeenCalledWith({
         customerId: "ct-customer-id",
         id: "ct-payment-method-id",
         version: 1,
@@ -3219,22 +3227,8 @@ describe("paypal-payment.service", () => {
 
     test("looks up the commercetools PaymentMethod record by the configured interfaceAccount", async () => {
       mockStoredPaymentMethodsInterfaceAccount();
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerId: "ct-customer-id",
-      } as unknown as Cart);
-      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
-        status: "success",
-      } as never);
-      const getByTokenValueSpy = jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
-        .mockResolvedValue({ id: "ct-payment-method-id", version: 1 } as never);
-      jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "delete")
-        .mockResolvedValue({} as never);
 
       await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
-      await new Promise(process.nextTick);
 
       expect(getByTokenValueSpy).toHaveBeenCalledWith({
         customerId: "ct-customer-id",
@@ -3244,55 +3238,101 @@ describe("paypal-payment.service", () => {
       });
     });
 
-    test("does not attempt a mirror cleanup when no matching commercetools record exists", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerId: "ct-customer-id",
-      } as unknown as Cart);
-      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
-        status: "success",
-      } as never);
-      jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
-        .mockRejectedValue(new Error("not found") as never);
-      const deleteSpy = jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "delete")
-        .mockResolvedValue({} as never);
+    describe("without a commercetools record (PayPal's list decides)", () => {
+      beforeEach(() => {
+        getByTokenValueSpy.mockRejectedValue(new Error("not found") as never);
+      });
 
-      await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
-      await new Promise(process.nextTick);
+      test("deletes when PayPal lists the token for the customer, without a mirror cleanup", async () => {
+        (CommonConnect.getPaymentTokens as jest.Mock).mockResolvedValue({
+          payment_tokens: [{ id: "paypal-token-id" }],
+        } as never);
 
-      expect(deleteSpy).not.toHaveBeenCalled();
+        await paypalPaymentService.deleteStoredPaymentMethod(
+          "paypal-token-id"
+        );
+        await new Promise(process.nextTick);
+
+        expect(CommonConnect.getPaymentTokens).toHaveBeenCalledWith(
+          "paypal-customer-id"
+        );
+        expect(CommonConnect.deletePaymentToken).toHaveBeenCalledWith(
+          "paypal-token-id"
+        );
+        expect(ctPaymentMethodDeleteSpy).not.toHaveBeenCalled();
+      });
+
+      test("refuses a token PayPal doesn't list for the customer", async () => {
+        (CommonConnect.getPaymentTokens as jest.Mock).mockResolvedValue({
+          payment_tokens: [{ id: "someone-elses-token" }],
+        } as never);
+
+        await expect(
+          paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+        ).rejects.toThrow(
+          new ErrorInvalidOperation(
+            "payment token paypal-token-id does not belong to customer ct-customer-id"
+          )
+        );
+        expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
+      });
+
+      test("refuses with a 400 instead of a 500 when PayPal's token list lookup fails (e.g. 404 for an unknown PayPal customer)", async () => {
+        (CommonConnect.getPaymentTokens as jest.Mock).mockRejectedValue(
+          new Error("Request failed with status code 404") as never
+        );
+
+        await expect(
+          paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+        ).rejects.toThrow(
+          new ErrorInvalidOperation(
+            "payment token paypal-token-id does not belong to customer ct-customer-id"
+          )
+        );
+        expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
+      });
+
+      test("refuses without listing PayPal tokens when the customer has no PayPalUserId", async () => {
+        mockCustomerGetExecute.mockResolvedValue({
+          body: { ...mockCtCustomer, custom: undefined },
+        } as never);
+
+        await expect(
+          paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+        ).rejects.toThrow("does not belong to customer ct-customer-id");
+        expect(CommonConnect.getPaymentTokens).not.toHaveBeenCalled();
+        expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
+      });
     });
 
-    test("rethrows when the PayPal delete fails, without attempting a mirror cleanup", async () => {
+    test("refuses when the cart has no customer, before any ownership lookup", async () => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(mockCart);
+
+      await expect(
+        paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+      ).rejects.toThrow(
+        "payment token paypal-token-id cannot be deleted: cart has no customer"
+      );
+      expect(getByTokenValueSpy).not.toHaveBeenCalled();
+      expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
+    });
+
+    test("rethrows when the PayPal delete fails, without a mirror cleanup", async () => {
       (CommonConnect.deletePaymentToken as jest.Mock).mockRejectedValue(
         new Error("PayPal is down") as never
-      );
-      const getByTokenValueSpy = jest.spyOn(
-        paymentSDK.ctPaymentMethodService,
-        "getByTokenValue"
       );
 
       await expect(
         paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
       ).rejects.toThrow("PayPal is down");
+      await new Promise(process.nextTick);
 
-      expect(getByTokenValueSpy).not.toHaveBeenCalled();
+      expect(ctPaymentMethodDeleteSpy).not.toHaveBeenCalled();
     });
 
     test("logs the deletePaymentToken request/response onto the CT customer on success", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerId: "ct-customer-id",
-      } as unknown as Cart);
-      (CommonConnect.deletePaymentToken as jest.Mock).mockResolvedValue({
-        status: "success",
-      } as never);
-      jest
-        .spyOn(paymentSDK.ctPaymentMethodService, "getByTokenValue")
-        .mockRejectedValue(new Error("not found") as never);
-
       await paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id");
       await new Promise(process.nextTick);
 
@@ -3315,11 +3355,7 @@ describe("paypal-payment.service", () => {
       });
     });
 
-    test("logs the deletePaymentToken failure onto the CT customer, using the cart still fetched in parallel", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerId: "ct-customer-id",
-      } as unknown as Cart);
+    test("logs the deletePaymentToken failure onto the CT customer", async () => {
       (CommonConnect.deletePaymentToken as jest.Mock).mockRejectedValue(
         new Error("PayPal is down") as never
       );
@@ -3750,6 +3786,72 @@ describe("paypal-payment.service", () => {
       ).rejects.toThrow();
 
       expect(CommonConnect.updatePayPalOrder).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // SDK >=1.3.0 authenticates a session without a Cart (PayPal Express before the click)
+  describe("session without a Cart", () => {
+    beforeEach(() => {
+      jest
+        .spyOn(FastifyContext, "getCartIdFromContext")
+        .mockReturnValue(undefined);
+    });
+
+    test("config: skips the cart lookup and still returns the config", async () => {
+      const result = await paypalPaymentService.config();
+
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(result.settings).toEqual(
+        CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES
+      );
+      expect(result.userIdToken).toBeUndefined();
+    });
+
+    test("createPayment: throws instead of looking up an undefined cart", async () => {
+      await expect(
+        paypalPaymentService.createPayment({} as never)
+      ).rejects.toThrow(
+        new ErrorInvalidOperation("no cart found for the checkout session")
+      );
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+    });
+
+    test("createOrder: throws with the payment id", async () => {
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: { paymentSource: "paypal" },
+        })
+      ).rejects.toThrow(`no cart found for ${mockPayment.id}`);
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("updateShipping: throws with the payment id", async () => {
+      await expect(
+        paypalPaymentService.updateShipping({
+          paymentId: mockPayment.id,
+          orderID: mockPayPalOrder.id,
+          shippingMethodId: "standard",
+        })
+      ).rejects.toThrow(`no cart found for ${mockPayment.id}`);
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(CommonConnect.updatePayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("getStoredPaymentMethods: throws — not supported for Express Checkout", async () => {
+      await expect(
+        paypalPaymentService.getStoredPaymentMethods()
+      ).rejects.toThrow("no cart found for the checkout session");
+      expect(CommonConnect.getPaymentTokens).not.toHaveBeenCalled();
+    });
+
+    test("deleteStoredPaymentMethod: throws — not supported for Express Checkout", async () => {
+      await expect(
+        paypalPaymentService.deleteStoredPaymentMethod("paypal-token-id")
+      ).rejects.toThrow("no cart found for the checkout session");
+      expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
+      expect(CommonConnect.deletePaymentToken).not.toHaveBeenCalled();
     });
   });
 });

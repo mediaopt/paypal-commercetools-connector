@@ -31,10 +31,23 @@ export type {
 } from "../types";
 
 export class PayPalPaymentEnabler implements PaymentEnabler {
-  setupData: Promise<{ baseOptions: BaseOptions }>;
+  private configSetup: Promise<{ baseOptions: BaseOptions }> | null = null;
+  private standardSetup: Promise<{ baseOptions: BaseOptions }> | null = null;
 
-  constructor(options: BaseOptions) {
-    this.setupData = PayPalPaymentEnabler._Setup(options);
+  constructor(private options: BaseOptions) {}
+
+  // Session-only — also works for PayPal Express, whose session may have no Cart before the click
+  private getConfigSetup(): Promise<{ baseOptions: BaseOptions }> {
+    this.configSetup ??= PayPalPaymentEnabler._Setup(this.options);
+    return this.configSetup;
+  }
+
+  // Needs a Cart in the session — standard and stored builders only
+  private getStandardSetup(): Promise<{ baseOptions: BaseOptions }> {
+    this.standardSetup ??= this.getConfigSetup().then(
+      PayPalPaymentEnabler._SetupPayment
+    );
+    return this.standardSetup;
   }
 
   private static _Setup = async (
@@ -74,28 +87,11 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
           : undefined,
       };
 
-      // One shared commercetools Payment per checkout page load, shared by every standard/stored/
-      // express builder resolving this same setupData; and the one PayPal JS SDK script load
-      // above — independent of each other, so run together instead of sequentially. Both fatal on failure.
-      // No request body at all: payment is based on cart in session.
-      // If ever changed - processor's InitPaymentRequestSchema has to match exactly
-      const [paymentResult] = await Promise.all([
-        processorRequest<{}, CreatePaymentResponse>(
-          sessionHeader(options.sessionId),
-          processorUrls(options.processorUrl).createPaymentUrl,
-          {}
-        ),
-        preloadPayPalScript(paypalScriptOptions),
-      ]);
-      if (!paymentResult) {
-        throw new Error("Could not create payment");
-      }
-
       return {
         baseOptions: {
           processorUrl: options.processorUrl,
           sessionId: options.sessionId,
-          initialPayment: paymentResult,
+          countryCode: options.countryCode,
           storedPaymentMethodsEnabled:
             !!configJson.storedPaymentMethodsConfig?.isEnabled,
           enableVaulting: !!configJson.enableVaulting,
@@ -127,10 +123,40 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
     }
   };
 
+  private static _SetupPayment = async ({
+    baseOptions,
+  }: {
+    baseOptions: BaseOptions;
+  }): Promise<{ baseOptions: BaseOptions }> => {
+    try {
+      // One shared commercetools Payment per checkout page load, shared by every standard/stored
+      // builder; and the one PayPal JS SDK script load — independent of each other, so run
+      // together instead of sequentially. Both fatal on failure.
+      // No request body at all: payment is based on cart in session.
+      // If code ever changed - processor's InitPaymentRequestSchema type has to match exactly
+      const [paymentResult] = await Promise.all([
+        processorRequest<{}, CreatePaymentResponse>(
+          sessionHeader(baseOptions.sessionId),
+          processorUrls(baseOptions.processorUrl).createPaymentUrl,
+          {}
+        ),
+        preloadPayPalScript(baseOptions.paypalScriptOptions),
+      ]);
+      if (!paymentResult) {
+        throw new Error("Could not create payment");
+      }
+      return { baseOptions: { ...baseOptions, initialPayment: paymentResult } };
+    } catch (err) {
+      // Rethrown unchanged; this only adds visibility.
+      console.error(`[paypal-enabler][setup] _SetupPayment failed:`, err);
+      throw err;
+    }
+  };
+
   async createComponentBuilder(
     type: string
   ): Promise<PaymentComponentBuilder | never> {
-    const { baseOptions } = await this.setupData;
+    const { baseOptions } = await this.getStandardSetup();
     return Promise.resolve(
       new PayPalComponentBuilder(toPayPalPaymentMethodType(type), baseOptions)
     );
@@ -145,7 +171,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   async createExpressBuilder(
     type: string
   ): Promise<PaymentComponentBuilder | never> {
-    const { baseOptions } = await this.setupData;
+    const { baseOptions } = await this.getConfigSetup();
     return Promise.resolve(
       new PayPalComponentBuilder(
         toPayPalPaymentMethodType(type),
@@ -158,7 +184,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   async createStoredPaymentMethodBuilder(
     type: string
   ): Promise<StoredComponentBuilder | never> {
-    const { baseOptions } = await this.setupData;
+    const { baseOptions } = await this.getStandardSetup();
     const normalizedType = toPayPalPaymentMethodType(type);
 
     // Only credit cards are vaulted/stored — see Checkout-mode scope.
@@ -174,7 +200,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   }: {
     allowedMethodTypes: string[];
   }): Promise<{ storedPaymentMethods?: StoredPaymentMethod[] }> {
-    const { baseOptions } = await this.setupData;
+    const { baseOptions } = await this.getConfigSetup();
     const url = processorUrls(
       baseOptions.processorUrl
     ).getStoredPaymentMethodsURL;
@@ -193,7 +219,7 @@ export class PayPalPaymentEnabler implements PaymentEnabler {
   }
 
   async isStoredPaymentMethodsEnabled(): Promise<boolean> {
-    const { baseOptions } = await this.setupData;
+    const { baseOptions } = await this.getConfigSetup();
     return baseOptions.storedPaymentMethodsEnabled ?? false;
   }
 

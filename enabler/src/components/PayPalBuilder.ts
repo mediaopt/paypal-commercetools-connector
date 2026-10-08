@@ -10,6 +10,7 @@ import {
   BuilderType,
   GenericError,
   GenericMountProps,
+  OnErrorContext,
   PayPalPaymentMethodType,
   ValidationHandlers,
 } from "../types";
@@ -84,15 +85,17 @@ class PayPalComponent implements PaymentComponent {
       fullWidth: this.config.fullWidth,
       buttonText: this.config.buttonText,
       // onError is a new, checkout-only prop — not supported for legacy enabler components.
-      // For PayPal Express, paymentReference may be stale: onPayButtonClick switches to a new
-      // session and Payment, which this mount-time value doesn't follow. Refer to the logs.
+      // PayPal Express passes the Payment created on click; others use the setup-time one.
       onError: this.baseOptions.onError
-        ? (error: GenericError) =>
+        ? (error: GenericError, context?: OnErrorContext) =>
             this.baseOptions.onError?.(error, {
-              paymentReference: this.baseOptions.initialPayment?.id,
+              paymentReference:
+                context?.paymentReference ??
+                this.baseOptions.initialPayment?.id,
             })
         : undefined,
       initialAmount: this.config.initialAmount,
+      countryCode: this.baseOptions.countryCode,
       // For express, Checkout passes ExpressOptions (not ComponentOptions) into build()
       ...(this.builderType === "express" && {
         onExpressPayButtonClick: (this.config as unknown as ExpressOptions)
@@ -108,10 +111,26 @@ class PayPalComponent implements PaymentComponent {
       },
     };
 
+    // Express's session may have no Cart before the click, so the processor can't derive the
+    // currency from it
+    const expressCurrency =
+      this.builderType === "express"
+        ? this.config.initialAmount?.currencyCode
+        : undefined;
+    const baseOptions = expressCurrency
+      ? {
+          ...this.baseOptions,
+          expressSdkOptions: {
+            ...this.baseOptions.expressSdkOptions,
+            currency: expressCurrency,
+          },
+        }
+      : this.baseOptions;
+
     this.root = mountRenderTemplate(selector, {
       paymentMethodType: this.paymentMethodType,
       builderType: this.builderType,
-      baseOptions: this.baseOptions,
+      baseOptions,
       genericOptions,
     });
   }

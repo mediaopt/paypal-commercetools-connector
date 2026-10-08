@@ -167,6 +167,41 @@ describe("PayPalComponentBuilder", () => {
     });
   });
 
+  it("genericOptions.onError prefers the caller's paymentReference (PayPal Express's Payment created on click)", async () => {
+    const enablerOnError = jest.fn();
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions({
+        onError: enablerOnError,
+        initialPayment: { id: "payment-id" } as BaseOptions["initialPayment"],
+      }),
+      "express"
+    );
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    const error = { code: "EXPRESS_CREATE_ORDER_FAILED", message: "failed" };
+    capturedElement.props.genericOptions.onError(error, {
+      paymentReference: "click-payment-id",
+    });
+
+    expect(enablerOnError).toHaveBeenCalledWith(error, {
+      paymentReference: "click-payment-id",
+    });
+  });
+
+  it("genericOptions.countryCode is Checkout's EnablerOptions.countryCode from baseOptions", async () => {
+    const builder = new PayPalComponentBuilder(
+      "PayPal",
+      baseOptions({ countryCode: "DE" }),
+      "express"
+    );
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.genericOptions.countryCode).toBe("DE");
+  });
+
   it("genericOptions.onExpressPayButtonClick is Checkout's ExpressOptions.onPayButtonClick for an express builder", async () => {
     const onPayButtonClick = jest.fn();
     const builder = new PayPalComponentBuilder(
@@ -194,6 +229,48 @@ describe("PayPalComponentBuilder", () => {
     expect(
       capturedElement.props.genericOptions
     ).not.toHaveProperty("onExpressPayButtonClick");
+  });
+
+  it("express: overrides expressSdkOptions.currency with initialAmount.currencyCode — a session without a Cart gives the processor no currency", async () => {
+    const options = baseOptions({
+      expressSdkOptions: { currency: "USD", components: "buttons" },
+    });
+    const builder = new PayPalComponentBuilder("PayPal", options, "express");
+    const component = builder.build({
+      initialAmount: { centAmount: 2000, currencyCode: "EUR", fractionDigits: 2 },
+    } as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions.expressSdkOptions).toEqual({
+      currency: "EUR",
+      components: "buttons",
+    });
+    expect(capturedElement.props.baseOptions.sessionId).toBe("session-id");
+    // The shared baseOptions object stays untouched for every other builder
+    expect(options.expressSdkOptions).toEqual({
+      currency: "USD",
+      components: "buttons",
+    });
+  });
+
+  it("express: keeps baseOptions as-is when initialAmount has no currency", async () => {
+    const options = baseOptions({ expressSdkOptions: { currency: "USD" } });
+    const builder = new PayPalComponentBuilder("PayPal", options, "express");
+    const component = builder.build({} as never);
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions).toBe(options);
+  });
+
+  it("non-express: ignores initialAmount.currencyCode for the script options", async () => {
+    const options = baseOptions({ expressSdkOptions: { currency: "USD" } });
+    const builder = new PayPalComponentBuilder("PayPal", options, undefined);
+    const component = builder.build({
+      initialAmount: { centAmount: 2000, currencyCode: "EUR", fractionDigits: 2 },
+    });
+    await component.mount("#paypal-container");
+
+    expect(capturedElement.props.baseOptions).toBe(options);
   });
 
   it("onRegisterSubmit wires component.submit() to the registered handler", async () => {
@@ -229,10 +306,10 @@ describe("PayPalComponentBuilder", () => {
       isValid,
     });
 
-    await component.showValidation();
+    await component.showValidation!();
     expect(showValidation).toHaveBeenCalled();
 
-    await expect(component.isValid()).resolves.toBe(false);
+    await expect(component.isValid!()).resolves.toBe(false);
   });
 
   it("isValid() defaults to true before any validation handler is registered", async () => {
@@ -243,7 +320,7 @@ describe("PayPalComponentBuilder", () => {
     );
     const component = builder.build({});
 
-    await expect(component.isValid()).resolves.toBe(true);
+    await expect(component.isValid!()).resolves.toBe(true);
   });
 
   describe("isAvailable()", () => {
@@ -279,7 +356,7 @@ describe("PayPalComponentBuilder", () => {
         );
         const component = builder.build({});
 
-        await expect(component.isAvailable()).resolves.toBe(false);
+        await expect(component.isAvailable!()).resolves.toBe(false);
       }
     );
 
@@ -310,7 +387,7 @@ describe("PayPalComponentBuilder", () => {
         );
         const component = builder.build({});
 
-        await expect(component.isAvailable()).resolves.toBe(true);
+        await expect(component.isAvailable!()).resolves.toBe(true);
       }
     );
 
@@ -329,7 +406,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
 
       Object.defineProperty(navigator, "userAgent", {
         value: originalUserAgent,
@@ -347,7 +424,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
     });
 
     it("CardFields is available when 'card-fields' is present in standardScriptOptions.components", async () => {
@@ -360,7 +437,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(true);
+      await expect(component.isAvailable!()).resolves.toBe(true);
     });
 
     it("ApplePay is unavailable when 'applepay' is absent from standardScriptOptions.components, even when the browser itself supports Apple Pay", async () => {
@@ -377,7 +454,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(false);
+      await expect(component.isAvailable!()).resolves.toBe(false);
 
       delete (window as any).ApplePaySession;
     });
@@ -395,7 +472,7 @@ describe("PayPalComponentBuilder", () => {
       );
       const component = builder.build({});
 
-      await expect(component.isAvailable()).resolves.toBe(true);
+      await expect(component.isAvailable!()).resolves.toBe(true);
     });
   });
 });

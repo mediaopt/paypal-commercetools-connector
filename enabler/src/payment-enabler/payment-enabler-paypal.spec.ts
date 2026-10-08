@@ -4,12 +4,18 @@ jest.mock("../services/processorRequest", () => ({
 jest.mock("../app/preloadPayPalScript", () => ({
   preloadPayPalScript: jest.fn(),
 }));
+// Captures the baseOptions each builder is constructed with
+jest.mock("../components/PayPalBuilder", () => ({
+  PayPalComponentBuilder: jest.fn(),
+}));
 
 import { PayPalPaymentEnabler } from "./payment-enabler-paypal";
 import { processorRequest } from "../services/processorRequest";
 import { preloadPayPalScript } from "../app/preloadPayPalScript";
+import { PayPalComponentBuilder } from "../components/PayPalBuilder";
 import { PARTNER_ATTRIBUTION_ID } from "../constants";
 import { DEFAULT_SCRIPT_CURRENCY } from "../components/constants";
+import { BaseOptions } from "./interfaces/baseOptions";
 
 const mockedProcessorRequest = processorRequest as jest.MockedFunction<
   typeof processorRequest
@@ -17,6 +23,7 @@ const mockedProcessorRequest = processorRequest as jest.MockedFunction<
 const mockedPreload = preloadPayPalScript as jest.MockedFunction<
   typeof preloadPayPalScript
 >;
+const MockedBuilder = PayPalComponentBuilder as unknown as jest.Mock;
 
 const baseConfigJson = {
   clientId: "client-id",
@@ -40,13 +47,30 @@ const mockFetchOk = (json: Record<string, unknown>) => {
   });
 };
 
-const buildEnabler = () =>
+const buildEnabler = (overrides: Record<string, unknown> = {}) =>
   new PayPalPaymentEnabler({
     processorUrl: "https://processor.example",
     sessionId: "session-id",
+    ...overrides,
   } as any);
 
-describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
+const lastBuilderArgs = (): [string, BaseOptions, string | undefined] =>
+  MockedBuilder.mock.calls[MockedBuilder.mock.calls.length - 1];
+
+// Standard setup: /operations/config + createPayment + shared script preload
+const standardBaseOptions = async (enabler = buildEnabler()) => {
+  await enabler.createComponentBuilder("paypal");
+  return lastBuilderArgs()[1];
+};
+
+const resetMocksWithWorkingSetup = () => {
+  jest.clearAllMocks();
+  mockedPreload.mockResolvedValue(undefined);
+  mockedProcessorRequest.mockResolvedValue({ id: "payment-id" } as any);
+  mockFetchOk(baseConfigJson);
+};
+
+describe("PayPalPaymentEnabler standard setup (via createComponentBuilder)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedPreload.mockResolvedValue(undefined);
@@ -56,7 +80,7 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
   it("builds paypalScriptOptions from standardScriptOptions + settings, byte-identical to what useSettings.tsx's own merge separately produces for a standard component, and preloads it", async () => {
     mockFetchOk(baseConfigJson);
 
-    const { baseOptions } = await buildEnabler().setupData;
+    const baseOptions = await standardBaseOptions();
 
     const expectedScriptOptions = {
       clientId: "client-id",
@@ -74,7 +98,7 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
   it("passes expressSdkOptions/standardScriptOptions through from the config response unchanged, for the Express-only/settings-driven consumers", async () => {
     mockFetchOk(baseConfigJson);
 
-    const { baseOptions } = await buildEnabler().setupData;
+    const baseOptions = await standardBaseOptions();
 
     expect(baseOptions.expressSdkOptions).toEqual({ currency: "USD" });
     expect(baseOptions.standardScriptOptions).toEqual(
@@ -85,7 +109,7 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
   it("falls back to DEFAULT_SCRIPT_CURRENCY when neither standardScriptOptions nor a component override sets currency", async () => {
     mockFetchOk({ ...baseConfigJson, standardScriptOptions: {} });
 
-    const { baseOptions } = await buildEnabler().setupData;
+    const baseOptions = await standardBaseOptions();
 
     expect(baseOptions.paypalScriptOptions.currency).toBe(
       DEFAULT_SCRIPT_CURRENCY
@@ -95,10 +119,18 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
   it("omits intent/merchantId (rather than inventing a value) when settings doesn't supply them", async () => {
     mockFetchOk({ ...baseConfigJson, settings: {} });
 
-    const { baseOptions } = await buildEnabler().setupData;
+    const baseOptions = await standardBaseOptions();
 
     expect(baseOptions.paypalScriptOptions.intent).toBeUndefined();
     expect(baseOptions.paypalScriptOptions.merchantId).toBeUndefined();
+  });
+
+  it("seeds initialPayment from the createPayment response", async () => {
+    mockFetchOk(baseConfigJson);
+
+    const baseOptions = await standardBaseOptions();
+
+    expect(baseOptions.initialPayment).toEqual({ id: "payment-id" });
   });
 
   it("runs payment creation and script preload in parallel via Promise.all, not sequentially", async () => {
@@ -116,7 +148,7 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
       order.push("script:end");
     });
 
-    await buildEnabler().setupData;
+    await standardBaseOptions();
 
     // Both calls must have started before either finished — only possible if they were kicked
     // off together (Promise.all), not one awaited before the other begins.
@@ -132,14 +164,104 @@ describe("PayPalPaymentEnabler._Setup (via setupData)", () => {
     mockFetchOk(baseConfigJson);
     mockedPreload.mockRejectedValue(new Error("script failed"));
 
-    await expect(buildEnabler().setupData).rejects.toThrow("script failed");
+    await expect(
+      buildEnabler().createComponentBuilder("paypal")
+    ).rejects.toThrow("script failed");
   });
 
   it("rejects when payment creation fails, even though the script preload succeeds", async () => {
     mockFetchOk(baseConfigJson);
     mockedProcessorRequest.mockResolvedValue(false);
 
-    await expect(buildEnabler().setupData).rejects.toThrow(
+    await expect(
+      buildEnabler().createComponentBuilder("paypal")
+    ).rejects.toThrow("Could not create payment");
+  });
+
+  it("rejects when /operations/config fails", async () => {
+    (global as any).fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 401 });
+
+    await expect(
+      buildEnabler().createComponentBuilder("paypal")
+    ).rejects.toThrow("Could not fetch config");
+    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe("PayPalPaymentEnabler lazy, shared setup", () => {
+  beforeEach(resetMocksWithWorkingSetup);
+
+  it("does nothing on construction — no config fetch, no payment, no script", () => {
+    buildEnabler();
+
+    expect((global as any).fetch).not.toHaveBeenCalled();
+    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    expect(mockedPreload).not.toHaveBeenCalled();
+  });
+
+  it("fetches config and creates the payment only once across several standard builders", async () => {
+    const enabler = buildEnabler();
+
+    await enabler.createComponentBuilder("paypal");
+    await enabler.createComponentBuilder("card");
+    await enabler.isStoredPaymentMethodsEnabled();
+
+    expect((global as any).fetch).toHaveBeenCalledTimes(1);
+    expect(mockedProcessorRequest).toHaveBeenCalledTimes(1);
+    expect(mockedPreload).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one config fetch between Express and standard builders", async () => {
+    const enabler = buildEnabler();
+
+    await enabler.createExpressBuilder("paypal");
+    await enabler.createComponentBuilder("paypal");
+
+    expect((global as any).fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PayPalPaymentEnabler Express setup (via createExpressBuilder)", () => {
+  beforeEach(resetMocksWithWorkingSetup);
+
+  it("fetches only /operations/config with the session header — no createPayment, no standard script preload", async () => {
+    await buildEnabler().createExpressBuilder("paypal");
+
+    expect((global as any).fetch).toHaveBeenCalledWith(
+      "https://processor.example/operations/config",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({ "X-Session-Id": "session-id" }),
+      })
+    );
+    expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    expect(mockedPreload).not.toHaveBeenCalled();
+  });
+
+  it("builds the express builder without initialPayment — its Payment is created on click", async () => {
+    await buildEnabler().createExpressBuilder("paypal");
+
+    const [paymentMethodType, baseOptions, builderType] = lastBuilderArgs();
+    expect(paymentMethodType).toBe("PayPal");
+    expect(builderType).toBe("express");
+    expect(baseOptions.initialPayment).toBeUndefined();
+    expect(baseOptions.expressSdkOptions).toEqual({ currency: "USD" });
+  });
+
+  it("passes Checkout's EnablerOptions.countryCode through to baseOptions", async () => {
+    await buildEnabler({ countryCode: "DE" }).createExpressBuilder("paypal");
+
+    expect(lastBuilderArgs()[1].countryCode).toBe("DE");
+  });
+
+  it("still resolves when payment creation would fail for this session (e.g. a session without a Cart)", async () => {
+    mockedProcessorRequest.mockResolvedValue(false);
+    const enabler = buildEnabler();
+
+    await expect(enabler.createExpressBuilder("paypal")).resolves.toBeDefined();
+    await expect(enabler.createComponentBuilder("paypal")).rejects.toThrow(
       "Could not create payment"
     );
   });
