@@ -36,6 +36,13 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   // processor with no such forcing, so the merchant genuinely must configure Capture intent.
   const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
+    : paymentInfo.id && paymentInfo.countryCode !== "DE"
+    ? ["invoice.wrongCountry"]
+    : paymentInfo.id && paymentInfo.amountPlanned.currencyCode !== "EUR"
+    ? ["invoice.wrongCurrency"]
+    : paymentInfo.id &&
+      !(paymentInfo.firstName && paymentInfo.lastName && paymentInfo.email)
+    ? ["invoice.missingBuyerData"]
     : paymentInfo.id && paymentInfo.amountPlanned.centAmount < minPayableAmount
     ? ["invoice.tooSmall", { min: minPayableAmount / 100 }]
     : paymentInfo.amountPlanned.centAmount > maxPayableAmount
