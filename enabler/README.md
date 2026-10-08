@@ -270,7 +270,10 @@ Checkout asks each component's `isAvailable()` before listing it
   `disableFunding`;
 - `CardFields`, Apple Pay or Google Pay is missing its entry (`card-fields`, `applepay`,
   `googlepay`) in the shared `components`;
-- Venmo or Apple Pay isn't supported by the buyer's browser/device.
+- Venmo or Apple Pay isn't supported by the buyer's browser/device;
+- the cart's country/currency is outside the method's entry in
+  `src/components/paymentMethodEligibility.ts` (currently Pay Upon Invoice and Venmo; other
+  methods can be enabled there by uncommenting their line).
 
 If a single-funding-source button still mounts somewhere PayPal considers it ineligible (e.g. wrong
 currency/country), PayPal's SDK renders nothing. The component then shows an inline "This payment
@@ -348,7 +351,12 @@ tells the merchant to call `capturePayment` again once ready to collect funds.
   mode the merchant must configure Capture themselves.
 - The payable amount is fixed at 5–2500 EUR and the FraudNet page id is fixed; only
   `invoiceBenefitsMessage` can be overridden (`PAYPAL_BUTTON_CONFIG.PayUponInvoice`).
-- For an ineligible cart the component shows the reason, and Checkout's `submit()` rejects with it.
+- Only offered for carts with a German billing country (falling back to the cart country) in EUR — other carts don't list it in Checkout.
+- For an ineligible cart (country, currency, amount, missing billing name/e-mail) the component
+  shows the reason, and Checkout's `submit()` rejects with it.
+- In a payment-only Checkout integration, the merchant is responsible for supplying a complete
+  billing address (street, postal code, city, country), billing name and customer e-mail. If any
+  is missing, the processor rejects the order before calling PayPal.
 - In Checkout, pressing Enter in the form never submits it.
 
 ## Pay Later button and messages

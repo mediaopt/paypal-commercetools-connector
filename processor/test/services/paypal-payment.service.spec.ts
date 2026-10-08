@@ -754,6 +754,63 @@ describe("paypal-payment.service", () => {
       expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
     });
 
+    const expectPuiOrderRefused = async (cart: object, field: string) => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(cart as unknown as Cart);
+
+      await expect(
+        paypalPaymentService.createOrder({
+          paymentId: mockPayment.id,
+          orderData: puiOrderData,
+          paymentMethodType: "PayUponInvoice",
+        })
+      ).rejects.toThrow(field);
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    };
+
+    test.each([
+      "streetName",
+      "city",
+      "postalCode",
+      "country",
+      "firstName",
+      "lastName",
+    ])(
+      "refuses to create the order when billingAddress.%s is missing",
+      async (field) => {
+        await expectPuiOrderRefused(
+          {
+            ...puiCart,
+            billingAddress: { ...mockShippingAddress, [field]: undefined },
+          },
+          `billingAddress.${field}`
+        );
+      }
+    );
+
+    test("refuses to create the order when customerEmail is missing", async () => {
+      await expectPuiOrderRefused(
+        { ...puiCart, customerEmail: undefined },
+        "customerEmail"
+      );
+    });
+
+    test("a missing billing streetNumber doesn't block the order (often folded into streetName)", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...puiCart,
+        billingAddress: { ...mockShippingAddress, streetNumber: undefined },
+      } as unknown as Cart);
+
+      await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: puiOrderData,
+        paymentMethodType: "PayUponInvoice",
+      });
+
+      expect(CommonConnect.createPayPalOrder).toHaveBeenCalled();
+    });
+
     test("a non-PUI order gets no placeholder transaction", async () => {
       (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
         mockPayPalOrder as never

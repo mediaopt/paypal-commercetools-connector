@@ -629,11 +629,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       this.validatePayUponInvoiceOrderParams(payment, ctCart);
     }
 
-    // Informational only — customerEmail is never actually sent to PayPal (createOrder/
-    // buildOrderRequest never reference it), so a missing one here isn't fatal. A real standard
-    // checkout flow already forces the buyer to fill this in before the enabler even loads;
-    // the one case this can still legitimately fire is a merchant embedding only the standard payment
-    // buttons in their own custom checkout UI without collecting it first. PayPal collects the
+    // Informational only for non-PUI orders — customerEmail is sent to PayPal only for PUI
+    // (`pay_upon_invoice.email`), where validatePayUponInvoiceOrderParams already rejected a
+    // missing one above. A real standard checkout flow already forces the buyer to fill this in
+    // before the enabler even loads; the one case this can still legitimately fire is a merchant
+    // embedding only the standard payment buttons in their own custom checkout UI without
+    // collecting it first. PayPal collects the
     // buyer's email inside its own popup for Express, so that case is excluded here — by this
     // point paymentMethodType/builderType are the request's own real values, not a guess.
     const isExpress =
@@ -838,6 +839,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
     if (payment.amountPlanned.centAmount !== cartTotal) {
       throw new ErrorInvalidOperation(
         `PayUponInvoice requires order amount to match cart total; payment amount ${payment.amountPlanned.centAmount} does not match cart total ${cartTotal}`
+      );
+    }
+
+    const billing = ctCart.billingAddress;
+    const missingFields = Object.entries({
+      "billingAddress.streetName": billing?.streetName,
+      "billingAddress.city": billing?.city,
+      "billingAddress.postalCode": billing?.postalCode,
+      "billingAddress.country": billing?.country,
+      "billingAddress.firstName": billing?.firstName,
+      "billingAddress.lastName": billing?.lastName,
+      customerEmail: ctCart.customerEmail,
+    })
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
+    if (missingFields.length) {
+      throw new ErrorInvalidOperation(
+        `PayUponInvoice requires ${missingFields.join(", ")}; missing on cart ${ctCart.id} (payment ${payment.id})`
       );
     }
   }

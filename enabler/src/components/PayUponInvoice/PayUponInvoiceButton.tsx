@@ -7,6 +7,7 @@ import { useNotifications } from "../../app/useNotifications";
 import { PayUponInvoiceButtonProps } from "../../types";
 
 import { PayUponInvoiceMask } from "./PayUponInvoiceMask";
+import { getCartIneligibility } from "../paymentMethodEligibility";
 import { useTranslation } from "react-i18next";
 
 export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
@@ -34,8 +35,21 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   // (usePayment.tsx's handleCreateOrder), regardless of the merchant's global setting, so this
   // check must not fire there. In legacy/self-hosted mode, settings are fetched raw from the
   // processor with no such forcing, so the merchant genuinely must configure Capture intent.
+  // Builder already hides ineligible carts in Checkout; this is the self-hosting fallback.
+  const cartIneligibility = getCartIneligibility(
+    "PayUponInvoice",
+    paymentInfo.countryCode,
+    paymentInfo.amountPlanned.currencyCode
+  );
   const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
+    : paymentInfo.id && cartIneligibility === "country"
+    ? ["invoice.wrongCountry"]
+    : paymentInfo.id && cartIneligibility === "currency"
+    ? ["invoice.wrongCurrency"]
+    : paymentInfo.id &&
+      !(paymentInfo.firstName && paymentInfo.lastName && paymentInfo.email)
+    ? ["invoice.missingBuyerData"]
     : paymentInfo.id && paymentInfo.amountPlanned.centAmount < minPayableAmount
     ? ["invoice.tooSmall", { min: minPayableAmount / 100 }]
     : paymentInfo.amountPlanned.centAmount > maxPayableAmount

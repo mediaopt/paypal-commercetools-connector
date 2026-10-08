@@ -39,9 +39,17 @@ const testButtonProps = {
   fraudNetSessionId: "123",
 };
 
-const paymentInfoWithAmount = (centAmount: number) => ({
+const paymentInfoWithAmount = (
+  centAmount: number,
+  overrides: Record<string, unknown> = {}
+) => ({
   id: "123",
   amountPlanned: { centAmount, currencyCode: "EUR" },
+  countryCode: "DE",
+  firstName: "Max",
+  lastName: "Mustermann",
+  email: "max@example.com",
+  ...overrides,
 });
 
 test("Mask is shown if settings and params are valid (legacy mode)", () => {
@@ -109,6 +117,48 @@ test("If amount is bigger than max corresponding error is shown", () => {
   expect(screen.getAllByText("invoice.tooBig").length).toEqual(1);
 });
 
+test("If billing country is not DE corresponding error is shown", () => {
+  (usePayment as jest.Mock).mockReturnValue({
+    paymentInfo: paymentInfoWithAmount(2000, { countryCode: "AT" }),
+    clientToken: "123",
+  });
+  (useSettings as jest.Mock).mockReturnValue({
+    settings: { payPalIntent: "Capture" },
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(screen.getAllByText("invoice.wrongCountry").length).toEqual(1);
+});
+
+test("If currency is not EUR corresponding error is shown instead of the euro amount error", () => {
+  (usePayment as jest.Mock).mockReturnValue({
+    paymentInfo: paymentInfoWithAmount(300000, {
+      amountPlanned: { centAmount: 300000, currencyCode: "USD" },
+    }),
+    clientToken: "123",
+  });
+  (useSettings as jest.Mock).mockReturnValue({
+    settings: { payPalIntent: "Capture" },
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(screen.getAllByText("invoice.wrongCurrency").length).toEqual(1);
+  expect(screen.queryByText("invoice.tooBig")).toEqual(null);
+});
+
+test.each(["firstName", "lastName", "email"])(
+  "If %s is missing corresponding error is shown",
+  (field) => {
+    (usePayment as jest.Mock).mockReturnValue({
+      paymentInfo: paymentInfoWithAmount(2000, { [field]: undefined }),
+      clientToken: "123",
+    });
+    (useSettings as jest.Mock).mockReturnValue({
+      settings: { payPalIntent: "Capture" },
+    });
+    render(<PayUponInvoiceButton {...testButtonProps} />);
+    expect(screen.getAllByText("invoice.missingBuyerData").length).toEqual(1);
+  }
+);
+
 test("In legacy mode (no onRegisterSubmit), missing clientToken shows the third-party error", () => {
   (usePayment as jest.Mock).mockReturnValue({
     paymentInfo: paymentInfoWithAmount(2000),
@@ -150,6 +200,9 @@ test("If payment id is missing mask and error messages are not rendered", () => 
   render(<PayUponInvoiceButton {...testButtonProps} />);
   expect(screen.queryByText("Mocked mask")).toEqual(null);
   expect(screen.queryByText("invoice.merchantIssue")).toEqual(null);
+  expect(screen.queryByText("invoice.wrongCountry")).toEqual(null);
+  expect(screen.queryByText("invoice.wrongCurrency")).toEqual(null);
+  expect(screen.queryByText("invoice.missingBuyerData")).toEqual(null);
   expect(screen.queryByText("invoice.tooSmall")).toEqual(null);
   expect(screen.queryByText("invoice.tooBig")).toEqual(null);
   expect(screen.queryByText("invoice.thirdPartyIssue")).toEqual(null);

@@ -17,6 +17,7 @@ import {
 import { mountRenderTemplate } from "./RenderTemplate/RenderTemplate";
 import { isVenmoSupported } from "./venmoAvailability";
 import { isApplePaySupported } from "./applePayAvailability";
+import { getCartIneligibility } from "./paymentMethodEligibility";
 import { sessionHeader } from "../helpers/sessionHeader";
 import { FIXED_SETTINGS_OVERRIDES_BY_PAYMENT_METHOD_TYPE } from "./constants";
 
@@ -187,6 +188,22 @@ class PayPalComponent implements PaymentComponent {
     if (browserCheck && !browserCheck()) {
       console.warn(
         `${this.paymentMethodType} not available — browser/device check failed`
+      );
+      return false;
+    }
+
+    // No initialPayment (PayPal Express, no cart before the click) means no cart to check.
+    const { initialPayment } = this.baseOptions;
+    const cartIneligibility =
+      initialPayment &&
+      getCartIneligibility(
+        this.paymentMethodType,
+        initialPayment.countryCode,
+        initialPayment.amountPlanned.currencyCode
+      );
+    if (cartIneligibility) {
+      console.warn(
+        `${this.paymentMethodType} not available — cart ${cartIneligibility} not eligible`
       );
       return false;
     }
