@@ -455,6 +455,17 @@ describe("PayPalComponentBuilder", () => {
       }
     );
 
+    it("skips the cart check when there is no initialPayment (PayPal Express before the click)", async () => {
+      const builder = new PayPalComponentBuilder(
+        "PayPal",
+        baseOptions({ initialPayment: undefined }),
+        "express"
+      );
+      const component = builder.build({});
+
+      await expect(component.isAvailable()).resolves.toBe(true);
+    });
+
     it("a method without a cart eligibility entry ignores the cart's country/currency", async () => {
       const builder = new PayPalComponentBuilder(
         "Blik",

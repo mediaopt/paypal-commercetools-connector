@@ -173,12 +173,15 @@ class PayPalComponent implements PaymentComponent {
       return false;
     }
 
-    const { countryCode, amountPlanned } = this.baseOptions.initialPayment;
-    const cartIneligibility = getCartIneligibility(
-      this.paymentMethodType,
-      countryCode,
-      amountPlanned.currencyCode
-    );
+    // No initialPayment (PayPal Express, no cart before the click) means no cart to check.
+    const { initialPayment } = this.baseOptions;
+    const cartIneligibility =
+      initialPayment &&
+      getCartIneligibility(
+        this.paymentMethodType,
+        initialPayment.countryCode,
+        initialPayment.amountPlanned.currencyCode
+      );
     if (cartIneligibility) {
       console.warn(
         `${this.paymentMethodType} not available — cart ${cartIneligibility} not eligible`
