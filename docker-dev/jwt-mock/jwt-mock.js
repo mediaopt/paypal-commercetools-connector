@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 9002;
 async function main() {
   const { publicKey, privateKey } = await generateKeyPair('RS256');
   const publicJwk = await exportJWK(publicKey);
+  // Differs from the commercetools connect-payment-integration-template, which uses a fixed kid ('jwt-mock-key-1').
   // A new key on every start gets a new kid, so the processor's JWKS cache fetches it instead of reusing the old key
   const kid = await calculateJwkThumbprint(publicJwk);
   publicJwk.kid = kid;

@@ -58,10 +58,6 @@ The commercetools API client needs at least the following scopes (the health che
 
 ## Authentication
 
-- `oauth2`: relies on the commercetools OAuth2 server
-- `session`: relies on the commercetools session service
-- `jwt`: relies on the JWT injected by the Merchant Center via the forward-to proxy
-
-For local authentication (OAuth2 token, session, JWT), see the commercetools [connect-payment-integration-template](https://github.com/commercetools/connect-payment-integration-template).
+The processor uses the authentication mechanisms of the commercetools [connect-payment-integration-template](https://github.com/commercetools/connect-payment-integration-template): `oauth2`, `session` and `jwt`. See the template's [processor README](https://github.com/commercetools/connect-payment-integration-template/blob/main/processor/README.md#authentication) for how to obtain each of them for local development. This repository follows the template as closely as possible. It differs in the JWT mock that `docker compose up` starts: `docker-dev/jwt-mock` gives every newly generated key a new `kid` instead of the template's fixed one, so the processor's JWKS cache picks up the new key after the mock restarts.
 
 Send the session id as the `x-session-id` header to the session-protected endpoints. The enabler development page (`enabler/dev-utils/session.js`) does this automatically.
