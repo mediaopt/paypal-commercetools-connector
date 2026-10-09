@@ -141,7 +141,7 @@ To run the connector locally for test purposes:
   - the enabler development page (`http://localhost:3000`)
 - open `http://localhost:3000`, enter a cart id and the page creates a commercetools session and mounts the payment components
 
-`docker-compose.yaml` overrides `CTP_JWKS_URL`, `CTP_JWT_ISSUER` (`https://issuer.com`) and `VITE_PROCESSOR_URL`, so their `.env` values are not used locally. See [processor/README.md](processor/README.md) for authentication details, including how to get a local JWT.
+For local authentication (OAuth2 token, session, JWT), see the commercetools [connect-payment-integration-template](https://github.com/commercetools/connect-payment-integration-template).
 
 In production the [Payment Intents API](https://docs.commercetools.com/checkout/payment-intents-api) is called on commercetools' own Checkout host, which forwards to the processor's `POST /operations/payment-intents/:id` route. Locally there's no Checkout host in front of the processor, so that route can be called directly for testing. Note, that on stage/production commercetools order is required to reach the intents API.
 
