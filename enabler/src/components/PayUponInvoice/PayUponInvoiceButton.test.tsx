@@ -4,12 +4,24 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { usePayment } from "../../app/usePayment";
 import { useSettings } from "../../app/useSettings";
 
+// Field labels come from the real translations (in mockLanguage), so a code without a label
+// shows up as its raw code or another language's label; every other key stays as is.
+let mockLanguage = "en";
 jest.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   Trans: ({ i18nKey }: { i18nKey: string }) => i18nKey,
   useTranslation: () => {
     return {
-      t: (str: string, options?: { fields?: string }) =>
-        options?.fields ? `${str}: ${options.fields}` : str,
+      t: (str: string, options?: { fields?: string; defaultValue?: string }) =>
+        str.startsWith("invoice.fields.")
+          ? jest
+              .requireActual<{ default: { t: (...args: unknown[]) => string } }>(
+                "../../messages/i18n"
+              )
+              .default.t(str, { ...options, lng: mockLanguage })
+          : options?.fields
+          ? `${str}: ${options.fields}`
+          : str,
       i18n: {
         changeLanguage: () => new Promise(() => {}),
       },
@@ -18,6 +30,10 @@ jest.mock("react-i18next", () => ({
 }));
 jest.mock("../../app/usePayment");
 jest.mock("../../app/useSettings");
+const mockNotify = jest.fn();
+jest.mock("../../app/useNotifications", () => ({
+  useNotifications: () => ({ notify: mockNotify }),
+}));
 jest.mock("./PayUponInvoiceMask", () => ({
   PayUponInvoiceMask: (
     fraudNetSessionId: string,
@@ -66,11 +82,8 @@ const mockCaptureState = (
   });
 };
 
-// Matches the t() mock above: labels stay as their i18n keys.
-const missingBuyerDataMessage = (...fields: string[]) =>
-  `invoice.missingBuyerData: ${fields
-    .map((field) => `invoice.fields.${field}`)
-    .join(", ")}`;
+const missingBuyerDataMessage = (...labels: string[]) =>
+  `invoice.missingBuyerData: ${labels.join(", ")}`;
 
 test("Mask is shown if settings and params are valid (legacy mode)", () => {
   (usePayment as jest.Mock).mockReturnValue({
@@ -174,10 +187,41 @@ test("The processor's missing-fields list is shown as translated labels instead 
   render(<PayUponInvoiceButton {...testButtonProps} />);
   expect(
     screen.getAllByText(
-      missingBuyerDataMessage("billingAddress.streetName", "billingAddress.city")
+      missingBuyerDataMessage("street", "city")
     ).length
   ).toEqual(1);
   expect(screen.queryByText("Mocked mask")).toEqual(null);
+});
+
+// Every code the processor's findPayUponInvoiceMissingFields (order.utils.ts) can send.
+const FIELD_LABELS = {
+  "billingAddress.firstName": { en: "first name", de: "Vorname" },
+  "billingAddress.lastName": { en: "last name", de: "Nachname" },
+  "billingAddress.streetName": { en: "street", de: "Straße" },
+  "billingAddress.postalCode": { en: "postal code", de: "Postleitzahl" },
+  "billingAddress.city": { en: "city", de: "Ort" },
+  "billingAddress.country": { en: "country", de: "Land" },
+  email: { en: "e-mail address", de: "E-Mail-Adresse" },
+};
+
+describe.each(["en", "de"] as const)("Field labels (%s)", (language) => {
+  beforeEach(() => {
+    mockLanguage = language;
+  });
+  afterEach(() => {
+    mockLanguage = "en";
+  });
+
+  test.each(Object.entries(FIELD_LABELS))(
+    "A missing %s from the processor is shown as its label",
+    (field, labels) => {
+      mockCaptureState({ payUponInvoiceMissingFields: [field] });
+      render(<PayUponInvoiceButton {...testButtonProps} />);
+      expect(
+        screen.getAllByText(missingBuyerDataMessage(labels[language])).length
+      ).toEqual(1);
+    }
+  );
 });
 
 test("An empty missing-fields list from the processor wins over the legacy name/e-mail check", () => {
@@ -193,17 +237,13 @@ test.each(["firstName", "lastName", "email"])(
     render(<PayUponInvoiceButton {...testButtonProps} />);
     expect(
       screen.getAllByText(
-        missingBuyerDataMessage(
-          "billingAddress.firstName",
-          "billingAddress.lastName",
-          "email"
-        )
+        missingBuyerDataMessage("first name", "last name", "e-mail address")
       ).length
     ).toEqual(1);
   }
 );
 
-test("In Checkout mode, missing fields make isValid() false and submit() reject with the same message", async () => {
+test("In Checkout mode, missing fields make isValid() false, showValidation() notify and submit() reject with the same message", async () => {
   mockCaptureState(
     { payUponInvoiceMissingFields: ["billingAddress.postalCode"] },
     ""
@@ -222,11 +262,17 @@ test("In Checkout mode, missing fields make isValid() false and submit() reject 
     () => Promise<void>,
   ];
   const [validation] = onRegisterValidation.mock.calls.at(-1) as [
-    { isValid: () => Promise<boolean> },
+    { isValid: () => Promise<boolean>; showValidation: () => Promise<void> },
   ];
   await expect(validation.isValid()).resolves.toBe(false);
+  expect(mockNotify).not.toHaveBeenCalled();
+  await validation.showValidation();
+  expect(mockNotify).toHaveBeenCalledWith(
+    "Warning",
+    missingBuyerDataMessage("postal code")
+  );
   await expect(submit()).rejects.toThrow(
-    missingBuyerDataMessage("billingAddress.postalCode")
+    missingBuyerDataMessage("postal code")
   );
   expect(screen.queryByText("Mocked mask")).toEqual(null);
 });
