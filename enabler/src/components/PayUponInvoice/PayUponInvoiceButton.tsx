@@ -4,7 +4,7 @@ import { usePayment } from "../../app/usePayment";
 import { useSettings } from "../../app/useSettings";
 import { useNotifications } from "../../app/useNotifications";
 
-import { PayUponInvoiceButtonProps } from "../../types";
+import { CartInformationInitial, PayUponInvoiceButtonProps } from "../../types";
 
 import { PayUponInvoiceMask } from "./PayUponInvoiceMask";
 import { getCartIneligibility } from "../paymentMethodEligibility";
@@ -35,18 +35,26 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   // (usePayment.tsx's handleCreateOrder), regardless of the merchant's global setting, so this
   // check must not fire there. In legacy/self-hosted mode, settings are fetched raw from the
   // processor with no such forcing, so the merchant genuinely must configure Capture intent.
-  // Builder already hides ineligible carts in Checkout; this is the self-hosting fallback.
+  // Check order and rules: enabler/README.md#cart-country-and-currency-rules. Builder already
+  // hides ineligible carts in Checkout; this is the self-hosting fallback.
+  // Legacy self-hosted backends send neither countryCode nor the missing-fields list; read the
+  // buyer data the merchant passed as cartInformation instead.
+  const { billing, account } =
+    paymentInfo.cartInformation ?? CartInformationInitial;
   const cartIneligibility = getCartIneligibility(
     "PayUponInvoice",
-    paymentInfo.countryCode,
+    paymentInfo.countryCode || billing.country,
     paymentInfo.amountPlanned.currencyCode
   );
-  // Legacy self-hosted backends don't send the list; keep their old name/e-mail check.
   const missingBuyerFields =
     paymentInfo.payUponInvoiceMissingFields ??
-    (paymentInfo.firstName && paymentInfo.lastName && paymentInfo.email
-      ? []
-      : ["billingAddress.firstName", "billingAddress.lastName", "email"]);
+    Object.entries({
+      "billingAddress.firstName": paymentInfo.firstName || billing.firstName,
+      "billingAddress.lastName": paymentInfo.lastName || billing.lastName,
+      email: paymentInfo.email || account.email,
+    })
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
   const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
     : paymentInfo.id && cartIneligibility === "country"

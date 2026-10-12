@@ -193,6 +193,7 @@ class PayPalComponent implements PaymentComponent {
     }
 
     // No initialPayment (PayPal Express, no cart before the click) means no cart to check.
+    // PayPal's country/currency requirements: enabler/README.md#cart-country-and-currency-rules.
     const { initialPayment } = this.baseOptions;
     const cartIneligibility =
       initialPayment &&

@@ -614,10 +614,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
-      this.validateVenmoOrderParams(payment);
-    }
-
     const isPayUponInvoice =
       paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE;
     const [ctCart, settings] = await Promise.all([
@@ -628,6 +624,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       isPayUponInvoice ? this.resolveSettings() : Promise.resolve(undefined),
     ]);
 
+    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
+      this.validateVenmoOrderParams(payment, ctCart);
+    }
     if (isPayUponInvoice) {
       this.validatePayUponInvoiceOrderParams(payment, ctCart);
     }
@@ -823,48 +822,54 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  // PayPal's Venmo funding source only supports USD-denominated orders.
-  private validateVenmoOrderParams(payment: Payment): void {
-    if (payment.amountPlanned.currencyCode !== "USD") {
-      throw new ErrorInvalidOperation(
-        `Venmo requires a USD-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
-      );
-    }
+  // Venmo is US/USD-only (PayPal requirement); an unknown country passes, PayPal judges the buyer.
+  // Same rules as the enabler's paymentMethodEligibility.ts, documented in
+  // enabler/README.md#cart-country-and-currency-rules.
+  private validateVenmoOrderParams(payment: Payment, ctCart: Cart): void {
+    const { currencyCode } = payment.amountPlanned;
+    const country = ctCart.billingAddress?.country || ctCart.country;
+    this.throwOrderParamsProblems("Venmo", payment, ctCart, [
+      currencyCode !== "USD" && `a USD-denominated payment (got ${currencyCode})`,
+      !!country && country !== "US" && `a US billing address (got ${country})`,
+    ]);
   }
 
-  // PayUponInvoice is DE/EUR-only (same pair as the enabler's paymentMethodEligibility.ts) and
-  // requires the order amount to exactly match the cart's taxed gross total.
+  // PayUponInvoice is DE/EUR-only (PayPal requirement) and requires the order amount to exactly
+  // match the cart's taxed gross total. Same rules as the enabler's paymentMethodEligibility.ts and
+  // PayUponInvoiceButton.tsx, documented in enabler/README.md#cart-country-and-currency-rules.
   // Checkout always shows the component for the current cart; these re-checks only matter for a
   // payment-only integration that changes the cart afterwards. Refreshing it is the merchant's job
   // (enabler README, "Pay Upon Invoice"), so the generic buyer error here is accepted.
+  // A missing billing country is reported by findPayUponInvoiceMissingFields.
   private validatePayUponInvoiceOrderParams(
     payment: Payment,
     ctCart: Cart
   ): void {
-    if (payment.amountPlanned.currencyCode !== "EUR") {
-      throw new ErrorInvalidOperation(
-        `PayUponInvoice requires a EUR-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
-      );
-    }
-    const billing = ctCart.billingAddress;
-    if (billing?.country && billing.country !== "DE") {
-      throw new ErrorInvalidOperation(
-        `PayUponInvoice requires a DE billing address; cart ${ctCart.id} has ${billing.country} (payment ${payment.id})`
-      );
-    }
-
+    const { currencyCode, centAmount } = payment.amountPlanned;
+    const country = ctCart.billingAddress?.country;
     const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)
       ?.centAmount;
-    if (payment.amountPlanned.centAmount !== cartTotal) {
-      throw new ErrorInvalidOperation(
-        `PayUponInvoice requires order amount to match cart total; payment amount ${payment.amountPlanned.centAmount} does not match cart total ${cartTotal}`
-      );
-    }
-
     const missingFields = findPayUponInvoiceMissingFields(ctCart);
-    if (missingFields.length) {
+    this.throwOrderParamsProblems("PayUponInvoice", payment, ctCart, [
+      currencyCode !== "EUR" && `a EUR-denominated payment (got ${currencyCode})`,
+      !!country && country !== "DE" && `a DE billing address (got ${country})`,
+      centAmount !== cartTotal &&
+        `the order amount to match the cart total (payment amount ${centAmount} does not match cart total ${cartTotal})`,
+      !!missingFields.length && `${missingFields.join(", ")} (missing)`,
+    ]);
+  }
+
+  // One error listing every problem, so a rejected order shows all of them at once.
+  private throwOrderParamsProblems(
+    paymentMethodType: string,
+    payment: Payment,
+    ctCart: Cart,
+    checks: (string | false)[]
+  ): void {
+    const problems = checks.filter(Boolean);
+    if (problems.length) {
       throw new ErrorInvalidOperation(
-        `PayUponInvoice requires ${missingFields.join(", ")}; missing on cart ${ctCart.id} (payment ${payment.id})`
+        `${paymentMethodType} requires ${problems.join("; ")} — cart ${ctCart.id}, payment ${payment.id}`
       );
     }
   }

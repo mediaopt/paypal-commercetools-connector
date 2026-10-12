@@ -3,6 +3,7 @@ import { PayUponInvoiceButton } from "./PayUponInvoiceButton";
 import { cleanup, render, screen } from "@testing-library/react";
 import { usePayment } from "../../app/usePayment";
 import { useSettings } from "../../app/useSettings";
+import { CartInformationInitial } from "../../types";
 
 // Field labels come from the real translations (in mockLanguage), so a code without a label
 // shows up as its raw code or another language's label; every other key stays as is.
@@ -230,18 +231,68 @@ test("An empty missing-fields list from the processor wins over the legacy name/
   expect(screen.getAllByText("Mocked mask").length).toEqual(1);
 });
 
-test.each(["firstName", "lastName", "email"])(
-  "Legacy backend without a missing-fields list: a missing %s lists all name/e-mail fields (the old contract can't tell which)",
-  (field) => {
+test.each([
+  ["firstName", "first name"],
+  ["lastName", "last name"],
+  ["email", "e-mail address"],
+])(
+  "Legacy backend without a missing-fields list: a missing %s is named on its own",
+  (field, label) => {
     mockCaptureState({ [field]: undefined });
     render(<PayUponInvoiceButton {...testButtonProps} />);
     expect(
-      screen.getAllByText(
-        missingBuyerDataMessage("first name", "last name", "e-mail address")
-      ).length
+      screen.getAllByText(missingBuyerDataMessage(label)).length
     ).toEqual(1);
   }
 );
+
+// An old backend returns none of the buyer fields; the merchant's cartInformation prop has them.
+const legacyCartInformation = (billing: Record<string, string>) => ({
+  account: { email: "max@example.com" },
+  billing: {
+    ...CartInformationInitial.billing,
+    firstName: "Max",
+    lastName: "Mustermann",
+    country: "DE",
+    ...billing,
+  },
+  shipping: CartInformationInitial.shipping,
+});
+const legacyBackendOverrides = {
+  countryCode: undefined,
+  firstName: undefined,
+  lastName: undefined,
+  email: undefined,
+};
+
+test("Legacy backend without buyer data: country, name and e-mail are read from cartInformation", () => {
+  mockCaptureState({
+    ...legacyBackendOverrides,
+    cartInformation: legacyCartInformation({}),
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(screen.getAllByText("Mocked mask").length).toEqual(1);
+});
+
+test("Legacy backend without buyer data: a non-DE cartInformation country shows the wrong-country error", () => {
+  mockCaptureState({
+    ...legacyBackendOverrides,
+    cartInformation: legacyCartInformation({ country: "AT" }),
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(screen.getAllByText("invoice.wrongCountry").length).toEqual(1);
+});
+
+test("Legacy backend without buyer data: a name missing in cartInformation too is named", () => {
+  mockCaptureState({
+    ...legacyBackendOverrides,
+    cartInformation: legacyCartInformation({ lastName: "" }),
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(
+    screen.getAllByText(missingBuyerDataMessage("last name")).length
+  ).toEqual(1);
+});
 
 test("In Checkout mode, missing fields make isValid() false, showValidation() notify and submit() reject with the same message", async () => {
   mockCaptureState(

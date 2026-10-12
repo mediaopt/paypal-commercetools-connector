@@ -809,6 +809,24 @@ describe("paypal-payment.service", () => {
       );
     });
 
+    test("reports every problem in one error", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        amountPlanned: { ...mockPayment.amountPlanned, centAmount: 900 },
+      } as unknown as Payment);
+
+      await expectPuiOrderRefused(
+        {
+          ...puiCart,
+          customerEmail: undefined,
+          billingAddress: { ...mockShippingAddress, country: "AT", city: undefined },
+        },
+        "PayUponInvoice requires a EUR-denominated payment (got USD); a DE billing address (got AT); " +
+          "the order amount to match the cart total (payment amount 900 does not match cart total 1000); " +
+          "billingAddress.city, email (missing)"
+      );
+    });
+
     test("refuses to create the order when neither customerEmail nor billingAddress.email is set", async () => {
       await expectPuiOrderRefused(
         { ...puiCart, customerEmail: undefined },
@@ -956,6 +974,53 @@ describe("paypal-payment.service", () => {
       });
 
       expect(CommonConnect.getSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createOrder: Venmo", () => {
+    const createVenmoOrder = () =>
+      paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "venmo" },
+        paymentMethodType: "Venmo",
+      });
+    const mockVenmoCart = (cart: object) =>
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue({ ...mockCart, ...cart } as unknown as Cart);
+
+    test.each([
+      ["a US billing country", { billingAddress: { country: "US" } }],
+      ["a US cart country without a billing country", { country: "US" }],
+      ["no country at all (PayPal judges the buyer)", {}],
+    ])("creates the order for a USD cart with %s", async (_, cart) => {
+      mockVenmoCart(cart);
+
+      await createVenmoOrder();
+
+      expect(CommonConnect.createPayPalOrder).toHaveBeenCalled();
+    });
+
+    test("prefers the billing country over the cart country", async () => {
+      mockVenmoCart({ country: "US", billingAddress: { country: "DE" } });
+
+      await expect(createVenmoOrder()).rejects.toThrow(
+        "Venmo requires a US billing address (got DE)"
+      );
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("reports a non-USD payment and a non-US country in one error", async () => {
+      mockVenmoCart({ billingAddress: { country: "DE" } });
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        amountPlanned: { ...mockPayment.amountPlanned, currencyCode: "EUR" },
+      } as unknown as Payment);
+
+      await expect(createVenmoOrder()).rejects.toThrow(
+        "Venmo requires a USD-denominated payment (got EUR); a US billing address (got DE)"
+      );
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
     });
   });
 

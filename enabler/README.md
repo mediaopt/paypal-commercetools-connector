@@ -271,14 +271,51 @@ Checkout asks each component's `isAvailable()` before listing it
 - `CardFields`, Apple Pay or Google Pay is missing its entry (`card-fields`, `applepay`,
   `googlepay`) in the shared `components`;
 - Venmo or Apple Pay isn't supported by the buyer's browser/device;
-- the cart's country/currency is outside the method's entry in
-  `src/components/paymentMethodEligibility.ts` (currently Pay Upon Invoice and Venmo; other
-  methods can be enabled there by uncommenting their line). The processor checks these two again
-  when creating the order (Pay Upon Invoice: DE/EUR, Venmo: USD).
+- the cart's country/currency is outside the method's PayPal requirements, see
+  [Cart country and currency rules](#cart-country-and-currency-rules).
 
 If a single-funding-source button still mounts somewhere PayPal considers it ineligible (e.g. wrong
 currency/country), PayPal's SDK renders nothing. The component then shows an inline "This payment
 method is not available for your cart." message (`useFundingSourceEligible.ts`).
+
+### Cart country and currency rules
+
+These are PayPal's requirements for the method, not connector choices. "Country" is the cart's
+billing country, falling back to the cart's own country.
+
+| Method           | Country | Currency | Country unknown                                       |
+| ---------------- | ------- | -------- | ----------------------------------------------------- |
+| Pay Upon Invoice | DE      | EUR      | not offered: an unknown country is not Germany        |
+| Venmo            | US      | USD      | offered: PayPal checks the buyer itself               |
+
+The rules are checked in three places, which must stay in sync with this table:
+
+- `src/components/paymentMethodEligibility.ts`, used by `isAvailable()`: Checkout doesn't list
+  the method;
+- `PayUponInvoiceButton.tsx`, for legacy/self-hosted mode, where `isAvailable()` isn't called;
+- the processor's `createOrder` (`validatePayUponInvoiceOrderParams`, `validateVenmoOrderParams` in
+  `paypal-payment.service.ts`), as a last guard before calling PayPal. It reports every problem
+  in one error.
+
+Other methods (Pay Later, local methods) have commented-out entries in
+`paymentMethodEligibility.ts`; uncomment one to enforce it, after verifying it against PayPal's docs.
+
+The Pay Upon Invoice component checks a cart in this order and shows the first reason that
+applies, instead of the form:
+
+1. legacy mode only: the merchant hasn't configured PayPal intent Capture;
+2. country is not DE, or unknown (PayPal requirement);
+3. currency is not EUR (PayPal requirement);
+4. billing data is missing: named field by field (e.g. "street, postal code"), from the list the
+   processor returns with the payment. A missing billing country shows up here only when the cart
+   country is DE; otherwise step 2 already applies;
+5. the amount is outside 5–2500 EUR;
+6. legacy mode only: no client token.
+
+Steps 2 and 3 come before 4 on purpose: PayPal forbids offering Pay Upon Invoice outside
+Germany/EUR, so a cart that fails them is never shown as "fix your data". In legacy mode with a
+backend that returns neither the country, the buyer's name/e-mail nor the missing-fields list, the
+component reads them from the `cartInformation` prop.
 
 ## Stored cards and vaulting
 
@@ -352,11 +389,11 @@ tells the merchant to call `capturePayment` again once ready to collect funds.
   mode the merchant must configure Capture themselves.
 - The payable amount is fixed at 5–2500 EUR and the FraudNet page id is fixed; only
   `invoiceBenefitsMessage` can be overridden (`PAYPAL_BUTTON_CONFIG.PayUponInvoice`).
-- Only offered for carts with a German billing country (falling back to the cart country) in EUR — other carts don't list it in Checkout.
+- Only offered for DE/EUR carts (PayPal requirement) — other carts don't list it in Checkout. See
+  [Cart country and currency rules](#cart-country-and-currency-rules) for the full rules and the
+  order in which the component checks a cart.
 - For an ineligible cart (country, currency, amount, missing billing data) the component shows the
-  reason instead of the form, and Checkout's `submit()` rejects with it. Missing billing data is
-  named field by field (e.g. "street, postal code"), from the list the processor returns with the
-  payment.
+  reason instead of the form, and Checkout's `submit()` rejects with it.
 - In full Checkout mode, Checkout collects the billing address and e-mail before the payment step,
   and the connector re-reads the cart (`createPayment`) when the buyer changes it, so the component
   always sees current data.
@@ -429,11 +466,12 @@ is not shown.
 
 ## Venmo
 
-`Venmo` only works for USD-denominated orders with a US buyer. `processor` enforces the currency
-at order creation (`validateVenmoOrderParams` in `paypal-payment.service.ts`), but
+`Venmo` only works for USD-denominated orders with a US buyer (PayPal requirement). The enabler
+doesn't offer it for other carts, and the processor rejects the order — see
+[Cart country and currency rules](#cart-country-and-currency-rules).
 `GET /operations/payment-components` (`getSupportedPaymentComponents()`, JWT-only, no cart in
-context) always lists `Venmo`. Restricting Venmo to eligible carts is a merchant-configured
-Checkout payment-integration predicate, not something the connector enforces.
+context) still always lists `Venmo`; the recommended payment-integration predicate in the root
+README keeps Checkout from even asking for it.
 
 What the connector _does_ enforce is browser support (`src/components/venmoAvailability.ts`,
 `isVenmoSupported()`): per [PayPal's Venmo documentation](https://developer.paypal.com/v5/venmo/overview),
