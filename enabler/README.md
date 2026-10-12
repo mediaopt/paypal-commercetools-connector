@@ -273,7 +273,8 @@ Checkout asks each component's `isAvailable()` before listing it
 - Venmo or Apple Pay isn't supported by the buyer's browser/device;
 - the cart's country/currency is outside the method's entry in
   `src/components/paymentMethodEligibility.ts` (currently Pay Upon Invoice and Venmo; other
-  methods can be enabled there by uncommenting their line).
+  methods can be enabled there by uncommenting their line). The processor checks these two again
+  when creating the order (Pay Upon Invoice: DE/EUR, Venmo: USD).
 
 If a single-funding-source button still mounts somewhere PayPal considers it ineligible (e.g. wrong
 currency/country), PayPal's SDK renders nothing. The component then shows an inline "This payment
@@ -352,11 +353,23 @@ tells the merchant to call `capturePayment` again once ready to collect funds.
 - The payable amount is fixed at 5–2500 EUR and the FraudNet page id is fixed; only
   `invoiceBenefitsMessage` can be overridden (`PAYPAL_BUTTON_CONFIG.PayUponInvoice`).
 - Only offered for carts with a German billing country (falling back to the cart country) in EUR — other carts don't list it in Checkout.
-- For an ineligible cart (country, currency, amount, missing billing name/e-mail) the component
-  shows the reason, and Checkout's `submit()` rejects with it.
-- In a payment-only Checkout integration, the merchant is responsible for supplying a complete
-  billing address (street, postal code, city, country), billing name and customer e-mail. If any
-  is missing, the processor rejects the order before calling PayPal.
+- For an ineligible cart (country, currency, amount, missing billing data) the component shows the
+  reason instead of the form, and Checkout's `submit()` rejects with it. Missing billing data is
+  named field by field (e.g. "street, postal code"), from the list the processor returns with the
+  payment.
+- In full Checkout mode, Checkout collects the billing address and e-mail before the payment step,
+  and the connector re-reads the cart (`createPayment`) when the buyer changes it, so the component
+  always sees current data.
+- In a payment-only Checkout integration, the merchant is responsible for:
+  - supplying a complete billing address (name, street, postal code, city, country) and the
+    buyer's e-mail, as the cart's `customerEmail` or the billing address's `email`;
+  - keeping the cart current: after changing its billing address, currency or total, reload the
+    payment step so the component reads the updated cart.
+
+  The processor checks the billing data, the DE billing country and the EUR currency again when
+  creating the order, and rejects it before calling PayPal if anything is missing or wrong. A
+  buyer on a stale component then sees only a generic error; this is a last guard, not a substitute
+  for refreshing the cart.
 - In Checkout, pressing Enter in the form never submits it.
 
 ## Pay Later button and messages

@@ -834,6 +834,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
   // PayUponInvoice is DE/EUR-only (same pair as the enabler's paymentMethodEligibility.ts) and
   // requires the order amount to exactly match the cart's taxed gross total.
+  // Checkout always shows the component for the current cart; these re-checks only matter for a
+  // payment-only integration that changes the cart afterwards. Refreshing it is the merchant's job
+  // (enabler README, "Pay Upon Invoice"), so the generic buyer error here is accepted.
   private validatePayUponInvoiceOrderParams(
     payment: Payment,
     ctCart: Cart
