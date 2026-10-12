@@ -1,6 +1,10 @@
 import { ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
 import { PaymentResult } from "./enabler";
-import { CreatePaymentResponse, GetSettingsResponse } from "../../types";
+import {
+  CreatePaymentResponse,
+  GetSettingsResponse,
+  OnErrorContext,
+} from "../../types";
 
 type ComponentSdkOptions = Record<string, unknown>;
 
@@ -11,7 +15,7 @@ export type BaseOptions = {
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;
   /** commercetools Checkout's own construction-time failure channel (EnablerOptions.onError)*/
-  onError?: (error: any, context?: { paymentReference?: string }) => void;
+  onError?: (error: any, context?: OnErrorContext) => void;
   /** PayPal Express's own PayPal JS SDK script options, from the processor's
    * PAYPAL_EXPRESS_SDK_OPTIONS — see resolveOptions.ts's express branch. Flat, not keyed by
    * paymentMethodType: Express is the only paymentMethodType that ever reads this field, since
@@ -47,9 +51,13 @@ export type BaseOptions = {
    * PayPal Express is excluded — it always must mount alone (no concurrent-mount risk) and needs
    * genuinely different options*/
   paypalScriptOptions: ReactPayPalScriptOptions;
+  /** Checkout's country (EnablerOptions.countryCode) — the only country before a Cart exists (PayPal Express) */
+  countryCode?: string;
   /** When true express PayPal payment is redirected to merchant side for approval */
   redirectOnApprove?: boolean;
-  /** The commercetools Payment for this checkout page load — created once in PayPalPaymentEnabler._Setup(),
-   * alongside the /operations/config fetch, and shared by every builder resolving this same BaseOptions object.*/
-  initialPayment: CreatePaymentResponse;
+  /** The commercetools Payment for this checkout page load — created once in
+   * PayPalPaymentEnabler._SetupPayment(), and shared by every standard/stored builder. Absent for
+   * PayPal Express: its session may have no Cart before the click, and onPayButtonClick's session
+   * gets its own Payment (see usePayment.tsx's handleCreateOrder).*/
+  initialPayment?: CreatePaymentResponse;
 };

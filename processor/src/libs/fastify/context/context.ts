@@ -42,9 +42,10 @@ export const getCtSessionIdFromContext = (): string => {
   return paymentSdk.getCtSessionIdFromContext(contextData) as string;
 };
 
-export const getCartIdFromContext = (): string => {
+// Undefined for a session without a Cart (e.g. PayPal Express before the click)
+export const getCartIdFromContext = (): string | undefined => {
   const contextData = getRequestContext() as ContextData;
-  return paymentSdk.getCartIdFromContext(contextData) as string;
+  return paymentSdk.getCartIdFromContext(contextData);
 };
 
 export const getAllowedPaymentMethodsFromContext = (): string[] => {

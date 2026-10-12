@@ -50,6 +50,8 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
     paypalMessages,
     messagesStyle,
     disablePayLaterButton,
+    initialAmount,
+    countryCode,
     ...restprops
   } = props;
   const save = useRef<HTMLInputElement>(null);
@@ -203,6 +205,8 @@ export const PayPalMask: React.FC<CustomPayPalButtonsComponentProps> = (
           paymentInfo={paymentInfo}
           isExpress={isExpress}
           messagesStyle={messagesStyle}
+          initialAmount={initialAmount}
+          countryCode={countryCode}
         />
       )}
 

@@ -141,8 +141,8 @@ export const RenderTemplate: FC<RenderTemplateProps> = ({
         // baseOptions.processorUrl is the single source of truth — callers used to also pass a
         // separate processorUrl prop duplicating this same value.
         processorUrl: baseOptions.processorUrl,
-        // Resolved once in PayPalPaymentEnabler._Setup(), same as `settings` — already present by
-        // the time any component reaches this point.
+        // Resolved once in PayPalPaymentEnabler._SetupPayment() for standard/stored builders —
+        // already present by the time they reach this point. Absent for PayPal Express.
         initialPayment: baseOptions.initialPayment,
         // Injects createPaymentUrl/createOrderUrl/authorizeOrderUrl/onApproveUrl/
         // authenticateThreeDSOrderUrl (plus expressApproveUrl/updateShippingUrl/

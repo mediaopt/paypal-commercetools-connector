@@ -54,7 +54,7 @@ The commercetools API client needs at least the following scopes (the health che
 | `POST /payments/3ds`                       | session                                                  | 3DS authentication result for credit cards           |
 | `POST /payments/updateShipping`            | session                                                  | PayPal Express shipping change                       |
 | `GET /stored-payment-methods`              | session                                                  | the customer's stored credit cards                   |
-| `DELETE /stored-payment-methods/:id`       | session                                                  | remove a stored credit card                          |
+| `DELETE /stored-payment-methods/:id`       | session                                                  | remove the cart customer's stored credit card        |
 
 ## Authentication
 

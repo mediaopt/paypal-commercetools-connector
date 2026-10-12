@@ -3,9 +3,9 @@ import { FC } from "react";
 import { PayPalContextProvider } from "../PayPalContextProvider";
 import { PayPalButton } from "./PayPalButton";
 
-import { SmartComponentsProps } from "../../types";
+import { ProviderErrorProps, SmartComponentsProps } from "../../types";
 
-export const PayPal: FC<SmartComponentsProps> = ({
+export const PayPal: FC<SmartComponentsProps & ProviderErrorProps> = ({
   options,
 
   createPaymentUrl,
@@ -33,6 +33,7 @@ export const PayPal: FC<SmartComponentsProps> = ({
   redirectOnApprove,
   initialPayment,
   onExpressPayButtonClick,
+  onError,
 
   ...restProps
 }) => {
@@ -62,6 +63,7 @@ export const PayPal: FC<SmartComponentsProps> = ({
       redirectOnApprove={redirectOnApprove}
       initialPayment={initialPayment}
       onExpressPayButtonClick={onExpressPayButtonClick}
+      onError={onError}
     >
       <PayPalButton {...buttonProps} enableVaulting={enableVaulting} />
     </PayPalContextProvider>
