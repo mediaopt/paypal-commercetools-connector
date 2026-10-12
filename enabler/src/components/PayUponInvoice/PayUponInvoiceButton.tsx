@@ -69,17 +69,17 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     : paymentInfo.id && !onRegisterSubmit && !clientToken
     ? ["invoice.thirdPartyIssue"]
     : null;
+  const invoiceMessage =
+    invoiceError &&
+    t(...(invoiceError as [string, Record<string, string | number>] | [string]));
 
   useEffect(() => {
-    if (!onRegisterSubmit || !invoiceError) return;
+    if (!onRegisterSubmit || !invoiceMessage) return;
     // Checkout mode, but this cart/settings state is ineligible — PayUponInvoiceMask never mounts
     // below, so nothing would otherwise call onRegisterSubmit/onRegisterValidation. Registering
     // both here overwrites any stale handler PayUponInvoiceMask left behind if the cart became
     // ineligible after it had already mounted.
-    const message = t(
-      ...(invoiceError as [string, Record<string, string | number>] | [string])
-    );
-    const notifyInvoiceError = () => notify("Warning", message);
+    const notifyInvoiceError = () => notify("Warning", invoiceMessage);
 
     // isValid()/showValidation() are the primary path — Checkout is expected to check isValid()
     // before ever calling submit(), and showValidation() is what actually surfaces this message
@@ -91,19 +91,17 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     // with a dead button.
     onRegisterSubmit(async () => {
       notifyInvoiceError();
-      throw new Error(message);
+      throw new Error(invoiceMessage);
     });
     onRegisterValidation?.({
       isValid: async () => false,
       showValidation: async () => notifyInvoiceError(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoiceError, onRegisterSubmit, onRegisterValidation]);
+  }, [invoiceMessage, onRegisterSubmit, onRegisterValidation]);
 
-  return invoiceError ? (
-    <div>
-      {t(...(invoiceError as [string, Record<string, string | number>] | [string]))}
-    </div>
+  return invoiceMessage ? (
+    <div>{invoiceMessage}</div>
   ) : paymentInfo.id && (onRegisterSubmit || clientToken) ? (
     <PayUponInvoiceMask
       fraudNetSessionId={fraudNetSessionId}

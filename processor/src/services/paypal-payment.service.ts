@@ -610,9 +610,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       this.validatePayUponInvoiceOrderParams(payment, ctCart);
     }
 
-    // Informational only for non-PUI orders — customerEmail is sent to PayPal only for PUI
-    // (`pay_upon_invoice.email`), where validatePayUponInvoiceOrderParams already rejected a
-    // missing one above. A real standard checkout flow already forces the buyer to fill this in
+    // Informational only for non-PUI orders — the buyer e-mail is sent to PayPal only for PUI
+    // (`pay_upon_invoice.email`, via resolveBuyerEmail), where validatePayUponInvoiceOrderParams
+    // already rejected a missing one above. A real standard checkout flow already forces the buyer to fill this in
     // before the enabler even loads; the one case this can still legitimately fire is a merchant
     // embedding only the standard payment buttons in their own custom checkout UI without
     // collecting it first. PayPal collects the
@@ -621,9 +621,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const isExpress =
       paymentMethodType === StandardPaymentMethodType.PAYPAL &&
       builderType === CustomBuilderType.EXPRESS;
-    if (!isExpress && !ctCart.customerEmail) {
+    if (!isExpress && !resolveBuyerEmail(ctCart)) {
       log.warn(
-        `createOrder: cart ${ctCart.id} has no customerEmail for a non-Express order (payment ${paymentId})`
+        `createOrder: cart ${ctCart.id} has no buyer e-mail (customerEmail or billingAddress.email) for a non-Express order (payment ${paymentId})`
       );
     }
 
