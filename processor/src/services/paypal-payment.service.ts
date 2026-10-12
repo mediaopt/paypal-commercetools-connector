@@ -107,6 +107,7 @@ import {
   findVoidableTransaction,
   buildPlaceholderInteractionId,
   isPlaceholderInteractionId,
+  resolveBuyerEmail,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -560,7 +561,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       },
       id: payment.id,
       amountPlanned: payment.amountPlanned,
-      email: ctCart.customerEmail,
+      email: resolveBuyerEmail(ctCart),
       ctCustomerId: ctCart.customerId,
       firstName: ctCart.billingAddress?.firstName,
       lastName: ctCart.billingAddress?.lastName,
@@ -840,7 +841,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       "billingAddress.country": billing?.country,
       "billingAddress.firstName": billing?.firstName,
       "billingAddress.lastName": billing?.lastName,
-      customerEmail: ctCart.customerEmail,
+      "customerEmail or billingAddress.email": resolveBuyerEmail(ctCart),
     })
       .filter(([, value]) => !value)
       .map(([field]) => field);

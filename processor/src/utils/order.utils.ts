@@ -98,6 +98,10 @@ export const buildRatePayExperienceContext = (
   };
 };
 
+// PUI buyer e-mail: payment-only carts may carry it only on the billing address.
+export const resolveBuyerEmail = (ctCart: Cart): string | undefined =>
+  ctCart.customerEmail || ctCart.billingAddress?.email;
+
 const pickExperienceContextOverrides = (
   overrides: Record<string, unknown>,
   keys: string[]
@@ -243,7 +247,7 @@ export const buildOrderRequest = (
       ? {
           payment_source: {
             pay_upon_invoice: {
-              email: ctCart.customerEmail,
+              email: resolveBuyerEmail(ctCart),
               name: {
                 given_name: ctCart.billingAddress?.firstName,
                 surname: ctCart.billingAddress?.lastName,
