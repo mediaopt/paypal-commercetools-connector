@@ -8,6 +8,7 @@ type CartEligibility = {
 // Cart country/currency each payment method is restricted to; a method without an entry is not
 // restricted here. countryCode is the billing country, falling back to the cart country.
 // To enforce a commented-out method, uncomment its line — verify the pair against PayPal's docs first.
+// Server-side counterparts: processor's validateVenmoOrderParams / validatePayUponInvoiceOrderParams.
 const CART_ELIGIBILITY_BY_PAYMENT_METHOD_TYPE: Partial<
   Record<PayPalPaymentMethodType, CartEligibility>
 > = {

@@ -807,11 +807,24 @@ export class PayPalPaymentService extends AbstractPaymentService {
     }
   }
 
-  // PayUponInvoice requires the order amount to exactly match the cart's taxed gross total.
+  // PayUponInvoice is DE/EUR-only (same pair as the enabler's paymentMethodEligibility.ts) and
+  // requires the order amount to exactly match the cart's taxed gross total.
   private validatePayUponInvoiceOrderParams(
     payment: Payment,
     ctCart: Cart
   ): void {
+    if (payment.amountPlanned.currencyCode !== "EUR") {
+      throw new ErrorInvalidOperation(
+        `PayUponInvoice requires a EUR-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
+      );
+    }
+    const billing = ctCart.billingAddress;
+    if (billing?.country && billing.country !== "DE") {
+      throw new ErrorInvalidOperation(
+        `PayUponInvoice requires a DE billing address; cart ${ctCart.id} has ${billing.country} (payment ${payment.id})`
+      );
+    }
+
     const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)
       ?.centAmount;
     if (payment.amountPlanned.centAmount !== cartTotal) {
@@ -820,7 +833,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    const billing = ctCart.billingAddress;
     const missingFields = Object.entries({
       "billingAddress.streetName": billing?.streetName,
       "billingAddress.city": billing?.city,
