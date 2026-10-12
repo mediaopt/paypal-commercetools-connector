@@ -8,7 +8,8 @@ jest.mock("react-i18next", () => ({
   Trans: ({ i18nKey }: { i18nKey: string }) => i18nKey,
   useTranslation: () => {
     return {
-      t: (str: string) => str,
+      t: (str: string, options?: { fields?: string }) =>
+        options?.fields ? `${str}: ${options.fields}` : str,
       i18n: {
         changeLanguage: () => new Promise(() => {}),
       },
@@ -51,6 +52,25 @@ const paymentInfoWithAmount = (
   email: "max@example.com",
   ...overrides,
 });
+
+const mockCaptureState = (
+  overrides: Record<string, unknown>,
+  clientToken = "123"
+) => {
+  (usePayment as jest.Mock).mockReturnValue({
+    paymentInfo: paymentInfoWithAmount(2000, overrides),
+    clientToken,
+  });
+  (useSettings as jest.Mock).mockReturnValue({
+    settings: { payPalIntent: "Capture" },
+  });
+};
+
+// Matches the t() mock above: labels stay as their i18n keys.
+const missingBuyerDataMessage = (...fields: string[]) =>
+  `invoice.missingBuyerData: ${fields
+    .map((field) => `invoice.fields.${field}`)
+    .join(", ")}`;
 
 test("Mask is shown if settings and params are valid (legacy mode)", () => {
   (usePayment as jest.Mock).mockReturnValue({
@@ -144,20 +164,72 @@ test("If currency is not EUR corresponding error is shown instead of the euro am
   expect(screen.queryByText("invoice.tooBig")).toEqual(null);
 });
 
+test("The processor's missing-fields list is shown as translated labels instead of the mask", () => {
+  mockCaptureState({
+    payUponInvoiceMissingFields: [
+      "billingAddress.streetName",
+      "billingAddress.city",
+    ],
+  });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(
+    screen.getAllByText(
+      missingBuyerDataMessage("billingAddress.streetName", "billingAddress.city")
+    ).length
+  ).toEqual(1);
+  expect(screen.queryByText("Mocked mask")).toEqual(null);
+});
+
+test("An empty missing-fields list from the processor wins over the legacy name/e-mail check", () => {
+  mockCaptureState({ email: undefined, payUponInvoiceMissingFields: [] });
+  render(<PayUponInvoiceButton {...testButtonProps} />);
+  expect(screen.getAllByText("Mocked mask").length).toEqual(1);
+});
+
 test.each(["firstName", "lastName", "email"])(
-  "If %s is missing corresponding error is shown",
+  "Legacy backend without a missing-fields list: a missing %s lists all name/e-mail fields (the old contract can't tell which)",
   (field) => {
-    (usePayment as jest.Mock).mockReturnValue({
-      paymentInfo: paymentInfoWithAmount(2000, { [field]: undefined }),
-      clientToken: "123",
-    });
-    (useSettings as jest.Mock).mockReturnValue({
-      settings: { payPalIntent: "Capture" },
-    });
+    mockCaptureState({ [field]: undefined });
     render(<PayUponInvoiceButton {...testButtonProps} />);
-    expect(screen.getAllByText("invoice.missingBuyerData").length).toEqual(1);
+    expect(
+      screen.getAllByText(
+        missingBuyerDataMessage(
+          "billingAddress.firstName",
+          "billingAddress.lastName",
+          "email"
+        )
+      ).length
+    ).toEqual(1);
   }
 );
+
+test("In Checkout mode, missing fields make isValid() false and submit() reject with the same message", async () => {
+  mockCaptureState(
+    { payUponInvoiceMissingFields: ["billingAddress.postalCode"] },
+    ""
+  );
+  const onRegisterSubmit = jest.fn();
+  const onRegisterValidation = jest.fn();
+  render(
+    <PayUponInvoiceButton
+      {...testButtonProps}
+      onRegisterSubmit={onRegisterSubmit}
+      onRegisterValidation={onRegisterValidation}
+    />,
+  );
+
+  const [submit] = onRegisterSubmit.mock.calls.at(-1) as [
+    () => Promise<void>,
+  ];
+  const [validation] = onRegisterValidation.mock.calls.at(-1) as [
+    { isValid: () => Promise<boolean> },
+  ];
+  await expect(validation.isValid()).resolves.toBe(false);
+  await expect(submit()).rejects.toThrow(
+    missingBuyerDataMessage("billingAddress.postalCode")
+  );
+  expect(screen.queryByText("Mocked mask")).toEqual(null);
+});
 
 test("In legacy mode (no onRegisterSubmit), missing clientToken shows the third-party error", () => {
   (usePayment as jest.Mock).mockReturnValue({
@@ -202,7 +274,7 @@ test("If payment id is missing mask and error messages are not rendered", () => 
   expect(screen.queryByText("invoice.merchantIssue")).toEqual(null);
   expect(screen.queryByText("invoice.wrongCountry")).toEqual(null);
   expect(screen.queryByText("invoice.wrongCurrency")).toEqual(null);
-  expect(screen.queryByText("invoice.missingBuyerData")).toEqual(null);
+  expect(screen.queryByText(/invoice\.missingBuyerData/)).toEqual(null);
   expect(screen.queryByText("invoice.tooSmall")).toEqual(null);
   expect(screen.queryByText("invoice.tooBig")).toEqual(null);
   expect(screen.queryByText("invoice.thirdPartyIssue")).toEqual(null);
