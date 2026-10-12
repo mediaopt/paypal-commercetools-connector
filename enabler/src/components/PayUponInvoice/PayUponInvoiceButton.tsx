@@ -41,15 +41,27 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     paymentInfo.countryCode,
     paymentInfo.amountPlanned.currencyCode
   );
+  // Legacy self-hosted backends don't send the list; keep their old name/e-mail check.
+  const missingBuyerFields =
+    paymentInfo.payUponInvoiceMissingFields ??
+    (paymentInfo.firstName && paymentInfo.lastName && paymentInfo.email
+      ? []
+      : ["billingAddress.firstName", "billingAddress.lastName", "email"]);
   const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
     : paymentInfo.id && cartIneligibility === "country"
     ? ["invoice.wrongCountry"]
     : paymentInfo.id && cartIneligibility === "currency"
     ? ["invoice.wrongCurrency"]
-    : paymentInfo.id &&
-      !(paymentInfo.firstName && paymentInfo.lastName && paymentInfo.email)
-    ? ["invoice.missingBuyerData"]
+    : paymentInfo.id && missingBuyerFields.length
+    ? [
+        "invoice.missingBuyerData",
+        {
+          fields: missingBuyerFields
+            .map((field) => t(`invoice.fields.${field}`, { defaultValue: field }))
+            .join(", "),
+        },
+      ]
     : paymentInfo.id && paymentInfo.amountPlanned.centAmount < minPayableAmount
     ? ["invoice.tooSmall", { min: minPayableAmount / 100 }]
     : paymentInfo.amountPlanned.centAmount > maxPayableAmount
@@ -65,7 +77,7 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     // both here overwrites any stale handler PayUponInvoiceMask left behind if the cart became
     // ineligible after it had already mounted.
     const message = t(
-      ...(invoiceError as [string, Record<string, number>] | [string])
+      ...(invoiceError as [string, Record<string, string | number>] | [string])
     );
     const notifyInvoiceError = () => notify("Warning", message);
 
@@ -90,7 +102,7 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
 
   return invoiceError ? (
     <div>
-      {t(...(invoiceError as [string, Record<string, number>] | [string]))}
+      {t(...(invoiceError as [string, Record<string, string | number>] | [string]))}
     </div>
   ) : paymentInfo.id && (onRegisterSubmit || clientToken) ? (
     <PayUponInvoiceMask

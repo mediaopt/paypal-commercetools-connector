@@ -25,7 +25,18 @@ i18n.use(initReactI18next).init({
           wrongCurrency:
             "Pay upon invoice is only available for payments in euro.",
           missingBuyerData:
-            "Pay upon invoice requires your billing name and e-mail address.",
+            "Pay upon invoice requires the following details: {{fields}}.",
+          fields: {
+            billingAddress: {
+              firstName: "first name",
+              lastName: "last name",
+              streetName: "street",
+              postalCode: "postal code",
+              city: "city",
+              country: "country",
+            },
+            email: "e-mail address",
+          },
           tooSmall: "Pay upon invoice is available starting from {{min}} euro.",
           tooBig:
             "Pay upon invoice is available only if amount is below {{max}} euro.",
@@ -78,7 +89,18 @@ i18n.use(initReactI18next).init({
           wrongCurrency:
             "Zahlung auf Rechnung ist nur für Zahlungen in Euro möglich.",
           missingBuyerData:
-            "Für Zahlung auf Rechnung werden Ihr Name in der Rechnungsadresse und Ihre E-Mail-Adresse benötigt.",
+            "Für Zahlung auf Rechnung fehlen folgende Angaben: {{fields}}.",
+          fields: {
+            billingAddress: {
+              firstName: "Vorname",
+              lastName: "Nachname",
+              streetName: "Straße",
+              postalCode: "Postleitzahl",
+              city: "Ort",
+              country: "Land",
+            },
+            email: "E-Mail-Adresse",
+          },
           tooSmall: "Zahlung auf Rechnung ist ab {{min}} Euro möglich.",
           tooBig:
             "Zahlung auf Rechnung ist nur bei einem Betrag unter {{max}} Euro möglich.",

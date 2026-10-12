@@ -511,6 +511,8 @@ export type PaymentData = {
   firstName?: string;
   lastName?: string;
   countryCode?: string;
+  /** Field codes PayUponInvoice still needs, see the processor's findPayUponInvoiceMissingFields. */
+  payUponInvoiceMissingFields?: string[];
   shippingAddress?: ShippingAddress;
   shippingOptions?: PayPalShippingOption[];
   priceBreakdown?: unknown;

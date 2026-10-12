@@ -91,6 +91,7 @@ const PaymentFrontendRenderingSchema = Type.Object({
   firstName: Type.Optional(Type.String()),
   lastName: Type.Optional(Type.String()),
   countryCode: Type.Optional(Type.String()),
+  payUponInvoiceMissingFields: Type.Optional(Type.Array(Type.String())),
   shippingAddress: Type.Optional(Type.Any()),
   lineItems: Type.Optional(Type.Array(Type.Any())),
   priceBreakdown: Type.Optional(Type.Any()),

@@ -108,6 +108,7 @@ import {
   buildPlaceholderInteractionId,
   isPlaceholderInteractionId,
   resolveBuyerEmail,
+  findPayUponInvoiceMissingFields,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -566,6 +567,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       firstName: ctCart.billingAddress?.firstName,
       lastName: ctCart.billingAddress?.lastName,
       countryCode: ctCart.billingAddress?.country || ctCart.country,
+      payUponInvoiceMissingFields: findPayUponInvoiceMissingFields(ctCart),
       shippingAddress,
       // for Express shipping options will be fetched on opening window when PayPal sets address
       lineItems: lineItems ?? undefined,
@@ -834,17 +836,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    const missingFields = Object.entries({
-      "billingAddress.streetName": billing?.streetName,
-      "billingAddress.city": billing?.city,
-      "billingAddress.postalCode": billing?.postalCode,
-      "billingAddress.country": billing?.country,
-      "billingAddress.firstName": billing?.firstName,
-      "billingAddress.lastName": billing?.lastName,
-      "customerEmail or billingAddress.email": resolveBuyerEmail(ctCart),
-    })
-      .filter(([, value]) => !value)
-      .map(([field]) => field);
+    const missingFields = findPayUponInvoiceMissingFields(ctCart);
     if (missingFields.length) {
       throw new ErrorInvalidOperation(
         `PayUponInvoice requires ${missingFields.join(", ")}; missing on cart ${ctCart.id} (payment ${payment.id})`

@@ -102,6 +102,22 @@ export const buildRatePayExperienceContext = (
 export const resolveBuyerEmail = (ctCart: Cart): string | undefined =>
   ctCart.customerEmail || ctCart.billingAddress?.email;
 
+// Cart data PayPal requires for PUI, as field codes (enabler: invoice.fields.<code> labels).
+export const findPayUponInvoiceMissingFields = (ctCart: Cart): string[] => {
+  const billing = ctCart.billingAddress;
+  return Object.entries({
+    "billingAddress.firstName": billing?.firstName,
+    "billingAddress.lastName": billing?.lastName,
+    "billingAddress.streetName": billing?.streetName,
+    "billingAddress.postalCode": billing?.postalCode,
+    "billingAddress.city": billing?.city,
+    "billingAddress.country": billing?.country,
+    email: resolveBuyerEmail(ctCart),
+  })
+    .filter(([, value]) => !value)
+    .map(([field]) => field);
+};
+
 const pickExperienceContextOverrides = (
   overrides: Record<string, unknown>,
   keys: string[]
