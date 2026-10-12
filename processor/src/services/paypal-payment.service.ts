@@ -633,12 +633,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     // Informational only for non-PUI orders — the buyer e-mail is sent to PayPal only for PUI
     // (`pay_upon_invoice.email`, via resolveBuyerEmail), where validatePayUponInvoiceOrderParams
-    // already rejected a missing one above. A real standard checkout flow already forces the buyer to fill this in
-    // before the enabler even loads; the one case this can still legitimately fire is a merchant
-    // embedding only the standard payment buttons in their own custom checkout UI without
-    // collecting it first. PayPal collects the
-    // buyer's email inside its own popup for Express, so that case is excluded here — by this
-    // point paymentMethodType/builderType are the request's own real values, not a guess.
+    // already rejected a missing one above. A real standard checkout flow already forces the buyer
+    // to fill this in before the enabler even loads; the one case this can still legitimately fire
+    // is a merchant embedding only the standard payment buttons in their own custom checkout UI
+    // without collecting it first. PayPal collects the buyer's email inside its own popup for
+    // Express, so that case is excluded here — by this point paymentMethodType/builderType are the
+    // request's own real values, not a guess.
     const isExpress =
       paymentMethodType === StandardPaymentMethodType.PAYPAL &&
       builderType === CustomBuilderType.EXPRESS;
