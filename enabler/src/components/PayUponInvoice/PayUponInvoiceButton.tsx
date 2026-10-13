@@ -4,9 +4,10 @@ import { usePayment } from "../../app/usePayment";
 import { useSettings } from "../../app/useSettings";
 import { useNotifications } from "../../app/useNotifications";
 
-import { PayUponInvoiceButtonProps } from "../../types";
+import { CartInformationInitial, PayUponInvoiceButtonProps } from "../../types";
 
 import { PayUponInvoiceMask } from "./PayUponInvoiceMask";
+import { getCartIneligibility } from "../paymentMethodEligibility";
 import { useTranslation } from "react-i18next";
 
 export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
@@ -34,8 +35,41 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
   // (usePayment.tsx's handleCreateOrder), regardless of the merchant's global setting, so this
   // check must not fire there. In legacy/self-hosted mode, settings are fetched raw from the
   // processor with no such forcing, so the merchant genuinely must configure Capture intent.
+  // Check order and rules: enabler/README.md#cart-country-and-currency-rules. Builder already
+  // hides ineligible carts in Checkout; this is the self-hosting fallback.
+  // Legacy self-hosted backends send neither countryCode nor the missing-fields list; read the
+  // buyer data the merchant passed as cartInformation instead.
+  const { billing, account } =
+    paymentInfo.cartInformation ?? CartInformationInitial;
+  const cartIneligibility = getCartIneligibility(
+    "PayUponInvoice",
+    paymentInfo.countryCode || billing.country,
+    paymentInfo.amountPlanned.currencyCode
+  );
+  const missingBuyerFields =
+    paymentInfo.payUponInvoiceMissingFields ??
+    Object.entries({
+      "billingAddress.firstName": paymentInfo.firstName || billing.firstName,
+      "billingAddress.lastName": paymentInfo.lastName || billing.lastName,
+      email: paymentInfo.email || account.email,
+    })
+      .filter(([, value]) => !value)
+      .map(([field]) => field);
   const invoiceError = !onRegisterSubmit && !(settings?.payPalIntent === "Capture")
     ? ["invoice.merchantIssue"]
+    : paymentInfo.id && cartIneligibility === "country"
+    ? ["invoice.wrongCountry"]
+    : paymentInfo.id && cartIneligibility === "currency"
+    ? ["invoice.wrongCurrency"]
+    : paymentInfo.id && missingBuyerFields.length
+    ? [
+        "invoice.missingBuyerData",
+        {
+          fields: missingBuyerFields
+            .map((field) => t(`invoice.fields.${field}`, { defaultValue: field }))
+            .join(", "),
+        },
+      ]
     : paymentInfo.id && paymentInfo.amountPlanned.centAmount < minPayableAmount
     ? ["invoice.tooSmall", { min: minPayableAmount / 100 }]
     : paymentInfo.amountPlanned.centAmount > maxPayableAmount
@@ -43,17 +77,17 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     : paymentInfo.id && !onRegisterSubmit && !clientToken
     ? ["invoice.thirdPartyIssue"]
     : null;
+  const invoiceMessage =
+    invoiceError &&
+    t(...(invoiceError as [string, Record<string, string | number>] | [string]));
 
   useEffect(() => {
-    if (!onRegisterSubmit || !invoiceError) return;
+    if (!onRegisterSubmit || !invoiceMessage) return;
     // Checkout mode, but this cart/settings state is ineligible — PayUponInvoiceMask never mounts
     // below, so nothing would otherwise call onRegisterSubmit/onRegisterValidation. Registering
     // both here overwrites any stale handler PayUponInvoiceMask left behind if the cart became
     // ineligible after it had already mounted.
-    const message = t(
-      ...(invoiceError as [string, Record<string, number>] | [string])
-    );
-    const notifyInvoiceError = () => notify("Warning", message);
+    const notifyInvoiceError = () => notify("Warning", invoiceMessage);
 
     // isValid()/showValidation() are the primary path — Checkout is expected to check isValid()
     // before ever calling submit(), and showValidation() is what actually surfaces this message
@@ -65,19 +99,17 @@ export const PayUponInvoiceButton: FC<PayUponInvoiceButtonProps> = ({
     // with a dead button.
     onRegisterSubmit(async () => {
       notifyInvoiceError();
-      throw new Error(message);
+      throw new Error(invoiceMessage);
     });
     onRegisterValidation?.({
       isValid: async () => false,
       showValidation: async () => notifyInvoiceError(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoiceError, onRegisterSubmit, onRegisterValidation]);
+  }, [invoiceMessage, onRegisterSubmit, onRegisterValidation]);
 
-  return invoiceError ? (
-    <div>
-      {t(...(invoiceError as [string, Record<string, number>] | [string]))}
-    </div>
+  return invoiceMessage ? (
+    <div>{invoiceMessage}</div>
   ) : paymentInfo.id && (onRegisterSubmit || clientToken) ? (
     <PayUponInvoiceMask
       fraudNetSessionId={fraudNetSessionId}

@@ -67,6 +67,7 @@ const toPaymentInfo = (
   firstName: payment.firstName,
   lastName: payment.lastName,
   countryCode: payment.countryCode,
+  payUponInvoiceMissingFields: payment.payUponInvoiceMissingFields,
   shippingAddress: payment.shippingAddress,
   shippingOptions: payment.shippingOptions,
   priceBreakdown: payment.priceBreakdown,

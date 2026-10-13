@@ -120,7 +120,7 @@ export type CreateOrderRequest = {
   builderType?: BuilderType;
   /** The same paymentMethodType already sent on the initial /payments request (see
    * PaymentRequestSchemaDTO's paymentMethodType) — lets the processor apply payment-method-specific
-   * order constraints, e.g. Venmo's USD-only requirement. */
+   * order constraints, e.g. Venmo's US/USD-only requirement. */
   paymentMethodType?: PayPalPaymentMethodType;
 };
 
@@ -516,6 +516,8 @@ export type PaymentData = {
   firstName?: string;
   lastName?: string;
   countryCode?: string;
+  /** Field codes PayUponInvoice still needs, see the processor's findPayUponInvoiceMissingFields. */
+  payUponInvoiceMissingFields?: string[];
   shippingAddress?: ShippingAddress;
   shippingOptions?: PayPalShippingOption[];
   priceBreakdown?: unknown;

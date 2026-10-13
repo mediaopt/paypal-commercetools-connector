@@ -109,6 +109,16 @@ describe("paypal-payment.service", () => {
     lastName: "Doe",
   };
 
+  const puiCart = {
+    ...mockCart,
+    customerEmail: "buyer@example.com",
+    billingAddress: { ...mockShippingAddress },
+  } as unknown as Cart;
+  const puiPayment = {
+    ...mockPayment,
+    amountPlanned: { ...mockPayment.amountPlanned, currencyCode: "EUR" },
+  } as unknown as Payment;
+
   // paymentSDK.ctAPI.client is a non-configurable getter in the SDK; save/restore manually.
   let savedClient: unknown;
   const mockClientPost = jest.fn();
@@ -654,11 +664,6 @@ describe("paypal-payment.service", () => {
   });
 
   describe("createOrder: PayUponInvoice", () => {
-    const puiCart = {
-      ...mockCart,
-      customerEmail: "buyer@example.com",
-      billingAddress: { ...mockShippingAddress },
-    } as unknown as Cart;
     const puiOrderData = {
       fraudNetSessionId: "fraudnet-session",
       birthDate: "1990-05-12",
@@ -669,6 +674,9 @@ describe("paypal-payment.service", () => {
 
     beforeEach(() => {
       jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue(puiCart);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "getPayment")
+        .mockResolvedValue(puiPayment);
       (CommonConnect.createPayPalOrder as jest.Mock).mockResolvedValue(
         puiPayPalOrder as never
       );
@@ -724,8 +732,8 @@ describe("paypal-payment.service", () => {
                 state: "Pending",
                 interactionId: buildPlaceholderInteractionId(puiPayPalOrder.id),
                 amount: {
-                  centAmount: mockPayment.amountPlanned.centAmount,
-                  currencyCode: mockPayment.amountPlanned.currencyCode,
+                  centAmount: puiPayment.amountPlanned.centAmount,
+                  currencyCode: puiPayment.amountPlanned.currencyCode,
                 },
               },
             },
@@ -738,20 +746,136 @@ describe("paypal-payment.service", () => {
       );
     });
 
-    test("refuses to create the order when the payment amount doesn't match the cart total", async () => {
-      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
-        ...mockPayment,
-        amountPlanned: { ...mockPayment.amountPlanned, centAmount: 900 },
-      } as unknown as Payment);
-
+    const expectPuiCreateOrderRejects = async (message: string) => {
       await expect(
         paypalPaymentService.createOrder({
           paymentId: mockPayment.id,
           orderData: puiOrderData,
           paymentMethodType: "PayUponInvoice",
         })
-      ).rejects.toThrow(ErrorInvalidOperation);
+      ).rejects.toThrow(message);
       expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    };
+
+    test("refuses to create the order when the payment amount doesn't match the cart total", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...puiPayment,
+        amountPlanned: { ...puiPayment.amountPlanned, centAmount: 900 },
+      } as unknown as Payment);
+
+      await expectPuiCreateOrderRejects("does not match cart total");
+    });
+
+    test("refuses to create the order for a non-EUR payment", async () => {
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "getPayment")
+        .mockResolvedValue(mockPayment);
+
+      await expectPuiCreateOrderRejects("requires a EUR-denominated payment");
+    });
+
+    const expectPuiOrderRefused = async (cart: object, field: string) => {
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue(cart as unknown as Cart);
+
+      await expectPuiCreateOrderRejects(field);
+    };
+
+    test.each([
+      "streetName",
+      "city",
+      "postalCode",
+      "country",
+      "firstName",
+      "lastName",
+    ])(
+      "refuses to create the order when billingAddress.%s is missing",
+      async (field) => {
+        await expectPuiOrderRefused(
+          {
+            ...puiCart,
+            billingAddress: { ...mockShippingAddress, [field]: undefined },
+          },
+          `billingAddress.${field}`
+        );
+      }
+    );
+
+    test("refuses to create the order for a non-DE billing address", async () => {
+      await expectPuiOrderRefused(
+        { ...puiCart, billingAddress: { ...mockShippingAddress, country: "AT" } },
+        "requires a DE billing address"
+      );
+    });
+
+    test("reports every problem in one error", async () => {
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        amountPlanned: { ...mockPayment.amountPlanned, centAmount: 900 },
+      } as unknown as Payment);
+
+      await expectPuiOrderRefused(
+        {
+          ...puiCart,
+          customerEmail: undefined,
+          billingAddress: { ...mockShippingAddress, country: "AT", city: undefined },
+        },
+        "PayUponInvoice requires a EUR-denominated payment (got USD); a DE billing address (got AT); " +
+          "the order amount to match the cart total (payment amount 900 does not match cart total 1000); " +
+          "billingAddress.city, email (missing)"
+      );
+    });
+
+    test("refuses to create the order when neither customerEmail nor billingAddress.email is set", async () => {
+      await expectPuiOrderRefused(
+        { ...puiCart, customerEmail: undefined },
+        "PayUponInvoice requires email"
+      );
+    });
+
+    test("takes the e-mail from billingAddress.email when customerEmail is missing, without warning about it", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...puiCart,
+        customerEmail: undefined,
+        billingAddress: { ...mockShippingAddress, email: "billing@example.com" },
+      } as unknown as Cart);
+      const warnSpy = jest.spyOn(log, "warn").mockImplementation(() => log);
+
+      await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: puiOrderData,
+        paymentMethodType: "PayUponInvoice",
+      });
+
+      expect(CommonConnect.createPayPalOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payment_source: {
+            pay_upon_invoice: expect.objectContaining({
+              email: "billing@example.com",
+            }),
+          },
+        }),
+        "fraudnet-session"
+      );
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("no buyer e-mail")
+      );
+    });
+
+    test("a missing billing streetNumber doesn't block the order (often folded into streetName)", async () => {
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...puiCart,
+        billingAddress: { ...mockShippingAddress, streetNumber: undefined },
+      } as unknown as Cart);
+
+      await paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: puiOrderData,
+        paymentMethodType: "PayUponInvoice",
+      });
+
+      expect(CommonConnect.createPayPalOrder).toHaveBeenCalled();
     });
 
     test("a non-PUI order gets no placeholder transaction", async () => {
@@ -853,6 +977,114 @@ describe("paypal-payment.service", () => {
     });
   });
 
+  describe("createOrder: Venmo", () => {
+    const createVenmoOrder = () =>
+      paypalPaymentService.createOrder({
+        paymentId: mockPayment.id,
+        orderData: { paymentSource: "venmo" },
+        paymentMethodType: "Venmo",
+      });
+    const mockVenmoCart = (cart: object) =>
+      jest
+        .spyOn(paymentSDK.ctCartService, "getCart")
+        .mockResolvedValue({ ...mockCart, ...cart } as unknown as Cart);
+
+    test.each([
+      ["a US billing country", { billingAddress: { country: "US" } }],
+      ["a US cart country without a billing country", { country: "US" }],
+      ["no country at all (PayPal judges the buyer)", {}],
+    ])("creates the order for a USD cart with %s", async (_, cart) => {
+      mockVenmoCart(cart);
+
+      await createVenmoOrder();
+
+      expect(CommonConnect.createPayPalOrder).toHaveBeenCalled();
+    });
+
+    test("prefers the billing country over the cart country", async () => {
+      mockVenmoCart({ country: "US", billingAddress: { country: "DE" } });
+
+      await expect(createVenmoOrder()).rejects.toThrow(
+        "Venmo requires a US billing address (got DE)"
+      );
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    });
+
+    test("reports a non-USD payment and a non-US country in one error", async () => {
+      mockVenmoCart({ billingAddress: { country: "DE" } });
+      jest.spyOn(paymentSDK.ctPaymentService, "getPayment").mockResolvedValue({
+        ...mockPayment,
+        amountPlanned: { ...mockPayment.amountPlanned, currencyCode: "EUR" },
+      } as unknown as Payment);
+
+      await expect(createVenmoOrder()).rejects.toThrow(
+        "Venmo requires a USD-denominated payment (got EUR); a US billing address (got DE)"
+      );
+      expect(CommonConnect.createPayPalOrder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createPayment: PayUponInvoice buyer data", () => {
+    // A still-relevant last-linked payment is reused, so no new CT payment gets created here.
+    const createPaymentFor = (cartOverrides: object) => {
+      const reusablePayment = {
+        ...mockPayment,
+        anonymousId: "anonymous-id",
+        checkoutTransactionItemId: "checkout-transaction-item-id",
+        paymentStatus: { interfaceCode: "Initial" },
+        paymentMethodInfo: {
+          paymentInterface: ConfigModule.getConfig().paymentInterface,
+        },
+      };
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
+        ...mockCart,
+        anonymousId: "anonymous-id",
+        paymentInfo: { payments: [{ obj: reusablePayment }] },
+        ...cartOverrides,
+      } as unknown as Cart);
+      jest
+        .spyOn(paymentSDK.ctCartService, "getPaymentAmount")
+        .mockResolvedValue(mockPayment.amountPlanned as never);
+      jest
+        .spyOn(FastifyContext, "getCheckoutTransactionItemIdFromContext")
+        .mockReturnValue("checkout-transaction-item-id");
+      return paypalPaymentService.createPayment({});
+    };
+
+    test("returns no missing fields for a complete cart", async () => {
+      const result = await createPaymentFor({
+        customerEmail: "buyer@example.com",
+        billingAddress: { ...mockShippingAddress },
+      });
+
+      expect(result.payUponInvoiceMissingFields).toEqual([]);
+      expect(result.email).toBe("buyer@example.com");
+    });
+
+    test("lists the missing billing fields and the e-mail, in reading order", async () => {
+      const result = await createPaymentFor({
+        billingAddress: { firstName: "Jane", country: "DE" },
+      });
+
+      expect(result.payUponInvoiceMissingFields).toEqual([
+        "billingAddress.lastName",
+        "billingAddress.streetName",
+        "billingAddress.postalCode",
+        "billingAddress.city",
+        "email",
+      ]);
+    });
+
+    test("falls back to billingAddress.email when customerEmail is missing", async () => {
+      const result = await createPaymentFor({
+        billingAddress: { ...mockShippingAddress, email: "billing@example.com" },
+      });
+
+      expect(result.email).toBe("billing@example.com");
+      expect(result.payUponInvoiceMissingFields).toEqual([]);
+    });
+  });
+
   describe("createOrder: PAYPAL_ORDER_EXPERIENCE_CONTEXT overrides", () => {
     const overrides = {
       user_action: "CONTINUE",
@@ -893,11 +1125,10 @@ describe("paypal-payment.service", () => {
     });
 
     test("the pay_upon_invoice experience_context only receives PUI keys", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerEmail: "buyer@example.com",
-        billingAddress: { ...mockShippingAddress },
-      } as unknown as Cart);
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue(puiCart);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "getPayment")
+        .mockResolvedValue(puiPayment);
 
       await paypalPaymentService.createOrder({
         paymentId: mockPayment.id,
@@ -921,11 +1152,10 @@ describe("paypal-payment.service", () => {
     });
 
     test("PAYPAL_ORDER_EXPERIENCE_CONTEXT wins over the merchant-center RatePay settings", async () => {
-      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue({
-        ...mockCart,
-        customerEmail: "buyer@example.com",
-        billingAddress: { ...mockShippingAddress },
-      } as unknown as Cart);
+      jest.spyOn(paymentSDK.ctCartService, "getCart").mockResolvedValue(puiCart);
+      jest
+        .spyOn(paymentSDK.ctPaymentService, "getPayment")
+        .mockResolvedValue(puiPayment);
       (CommonConnect.getSettings as jest.Mock).mockResolvedValue({
         ratePayBrandName: { de: "Shop GmbH" },
         ratePayCustomerServiceInstructions: { de: "Call 0800 123" },

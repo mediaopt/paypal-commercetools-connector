@@ -20,6 +20,23 @@ i18n.use(initReactI18next).init({
           thirdPartyIssue:
             "Pay upon invoice is currently not available. Please try again later.",
           merchantIssue: "Pay upon invoice is not available at the moment.",
+          wrongCountry:
+            "Pay upon invoice is only available for billing addresses in Germany.",
+          wrongCurrency:
+            "Pay upon invoice is only available for payments in euro.",
+          missingBuyerData:
+            "Pay upon invoice requires the following details: {{fields}}.",
+          fields: {
+            billingAddress: {
+              firstName: "first name",
+              lastName: "last name",
+              streetName: "street",
+              postalCode: "postal code",
+              city: "city",
+              country: "country",
+            },
+            email: "e-mail address",
+          },
           tooSmall: "Pay upon invoice is available starting from {{min}} euro.",
           tooBig:
             "Pay upon invoice is available only if amount is below {{max}} euro.",
@@ -67,6 +84,23 @@ i18n.use(initReactI18next).init({
           thirdPartyIssue:
             "Zahlung auf Rechnung ist derzeit nicht verfügbar. Bitte versuchen Sie es später noch einmal.",
           merchantIssue: "Zahlung auf Rechnung ist zur Zeit nicht verfügbar.",
+          wrongCountry:
+            "Zahlung auf Rechnung ist nur für Rechnungsadressen in Deutschland möglich.",
+          wrongCurrency:
+            "Zahlung auf Rechnung ist nur für Zahlungen in Euro möglich.",
+          missingBuyerData:
+            "Für Zahlung auf Rechnung fehlen folgende Angaben: {{fields}}.",
+          fields: {
+            billingAddress: {
+              firstName: "Vorname",
+              lastName: "Nachname",
+              streetName: "Straße",
+              postalCode: "Postleitzahl",
+              city: "Ort",
+              country: "Land",
+            },
+            email: "E-Mail-Adresse",
+          },
           tooSmall: "Zahlung auf Rechnung ist ab {{min}} Euro möglich.",
           tooBig:
             "Zahlung auf Rechnung ist nur bei einem Betrag unter {{max}} Euro möglich.",

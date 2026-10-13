@@ -14,7 +14,7 @@ export const StandardPaymentMethodType = {
   PAYPAL_CREDIT_CARD: "PayPalCreditCard",
   ALL_BUTTONS: "AllButtons",
   // Venmo has no commercetools icon-key equivalent — see paymentMethodIcon.utils.ts. PayPal's
-  // Venmo funding source is USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
+  // Venmo funding source is US/USD-only — see paypal-payment.service.ts's validateVenmoOrderParams.
   VENMO: "Venmo",
   CREDIT: "Credit",
 
@@ -91,6 +91,7 @@ const PaymentFrontendRenderingSchema = Type.Object({
   firstName: Type.Optional(Type.String()),
   lastName: Type.Optional(Type.String()),
   countryCode: Type.Optional(Type.String()),
+  payUponInvoiceMissingFields: Type.Optional(Type.Array(Type.String())),
   shippingAddress: Type.Optional(Type.Any()),
   lineItems: Type.Optional(Type.Array(Type.Any())),
   priceBreakdown: Type.Optional(Type.Any()),
@@ -150,7 +151,7 @@ export const CreateOrderRequestSchema = Type.Object({
   orderData: Type.Optional(CreateOrderDataSchema),
   payPalIntent: PayPalIntentSchema,
   builderType: Type.Optional(Type.String()),
-  // Lets createOrder() apply payment-method-specific order constraints (e.g. Venmo's USD-only
+  // Lets createOrder() apply payment-method-specific order constraints (e.g. Venmo's US/USD-only
   // requirement) — see paypal-payment.service.ts's validateVenmoOrderParams.
   paymentMethodType: Type.Optional(Type.Enum(PaymentMethodType)),
 });

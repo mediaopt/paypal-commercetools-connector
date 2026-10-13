@@ -107,6 +107,8 @@ import {
   findVoidableTransaction,
   buildPlaceholderInteractionId,
   isPlaceholderInteractionId,
+  resolveBuyerEmail,
+  findPayUponInvoiceMissingFields,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -580,11 +582,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       },
       id: payment.id,
       amountPlanned: payment.amountPlanned,
-      email: ctCart.customerEmail,
+      email: resolveBuyerEmail(ctCart),
       ctCustomerId: ctCart.customerId,
       firstName: ctCart.billingAddress?.firstName,
       lastName: ctCart.billingAddress?.lastName,
       countryCode: ctCart.billingAddress?.country || ctCart.country,
+      payUponInvoiceMissingFields: findPayUponInvoiceMissingFields(ctCart),
       shippingAddress,
       // for Express shipping options will be fetched on opening window when PayPal sets address
       lineItems: lineItems ?? undefined,
@@ -611,10 +614,6 @@ export class PayPalPaymentService extends AbstractPaymentService {
       );
     }
 
-    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
-      this.validateVenmoOrderParams(payment);
-    }
-
     const isPayUponInvoice =
       paymentMethodType === StandardPaymentMethodType.PAY_UPON_INVOICE;
     const [ctCart, settings] = await Promise.all([
@@ -625,23 +624,27 @@ export class PayPalPaymentService extends AbstractPaymentService {
       isPayUponInvoice ? this.resolveSettings() : Promise.resolve(undefined),
     ]);
 
+    if (paymentMethodType === StandardPaymentMethodType.VENMO) {
+      this.validateVenmoOrderParams(payment, ctCart);
+    }
     if (isPayUponInvoice) {
       this.validatePayUponInvoiceOrderParams(payment, ctCart);
     }
 
-    // Informational only — customerEmail is never actually sent to PayPal (createOrder/
-    // buildOrderRequest never reference it), so a missing one here isn't fatal. A real standard
-    // checkout flow already forces the buyer to fill this in before the enabler even loads;
-    // the one case this can still legitimately fire is a merchant embedding only the standard payment
-    // buttons in their own custom checkout UI without collecting it first. PayPal collects the
-    // buyer's email inside its own popup for Express, so that case is excluded here — by this
-    // point paymentMethodType/builderType are the request's own real values, not a guess.
+    // Informational only for non-PUI orders — the buyer e-mail is sent to PayPal only for PUI
+    // (`pay_upon_invoice.email`, via resolveBuyerEmail), where validatePayUponInvoiceOrderParams
+    // already rejected a missing one above. A real standard checkout flow already forces the buyer
+    // to fill this in before the enabler even loads; the one case this can still legitimately fire
+    // is a merchant embedding only the standard payment buttons in their own custom checkout UI
+    // without collecting it first. PayPal collects the buyer's email inside its own popup for
+    // Express, so that case is excluded here — by this point paymentMethodType/builderType are the
+    // request's own real values, not a guess.
     const isExpress =
       paymentMethodType === StandardPaymentMethodType.PAYPAL &&
       builderType === CustomBuilderType.EXPRESS;
-    if (!isExpress && !ctCart.customerEmail) {
+    if (!isExpress && !resolveBuyerEmail(ctCart)) {
       log.warn(
-        `createOrder: cart ${ctCart.id} has no customerEmail for a non-Express order (payment ${paymentId})`
+        `createOrder: cart ${ctCart.id} has no buyer e-mail (customerEmail or billingAddress.email) for a non-Express order (payment ${paymentId})`
       );
     }
 
@@ -819,25 +822,54 @@ export class PayPalPaymentService extends AbstractPaymentService {
     };
   }
 
-  // PayPal's Venmo funding source only supports USD-denominated orders.
-  private validateVenmoOrderParams(payment: Payment): void {
-    if (payment.amountPlanned.currencyCode !== "USD") {
-      throw new ErrorInvalidOperation(
-        `Venmo requires a USD-denominated payment; payment ${payment.id} is ${payment.amountPlanned.currencyCode}`
-      );
-    }
+  // Venmo is US/USD-only (PayPal requirement); an unknown country passes, PayPal judges the buyer.
+  // Same rules as the enabler's paymentMethodEligibility.ts, documented in
+  // enabler/README.md#cart-country-and-currency-rules.
+  private validateVenmoOrderParams(payment: Payment, ctCart: Cart): void {
+    const { currencyCode } = payment.amountPlanned;
+    const country = ctCart.billingAddress?.country || ctCart.country;
+    this.throwOrderParamsProblems("Venmo", payment, ctCart, [
+      currencyCode !== "USD" && `a USD-denominated payment (got ${currencyCode})`,
+      !!country && country !== "US" && `a US billing address (got ${country})`,
+    ]);
   }
 
-  // PayUponInvoice requires the order amount to exactly match the cart's taxed gross total.
+  // PayUponInvoice is DE/EUR-only (PayPal requirement) and requires the order amount to exactly
+  // match the cart's taxed gross total. Same rules as the enabler's paymentMethodEligibility.ts and
+  // PayUponInvoiceButton.tsx, documented in enabler/README.md#cart-country-and-currency-rules.
+  // Checkout always shows the component for the current cart; these re-checks only matter for a
+  // payment-only integration that changes the cart afterwards. Refreshing it is the merchant's job
+  // (enabler README, "Pay Upon Invoice"), so the generic buyer error here is accepted.
+  // A missing billing country is reported by findPayUponInvoiceMissingFields.
   private validatePayUponInvoiceOrderParams(
     payment: Payment,
     ctCart: Cart
   ): void {
+    const { currencyCode, centAmount } = payment.amountPlanned;
+    const country = ctCart.billingAddress?.country;
     const cartTotal = (ctCart.taxedPrice?.totalGross ?? ctCart.totalPrice)
       ?.centAmount;
-    if (payment.amountPlanned.centAmount !== cartTotal) {
+    const missingFields = findPayUponInvoiceMissingFields(ctCart);
+    this.throwOrderParamsProblems("PayUponInvoice", payment, ctCart, [
+      currencyCode !== "EUR" && `a EUR-denominated payment (got ${currencyCode})`,
+      !!country && country !== "DE" && `a DE billing address (got ${country})`,
+      centAmount !== cartTotal &&
+        `the order amount to match the cart total (payment amount ${centAmount} does not match cart total ${cartTotal})`,
+      !!missingFields.length && `${missingFields.join(", ")} (missing)`,
+    ]);
+  }
+
+  // One error listing every problem, so a rejected order shows all of them at once.
+  private throwOrderParamsProblems(
+    paymentMethodType: string,
+    payment: Payment,
+    ctCart: Cart,
+    checks: (string | false)[]
+  ): void {
+    const problems = checks.filter(Boolean);
+    if (problems.length) {
       throw new ErrorInvalidOperation(
-        `PayUponInvoice requires order amount to match cart total; payment amount ${payment.amountPlanned.centAmount} does not match cart total ${cartTotal}`
+        `${paymentMethodType} requires ${problems.join("; ")} — cart ${ctCart.id}, payment ${payment.id}`
       );
     }
   }
