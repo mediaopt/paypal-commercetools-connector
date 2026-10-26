@@ -1,4 +1,4 @@
-import { ChangeEvent } from 'react';
+import { FormikHandlers } from 'formik';
 import { LocalizedString } from '@commercetools/platform-sdk/dist/declarations/src/generated/models/common';
 
 export type SettingsFormDataType = {
@@ -56,12 +56,7 @@ type PayPalButtonColors = 'gold' | 'blue' | 'white' | 'silver' | 'black';
 
 export type PayPalSettingsType = {
   values: SettingsFormDataType;
-  handleChange: {
-    (e: ChangeEvent<any>): void;
-    <T = string | ChangeEvent<any>>(field: T): T extends ChangeEvent<any>
-      ? void
-      : (e: string | ChangeEvent<any>) => void;
-  };
+  handleChange: FormikHandlers['handleChange'];
 };
 
 export type FetchedCustomObjectType = {
