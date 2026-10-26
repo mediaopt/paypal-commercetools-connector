@@ -69,7 +69,12 @@ describe('Testing PayPal customer Requests', () => {
         customerResponse,
         'getUserIDTokenResponse'
       );
-      expect(token.length).toBe(681);
+      expect(token.split('.')).toHaveLength(3); //JWT format token
+      const payload = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString()
+      );
+      expect(payload.client_id).toBe(process.env.PAYPAL_CLIENT_ID);
+      expect(payload.exp * 1000).toBeGreaterThan(Date.now());
     },
     longTestTimeoutMs
   );
