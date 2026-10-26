@@ -37,9 +37,6 @@
     "@commercetools-frontend/mc-dev-authentication": "^27.5.2",
     "@commercetools-frontend/mc-scripts": "^27.5.2",
     "@commercetools-frontend/permissions": "^27.5.2",
-    "@commercetools-test-data/channel": "^10.15.3",
-    "@commercetools-test-data/commons": "^10.15.3",
-    "@commercetools-test-data/core": "^10.15.3",
     "@commercetools-uikit/checkbox-input": "^20.5.0",
     "@commercetools-uikit/constraints": "^20.5.0",
     "@commercetools-uikit/data-table": "^20.5.0",
@@ -65,7 +62,6 @@
     "@commercetools/sync-actions": "^7.0.0",
     "@emotion/react": "11.11.0",
     "@formatjs/cli": "6.1.1",
-    "@graphql-eslint/eslint-plugin": "^3.20.1",
     "@jest/types": "^29.5.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^5.17.0",
@@ -99,6 +95,9 @@
     "typescript": "^5.9.3",
     "uuid": "^14.0.0",
     "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "@graphql-eslint/eslint-plugin": "^3.20.1"
   },
   "overrides": {
     "jsondiffpatch": "^0.7.2",
