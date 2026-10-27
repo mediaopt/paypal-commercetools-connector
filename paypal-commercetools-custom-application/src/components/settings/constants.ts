@@ -1,9 +1,10 @@
 import { SettingsPropComponent } from '../types';
 import { DEFAULT_SETTINGS } from './defaultSettings';
+import { SettingsFormDataType } from '../../types/types';
 
 export const PAYMENT_DEFAULTS: Record<
   SettingsPropComponent,
-  { [key: string]: any }
+  Partial<SettingsFormDataType>
 > = {
   settings: {
     merchantId: DEFAULT_SETTINGS.merchantId,
