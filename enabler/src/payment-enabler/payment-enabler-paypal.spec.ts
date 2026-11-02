@@ -171,7 +171,7 @@ describe("PayPalPaymentEnabler standard setup (via createComponentBuilder)", () 
 
   it("rejects when payment creation fails, even though the script preload succeeds", async () => {
     mockFetchOk(baseConfigJson);
-    mockedProcessorRequest.mockResolvedValue(false);
+    mockedProcessorRequest.mockResolvedValue(undefined);
 
     await expect(
       buildEnabler().createComponentBuilder("paypal")
@@ -240,6 +240,13 @@ describe("PayPalPaymentEnabler Express setup (via createExpressBuilder)", () => 
     expect(mockedPreload).not.toHaveBeenCalled();
   });
 
+  it("sends no X-Session-Id when Checkout created the enabler without a session (no cart yet)", async () => {
+    await buildEnabler({ sessionId: undefined }).createExpressBuilder("paypal");
+
+    const [, init] = (global as any).fetch.mock.calls[0];
+    expect(init.headers).not.toHaveProperty("X-Session-Id");
+  });
+
   it("builds the express builder without initialPayment — its Payment is created on click", async () => {
     await buildEnabler().createExpressBuilder("paypal");
 
@@ -257,7 +264,7 @@ describe("PayPalPaymentEnabler Express setup (via createExpressBuilder)", () => 
   });
 
   it("still resolves when payment creation would fail for this session (e.g. a session without a Cart)", async () => {
-    mockedProcessorRequest.mockResolvedValue(false);
+    mockedProcessorRequest.mockResolvedValue(undefined);
     const enabler = buildEnabler();
 
     await expect(enabler.createExpressBuilder("paypal")).resolves.toBeDefined();
