@@ -45,7 +45,7 @@ describe("makeRequest", () => {
     expect(rejection).toEqual(errorBody);
   });
 
-  test("logs the failure via console.warn rather than letting it reach a user-facing notification", async () => {
+  test("does not log the failure itself — processorRequest() does, without the body", async () => {
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     mockFetch.mockResolvedValue({
       ok: false,
@@ -55,10 +55,7 @@ describe("makeRequest", () => {
 
     await makeRequest(requestHeader, "https://processor.example.com/payments/3ds", "POST").catch(() => {});
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("failed with status 400"),
-      expect.objectContaining({ message: "stale payment version" }),
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 

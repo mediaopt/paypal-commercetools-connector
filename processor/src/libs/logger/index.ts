@@ -2,6 +2,27 @@ import { createApplicationLogger, rewriteFieldsFormatter } from '@commercetools-
 import { getRequestContext } from '../fastify/context/context';
 import { config } from '../../config/config';
 
+type LogFormat = NonNullable<
+  NonNullable<Parameters<typeof createApplicationLogger>[0]>['formatters']
+>[number];
+
+/**
+ * Prefixes every line logged during a request with `METHOD /route/template: `, so lines of different
+ * routes are told apart by their text. The replacers below only rewrite fields a log call already
+ * passes, so they never reach a plain-string line. Uses the route template, never the request URL:
+ * a path param can be a payment method token (DELETE /stored-payment-methods/:id) and the query string
+ * is whatever the caller sent. Lines outside a request (startup, jobs) stay as they are.
+ */
+export const routePrefixFormatter: LogFormat = {
+  transform: (info) => {
+    const { method, pathTemplate } = getRequestContext();
+    if (method) {
+      info.message = `${method} ${pathTemplate ?? 'unmatched route'}: ${info.message}`;
+    }
+    return info;
+  },
+};
+
 /**
  * Custom fields formatter to replace the removed defaultFieldsFormatter from the SDK
  * Uses rewriteFieldsFormatter to add standard fields to all log messages
@@ -42,5 +63,6 @@ export const log = createApplicationLogger({
         },
       ],
     }),
+    routePrefixFormatter,
   ],
 });

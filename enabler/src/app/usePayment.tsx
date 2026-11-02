@@ -257,7 +257,7 @@ export const PaymentProvider: FC<
 
     let paymentVersion: number | undefined = createPaymentResult.version;
     if (getClientTokenUrl) {
-      const clientTokenResult = (await processorRequest<
+      const clientTokenResult = await processorRequest<
         ClientTokenRequest,
         ClientTokenResponse
       >(header, getClientTokenUrl, {
@@ -265,9 +265,9 @@ export const PaymentProvider: FC<
         paymentVersion: createPaymentResult.version,
         braintreeCustomerId: createPaymentResult.braintreeCustomerId,
         merchantAccountId: undefined,
-      })) as ClientTokenResponse;
-      setClientToken(clientTokenResult.clientToken);
-      paymentVersion = clientTokenResult.paymentVersion;
+      });
+      setClientToken(clientTokenResult?.clientToken ?? "");
+      paymentVersion = clientTokenResult?.paymentVersion;
     }
 
     setPaymentInfo({
@@ -379,9 +379,16 @@ export const PaymentProvider: FC<
             setRequestHeader(orderRequestHeader);
             // The current Payment belongs to the previous session
             orderPaymentId = "";
+          } else if (!requestHeader["X-Session-Id"]) {
+            // Without any session the processor refuses createPayment anyway — fail here with a clear reason
+            throw new Error(
+              "PayPal Express: onPayButtonClick resolved without a sessionId and there is no current session."
+            );
           } else {
+            // Checkout throws rather than resolve without a sessionId: reaching this means the enabler is driven
+            // without the commercetools Checkout SDK
             console.warn(
-              "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
+              "PayPal Express: missing sessionId. Ensure that you either use the commercetools Checkout SDK or directly import the components."
             );
           }
           if (!orderPaymentId) {

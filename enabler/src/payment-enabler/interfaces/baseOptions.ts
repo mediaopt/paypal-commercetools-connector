@@ -10,7 +10,9 @@ type ComponentSdkOptions = Record<string, unknown>;
 
 export type BaseOptions = {
   processorUrl: string;
-  sessionId: string;
+  /** Undefined when commercetools Checkout creates the PayPal Express enabler before the merchant's
+   * session has a cart. */
+  sessionId?: string;
   storedPaymentMethodsEnabled?: boolean;
   enableVaulting?: boolean;
   purchaseCallback?: (result: PaymentResult, options: any) => void;

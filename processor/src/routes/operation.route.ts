@@ -3,19 +3,26 @@ import {
   JWTAuthenticationHook,
   Oauth2AuthenticationHook,
   SessionHeaderAuthenticationHook,
-} from '@commercetools/connect-payments-sdk';
-import { Type } from '@sinclair/typebox';
-import { FastifyInstance, FastifyPluginOptions } from 'fastify';
-import { ConfigResponseSchema, ConfigResponseSchemaDTO } from '../dtos/operations/config.dto';
-import { SupportedPaymentComponentsSchema } from '../dtos/operations/payment-componets.dto';
+} from "@commercetools/connect-payments-sdk";
+import { Type } from "@sinclair/typebox";
+import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import {
+  ConfigResponseSchema,
+  ConfigResponseSchemaDTO,
+} from "../dtos/operations/config.dto";
+import { SupportedPaymentComponentsSchema } from "../dtos/operations/payment-componets.dto";
 import {
   PaymentIntentRequestSchema,
   PaymentIntentRequestSchemaDTO,
   PaymentIntentResponseSchema,
   PaymentIntentResponseSchemaDTO,
-} from '../dtos/operations/payment-intents.dto';
-import { StatusResponseSchema, StatusResponseSchemaDTO } from '../dtos/operations/status.dto';
-import { AbstractPaymentService } from '../services/abstract-payment.service';
+} from "../dtos/operations/payment-intents.dto";
+import {
+  StatusResponseSchema,
+  StatusResponseSchemaDTO,
+} from "../dtos/operations/status.dto";
+import { AbstractPaymentService } from "../services/abstract-payment.service";
+import { optionalSessionAuth } from "../libs/fastify/optional-session-auth";
 
 type OperationRouteOptions = {
   sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
@@ -25,25 +32,31 @@ type OperationRouteOptions = {
   paymentService: AbstractPaymentService;
 };
 
-export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPluginOptions & OperationRouteOptions) => {
+export const operationsRoute = async (
+  fastify: FastifyInstance,
+  opts: FastifyPluginOptions & OperationRouteOptions
+) => {
+  // Session auth is only attempted: the config holds nothing secret, and commercetools Checkout
+  // creates the PayPal Express enabler without a session when the merchant's session has no cart
+  // yet. A cart-bound session still gets its cart-derived values.
   fastify.get<{ Reply: ConfigResponseSchemaDTO }>(
-    '/config',
+    "/config",
     {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         response: {
           200: ConfigResponseSchema,
         },
       },
     },
-    async (_, reply) => {
+    async (request, reply) => {
+      await optionalSessionAuth(opts.sessionHeaderAuthHook, request);
       const config = await opts.paymentService.config();
       reply.code(200).send(config);
-    },
+    }
   );
 
   fastify.get<{ Reply: StatusResponseSchemaDTO }>(
-    '/status',
+    "/status",
     {
       preHandler: [opts.jwtAuthHook.authenticate()],
       schema: {
@@ -55,11 +68,11 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
     async (_, reply) => {
       const status = await opts.paymentService.status();
       reply.code(200).send(status);
-    },
+    }
   );
 
   fastify.get(
-    '/payment-components',
+    "/payment-components",
     {
       preHandler: [opts.jwtAuthHook.authenticate()],
       schema: {
@@ -71,24 +84,31 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
     async (_, reply) => {
       const result = await opts.paymentService.getSupportedPaymentComponents();
       reply.code(200).send(result);
-    },
+    }
   );
 
-  fastify.post<{ Body: PaymentIntentRequestSchemaDTO; Reply: PaymentIntentResponseSchemaDTO; Params: { id: string } }>(
-    '/payment-intents/:id',
+  fastify.post<{
+    Body: PaymentIntentRequestSchemaDTO;
+    Reply: PaymentIntentResponseSchemaDTO;
+    Params: { id: string };
+  }>(
+    "/payment-intents/:id",
     {
       preHandler: [
         opts.oauth2AuthHook.authenticate(),
-        opts.authorizationHook.authorize('manage_project', 'manage_checkout_payment_intents'),
+        opts.authorizationHook.authorize(
+          "manage_project",
+          "manage_checkout_payment_intents"
+        ),
       ],
       schema: {
         params: {
-          $id: 'paramsSchema',
-          type: 'object',
+          $id: "paramsSchema",
+          type: "object",
           properties: {
             id: Type.String(),
           },
-          required: ['id'],
+          required: ["id"],
         },
         body: PaymentIntentRequestSchema,
         response: {
@@ -104,6 +124,6 @@ export const operationsRoute = async (fastify: FastifyInstance, opts: FastifyPlu
       });
 
       return reply.status(200).send(resp);
-    },
+    }
   );
 };

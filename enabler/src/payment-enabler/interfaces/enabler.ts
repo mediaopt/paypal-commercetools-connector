@@ -178,9 +178,10 @@ export type EnablerOptions = {
   processorUrl: string;
 
   /**
-   * The session ID for the payment.
+   * The session ID for the payment. Undefined when commercetools Checkout creates the PayPal Express
+   * enabler before the merchant's session has a cart.
    */
-  sessionId: string;
+  sessionId?: string;
 
   /**
    * The locale for the payment.

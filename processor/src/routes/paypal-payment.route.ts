@@ -64,7 +64,7 @@ export const paymentRoutes = async (
       const resp = await opts.paymentService.createPayment(
         request.body as PaymentRequestSchemaDTO
       );
-      log.info(`createPayment: success, paymentId: ${resp.id}`);
+      log.info(`success, paymentId: ${resp.id}`);
       return reply.status(200).send(resp);
     }
   );
@@ -86,7 +86,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const resp = await opts.paymentService.createOrder(request.body);
       log.info(
-        `createOrder: success, paymentId: ${request.body.paymentId}, orderId: ${resp.orderData.id}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${resp.orderData.id}`
       );
       return reply.status(200).send(resp);
     }
@@ -109,7 +109,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const resp = await opts.paymentService.authorizeOrder(request.body);
       log.info(
-        `authorizeOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     }
@@ -132,7 +132,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const resp = await opts.paymentService.captureOrder(request.body);
       log.info(
-        `captureOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     }
@@ -155,7 +155,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const resp = await opts.paymentService.expressApprove(request.body);
       log.info(
-        `expressApprove: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     }
@@ -180,7 +180,7 @@ export const paymentRoutes = async (
         request.body
       );
       log.info(
-        `authenticateThreeDSOrder: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     }
@@ -203,7 +203,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const resp = await opts.paymentService.updateShipping(request.body);
       log.info(
-        `updateShipping: success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
+        `success, paymentId: ${request.body.paymentId}, orderId: ${request.body.orderID}`
       );
       return reply.status(200).send(resp);
     }
@@ -222,7 +222,7 @@ export const paymentRoutes = async (
     async (request, reply) => {
       const result = await opts.paymentService.getStoredPaymentMethods();
       log.info(
-        `getStoredPaymentMethods: success, cartId: ${getCartIdFromContext()}, count: ${
+        `success, cartId: ${getCartIdFromContext()}, count: ${
           result.storedPaymentMethods.length
         }`
       );

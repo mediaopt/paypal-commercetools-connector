@@ -117,25 +117,20 @@ export const SettingsProvider: FC<
       isLoading(true);
 
       if (getUserInfoUrl && !userIdToken) {
-        const { userIdToken, paymentTokens } = (await processorRequest<
+        const userInfo = await processorRequest<
           undefined,
           GetUserInfoResponse
-        >(
-          requestHeader,
-          getUserInfoUrl,
-          undefined,
-          "GET"
-        )) as GetUserInfoResponse;
+        >(requestHeader, getUserInfoUrl, undefined, "GET");
 
-        setPaymentTokens(paymentTokens);
-        setUserIdToken(userIdToken);
+        setPaymentTokens(userInfo?.paymentTokens);
+        setUserIdToken(userInfo?.userIdToken);
       }
 
       if (getSettingsUrl && !settings) {
-        const getSettingsResult = (await processorRequest<
+        const getSettingsResult = await processorRequest<
           undefined,
-          GetSettingsResponse
-        >(requestHeader, getSettingsUrl, undefined, "GET")) as Record<any, any>;
+          GetSettingsResponse & { ok?: boolean }
+        >(requestHeader, getSettingsUrl, undefined, "GET");
 
         if (
           !getSettingsResult ||
@@ -144,7 +139,7 @@ export const SettingsProvider: FC<
           notify("Error", "Could not fetch settings");
           isLoading(false);
         } else {
-          setSettings(getSettingsResult as GetSettingsResponse);
+          setSettings(getSettingsResult);
         }
       }
       isLoading(false);
