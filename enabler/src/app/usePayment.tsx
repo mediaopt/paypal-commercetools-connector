@@ -666,12 +666,10 @@ export const PaymentProvider: FC<
           builderType,
         });
 
-        //@ts-ignore
-        if (onApproveResult.ok === false) {
+        if (!onApproveResult || onApproveResult.ok === false) {
           throw new Error(t("payPal.generalError"));
         }
-        const { orderData, merchantReturnUrl } =
-          onApproveResult as OnApproveResponse;
+        const { orderData, merchantReturnUrl } = onApproveResult;
         if (merchantReturnUrl) {
           redirectTo(merchantReturnUrl);
           return;
