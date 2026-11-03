@@ -381,9 +381,10 @@ export const PaymentProvider: FC<
             orderPaymentId = "";
           } else if (!requestHeader["X-Session-Id"]) {
             // Without any session the processor refuses createPayment anyway — fail here with a clear reason
-            throw new Error(
-              "PayPal Express: onPayButtonClick resolved without a sessionId and there is no current session."
+            console.error(
+              "[paypal-enabler] PayPal Express: onPayButtonClick resolved without a sessionId and there is no current session."
             );
+            throw new Error(t("interface.generalError"));
           } else {
             // Checkout throws rather than resolve without a sessionId: reaching this means the enabler is driven
             // without the commercetools Checkout SDK
