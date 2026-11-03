@@ -147,6 +147,48 @@ const buildErrorResponsePayload = (e: unknown) => ({
   details: errorResponseBody(e),
 });
 
+// The only settings keys GET /operations/config sends to the browser (the endpoint is public).
+// Keep in sync with the enabler's PayPalLegacySettings.
+const PUBLIC_SETTINGS_KEYS: readonly (keyof PayPalSettings)[] = [
+  "merchantId",
+  "email",
+  "acceptPayPal",
+  "acceptPayLater",
+  "acceptVenmo",
+  "acceptLocal",
+  "acceptCredit",
+  "buttonPaymentPage",
+  "buttonCartPage",
+  "buttonDetailPage",
+  "buttonShippingPage",
+  "buttonShape",
+  "buttonTagline",
+  "payLaterMessagingType",
+  "payLaterMessageHomePage",
+  "payLaterMessageCategoryPage",
+  "payLaterMessageDetailsPage",
+  "payLaterMessageCartPage",
+  "payLaterMessagePaymentPage",
+  "payLaterMessageTextLogoType",
+  "payLaterMessageTextLogoPosition",
+  "payLaterMessageTextColor",
+  "payLaterMessageTextSize",
+  "payLaterMessageTextAlign",
+  "payLaterMessageFlexColor",
+  "payLaterMessageFlexRatio",
+  "threeDSOption",
+  "payPalIntent",
+  "ratePayBrandName",
+  "ratePayLogoUrl",
+  "ratePayCustomerServiceInstructions",
+  "paymentDescription",
+  "storeInVaultOnSuccess",
+  "paypalButtonConfig",
+  "hostedFieldsPayButtonClasses",
+  "hostedFieldsInputFieldClasses",
+  "threeDSAction",
+];
+
 export class PayPalPaymentService extends AbstractPaymentService {
   private payPalCustomerService: PayPalCustomerService;
   private ctPaymentMethodService: CommercetoolsPaymentMethodService;
@@ -208,12 +250,19 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolveUserIdToken(cartSummary?.customerId)
       : undefined;
 
+    const publicSettings = Object.fromEntries(
+      PUBLIC_SETTINGS_KEYS.filter((key) => key in settings).map((key) => [
+        key,
+        settings[key],
+      ])
+    );
+
     // Per-component overrides (style/fundingSource/messagesStyle/...), sourced from PAYPAL_BUTTON_CONFIG
     // — already componentType-keyed (plus the dedicated PayPalExpress slot), passed through as-is;
     // the enabler merges these over its own defaults and the general settings above (see
     // enabler's RenderTemplate/resolveOptions.ts 4-layer resolution).
     const mergedSettings = {
-      ...settings,
+      ...publicSettings,
       ...getConfig().buttonConfig,
     };
 

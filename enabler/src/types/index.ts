@@ -790,6 +790,7 @@ export type PayPalBrandButtonType = Extract<
 // Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
 // custom object shape, read via getSettings()). Duplicated here rather than imported since the
 // enabler doesn't depend on common-connect — keep field names in sync with that type by hand.
+// The processor sends only these keys (PUBLIC_SETTINGS_KEYS in paypal-payment.service.ts), so keep both in sync.
 type PayPalLegacySettings = {
   merchantId: string;
   email: string;
