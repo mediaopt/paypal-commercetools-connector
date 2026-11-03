@@ -15,6 +15,7 @@ export const optionalSessionAuth = async (
   request: FastifyRequest
 ): Promise<void> => {
   if (!request.headers["x-session-id"]) {
+    // Intentionally info, not debug: a session canary that helps merchants set up the Express flow properly
     log.info("no session header, answering without a session");
     return;
   }
@@ -24,7 +25,7 @@ export const optionalSessionAuth = async (
     const cause = (e as { cause?: unknown })?.cause ?? e;
     const status = (cause as { privateFields?: { status?: unknown } })
       ?.privateFields?.status;
-    log.error(
+    log.warn(
       `could not read the commercetools session, answering without it — ${errorMessage(
         cause
       )}${status !== undefined ? ` (status ${status})` : ""}`
