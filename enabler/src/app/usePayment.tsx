@@ -256,6 +256,8 @@ export const PaymentProvider: FC<
     }
 
     let paymentVersion: number | undefined = createPaymentResult.version;
+    // Reachable in legacy mode only (processorUrls() has no client-token route), so the behaviour
+    // is kept as it was for backward compatibility: a failed fetch continues without a token
     if (getClientTokenUrl) {
       const clientTokenResult = await processorRequest<
         ClientTokenRequest,
