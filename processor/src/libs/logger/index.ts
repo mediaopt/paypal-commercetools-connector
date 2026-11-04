@@ -12,6 +12,8 @@ type LogFormat = NonNullable<
  * passes, so they never reach a plain-string line. Uses the route template, never the request URL:
  * a path param can be a payment method token (DELETE /stored-payment-methods/:id) and the query string
  * is whatever the caller sent. Lines outside a request (startup, jobs) stay as they are.
+ * A helper reached from more than one route keeps its own `functionName: ` prefix, since the route
+ * alone doesn't identify it; anything else leaves the name to this prefix.
  */
 export const routePrefixFormatter: LogFormat = {
   transform: (info) => {
