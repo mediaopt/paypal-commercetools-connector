@@ -42,6 +42,13 @@ import * as StoredPaymentMethodsConfigModule from "../../src/config/stored-payme
 import { log } from "../../src/libs/logger";
 import { buildPlaceholderInteractionId } from "../../src/utils/order.utils";
 
+// config() never sends sendTrackingToPayPal to the browser (not in PUBLIC_SETTINGS_KEYS); toEqual
+// treats an undefined key as absent
+const PUBLIC_DEFAULT_SETTINGS = {
+  ...CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES,
+  sendTrackingToPayPal: undefined,
+};
+
 describe("paypal-payment.service", () => {
   const opts: PayPalPaymentServiceOptions = {
     ctCartService: paymentSDK.ctCartService,
@@ -2831,7 +2838,30 @@ describe("paypal-payment.service", () => {
       expect(result.settings).toEqual({
         ...ConfigModule.getConfig().settingsFallback,
         ...settings,
+        sendTrackingToPayPal: undefined,
       });
+    });
+
+    test("sends only the public settings keys to the browser", async () => {
+      (CommonConnect.getSettings as jest.Mock).mockResolvedValue({
+        merchantId: "merchant-1",
+        partnerAttributionId: "partner-1",
+        sendTrackingToPayPal: true,
+        payUponInvoiceMailSubject: { en: "subject" },
+        payUponInvoiceMailEmailText: { en: "text" },
+      } as never);
+
+      const result = await paypalPaymentService.config();
+
+      expect(result.settings.merchantId).toBe("merchant-1");
+      for (const key of [
+        "partnerAttributionId",
+        "sendTrackingToPayPal",
+        "payUponInvoiceMailSubject",
+        "payUponInvoiceMailEmailText",
+      ]) {
+        expect(result.settings).not.toHaveProperty(key);
+      }
     });
 
     test("falls back to env-configured settings when the custom object is unavailable", async () => {
@@ -2856,9 +2886,7 @@ describe("paypal-payment.service", () => {
 
       const result = await paypalPaymentService.config();
 
-      expect(result.settings).toEqual(
-        CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES
-      );
+      expect(result.settings).toEqual(PUBLIC_DEFAULT_SETTINGS);
     });
 
     test("resolves userIdToken when vaulting is enabled and the CT customer has a linked PayPal customer id", async () => {
@@ -4031,9 +4059,7 @@ describe("paypal-payment.service", () => {
       const result = await paypalPaymentService.config();
 
       expect(paymentSDK.ctCartService.getCart).not.toHaveBeenCalled();
-      expect(result.settings).toEqual(
-        CommonConnect.CUSTOM_OBJECT_DEFAULT_VALUES
-      );
+      expect(result.settings).toEqual(PUBLIC_DEFAULT_SETTINGS);
       expect(result.userIdToken).toBeUndefined();
     });
 

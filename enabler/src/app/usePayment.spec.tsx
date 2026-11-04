@@ -1,7 +1,7 @@
 import { FC, useEffect } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 
-import "../messages/i18n";
+import i18n from "../messages/i18n";
 
 jest.mock("../services/processorRequest", () => ({
   processorRequest: jest.fn(),
@@ -720,7 +720,8 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     consoleWarnSpy.mockRestore();
   });
 
-  it("fails with a clear reason, before any processor call, when onPayButtonClick returns no sessionId and there is no current session", async () => {
+  it("fails before any processor call when onPayButtonClick returns no sessionId and there is no current session", async () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
     const onError = jest.fn();
     const onExpressPayButtonClick = jest.fn().mockResolvedValue(undefined);
     render(
@@ -744,14 +745,18 @@ describe("PaymentProvider handleCreateOrder PayPal Express session switch (onExp
     });
 
     expect(mockedProcessorRequest).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("there is no current session")
+    );
     expect(mockNotify).toHaveBeenCalledWith(
       "Error",
-      expect.stringContaining("there is no current session")
+      i18n.t("interface.generalError")
     );
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({ code: "EXPRESS_CREATE_ORDER_FAILED" }),
       expect.anything()
     );
+    consoleErrorSpy.mockRestore();
   });
 
   it("reports a failed createOrder to Checkout's onError as EXPRESS_CREATE_ORDER_FAILED, with the Payment created on click", async () => {
@@ -1275,6 +1280,39 @@ describe("PaymentProvider handleOnApprove forceCheckoutReportError error propaga
       expect(onError).toHaveBeenCalledWith(expect.any(Error))
     );
     expect(mockNotify).toHaveBeenCalledWith("Error", "network down");
+  });
+
+  it("shows the translated general error, not a TypeError, when the approve call fails (processorRequest returns undefined)", async () => {
+    mockedProcessorRequest.mockImplementation((_header, url) =>
+      (url as string).includes("/approve")
+        ? Promise.resolve(undefined as never)
+        : Promise.resolve({
+            id: "payment-1",
+            amountPlanned: {
+              centAmount: 1000,
+              currencyCode: "EUR",
+              fractionDigits: 2,
+            },
+          } as never)
+    );
+    const onError = jest.fn();
+
+    render(
+      <PaymentProvider
+        {...mockProviderProps}
+        onApproveUrl="https://processor.test/payments/approve"
+      >
+        <OnApproveConsumer forceCheckoutReportError onError={onError} />
+      </PaymentProvider>
+    );
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(expect.any(Error))
+    );
+    expect(mockNotify).toHaveBeenCalledWith(
+      "Error",
+      i18n.t("payPal.generalError")
+    );
   });
 
   it("does not rethrow a failed processor call when forceCheckoutReportError is not set — matches today's behavior for other builders", async () => {
