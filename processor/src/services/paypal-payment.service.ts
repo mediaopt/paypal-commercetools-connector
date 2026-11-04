@@ -109,6 +109,7 @@ import {
   isPlaceholderInteractionId,
   resolveBuyerEmail,
   findPayUponInvoiceMissingFields,
+  pickKeys,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -250,19 +251,12 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ? await this.resolveUserIdToken(cartSummary?.customerId)
       : undefined;
 
-    const publicSettings = Object.fromEntries(
-      PUBLIC_SETTINGS_KEYS.filter((key) => key in settings).map((key) => [
-        key,
-        settings[key],
-      ])
-    );
-
     // Per-component overrides (style/fundingSource/messagesStyle/...), sourced from PAYPAL_BUTTON_CONFIG
     // — already componentType-keyed (plus the dedicated PayPalExpress slot), passed through as-is;
     // the enabler merges these over its own defaults and the general settings above (see
     // enabler's RenderTemplate/resolveOptions.ts 4-layer resolution).
     const mergedSettings = {
-      ...publicSettings,
+      ...pickKeys(settings, PUBLIC_SETTINGS_KEYS),
       ...getConfig().buttonConfig,
     };
 

@@ -669,6 +669,7 @@ export const PaymentProvider: FC<
           builderType,
         });
 
+        // ok: false kept for self-hosted legacy backends that may still answer 200 with it
         if (!onApproveResult || onApproveResult.ok === false) {
           throw new Error(t("payPal.generalError"));
         }

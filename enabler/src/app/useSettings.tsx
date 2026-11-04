@@ -144,6 +144,8 @@ export const SettingsProvider: FC<
       }
       isLoading(false);
     };
+    // Legacy only (Checkout renders no PaymentTokens list): a failed delete still drops the token from the
+    // UI. Kept as is — out of scope of the current ticket and needs extra testing
     const handleRemovePaymentToken = async (paymentTokenId: string) => {
       isLoading(true);
       // Prefers the processor-derived DELETE route over the legacy removePaymentTokenUrl (POST +

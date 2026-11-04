@@ -118,12 +118,12 @@ export const findPayUponInvoiceMissingFields = (ctCart: Cart): string[] => {
     .map(([field]) => field);
 };
 
-const pickExperienceContextOverrides = (
-  overrides: Record<string, unknown>,
-  keys: string[]
+export const pickKeys = (
+  source: Record<string, unknown>,
+  keys: readonly string[]
 ) =>
   Object.fromEntries(
-    Object.entries(overrides).filter(([key]) => keys.includes(key))
+    Object.entries(source).filter(([key]) => keys.includes(key))
   );
 
 export const buildOrderRequest = (
@@ -197,7 +197,7 @@ export const buildOrderRequest = (
     ...(shipping && !isExpress
       ? { shipping_preference: "SET_PROVIDED_ADDRESS" as const }
       : {}),
-    ...pickExperienceContextOverrides(
+    ...pickKeys(
       experienceContextOverrides,
       PAYPAL_WALLET_EXPERIENCE_CONTEXT_KEYS
     ),
@@ -296,7 +296,7 @@ export const buildOrderRequest = (
                 customer_service_instructions:
                   PAY_UPON_INVOICE_CUSTOMER_SERVICE_INSTRUCTIONS,
                 locale: ctCart.locale ?? PAY_UPON_INVOICE_DEFAULT_LOCALE,
-                ...pickExperienceContextOverrides(
+                ...pickKeys(
                   experienceContextOverrides,
                   PAY_UPON_INVOICE_EXPERIENCE_CONTEXT_KEYS
                 ),
