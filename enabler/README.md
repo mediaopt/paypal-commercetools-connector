@@ -350,6 +350,24 @@ component reads them from the `cartInformation` prop.
   without one.
 - Stored payment methods aren't supported for Express.
 
+### Delivery address and digital goods
+
+commercetools has no built-in flag for digital goods, so Express decides whether a delivery is needed
+from the cart's shipping address when the PayPal order is created:
+
+- **No shipping address on the cart:** the cart is treated as digital goods only. Every item is sent
+  to PayPal as `DIGITAL_GOODS`, and PayPal does not ask for a delivery address.
+- **Shipping address set (at least `country`, the only required field of a commercetools address):**
+  the cart is treated as physical goods, and the buyer chooses the delivery address in the PayPal
+  popup.
+  - If the buyer has a default address in their PayPal account, PayPal uses it and replaces the
+    cart's country automatically.
+  - If not, the buyer has to fill in every field PayPal needs for a valid address. They can still
+    change the address at this step, which updates the cart (see `updateShipping` above).
+
+To let buyers choose the delivery in the PayPal popup, set the cart's shipping address country before
+the PayPal order is created: before the button renders, or in your `onPayButtonClick` hook.
+
 ### Buyer redirect after approval (`merchantReturnUrl`)
 
 `authorizeOrder()`/`captureOrder()` responses — and `createOrder()` for orders that settle
