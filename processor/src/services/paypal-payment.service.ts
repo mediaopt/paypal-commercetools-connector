@@ -109,6 +109,7 @@ import {
   isPlaceholderInteractionId,
   resolveBuyerEmail,
   findPayUponInvoiceMissingFields,
+  pickKeys,
 } from "../utils/order.utils";
 import {
   fetchPayPalShippingOptionsForCart,
@@ -146,6 +147,48 @@ const buildErrorResponsePayload = (e: unknown) => ({
   message: `${errorMessage(e)}${payPalDebugIdSuffix(e)}`,
   details: errorResponseBody(e),
 });
+
+// The only settings keys GET /operations/config sends to the browser (the endpoint is public).
+// Keep in sync with the enabler's PayPalLegacySettings.
+const PUBLIC_SETTINGS_KEYS: readonly (keyof PayPalSettings)[] = [
+  "merchantId",
+  "email",
+  "acceptPayPal",
+  "acceptPayLater",
+  "acceptVenmo",
+  "acceptLocal",
+  "acceptCredit",
+  "buttonPaymentPage",
+  "buttonCartPage",
+  "buttonDetailPage",
+  "buttonShippingPage",
+  "buttonShape",
+  "buttonTagline",
+  "payLaterMessagingType",
+  "payLaterMessageHomePage",
+  "payLaterMessageCategoryPage",
+  "payLaterMessageDetailsPage",
+  "payLaterMessageCartPage",
+  "payLaterMessagePaymentPage",
+  "payLaterMessageTextLogoType",
+  "payLaterMessageTextLogoPosition",
+  "payLaterMessageTextColor",
+  "payLaterMessageTextSize",
+  "payLaterMessageTextAlign",
+  "payLaterMessageFlexColor",
+  "payLaterMessageFlexRatio",
+  "threeDSOption",
+  "payPalIntent",
+  "ratePayBrandName",
+  "ratePayLogoUrl",
+  "ratePayCustomerServiceInstructions",
+  "paymentDescription",
+  "storeInVaultOnSuccess",
+  "paypalButtonConfig",
+  "hostedFieldsPayButtonClasses",
+  "hostedFieldsInputFieldClasses",
+  "threeDSAction",
+];
 
 export class PayPalPaymentService extends AbstractPaymentService {
   private payPalCustomerService: PayPalCustomerService;
@@ -188,7 +231,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       }))
       .catch((e) => {
         log.warn(
-          `config: failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
+          `failed to fetch cart for script-options/stored-payment-methods derivation — ${errorMessage(
             e
           )}`
         );
@@ -213,7 +256,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // the enabler merges these over its own defaults and the general settings above (see
     // enabler's RenderTemplate/resolveOptions.ts 4-layer resolution).
     const mergedSettings = {
-      ...settings,
+      ...pickKeys(settings, PUBLIC_SETTINGS_KEYS),
       ...getConfig().buttonConfig,
     };
 
@@ -235,14 +278,16 @@ export class PayPalPaymentService extends AbstractPaymentService {
       // Not added when the merchant disabled it in the script options, which the conflict check
       // below would otherwise reject
       ...(settings.acceptVenmo !== false &&
-        !getConfig().standardScriptOptions.disableFunding?.includes("venmo") && {
-        enableFunding: Array.from(
-          new Set([
-            ...(getConfig().standardScriptOptions.enableFunding ?? []),
-            "venmo",
-          ])
-        ),
-      }),
+        !getConfig().standardScriptOptions.disableFunding?.includes(
+          "venmo"
+        ) && {
+          enableFunding: Array.from(
+            new Set([
+              ...(getConfig().standardScriptOptions.enableFunding ?? []),
+              "venmo",
+            ])
+          ),
+        }),
     };
 
     // PAYPAL_STANDARD_SCRIPT_OPTIONS.enableFunding is optional — an unset/empty value means "no
@@ -334,7 +379,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return userIdToken;
     } catch (e) {
       log.warn(
-        `config: failed to generate PayPal userIdToken for customer ${paypalCustomerId} — ${errorMessage(
+        `failed to generate PayPal userIdToken for customer ${paypalCustomerId} — ${errorMessage(
           e
         )}${payPalDebugIdSuffix(e)}`
       );
@@ -491,7 +536,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       })
       .catch((e) => {
         log.warn(
-          `createPayment: failed to assign ${
+          `failed to assign ${
             getConfig().paymentTypeKey
           } custom type to payment ${newPayment.id} — ${errorMessage(e)}`
         );
@@ -644,7 +689,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       builderType === CustomBuilderType.EXPRESS;
     if (!isExpress && !resolveBuyerEmail(ctCart)) {
       log.warn(
-        `createOrder: cart ${ctCart.id} has no buyer e-mail (customerEmail or billingAddress.email) for a non-Express order (payment ${paymentId})`
+        `cart ${ctCart.id} has no buyer e-mail (customerEmail or billingAddress.email) for a non-Express order (payment ${paymentId})`
       );
     }
 
@@ -829,7 +874,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const { currencyCode } = payment.amountPlanned;
     const country = ctCart.billingAddress?.country || ctCart.country;
     this.throwOrderParamsProblems("Venmo", payment, ctCart, [
-      currencyCode !== "USD" && `a USD-denominated payment (got ${currencyCode})`,
+      currencyCode !== "USD" &&
+        `a USD-denominated payment (got ${currencyCode})`,
       !!country && country !== "US" && `a US billing address (got ${country})`,
     ]);
   }
@@ -851,7 +897,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
       ?.centAmount;
     const missingFields = findPayUponInvoiceMissingFields(ctCart);
     this.throwOrderParamsProblems("PayUponInvoice", payment, ctCart, [
-      currencyCode !== "EUR" && `a EUR-denominated payment (got ${currencyCode})`,
+      currencyCode !== "EUR" &&
+        `a EUR-denominated payment (got ${currencyCode})`,
       !!country && country !== "DE" && `a DE billing address (got ${country})`,
       centAmount !== cartTotal &&
         `the order amount to match the cart total (payment amount ${centAmount} does not match cart total ${cartTotal})`,
@@ -869,7 +916,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
     const problems = checks.filter(Boolean);
     if (problems.length) {
       throw new ErrorInvalidOperation(
-        `${paymentMethodType} requires ${problems.join("; ")} — cart ${ctCart.id}, payment ${payment.id}`
+        `${paymentMethodType} requires ${problems.join("; ")} — cart ${
+          ctCart.id
+        }, payment ${payment.id}`
       );
     }
   }
@@ -1274,7 +1323,11 @@ export class PayPalPaymentService extends AbstractPaymentService {
     // retry on this payment. The Failure transaction and status still record the attempt.
     await retryCTSync(
       () =>
-        this.syncPayPalOrderStatus(payment.id, response, newState !== "Failure"),
+        this.syncPayPalOrderStatus(
+          payment.id,
+          response,
+          newState !== "Failure"
+        ),
       config.operation,
       payment.id,
       response.status ?? ""
@@ -1672,7 +1725,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return updatedCart.body;
     } catch (e) {
       log.error(
-        `updateShipping: cart update failed for cart ${
+        `cart update failed for cart ${
           cart.id
         } — ${errorMessage(e)}`
       );
@@ -1801,7 +1854,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
       const correctedOp = assumedOp === "add" ? "replace" : "add";
       log.warn(
-        `updateShipping: assumed op "${assumedOp}" was wrong for order ${orderID} (cart's shippingInfo didn't reflect the order's actual state) — retrying with "${correctedOp}"`
+        `assumed op "${assumedOp}" was wrong for order ${orderID} (cart's shippingInfo didn't reflect the order's actual state) — retrying with "${correctedOp}"`
       );
       const correctedPatches = buildPatches(correctedOp);
       try {
@@ -1889,7 +1942,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     );
 
     log.info(
-      `updateShipping: success, paymentId: ${paymentId}, cartId: ${ctCart.id}`
+      `success, paymentId: ${paymentId}, cartId: ${ctCart.id}`
     );
     return {
       shippingOptions,
@@ -2064,9 +2117,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
         );
       }
 
-      const captureState = mapPayPalCaptureStatusToCommercetoolsTransactionState(
-        response.status
-      );
+      const captureState =
+        mapPayPalCaptureStatusToCommercetoolsTransactionState(response.status);
       await this.ctPaymentService.updatePayment({
         id: ctPayment.id,
         transaction: {
@@ -2089,7 +2141,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
       return {
         outcome:
-          this.convertTransactionStateToPaymentModificationOutcome(captureState),
+          this.convertTransactionStateToPaymentModificationOutcome(
+            captureState
+          ),
       };
     }
 
@@ -2171,7 +2225,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
     );
 
     return {
-      outcome: this.convertTransactionStateToPaymentModificationOutcome(refundState),
+      outcome:
+        this.convertTransactionStateToPaymentModificationOutcome(refundState),
     };
   }
 
@@ -2222,7 +2277,8 @@ export class PayPalPaymentService extends AbstractPaymentService {
     );
 
     return {
-      outcome: this.convertTransactionStateToPaymentModificationOutcome(voidState),
+      outcome:
+        this.convertTransactionStateToPaymentModificationOutcome(voidState),
     };
   }
 
@@ -2238,7 +2294,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
 
     if (!ctCart.customerId) {
       log.warn(
-        "getStoredPaymentMethods: cart has no customerId, returning empty"
+        "cart has no customerId, returning empty"
       );
       return { storedPaymentMethods: [] };
     }
@@ -2248,7 +2304,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
     );
     if (!paypalCustomerId) {
       log.warn(
-        `getStoredPaymentMethods: CT customer ${ctCart.customerId} has no PayPalUserId, returning empty`
+        `CT customer ${ctCart.customerId} has no PayPalUserId, returning empty`
       );
       return { storedPaymentMethods: [] };
     }
@@ -2299,7 +2355,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       return { storedPaymentMethods };
     } catch (e) {
       log.warn(
-        `getStoredPaymentMethods: could not list PayPal payment tokens for customer ${paypalCustomerId} — ${errorMessage(
+        `could not list PayPal payment tokens for customer ${paypalCustomerId} — ${errorMessage(
           e
         )}${payPalDebugIdSuffix(e)}`
       );
@@ -2343,7 +2399,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
             .then((response) => response.payment_tokens)
             .catch((e) => {
               log.warn(
-                `deleteStoredPaymentMethod: token list lookup failed for PayPal customer ${paypalCustomerId} (CT customer ${customerId}) — ${errorMessage(
+                `token list lookup failed for PayPal customer ${paypalCustomerId} (CT customer ${customerId}) — ${errorMessage(
                   e
                 )}${payPalDebugIdSuffix(e)}`
               );
@@ -2352,7 +2408,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         : undefined;
       if (!paypalTokens?.some((paymentToken) => paymentToken.id === token)) {
         log.warn(
-          `deleteStoredPaymentMethod: token ${token} not owned by customer ${customerId}`
+          `token ${token} not owned by customer ${customerId}`
         );
         throw new ErrorInvalidOperation(
           `payment token ${token} does not belong to customer ${customerId}`
@@ -2365,9 +2421,9 @@ export class PayPalPaymentService extends AbstractPaymentService {
       deleteResponse = await deletePaymentToken(token);
     } catch (e) {
       log.error(
-        `deleteStoredPaymentMethod: failed, cartId: ${ctCart.id} — ${errorMessage(
-          e
-        )}${payPalDebugIdSuffix(e)}`
+        `failed, cartId: ${
+          ctCart.id
+        } — ${errorMessage(e)}${payPalDebugIdSuffix(e)}`
       );
       void this.logProcessorCustomerInteraction(
         customerId,
@@ -2378,7 +2434,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
       throw e;
     }
 
-    log.info(`deleteStoredPaymentMethod: success, cartId: ${ctCart.id}`);
+    log.info(`success, cartId: ${ctCart.id}`);
     void this.logProcessorCustomerInteraction(
       customerId,
       "deletePaymentToken",
@@ -2398,7 +2454,7 @@ export class PayPalPaymentService extends AbstractPaymentService {
         })
         .catch((e) =>
           log.warn(
-            `deleteStoredPaymentMethod: could not delete commercetools PaymentMethod record: ${errorMessage(
+            `could not delete commercetools PaymentMethod record: ${errorMessage(
               e
             )}`
           )

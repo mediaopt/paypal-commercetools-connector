@@ -182,6 +182,7 @@ export type OnApproveResponse = {
   /** Buyer redirect target built by the processor (see PAYPAL_ONAPPROVE_PREFIX/MERCHANT_RETURN_URL) — when
    * present, the enabler navigates there instead of showing the normal result UI. */
   merchantReturnUrl?: string;
+  ok?: boolean;
 };
 
 // PayPal Express only (both Authorize and Capture intent), gated by PAYPAL_REDIRECT_ON_APPROVE —
@@ -789,6 +790,7 @@ export type PayPalBrandButtonType = Extract<
 // Legacy — mirrors common-connect's PayPalSettings (the CT paypal-commercetools-connector/settings
 // custom object shape, read via getSettings()). Duplicated here rather than imported since the
 // enabler doesn't depend on common-connect — keep field names in sync with that type by hand.
+// The processor sends only these keys (PUBLIC_SETTINGS_KEYS in paypal-payment.service.ts), so keep both in sync.
 type PayPalLegacySettings = {
   merchantId: string;
   email: string;

@@ -256,8 +256,10 @@ export const PaymentProvider: FC<
     }
 
     let paymentVersion: number | undefined = createPaymentResult.version;
+    // Reachable in legacy mode only (processorUrls() has no client-token route), so the behaviour
+    // is kept as it was for backward compatibility: a failed fetch continues without a token
     if (getClientTokenUrl) {
-      const clientTokenResult = (await processorRequest<
+      const clientTokenResult = await processorRequest<
         ClientTokenRequest,
         ClientTokenResponse
       >(header, getClientTokenUrl, {
@@ -265,9 +267,9 @@ export const PaymentProvider: FC<
         paymentVersion: createPaymentResult.version,
         braintreeCustomerId: createPaymentResult.braintreeCustomerId,
         merchantAccountId: undefined,
-      })) as ClientTokenResponse;
-      setClientToken(clientTokenResult.clientToken);
-      paymentVersion = clientTokenResult.paymentVersion;
+      });
+      setClientToken(clientTokenResult?.clientToken ?? "");
+      paymentVersion = clientTokenResult?.paymentVersion;
     }
 
     setPaymentInfo({
@@ -379,9 +381,17 @@ export const PaymentProvider: FC<
             setRequestHeader(orderRequestHeader);
             // The current Payment belongs to the previous session
             orderPaymentId = "";
+          } else if (!requestHeader["X-Session-Id"]) {
+            // Without any session the processor refuses createPayment anyway — fail here with a clear reason
+            console.error(
+              "[paypal-enabler] PayPal Express: onPayButtonClick resolved without a sessionId and there is no current session."
+            );
+            throw new Error(t("interface.generalError"));
           } else {
+            // Checkout throws rather than resolve without a sessionId: reaching this means the enabler is driven
+            // without the commercetools Checkout SDK
             console.warn(
-              "[paypal-enabler] onPayButtonClick returned no sessionId — keeping the current session"
+              "PayPal Express: missing sessionId. Ensure that you either use the commercetools Checkout SDK or directly import the components."
             );
           }
           if (!orderPaymentId) {
@@ -659,12 +669,11 @@ export const PaymentProvider: FC<
           builderType,
         });
 
-        //@ts-ignore
-        if (onApproveResult.ok === false) {
+        // ok: false kept for self-hosted legacy backends that may still answer 200 with it
+        if (!onApproveResult || onApproveResult.ok === false) {
           throw new Error(t("payPal.generalError"));
         }
-        const { orderData, merchantReturnUrl } =
-          onApproveResult as OnApproveResponse;
+        const { orderData, merchantReturnUrl } = onApproveResult;
         if (merchantReturnUrl) {
           redirectTo(merchantReturnUrl);
           return;

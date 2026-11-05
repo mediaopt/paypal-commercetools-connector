@@ -1,4 +1,5 @@
-export const sessionHeader = (sessionId: string) => ({
+// No X-Session-Id without a session (PayPal Express before the merchant's session has a cart)
+export const sessionHeader = (sessionId?: string) => ({
   "Content-Type": "application/json",
-  "X-Session-Id": sessionId,
+  ...(sessionId && { "X-Session-Id": sessionId }),
 });

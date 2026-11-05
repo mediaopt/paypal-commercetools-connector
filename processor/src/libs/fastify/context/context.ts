@@ -9,6 +9,7 @@ import fp from "fastify-plugin";
 
 export type ContextData = {
   anonymousId?: string;
+  method?: string;
   customerId?: string;
   path?: string;
   pathTemplate?: string;
@@ -91,6 +92,7 @@ export const requestContextPlugin = fp(async (fastify: FastifyInstance) => {
   await fastify.register(fastifyRequestContext, {
     defaultStoreValues: (req: FastifyRequest) => ({
       request: {
+        method: req.method,
         path: req.url,
         pathTemplate: req.routeOptions.url,
         pathParams: req.params,

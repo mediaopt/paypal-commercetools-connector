@@ -36,15 +36,10 @@ export const makeRequest = <ResponseType, T>(
       if (!response.ok) {
         // A non-2xx response must actually reject here — otherwise it gets returned as if it
         // were a successful response body, since nothing downstream checks response.ok itself.
-        // The raw processor message is dev-facing only (console.log, not user-facing copy — see
-        // CLAUDE.md's i18n rule); throwing the body itself (not an Error) means every existing
+        // Throwing the body itself (not an Error) means every existing
         // `error instanceof Error ? error.message : t(...)` catch throughout the enabler falls
         // through to its own already-defined, translated fallback instead of surfacing this to
-        // the shopper via notify().
-        console.warn(
-          `Request to ${url} failed with status ${response.status}`,
-          body
-        );
+        // the shopper via notify(). Not logged here: processorRequest() logs the failure.
         throw body;
       }
       return body;

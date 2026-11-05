@@ -338,10 +338,16 @@ component reads them from the `cartInformation` prop.
 - The buyer can change the shipping address in the PayPal popup. In Checkout, shipping changes go
   through `POST {processorUrl}/payments/updateShipping`; in legacy mode register `onShippingChange`
   on the component instead.
-- Before a Payment exists, the button shows Checkout's `initialAmount`. Checkout must create the
-  cart in `onPayButtonClick`.
-- No Payment is created before the click: the session may have no cart yet. On click the button
-  calls `onPayButtonClick` and creates the Payment under the session it returns.
+- Before a Payment exists, the button shows Checkout's `initialAmount`.
+- The cart can be on the session before the button renders, or be created and linked to the
+  session by your `onPayButtonClick` hook (e.g. a product page or mini-cart button), see
+  [Express payments](https://docs.commercetools.com/checkout/browser-sdk#express-payments).
+  Without `onPayButtonClick`, the Payment is created when the button mounts. With it, the Payment
+  is only created after the click, under the session the hook returns, even if the session
+  already contains a valid cart. If you create a new cart inside `onPayButtonClick`, it is your
+  responsibility to bind it to the session.
+- Before the click the enabler may have no session at all; `GET /operations/config` works
+  without one.
 - Stored payment methods aren't supported for Express.
 
 ### Buyer redirect after approval (`merchantReturnUrl`)

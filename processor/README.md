@@ -42,7 +42,7 @@ The commercetools API client needs at least the following scopes (the health che
 
 | Endpoint                                   | Authentication                                           | Purpose                                              |
 | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------- |
-| `GET /operations/config`                   | session                                                  | settings, PayPal client id and script options for the enabler |
+| `GET /operations/config`                   | session, optional ([Express without a cart](https://docs.commercetools.com/checkout/browser-sdk#express-payments)) | public settings, PayPal client id and script options for the enabler |
 | `GET /operations/status`                   | JWT                                                      | health check                                         |
 | `GET /operations/payment-components`       | JWT                                                      | payment methods supported by the connector           |
 | `POST /operations/payment-intents/:id`     | OAuth2 (`manage_project`, `manage_checkout_payment_intents`) | Payment Intents API: capture, cancel, refund         |
